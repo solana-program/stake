@@ -3,21 +3,17 @@
 //! * keep track of rewards
 //! * own mining pools
 
-#[deprecated(
-    since = "1.8.0",
-    note = "Please use `solana_sdk::stake::state` or `solana_program::stake::state` instead"
-)]
-pub use solana_sdk::stake::state::*;
 use {
-    solana_program_runtime::{ic_msg, invoke_context::InvokeContext},
-    solana_sdk::{
+    solana_program::{
         account::{AccountSharedData, ReadableAccount, WritableAccount},
         account_utils::StateMut,
         clock::{Clock, Epoch},
         feature_set::{self, FeatureSet},
         instruction::{checked_add, InstructionError},
+        msg,
         pubkey::Pubkey,
         rent::Rent,
+        stake::state::*,
         stake::{
             instruction::{LockupArgs, StakeError},
             program::id,
@@ -28,8 +24,10 @@ use {
         transaction_context::{
             BorrowedAccount, IndexOfAccount, InstructionContext, TransactionContext,
         },
+        vote::program as solana_vote_program,
+        vote::state::{VoteState, VoteStateVersions},
     },
-    solana_vote_program::vote_state::{self, VoteState, VoteStateVersions},
+    solana_program_runtime::invoke_context::InvokeContext,
     std::{cmp::Ordering, collections::HashSet, convert::TryFrom},
 };
 
@@ -905,7 +903,7 @@ pub fn merge(
     let mut stake_account = instruction_context
         .try_borrow_instruction_account(transaction_context, stake_account_index)?;
 
-    ic_msg!(invoke_context, "Checking if destination stake is mergeable");
+    msg!("Checking if destination stake is mergeable");
     let stake_merge_kind = MergeKind::get_if_mergeable(
         invoke_context,
         &stake_account.get_state()?,
@@ -920,7 +918,7 @@ pub fn merge(
         .authorized
         .check(signers, StakeAuthorize::Staker)?;
 
-    ic_msg!(invoke_context, "Checking if source stake is mergeable");
+    msg!("Checking if source stake is mergeable");
     let source_merge_kind = MergeKind::get_if_mergeable(
         invoke_context,
         &source_account.get_state()?,
@@ -929,7 +927,7 @@ pub fn merge(
         stake_history,
     )?;
 
-    ic_msg!(invoke_context, "Merging stake accounts");
+    msg!("Merging stake accounts");
     if let Some(merged_state) = stake_merge_kind.merge(invoke_context, source_merge_kind, clock)? {
         stake_account.set_state(&merged_state, &invoke_context.feature_set)?;
     }
@@ -959,8 +957,7 @@ pub fn redelegate(
     let mut uninitialized_stake_account = instruction_context
         .try_borrow_instruction_account(transaction_context, uninitialized_stake_account_index)?;
     if *uninitialized_stake_account.get_owner() != id() {
-        ic_msg!(
-            invoke_context,
+        msg!(
             "expected uninitialized stake account owner to be {}, not {}",
             id(),
             *uninitialized_stake_account.get_owner()
@@ -968,8 +965,7 @@ pub fn redelegate(
         return Err(InstructionError::IncorrectProgramId);
     }
     if uninitialized_stake_account.get_data().len() != StakeStateV2::size_of() {
-        ic_msg!(
-            invoke_context,
+        msg!(
             "expected uninitialized stake account data len to be {}, not {}",
             StakeStateV2::size_of(),
             uninitialized_stake_account.get_data().len()
@@ -980,10 +976,7 @@ pub fn redelegate(
         uninitialized_stake_account.get_state()?,
         StakeStateV2::Uninitialized
     ) {
-        ic_msg!(
-            invoke_context,
-            "expected uninitialized stake account to be uninitialized",
-        );
+        msg!("expected uninitialized stake account to be uninitialized",);
         return Err(InstructionError::AccountAlreadyInitialized);
     }
 
@@ -991,8 +984,7 @@ pub fn redelegate(
     let vote_account = instruction_context
         .try_borrow_instruction_account(transaction_context, vote_account_index)?;
     if *vote_account.get_owner() != solana_vote_program::id() {
-        ic_msg!(
-            invoke_context,
+        msg!(
             "expected vote account owner to be {}, not {}",
             solana_vote_program::id(),
             *vote_account.get_owner()
@@ -1006,23 +998,20 @@ pub fn redelegate(
         if let StakeStateV2::Stake(meta, stake, _stake_flags) = stake_account.get_state()? {
             let status = get_stake_status(invoke_context, &stake, &clock)?;
             if status.effective == 0 || status.activating != 0 || status.deactivating != 0 {
-                ic_msg!(invoke_context, "stake is not active");
+                msg!("stake is not active");
                 return Err(StakeError::RedelegateTransientOrInactiveStake.into());
             }
 
             // Deny redelegating to the same vote account. This is nonsensical and could be used to
             // grief the global stake warm-up/cool-down rate
             if stake.delegation.voter_pubkey == vote_pubkey {
-                ic_msg!(
-                    invoke_context,
-                    "redelegating to the same vote account not permitted"
-                );
+                msg!("redelegating to the same vote account not permitted");
                 return Err(StakeError::RedelegateToSameVoteAccount.into());
             }
 
             (meta, status.effective)
         } else {
-            ic_msg!(invoke_context, "invalid stake account data",);
+            msg!("invalid stake account data",);
             return Err(InstructionError::InvalidAccountData);
         };
 
@@ -1398,7 +1387,7 @@ impl MergeKind {
                     (_, 0, 0) => Ok(Self::FullyActive(*meta, *stake)),
                     _ => {
                         let err = StakeError::MergeTransientStake;
-                        ic_msg!(invoke_context, "{}", err);
+                        msg!("{}", err);
                         Err(err.into())
                     }
                 }
@@ -1427,7 +1416,7 @@ impl MergeKind {
         if stake.authorized == source.authorized && can_merge_lockups {
             Ok(())
         } else {
-            ic_msg!(invoke_context, "Unable to merge due to metadata mismatch");
+            msg!("Unable to merge due to metadata mismatch");
             Err(StakeError::MergeMismatch.into())
         }
     }
@@ -1438,13 +1427,13 @@ impl MergeKind {
         source: &Delegation,
     ) -> Result<(), InstructionError> {
         if stake.voter_pubkey != source.voter_pubkey {
-            ic_msg!(invoke_context, "Unable to merge due to voter mismatch");
+            msg!("Unable to merge due to voter mismatch");
             Err(StakeError::MergeMismatch.into())
         } else if stake.deactivation_epoch == Epoch::MAX && source.deactivation_epoch == Epoch::MAX
         {
             Ok(())
         } else {
-            ic_msg!(invoke_context, "Unable to merge due to stake deactivation");
+            msg!("Unable to merge due to stake deactivation");
             Err(StakeError::MergeMismatch.into())
         }
     }
@@ -1771,7 +1760,10 @@ fn do_create_account(
 ) -> AccountSharedData {
     let mut stake_account = AccountSharedData::new(lamports, StakeStateV2::size_of(), &id());
 
-    let vote_state = vote_state::from(vote_account).expect("vote_state");
+    // XXX TODO FIXME this is tricky because i need to impl a bpf-friendly parser but also
+    // we dont have AccountSharedData in solana_program, so whatever calls this needs to change...
+    // probably going all the way up to the instruction interface definition
+    let vote_state = unimplemented!(); // vote_state::from(vote_account).expect("vote_state");
 
     let rent_exempt_reserve = rent.minimum_balance(stake_account.data().len());
 

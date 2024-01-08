@@ -7,11 +7,7 @@ use {
             withdraw,
         },
     },
-    log::*,
-    solana_program_runtime::{
-        declare_process_instruction, sysvar_cache::get_sysvar_with_account_check,
-    },
-    solana_sdk::{
+    solana_program::{
         feature_set,
         instruction::InstructionError,
         program_utils::limited_deserialize,
@@ -22,6 +18,10 @@ use {
             state::{Authorized, Lockup},
         },
         transaction_context::{IndexOfAccount, InstructionContext, TransactionContext},
+    },
+    // XXX needed? log::*,
+    solana_program_runtime::{
+        declare_process_instruction, sysvar_cache::get_sysvar_with_account_check,
     },
 };
 

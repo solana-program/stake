@@ -1,11 +1,6 @@
 #![cfg_attr(RUSTC_WITH_SPECIALIZATION, feature(min_specialization))]
 #![allow(clippy::arithmetic_side_effects)]
-#[deprecated(
-    since = "1.8.0",
-    note = "Please use `solana_sdk::stake::program::id` or `solana_program::stake::program::id` instead"
-)]
-pub use solana_sdk::stake::program::{check_id, id};
-use solana_sdk::{
+use solana_program::{
     feature_set::{self, FeatureSet},
     genesis_config::GenesisConfig,
     native_token::LAMPORTS_PER_SOL,
@@ -29,6 +24,6 @@ pub fn get_minimum_delegation(feature_set: &FeatureSet) -> u64 {
         MINIMUM_DELEGATION_SOL * LAMPORTS_PER_SOL
     } else {
         #[allow(deprecated)]
-        solana_sdk::stake::MINIMUM_STAKE_DELEGATION
+        solana_program::stake::MINIMUM_STAKE_DELEGATION
     }
 }
