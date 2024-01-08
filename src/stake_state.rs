@@ -4,11 +4,11 @@
 //! * own mining pools
 
 use {
+    crate::feature_set_die,
     solana_program::{
         account::{AccountSharedData, ReadableAccount, WritableAccount},
         account_utils::StateMut,
         clock::{Clock, Epoch},
-        feature_set::{self, FeatureSet},
         instruction::{checked_add, InstructionError},
         msg,
         pubkey::Pubkey,
@@ -126,10 +126,7 @@ fn redelegate_stake(
     let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch(invoke_context);
     // If stake is currently active:
     if stake.stake(clock.epoch, stake_history, new_rate_activation_epoch) != 0 {
-        let stake_lamports_ok = if invoke_context
-            .feature_set
-            .is_active(&feature_set::stake_redelegate_instruction::id())
-        {
+        let stake_lamports_ok = if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
             // When a stake account is redelegated, the delegated lamports from the source stake
             // account are transferred to a new stake account. Do not permit the deactivation of
             // the source stake account to be rescinded, by more generally requiring the delegation
@@ -476,7 +473,6 @@ pub fn initialize(
     authorized: &Authorized,
     lockup: &Lockup,
     rent: &Rent,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     if stake_account.get_data().len() != StakeStateV2::size_of() {
         return Err(InstructionError::InvalidAccountData);
@@ -491,7 +487,7 @@ pub fn initialize(
                     authorized: *authorized,
                     lockup: *lockup,
                 }),
-                feature_set,
+                feature_set_die!(),
             )
         } else {
             Err(InstructionError::InsufficientFunds)
@@ -511,7 +507,6 @@ pub fn authorize(
     stake_authorize: StakeAuthorize,
     clock: &Clock,
     custodian: Option<&Pubkey>,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     match stake_account.get_state()? {
         StakeStateV2::Stake(mut meta, stake, stake_flags) => {
@@ -521,7 +516,10 @@ pub fn authorize(
                 stake_authorize,
                 Some((&meta.lockup, clock, custodian)),
             )?;
-            stake_account.set_state(&StakeStateV2::Stake(meta, stake, stake_flags), feature_set)
+            stake_account.set_state(
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+                feature_set_die!(),
+            )
         }
         StakeStateV2::Initialized(mut meta) => {
             meta.authorized.authorize(
@@ -530,7 +528,7 @@ pub fn authorize(
                 stake_authorize,
                 Some((&meta.lockup, clock, custodian)),
             )?;
-            stake_account.set_state(&StakeStateV2::Initialized(meta), feature_set)
+            stake_account.set_state(&StakeStateV2::Initialized(meta), feature_set_die!())
         }
         _ => Err(InstructionError::InvalidAccountData),
     }
@@ -548,7 +546,6 @@ pub fn authorize_with_seed(
     stake_authorize: StakeAuthorize,
     clock: &Clock,
     custodian: Option<&Pubkey>,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     let mut signers = HashSet::default();
     if instruction_context.is_instruction_account_signer(authority_base_index)? {
@@ -569,7 +566,6 @@ pub fn authorize_with_seed(
         stake_authorize,
         clock,
         custodian,
-        feature_set,
     )
 }
 
@@ -583,7 +579,6 @@ pub fn delegate(
     clock: &Clock,
     stake_history: &StakeHistory,
     signers: &HashSet<Pubkey>,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     let vote_account = instruction_context
         .try_borrow_instruction_account(transaction_context, vote_account_index)?;
@@ -600,7 +595,7 @@ pub fn delegate(
         StakeStateV2::Initialized(meta) => {
             meta.authorized.check(signers, StakeAuthorize::Staker)?;
             let ValidatedDelegatedInfo { stake_amount } =
-                validate_delegated_amount(&stake_account, &meta, feature_set)?;
+                validate_delegated_amount(&stake_account, &meta)?;
             let stake = new_stake(
                 stake_amount,
                 &vote_pubkey,
@@ -609,13 +604,13 @@ pub fn delegate(
             );
             stake_account.set_state(
                 &StakeStateV2::Stake(meta, stake, StakeFlags::empty()),
-                feature_set,
+                feature_set_die!(),
             )
         }
         StakeStateV2::Stake(meta, mut stake, stake_flags) => {
             meta.authorized.check(signers, StakeAuthorize::Staker)?;
             let ValidatedDelegatedInfo { stake_amount } =
-                validate_delegated_amount(&stake_account, &meta, feature_set)?;
+                validate_delegated_amount(&stake_account, &meta)?;
             redelegate_stake(
                 invoke_context,
                 &mut stake,
@@ -625,7 +620,10 @@ pub fn delegate(
                 clock,
                 stake_history,
             )?;
-            stake_account.set_state(&StakeStateV2::Stake(meta, stake, stake_flags), feature_set)
+            stake_account.set_state(
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+                feature_set_die!(),
+            )
         }
         _ => Err(InstructionError::InvalidAccountData),
     }
@@ -637,10 +635,7 @@ fn deactivate_stake(
     stake_flags: &mut StakeFlags,
     epoch: Epoch,
 ) -> Result<(), InstructionError> {
-    if invoke_context
-        .feature_set
-        .is_active(&feature_set::stake_redelegate_instruction::id())
-    {
+    if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
         if stake_flags.contains(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED) {
             let stake_history = invoke_context.get_sysvar_cache().get_stake_history()?;
             // when MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED flag is set on stake_flags,
@@ -683,7 +678,7 @@ pub fn deactivate(
         deactivate_stake(invoke_context, &mut stake, &mut stake_flags, clock.epoch)?;
         stake_account.set_state(
             &StakeStateV2::Stake(meta, stake, stake_flags),
-            &invoke_context.feature_set,
+            feature_set_die!(),
         )
     } else {
         Err(InstructionError::InvalidAccountData)
@@ -695,16 +690,18 @@ pub fn set_lockup(
     lockup: &LockupArgs,
     signers: &HashSet<Pubkey>,
     clock: &Clock,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     match stake_account.get_state()? {
         StakeStateV2::Initialized(mut meta) => {
             meta.set_lockup(lockup, signers, clock)?;
-            stake_account.set_state(&StakeStateV2::Initialized(meta), feature_set)
+            stake_account.set_state(&StakeStateV2::Initialized(meta), feature_set_die!())
         }
         StakeStateV2::Stake(mut meta, stake, stake_flags) => {
             meta.set_lockup(lockup, signers, clock)?;
-            stake_account.set_state(&StakeStateV2::Stake(meta, stake, stake_flags), feature_set)
+            stake_account.set_state(
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+                feature_set_die!(),
+            )
         }
         _ => Err(InstructionError::InvalidAccountData),
     }
@@ -743,11 +740,8 @@ pub fn split(
     match stake_state {
         StakeStateV2::Stake(meta, mut stake, stake_flags) => {
             meta.authorized.check(signers, StakeAuthorize::Staker)?;
-            let minimum_delegation = crate::get_minimum_delegation(&invoke_context.feature_set);
-            let is_active = if invoke_context
-                .feature_set
-                .is_active(&feature_set::require_rent_exempt_split_destination::id())
-            {
+            let minimum_delegation = crate::get_minimum_delegation();
+            let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
                 let clock = invoke_context.get_sysvar_cache().get_clock()?;
                 let status = get_stake_status(invoke_context, &stake, &clock)?;
                 status.effective > 0
@@ -815,14 +809,14 @@ pub fn split(
                 .try_borrow_instruction_account(transaction_context, stake_account_index)?;
             stake_account.set_state(
                 &StakeStateV2::Stake(meta, stake, stake_flags),
-                &invoke_context.feature_set,
+                feature_set_die!(),
             )?;
             drop(stake_account);
             let mut split = instruction_context
                 .try_borrow_instruction_account(transaction_context, split_index)?;
             split.set_state(
                 &StakeStateV2::Stake(split_meta, split_stake, stake_flags),
-                &invoke_context.feature_set,
+                feature_set_die!(),
             )?;
         }
         StakeStateV2::Initialized(meta) => {
@@ -842,10 +836,7 @@ pub fn split(
             split_meta.rent_exempt_reserve = validated_split_info.destination_rent_exempt_reserve;
             let mut split = instruction_context
                 .try_borrow_instruction_account(transaction_context, split_index)?;
-            split.set_state(
-                &StakeStateV2::Initialized(split_meta),
-                &invoke_context.feature_set,
-            )?;
+            split.set_state(&StakeStateV2::Initialized(split_meta), feature_set_die!())?;
         }
         StakeStateV2::Uninitialized => {
             let stake_pubkey = transaction_context.get_key_of_account_at_index(
@@ -863,17 +854,17 @@ pub fn split(
     let mut stake_account = instruction_context
         .try_borrow_instruction_account(transaction_context, stake_account_index)?;
     if lamports == stake_account.get_lamports() {
-        stake_account.set_state(&StakeStateV2::Uninitialized, &invoke_context.feature_set)?;
+        stake_account.set_state(&StakeStateV2::Uninitialized, feature_set_die!())?;
     }
     drop(stake_account);
 
     let mut split =
         instruction_context.try_borrow_instruction_account(transaction_context, split_index)?;
-    split.checked_add_lamports(lamports, &invoke_context.feature_set)?;
+    split.checked_add_lamports(lamports, feature_set_die!())?;
     drop(split);
     let mut stake_account = instruction_context
         .try_borrow_instruction_account(transaction_context, stake_account_index)?;
-    stake_account.checked_sub_lamports(lamports, &invoke_context.feature_set)?;
+    stake_account.checked_sub_lamports(lamports, feature_set_die!())?;
     Ok(())
 }
 
@@ -929,16 +920,16 @@ pub fn merge(
 
     msg!("Merging stake accounts");
     if let Some(merged_state) = stake_merge_kind.merge(invoke_context, source_merge_kind, clock)? {
-        stake_account.set_state(&merged_state, &invoke_context.feature_set)?;
+        stake_account.set_state(&merged_state, feature_set_die!())?;
     }
 
     // Source is about to be drained, deinitialize its state
-    source_account.set_state(&StakeStateV2::Uninitialized, &invoke_context.feature_set)?;
+    source_account.set_state(&StakeStateV2::Uninitialized, feature_set_die!())?;
 
     // Drain the source stake account
     let lamports = source_account.get_lamports();
-    source_account.checked_sub_lamports(lamports, &invoke_context.feature_set)?;
-    stake_account.checked_add_lamports(lamports, &invoke_context.feature_set)?;
+    source_account.checked_sub_lamports(lamports, feature_set_die!())?;
+    stake_account.checked_add_lamports(lamports, feature_set_die!())?;
     Ok(())
 }
 
@@ -1021,9 +1012,8 @@ pub fn redelegate(
     deactivate(invoke_context, stake_account, &clock, signers)?;
 
     // transfer the effective stake to the uninitialized stake account
-    stake_account.checked_sub_lamports(effective_stake, &invoke_context.feature_set)?;
-    uninitialized_stake_account
-        .checked_add_lamports(effective_stake, &invoke_context.feature_set)?;
+    stake_account.checked_sub_lamports(effective_stake, feature_set_die!())?;
+    uninitialized_stake_account.checked_add_lamports(effective_stake, feature_set_die!())?;
 
     // initialize and schedule `uninitialized_stake_account` for activation
     let sysvar_cache = invoke_context.get_sysvar_cache();
@@ -1032,11 +1022,8 @@ pub fn redelegate(
     uninitialized_stake_meta.rent_exempt_reserve =
         rent.minimum_balance(uninitialized_stake_account.get_data().len());
 
-    let ValidatedDelegatedInfo { stake_amount } = validate_delegated_amount(
-        &uninitialized_stake_account,
-        &uninitialized_stake_meta,
-        &invoke_context.feature_set,
-    )?;
+    let ValidatedDelegatedInfo { stake_amount } =
+        validate_delegated_amount(&uninitialized_stake_account, &uninitialized_stake_meta)?;
     uninitialized_stake_account.set_state(
         &StakeStateV2::Stake(
             uninitialized_stake_meta,
@@ -1048,7 +1035,7 @@ pub fn redelegate(
             ),
             StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED,
         ),
-        &invoke_context.feature_set,
+        feature_set_die!(),
     )?;
 
     Ok(())
@@ -1066,7 +1053,6 @@ pub fn withdraw(
     withdraw_authority_index: IndexOfAccount,
     custodian_index: Option<IndexOfAccount>,
     new_rate_activation_epoch: Option<Epoch>,
-    feature_set: &FeatureSet,
 ) -> Result<(), InstructionError> {
     let withdraw_authority_pubkey = transaction_context.get_key_of_account_at_index(
         instruction_context
@@ -1151,14 +1137,14 @@ pub fn withdraw(
 
     // Deinitialize state upon zero balance
     if lamports == stake_account.get_lamports() {
-        stake_account.set_state(&StakeStateV2::Uninitialized, feature_set)?;
+        stake_account.set_state(&StakeStateV2::Uninitialized, feature_set_die!())?;
     }
 
-    stake_account.checked_sub_lamports(lamports, feature_set)?;
+    stake_account.checked_sub_lamports(lamports, feature_set_die!())?;
     drop(stake_account);
     let mut to =
         instruction_context.try_borrow_instruction_account(transaction_context, to_index)?;
-    to.checked_add_lamports(lamports, feature_set)?;
+    to.checked_add_lamports(lamports, feature_set_die!())?;
     Ok(())
 }
 
@@ -1208,7 +1194,7 @@ pub(crate) fn deactivate_delinquent(
             deactivate_stake(invoke_context, &mut stake, &mut stake_flags, current_epoch)?;
             stake_account.set_state(
                 &StakeStateV2::Stake(meta, stake, stake_flags),
-                &invoke_context.feature_set,
+                feature_set_die!(),
             )
         } else {
             Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into())
@@ -1229,7 +1215,6 @@ struct ValidatedDelegatedInfo {
 fn validate_delegated_amount(
     account: &BorrowedAccount,
     meta: &Meta,
-    feature_set: &FeatureSet,
 ) -> Result<ValidatedDelegatedInfo, InstructionError> {
     let stake_amount = account
         .get_lamports()
@@ -1237,7 +1222,7 @@ fn validate_delegated_amount(
 
     // Stake accounts may be initialized with a stake amount below the minimum delegation so check
     // that the minimum is met before delegation.
-    if stake_amount < crate::get_minimum_delegation(feature_set) {
+    if stake_amount < crate::get_minimum_delegation() {
         return Err(StakeError::InsufficientDelegation.into());
     }
     Ok(ValidatedDelegatedInfo { stake_amount })
@@ -1312,9 +1297,7 @@ fn validate_split_amount(
     // these criteria must be met:
     // 1. the destination account must be prefunded with at least the rent-exempt reserve, or
     // 2. the split must consume 100% of the source
-    if invoke_context
-        .feature_set
-        .is_active(&feature_set::require_rent_exempt_split_destination::id())
+    if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION
         && source_is_active
         && source_remaining_balance != 0
         && destination_lamports < destination_rent_exempt_reserve

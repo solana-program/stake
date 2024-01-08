@@ -4,7 +4,6 @@ use {
         merge, new_warmup_cooldown_rate_epoch, redelegate, set_lockup, split, withdraw,
     },
     solana_program::{
-        feature_set,
         instruction::InstructionError,
         program_utils::limited_deserialize,
         pubkey::Pubkey,
@@ -69,13 +68,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
         Ok(StakeInstruction::Initialize(authorized, lockup)) => {
             let mut me = get_stake_account()?;
             let rent = get_sysvar_with_account_check::rent(invoke_context, instruction_context, 1)?;
-            initialize(
-                &mut me,
-                &authorized,
-                &lockup,
-                &rent,
-                &invoke_context.feature_set,
-            )
+            initialize(&mut me, &authorized, &lockup, &rent)
         }
         Ok(StakeInstruction::Authorize(authorized_pubkey, stake_authorize)) => {
             let mut me = get_stake_account()?;
@@ -92,7 +85,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 stake_authorize,
                 &clock,
                 custodian_pubkey,
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::AuthorizeWithSeed(args)) => {
@@ -114,7 +106,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 args.stake_authorize,
                 &clock,
                 custodian_pubkey,
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::DelegateStake) => {
@@ -129,10 +120,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
             )?;
             instruction_context.check_number_of_instruction_accounts(5)?;
             drop(me);
-            if !invoke_context
-                .feature_set
-                .is_active(&feature_set::reduce_stake_warmup_cooldown::id())
-            {
+            if !crate::FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN {
                 // XXX REMOVED config check
             }
             delegate(
@@ -144,7 +132,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 &clock,
                 &stake_history,
                 &signers,
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::Split(lamports)) => {
@@ -210,7 +197,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                     None
                 },
                 new_warmup_cooldown_rate_epoch(invoke_context),
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::Deactivate) => {
@@ -222,13 +208,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
         Ok(StakeInstruction::SetLockup(lockup)) => {
             let mut me = get_stake_account()?;
             let clock = invoke_context.get_sysvar_cache().get_clock()?;
-            set_lockup(
-                &mut me,
-                &lockup,
-                &signers,
-                &clock,
-                &invoke_context.feature_set,
-            )
+            set_lockup(&mut me, &lockup, &signers, &clock)
         }
         Ok(StakeInstruction::InitializeChecked) => {
             let mut me = get_stake_account()?;
@@ -249,13 +229,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
             };
 
             let rent = get_sysvar_with_account_check::rent(invoke_context, instruction_context, 1)?;
-            initialize(
-                &mut me,
-                &authorized,
-                &Lockup::default(),
-                &rent,
-                &invoke_context.feature_set,
-            )
+            initialize(&mut me, &authorized, &Lockup::default(), &rent)
         }
         Ok(StakeInstruction::AuthorizeChecked(stake_authorize)) => {
             let mut me = get_stake_account()?;
@@ -278,7 +252,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 stake_authorize,
                 &clock,
                 custodian_pubkey,
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::AuthorizeCheckedWithSeed(args)) => {
@@ -307,7 +280,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 args.stake_authorize,
                 &clock,
                 custodian_pubkey,
-                &invoke_context.feature_set,
             )
         }
         Ok(StakeInstruction::SetLockupChecked(lockup_checked)) => {
@@ -321,17 +293,10 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 custodian: custodian_pubkey.cloned(),
             };
             let clock = invoke_context.get_sysvar_cache().get_clock()?;
-            set_lockup(
-                &mut me,
-                &lockup,
-                &signers,
-                &clock,
-                &invoke_context.feature_set,
-            )
+            set_lockup(&mut me, &lockup, &signers, &clock)
         }
         Ok(StakeInstruction::GetMinimumDelegation) => {
-            let feature_set = invoke_context.feature_set.as_ref();
-            let minimum_delegation = crate::get_minimum_delegation(feature_set);
+            let minimum_delegation = crate::get_minimum_delegation();
             let minimum_delegation = Vec::from(minimum_delegation.to_le_bytes());
             invoke_context
                 .transaction_context
@@ -354,15 +319,9 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
         }
         Ok(StakeInstruction::Redelegate) => {
             let mut me = get_stake_account()?;
-            if invoke_context
-                .feature_set
-                .is_active(&feature_set::stake_redelegate_instruction::id())
-            {
+            if FEATURE_STAKE_REDELEGATE_INSTRUCTION {
                 instruction_context.check_number_of_instruction_accounts(3)?;
-                if !invoke_context
-                    .feature_set
-                    .is_active(&feature_set::reduce_stake_warmup_cooldown::id())
-                {
+                if FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN {
                     // XXX REMOVED config check
                 }
                 redelegate(
