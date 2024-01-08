@@ -14,9 +14,7 @@ use {
         },
         transaction_context::{IndexOfAccount, InstructionContext, TransactionContext},
     },
-    solana_program_runtime::{
-        declare_process_instruction, sysvar_cache::get_sysvar_with_account_check,
-    },
+    solana_program_runtime::declare_process_instruction,
 };
 
 fn get_optional_pubkey<'a>(
@@ -66,14 +64,10 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
     match limited_deserialize(data) {
         Ok(StakeInstruction::Initialize(authorized, lockup)) => {
             let mut me = get_stake_account()?;
-            let rent = get_sysvar_with_account_check::rent(invoke_context, instruction_context, 1)?;
-            initialize(&mut me, &authorized, &lockup, &rent)
+            initialize(&mut me, &authorized, &lockup)
         }
         Ok(StakeInstruction::Authorize(authorized_pubkey, stake_authorize)) => {
             let mut me = get_stake_account()?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 1)?;
-            instruction_context.check_number_of_instruction_accounts(3)?;
             let custodian_pubkey =
                 get_optional_pubkey(transaction_context, instruction_context, 3, false)?;
 
@@ -82,15 +76,12 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 &signers,
                 &authorized_pubkey,
                 stake_authorize,
-                &clock,
                 custodian_pubkey,
             )
         }
         Ok(StakeInstruction::AuthorizeWithSeed(args)) => {
             let mut me = get_stake_account()?;
             instruction_context.check_number_of_instruction_accounts(2)?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
             let custodian_pubkey =
                 get_optional_pubkey(transaction_context, instruction_context, 3, false)?;
 
@@ -103,34 +94,17 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 &args.authority_owner,
                 &args.new_authorized_pubkey,
                 args.stake_authorize,
-                &clock,
                 custodian_pubkey,
             )
         }
         Ok(StakeInstruction::DelegateStake) => {
             let me = get_stake_account()?;
             instruction_context.check_number_of_instruction_accounts(2)?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
-            let stake_history = get_sysvar_with_account_check::stake_history(
-                invoke_context,
-                instruction_context,
-                3,
-            )?;
-            instruction_context.check_number_of_instruction_accounts(5)?;
             drop(me);
             if !crate::FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN {
                 // XXX REMOVED config check
             }
-            delegate(
-                transaction_context,
-                instruction_context,
-                0,
-                1,
-                &clock,
-                &stake_history,
-                &signers,
-            )
+            delegate(transaction_context, instruction_context, 0, 1, &signers)
         }
         Ok(StakeInstruction::Split(lamports)) => {
             let me = get_stake_account()?;
@@ -148,35 +122,12 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
         Ok(StakeInstruction::Merge) => {
             let me = get_stake_account()?;
             instruction_context.check_number_of_instruction_accounts(2)?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
-            let stake_history = get_sysvar_with_account_check::stake_history(
-                invoke_context,
-                instruction_context,
-                3,
-            )?;
             drop(me);
-            merge(
-                transaction_context,
-                instruction_context,
-                0,
-                1,
-                &clock,
-                &stake_history,
-                &signers,
-            )
+            merge(transaction_context, instruction_context, 0, 1, &signers)
         }
         Ok(StakeInstruction::Withdraw(lamports)) => {
             let me = get_stake_account()?;
             instruction_context.check_number_of_instruction_accounts(2)?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
-            let stake_history = get_sysvar_with_account_check::stake_history(
-                invoke_context,
-                instruction_context,
-                3,
-            )?;
-            instruction_context.check_number_of_instruction_accounts(5)?;
             drop(me);
             withdraw(
                 transaction_context,
@@ -184,9 +135,8 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 0,
                 lamports,
                 1,
-                &clock,
-                &stake_history,
                 4,
+                // XXX this is wrong now (we will delete all this anyway)
                 if instruction_context.get_number_of_instruction_accounts() >= 6 {
                     Some(5)
                 } else {
@@ -197,9 +147,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
         }
         Ok(StakeInstruction::Deactivate) => {
             let mut me = get_stake_account()?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 1)?;
-            deactivate(&mut me, &clock, &signers)
+            deactivate(&mut me, &signers)
         }
         Ok(StakeInstruction::SetLockup(lockup)) => {
             let mut me = get_stake_account()?;
@@ -224,14 +172,11 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 withdrawer: *withdrawer_pubkey,
             };
 
-            let rent = get_sysvar_with_account_check::rent(invoke_context, instruction_context, 1)?;
-            initialize(&mut me, &authorized, &Lockup::default(), &rent)
+            initialize(&mut me, &authorized, &Lockup::default())
         }
         Ok(StakeInstruction::AuthorizeChecked(stake_authorize)) => {
             let mut me = get_stake_account()?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 1)?;
-            instruction_context.check_number_of_instruction_accounts(4)?;
+            // XXX these indexes wrong too
             let authorized_pubkey = transaction_context.get_key_of_account_at_index(
                 instruction_context.get_index_of_instruction_account_in_transaction(3)?,
             )?;
@@ -246,16 +191,13 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 &signers,
                 authorized_pubkey,
                 stake_authorize,
-                &clock,
                 custodian_pubkey,
             )
         }
         Ok(StakeInstruction::AuthorizeCheckedWithSeed(args)) => {
             let mut me = get_stake_account()?;
             instruction_context.check_number_of_instruction_accounts(2)?;
-            let clock =
-                get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
-            instruction_context.check_number_of_instruction_accounts(4)?;
+            // XXX wrong too
             let authorized_pubkey = transaction_context.get_key_of_account_at_index(
                 instruction_context.get_index_of_instruction_account_in_transaction(3)?,
             )?;
@@ -274,7 +216,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 &args.authority_owner,
                 authorized_pubkey,
                 args.stake_authorize,
-                &clock,
                 custodian_pubkey,
             )
         }

@@ -472,8 +472,8 @@ pub fn initialize(
     stake_account: &mut BorrowedAccount,
     authorized: &Authorized,
     lockup: &Lockup,
-    rent: &Rent,
 ) -> Result<(), InstructionError> {
+    let rent = Rent::get()?;
     if stake_account.get_data().len() != StakeStateV2::size_of() {
         return Err(InstructionError::InvalidAccountData);
     }
@@ -505,9 +505,9 @@ pub fn authorize(
     signers: &HashSet<Pubkey>,
     new_authority: &Pubkey,
     stake_authorize: StakeAuthorize,
-    clock: &Clock,
     custodian: Option<&Pubkey>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
     match stake_account.get_state()? {
         StakeStateV2::Stake(mut meta, stake, stake_flags) => {
             meta.authorized.authorize(
@@ -544,9 +544,9 @@ pub fn authorize_with_seed(
     authority_owner: &Pubkey,
     new_authority: &Pubkey,
     stake_authorize: StakeAuthorize,
-    clock: &Clock,
     custodian: Option<&Pubkey>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
     let mut signers = HashSet::default();
     if instruction_context.is_instruction_account_signer(authority_base_index)? {
         let base_pubkey = transaction_context.get_key_of_account_at_index(
@@ -575,10 +575,10 @@ pub fn delegate(
     instruction_context: &InstructionContext,
     stake_account_index: IndexOfAccount,
     vote_account_index: IndexOfAccount,
-    clock: &Clock,
-    stake_history: &StakeHistory,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
+    let stake_history = stake_history_die!();
     let vote_account = instruction_context
         .try_borrow_instruction_account(transaction_context, vote_account_index)?;
     if *vote_account.get_owner() != solana_vote_program::id() {
@@ -615,8 +615,6 @@ pub fn delegate(
                 stake_amount,
                 &vote_pubkey,
                 &vote_state?.convert_to_current(),
-                clock,
-                stake_history,
             )?;
             stake_account.set_state(
                 &StakeStateV2::Stake(meta, stake, stake_flags),
@@ -666,9 +664,9 @@ fn deactivate_stake(
 
 pub fn deactivate(
     stake_account: &mut BorrowedAccount,
-    clock: &Clock,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
     if let StakeStateV2::Stake(meta, mut stake, mut stake_flags) = stake_account.get_state()? {
         meta.authorized.check(signers, StakeAuthorize::Staker)?;
         deactivate_stake(&mut stake, &mut stake_flags, clock.epoch)?;
@@ -685,8 +683,8 @@ pub fn set_lockup(
     stake_account: &mut BorrowedAccount,
     lockup: &LockupArgs,
     signers: &HashSet<Pubkey>,
-    clock: &Clock,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
     match stake_account.get_state()? {
         StakeStateV2::Initialized(mut meta) => {
             meta.set_lockup(lockup, signers, clock)?;
@@ -866,10 +864,10 @@ pub fn merge(
     instruction_context: &InstructionContext,
     stake_account_index: IndexOfAccount,
     source_account_index: IndexOfAccount,
-    clock: &Clock,
-    stake_history: &StakeHistory,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
+    let stake_history = stake_history_die!();
     let mut source_account = instruction_context
         .try_borrow_instruction_account(transaction_context, source_account_index)?;
     // Ensure source isn't spoofed
@@ -1036,12 +1034,12 @@ pub fn withdraw(
     stake_account_index: IndexOfAccount,
     lamports: u64,
     to_index: IndexOfAccount,
-    clock: &Clock,
-    stake_history: &StakeHistory,
     withdraw_authority_index: IndexOfAccount,
     custodian_index: Option<IndexOfAccount>,
     new_rate_activation_epoch: Option<Epoch>,
 ) -> Result<(), InstructionError> {
+    let clock = Clock::get()?;
+    let stake_history = stake_history_die!();
     let withdraw_authority_pubkey = transaction_context.get_key_of_account_at_index(
         instruction_context
             .get_index_of_instruction_account_in_transaction(withdraw_authority_index)?,
