@@ -1,11 +1,7 @@
 use {
-    crate::{
-        config,
-        stake_state::{
-            authorize, authorize_with_seed, deactivate, deactivate_delinquent, delegate,
-            initialize, merge, new_warmup_cooldown_rate_epoch, redelegate, set_lockup, split,
-            withdraw,
-        },
+    crate::stake_state::{
+        authorize, authorize_with_seed, deactivate, deactivate_delinquent, delegate, initialize,
+        merge, new_warmup_cooldown_rate_epoch, redelegate, set_lockup, split, withdraw,
     },
     solana_program::{
         feature_set,
@@ -137,14 +133,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 .feature_set
                 .is_active(&feature_set::reduce_stake_warmup_cooldown::id())
             {
-                // Post feature activation, remove both the feature gate code and the config completely in the interface
-                let config_account =
-                    instruction_context.try_borrow_instruction_account(transaction_context, 4)?;
-                #[allow(deprecated)]
-                if !config::check_id(config_account.get_key()) {
-                    return Err(InstructionError::InvalidArgument);
-                }
-                config::from(&config_account).ok_or(InstructionError::InvalidArgument)?;
+                // XXX REMOVED config check
             }
             delegate(
                 invoke_context,
@@ -374,14 +363,7 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                     .feature_set
                     .is_active(&feature_set::reduce_stake_warmup_cooldown::id())
                 {
-                    // Post feature activation, remove both the feature gate code and the config completely in the interface
-                    let config_account = instruction_context
-                        .try_borrow_instruction_account(transaction_context, 3)?;
-                    #[allow(deprecated)]
-                    if !config::check_id(config_account.get_key()) {
-                        return Err(InstructionError::InvalidArgument);
-                    }
-                    config::from(&config_account).ok_or(InstructionError::InvalidArgument)?;
+                    // XXX REMOVED config check
                 }
                 redelegate(
                     invoke_context,

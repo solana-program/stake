@@ -2,17 +2,11 @@
 #![allow(clippy::arithmetic_side_effects)]
 use solana_program::{
     feature_set::{self, FeatureSet},
-    genesis_config::GenesisConfig,
     native_token::LAMPORTS_PER_SOL,
 };
 
-pub mod config;
 pub mod stake_instruction;
 pub mod stake_state;
-
-pub fn add_genesis_accounts(genesis_config: &mut GenesisConfig) -> u64 {
-    config::add_genesis_account(genesis_config)
-}
 
 /// The minimum stake amount that can be delegated, in lamports.
 /// NOTE: This is also used to calculate the minimum balance of a stake account, which is the
