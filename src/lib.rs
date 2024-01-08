@@ -13,6 +13,14 @@ macro_rules! feature_set_die {
     };
 }
 
+// XXX placeholder for stake_history
+#[macro_export]
+macro_rules! stake_history_die {
+    () => {
+        panic!("stake_history not supported")
+    };
+}
+
 // XXX placeholders for features
 const FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL: bool = false;
 const FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN: bool = false;

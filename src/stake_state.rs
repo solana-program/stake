@@ -4,7 +4,7 @@
 //! * own mining pools
 
 use {
-    crate::feature_set_die,
+    crate::{feature_set_die, stake_history_die},
     solana_program::{
         account::{AccountSharedData, ReadableAccount, WritableAccount},
         account_utils::StateMut,
@@ -27,7 +27,6 @@ use {
         vote::program as solana_vote_program,
         vote::state::{VoteState, VoteStateVersions},
     },
-    solana_program_runtime::invoke_context::InvokeContext,
     std::{cmp::Ordering, collections::HashSet, convert::TryFrom},
 };
 
@@ -91,31 +90,32 @@ pub fn meta_from(account: &AccountSharedData) -> Option<Meta> {
     from(account).and_then(|state: StakeStateV2| state.meta())
 }
 
-pub(crate) fn new_warmup_cooldown_rate_epoch(invoke_context: &InvokeContext) -> Option<Epoch> {
-    let epoch_schedule = invoke_context
-        .get_sysvar_cache()
-        .get_epoch_schedule()
-        .unwrap();
-    invoke_context
-        .feature_set
-        .new_warmup_cooldown_rate_epoch(epoch_schedule.as_ref())
+// XXX this calls a feature_set.rs function `new_warmup_cooldown_rate_epoch`
+// which... gets the slot that `reduce_stake_warmup_cooldown` was activated at
+// and then passes the slot to `epoch_schedule.get_epoch()`. so uh. ok it does exactly what it says
+// its a Option<Epoch> and gets passed into various stake functions
+// get activating/deactivating, calculate rewards, etc
+//
+// ok so that means if the feature isnt active we return None. easy
+// if the feature *is* active then its tricky if we dont have access to the featureset
+// EpochSchedule has a sysvar get impl but we would need to... hardcode the epochs for the networks? idk
+pub(crate) fn new_warmup_cooldown_rate_epoch() -> Option<Epoch> {
+    None
 }
 
 fn get_stake_status(
-    invoke_context: &InvokeContext,
     stake: &Stake,
     clock: &Clock,
 ) -> Result<StakeActivationStatus, InstructionError> {
-    let stake_history = invoke_context.get_sysvar_cache().get_stake_history()?;
+    let stake_history = stake_history_die!();
     Ok(stake.delegation.stake_activating_and_deactivating(
         clock.epoch,
         &stake_history,
-        new_warmup_cooldown_rate_epoch(invoke_context),
+        new_warmup_cooldown_rate_epoch(),
     ))
 }
 
 fn redelegate_stake(
-    invoke_context: &InvokeContext,
     stake: &mut Stake,
     stake_lamports: u64,
     voter_pubkey: &Pubkey,
@@ -123,7 +123,7 @@ fn redelegate_stake(
     clock: &Clock,
     stake_history: &StakeHistory,
 ) -> Result<(), StakeError> {
-    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch(invoke_context);
+    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
     // If stake is currently active:
     if stake.stake(clock.epoch, stake_history, new_rate_activation_epoch) != 0 {
         let stake_lamports_ok = if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
@@ -571,7 +571,6 @@ pub fn authorize_with_seed(
 
 #[allow(clippy::too_many_arguments)]
 pub fn delegate(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     stake_account_index: IndexOfAccount,
@@ -612,7 +611,6 @@ pub fn delegate(
             let ValidatedDelegatedInfo { stake_amount } =
                 validate_delegated_amount(&stake_account, &meta)?;
             redelegate_stake(
-                invoke_context,
                 &mut stake,
                 stake_amount,
                 &vote_pubkey,
@@ -630,20 +628,19 @@ pub fn delegate(
 }
 
 fn deactivate_stake(
-    invoke_context: &InvokeContext,
     stake: &mut Stake,
     stake_flags: &mut StakeFlags,
     epoch: Epoch,
 ) -> Result<(), InstructionError> {
     if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
         if stake_flags.contains(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED) {
-            let stake_history = invoke_context.get_sysvar_cache().get_stake_history()?;
+            let stake_history = stake_history_die!();
             // when MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED flag is set on stake_flags,
             // deactivation is only permitted when the stake delegation activating amount is zero.
             let status = stake.delegation.stake_activating_and_deactivating(
                 epoch,
                 &stake_history,
-                new_warmup_cooldown_rate_epoch(invoke_context),
+                new_warmup_cooldown_rate_epoch(),
             );
             if status.activating != 0 {
                 Err(InstructionError::from(
@@ -668,14 +665,13 @@ fn deactivate_stake(
 }
 
 pub fn deactivate(
-    invoke_context: &InvokeContext,
     stake_account: &mut BorrowedAccount,
     clock: &Clock,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
     if let StakeStateV2::Stake(meta, mut stake, mut stake_flags) = stake_account.get_state()? {
         meta.authorized.check(signers, StakeAuthorize::Staker)?;
-        deactivate_stake(invoke_context, &mut stake, &mut stake_flags, clock.epoch)?;
+        deactivate_stake(&mut stake, &mut stake_flags, clock.epoch)?;
         stake_account.set_state(
             &StakeStateV2::Stake(meta, stake, stake_flags),
             feature_set_die!(),
@@ -708,7 +704,6 @@ pub fn set_lockup(
 }
 
 pub fn split(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     stake_account_index: IndexOfAccount,
@@ -742,14 +737,13 @@ pub fn split(
             meta.authorized.check(signers, StakeAuthorize::Staker)?;
             let minimum_delegation = crate::get_minimum_delegation();
             let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
-                let clock = invoke_context.get_sysvar_cache().get_clock()?;
-                let status = get_stake_status(invoke_context, &stake, &clock)?;
+                let clock = Clock::get()?;
+                let status = get_stake_status(&stake, &clock)?;
                 status.effective > 0
             } else {
                 false
             };
             let validated_split_info = validate_split_amount(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 stake_account_index,
@@ -822,7 +816,6 @@ pub fn split(
         StakeStateV2::Initialized(meta) => {
             meta.authorized.check(signers, StakeAuthorize::Staker)?;
             let validated_split_info = validate_split_amount(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 stake_account_index,
@@ -869,7 +862,6 @@ pub fn split(
 }
 
 pub fn merge(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     stake_account_index: IndexOfAccount,
@@ -896,7 +888,6 @@ pub fn merge(
 
     msg!("Checking if destination stake is mergeable");
     let stake_merge_kind = MergeKind::get_if_mergeable(
-        invoke_context,
         &stake_account.get_state()?,
         stake_account.get_lamports(),
         clock,
@@ -911,7 +902,6 @@ pub fn merge(
 
     msg!("Checking if source stake is mergeable");
     let source_merge_kind = MergeKind::get_if_mergeable(
-        invoke_context,
         &source_account.get_state()?,
         source_account.get_lamports(),
         clock,
@@ -919,7 +909,7 @@ pub fn merge(
     )?;
 
     msg!("Merging stake accounts");
-    if let Some(merged_state) = stake_merge_kind.merge(invoke_context, source_merge_kind, clock)? {
+    if let Some(merged_state) = stake_merge_kind.merge(source_merge_kind, clock)? {
         stake_account.set_state(&merged_state, feature_set_die!())?;
     }
 
@@ -934,7 +924,6 @@ pub fn merge(
 }
 
 pub fn redelegate(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     stake_account: &mut BorrowedAccount,
@@ -942,7 +931,7 @@ pub fn redelegate(
     vote_account_index: IndexOfAccount,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
-    let clock = invoke_context.get_sysvar_cache().get_clock()?;
+    let clock = Clock::get()?;
 
     // ensure `uninitialized_stake_account_index` is in the uninitialized state
     let mut uninitialized_stake_account = instruction_context
@@ -987,7 +976,7 @@ pub fn redelegate(
 
     let (stake_meta, effective_stake) =
         if let StakeStateV2::Stake(meta, stake, _stake_flags) = stake_account.get_state()? {
-            let status = get_stake_status(invoke_context, &stake, &clock)?;
+            let status = get_stake_status(&stake, &clock)?;
             if status.effective == 0 || status.activating != 0 || status.deactivating != 0 {
                 msg!("stake is not active");
                 return Err(StakeError::RedelegateTransientOrInactiveStake.into());
@@ -1009,15 +998,14 @@ pub fn redelegate(
     // deactivate `stake_account`
     //
     // Note: This function also ensures `signers` contains the `StakeAuthorize::Staker`
-    deactivate(invoke_context, stake_account, &clock, signers)?;
+    deactivate(stake_account, &clock, signers)?;
 
     // transfer the effective stake to the uninitialized stake account
     stake_account.checked_sub_lamports(effective_stake, feature_set_die!())?;
     uninitialized_stake_account.checked_add_lamports(effective_stake, feature_set_die!())?;
 
     // initialize and schedule `uninitialized_stake_account` for activation
-    let sysvar_cache = invoke_context.get_sysvar_cache();
-    let rent = sysvar_cache.get_rent()?;
+    let rent = Rent::get()?;
     let mut uninitialized_stake_meta = stake_meta;
     uninitialized_stake_meta.rent_exempt_reserve =
         rent.minimum_balance(uninitialized_stake_account.get_data().len());
@@ -1149,7 +1137,6 @@ pub fn withdraw(
 }
 
 pub(crate) fn deactivate_delinquent(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     stake_account: &mut BorrowedAccount,
@@ -1191,7 +1178,7 @@ pub(crate) fn deactivate_delinquent(
         // Deactivate the stake account if its delegated vote account has never voted or has not
         // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
         if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, current_epoch) {
-            deactivate_stake(invoke_context, &mut stake, &mut stake_flags, current_epoch)?;
+            deactivate_stake(&mut stake, &mut stake_flags, current_epoch)?;
             stake_account.set_state(
                 &StakeStateV2::Stake(meta, stake, stake_flags),
                 feature_set_die!(),
@@ -1241,7 +1228,6 @@ struct ValidatedSplitInfo {
 /// delegation, and that the source account has enough lamports for the request split amount.  If
 /// not, return an error.
 fn validate_split_amount(
-    invoke_context: &InvokeContext,
     transaction_context: &TransactionContext,
     instruction_context: &InstructionContext,
     source_account_index: IndexOfAccount,
@@ -1290,7 +1276,7 @@ fn validate_split_amount(
         // nothing to do here
     }
 
-    let rent = invoke_context.get_sysvar_cache().get_rent()?;
+    let rent = Rent::get()?;
     let destination_rent_exempt_reserve = rent.minimum_balance(destination_data_len);
 
     // As of feature `require_rent_exempt_split_destination`, if the source is active stake, one of
@@ -1348,7 +1334,6 @@ impl MergeKind {
     }
 
     fn get_if_mergeable(
-        invoke_context: &InvokeContext,
         stake_state: &StakeStateV2,
         stake_lamports: u64,
         clock: &Clock,
@@ -1361,7 +1346,7 @@ impl MergeKind {
                 let status = stake.delegation.stake_activating_and_deactivating(
                     clock.epoch,
                     stake_history,
-                    new_warmup_cooldown_rate_epoch(invoke_context),
+                    new_warmup_cooldown_rate_epoch(),
                 );
 
                 match (status.effective, status.activating, status.deactivating) {
@@ -1382,12 +1367,7 @@ impl MergeKind {
         }
     }
 
-    fn metas_can_merge(
-        invoke_context: &InvokeContext,
-        stake: &Meta,
-        source: &Meta,
-        clock: &Clock,
-    ) -> Result<(), InstructionError> {
+    fn metas_can_merge(stake: &Meta, source: &Meta, clock: &Clock) -> Result<(), InstructionError> {
         // lockups may mismatch so long as both have expired
         let can_merge_lockups = stake.lockup == source.lockup
             || (!stake.lockup.is_in_force(clock, None) && !source.lockup.is_in_force(clock, None));
@@ -1405,7 +1385,6 @@ impl MergeKind {
     }
 
     fn active_delegations_can_merge(
-        invoke_context: &InvokeContext,
         stake: &Delegation,
         source: &Delegation,
     ) -> Result<(), InstructionError> {
@@ -1421,21 +1400,12 @@ impl MergeKind {
         }
     }
 
-    fn merge(
-        self,
-        invoke_context: &InvokeContext,
-        source: Self,
-        clock: &Clock,
-    ) -> Result<Option<StakeStateV2>, InstructionError> {
-        Self::metas_can_merge(invoke_context, self.meta(), source.meta(), clock)?;
+    fn merge(self, source: Self, clock: &Clock) -> Result<Option<StakeStateV2>, InstructionError> {
+        Self::metas_can_merge(self.meta(), source.meta(), clock)?;
         self.active_stake()
             .zip(source.active_stake())
             .map(|(stake, source)| {
-                Self::active_delegations_can_merge(
-                    invoke_context,
-                    &stake.delegation,
-                    &source.delegation,
-                )
+                Self::active_delegations_can_merge(&stake.delegation, &source.delegation)
             })
             .unwrap_or(Ok(()))?;
         let merged_state = match (self, source) {

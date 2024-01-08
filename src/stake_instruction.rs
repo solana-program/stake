@@ -14,7 +14,6 @@ use {
         },
         transaction_context::{IndexOfAccount, InstructionContext, TransactionContext},
     },
-    // XXX needed? log::*,
     solana_program_runtime::{
         declare_process_instruction, sysvar_cache::get_sysvar_with_account_check,
     },
@@ -124,7 +123,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 // XXX REMOVED config check
             }
             delegate(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 0,
@@ -139,7 +137,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
             instruction_context.check_number_of_instruction_accounts(2)?;
             drop(me);
             split(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 0,
@@ -160,7 +157,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
             )?;
             drop(me);
             merge(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 0,
@@ -196,14 +192,14 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                 } else {
                     None
                 },
-                new_warmup_cooldown_rate_epoch(invoke_context),
+                new_warmup_cooldown_rate_epoch(),
             )
         }
         Ok(StakeInstruction::Deactivate) => {
             let mut me = get_stake_account()?;
             let clock =
                 get_sysvar_with_account_check::clock(invoke_context, instruction_context, 1)?;
-            deactivate(invoke_context, &mut me, &clock, &signers)
+            deactivate(&mut me, &clock, &signers)
         }
         Ok(StakeInstruction::SetLockup(lockup)) => {
             let mut me = get_stake_account()?;
@@ -308,7 +304,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
 
             let clock = invoke_context.get_sysvar_cache().get_clock()?;
             deactivate_delinquent(
-                invoke_context,
                 transaction_context,
                 instruction_context,
                 &mut me,
@@ -325,7 +320,6 @@ declare_process_instruction!(Entrypoint, DEFAULT_COMPUTE_UNITS, |invoke_context|
                     // XXX REMOVED config check
                 }
                 redelegate(
-                    invoke_context,
                     transaction_context,
                     instruction_context,
                     &mut me,
