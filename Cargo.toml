@@ -19,7 +19,6 @@ num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.1"
 solana-program = { version = "1.18.0", path = "/home/hana/work/solana/solana/sdk/program" }
-solana-config-program = { version = "1.18.0", path = "/home/hana/work/solana/solana/programs/config" }
 thiserror = "1.0.52"
 
 [lib]

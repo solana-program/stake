@@ -1,9 +1,18 @@
-#![cfg_attr(RUSTC_WITH_SPECIALIZATION, feature(min_specialization))]
+#![cfg_attr(RUSTC_WITH_SPECIALIZATION, feature(min_specialization))] // XXX do i want this?
 #![allow(clippy::arithmetic_side_effects)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use solana_program::native_token::LAMPORTS_PER_SOL;
 
-pub mod stake_instruction;
-pub mod stake_state;
+// XXX split into processor, state, some other files probably
+pub mod omnibus;
+
+#[cfg(not(feature = "no-entrypoint"))]
+pub mod entrypoint;
+
+pub use solana_program;
+
+solana_program::declare_id!("7837mbBVYX9n2m8iy2Lf2QfooTutj3WprowcsFkvLrZA");
 
 // XXX placeholder for feature_set
 #[macro_export]
