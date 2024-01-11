@@ -32,7 +32,7 @@ macro_rules! stake_history_die {
 
 // XXX placeholders for features
 const FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL: bool = false;
-const FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN: bool = false;
+const FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN: bool = true;
 const FEATURE_STAKE_REDELEGATE_INSTRUCTION: bool = false;
 const FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION: bool = false;
 

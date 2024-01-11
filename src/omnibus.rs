@@ -73,6 +73,29 @@ impl Processor {
         Ok(())
     }
 
+    fn process_delegate(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let vote_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_history_info = next_account_info(account_info_iter)?;
+        let _stake_config_info = next_account_info(account_info_iter)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        if *vote_account_info.owner != solana_vote_program::id() {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+        msg!("HANA deserializing vote ({} cus left)", solana_program::compute_units::sol_remaining_compute_units());
+        let vote_state: VoteStateVersions = vote_account_info.deserialize_data().unwrap();
+        msg!("HANA vote_state: {:#?}", vote_state);
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
@@ -84,6 +107,15 @@ impl Processor {
             StakeInstruction::Initialize(authorized, lockup) => {
                 msg!("Instruction: Initialize");
                 Self::process_initialize(program_id, accounts, authorized, lockup)
+            }
+            StakeInstruction::DelegateStake => {
+                msg!("Instruction: DelegateStake");
+
+                if !crate::FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN {
+                    panic!("we only impl the `reduce_stake_warmup_cooldown` logic");
+                }
+
+                Self::process_delegate(program_id, accounts)
             }
             _ => unimplemented!(),
         }
