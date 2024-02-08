@@ -29,6 +29,14 @@ use {
     std::{cmp::Ordering, collections::HashSet, convert::TryFrom},
 };
 
+// XXX note to self. InstructionError is actually a superset of ProgramError
+// there is a TryFrom instance, but thats why theres no From instance
+// there are ProgramError conversions between u64 tho, and From<T> for InstructionError where T: FromPrimitive
+// very unusual. i guess i can look more into this but for now using ProgramError is fine seems safe
+
+// XXX a nice change would be to pop an account off the queue and discard if its a gettable sysvar
+// ie, allow people to omit them from the accounts list without breaking compat
+
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -73,10 +81,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_delegate(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-    ) -> ProgramResult {
+    fn process_delegate(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
         let vote_account_info = next_account_info(account_info_iter)?;
@@ -89,9 +94,13 @@ impl Processor {
         if *vote_account_info.owner != solana_vote_program::id() {
             return Err(ProgramError::IncorrectProgramId);
         }
-        msg!("HANA deserializing vote ({} cus left)", solana_program::compute_units::sol_remaining_compute_units());
-        let vote_state: VoteStateVersions = vote_account_info.deserialize_data().unwrap();
-        msg!("HANA vote_state: {:#?}", vote_state);
+
+        //let mut vote_state = Box::new(VoteState::default());
+        //VoteState::deserialize_into(&vote_account_info.data.borrow(), &mut vote_state).unwrap();
+        //let vote_state = vote_state;
+        let vote_state = VoteState::deserialize(&vote_account_info.data.borrow()).unwrap();
+
+        // XXX parse stake account, branch on enum, new stake or redelegate
 
         Ok(())
     }
@@ -101,7 +110,6 @@ impl Processor {
     // look into if theres a trait i can impl to not break the interface but modrenize
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         let instruction = bincode::deserialize(data).unwrap(); // XXX limited_deserialize?
-        msg!("HANA ixn: {:#?}", instruction);
 
         match instruction {
             StakeInstruction::Initialize(authorized, lockup) => {
