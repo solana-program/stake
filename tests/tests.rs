@@ -190,6 +190,7 @@ pub async fn get_stake_account(
     match bincode::deserialize::<StakeStateV2>(&stake_account.data).unwrap() {
         StakeStateV2::Initialized(meta) => (meta, None, lamports),
         StakeStateV2::Stake(meta, stake, _) => (meta, Some(stake), lamports),
+        StakeStateV2::Uninitialized => panic!("panic: uninitialized"),
         _ => unimplemented!(),
     }
 }
@@ -221,9 +222,7 @@ pub async fn create_independent_stake_account(
         ),
         stake::instruction::initialize(&stake.pubkey(), authorized, lockup),
     ];
-
     instructions[1].program_id = neostake::id();
-    println!("HANA {:#?}", instructions);
 
     let transaction = Transaction::new_signed_with_payer(
         &instructions,
@@ -234,6 +233,22 @@ pub async fn create_independent_stake_account(
     banks_client.process_transaction(transaction).await.unwrap();
 
     lamports
+}
+
+pub async fn delegate_stake_account(
+    banks_client: &mut BanksClient,
+    payer: &Keypair,
+    recent_blockhash: &Hash,
+    stake: &Pubkey,
+    authorized: &Keypair,
+    vote: &Pubkey,
+) {
+    let mut instruction = stake::instruction::delegate_stake(stake, &authorized.pubkey(), vote);
+    instruction.program_id = neostake::id();
+
+    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
+    transaction.sign(&[payer, authorized], *recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
 }
 
 #[tokio::test]
@@ -254,8 +269,29 @@ async fn hana_test() {
     )
     .await;
 
-    let stake_account =
-        get_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    let stake = bincode::deserialize::<StakeStateV2>(&stake_account.data).unwrap();
-    println!("HANA {} {:?}", accounts.alice_stake.pubkey(), stake);
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} after init: {:?}",
+        accounts.alice_stake.pubkey(),
+        stake_info
+    );
+
+    delegate_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.alice,
+        &accounts.vote_account.pubkey(),
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} after delegate: {:?}",
+        accounts.alice_stake.pubkey(),
+        stake_info
+    );
 }
