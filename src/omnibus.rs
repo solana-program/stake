@@ -170,24 +170,27 @@ impl Processor {
         let stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        if !stake_or_withdraw_authority_info.is_signer {
-            return Err(ProgramError::MissingRequiredSignature);
+        let mut signers = HashSet::new();
+
+        if stake_or_withdraw_authority_info.is_signer {
+            signers.insert(*stake_or_withdraw_authority_info.key);
         }
 
-        if let Some(lockup_authority_info) = option_lockup_authority_info {
-            if !lockup_authority_info.is_signer {
-                return Err(ProgramError::MissingRequiredSignature);
+        let custodian = if let Some(lockup_authority_info) = option_lockup_authority_info {
+            if lockup_authority_info.is_signer {
+                signers.insert(*lockup_authority_info.key);
             }
-        }
-        let custodian = option_lockup_authority_info.map(|ai| ai.key);
+
+            Some(lockup_authority_info.key)
+        } else {
+            None
+        };
+
+        signers = signers;
 
         let stake_state = stake_account_info
             .deserialize_data()
             .map_err(|_| ProgramError::InvalidAccountData)?;
-
-        let mut signers = HashSet::new();
-        signers.insert(*stake_or_withdraw_authority_info.key);
-        signers = signers;
 
         match stake_state {
             StakeStateV2::Initialized(mut meta) => {
@@ -237,9 +240,13 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
-        if !stake_authority_info.is_signer {
-            return Err(ProgramError::MissingRequiredSignature);
+        let mut signers = HashSet::new();
+
+        if stake_authority_info.is_signer {
+            signers.insert(*stake_authority_info.key);
         }
+
+        signers = signers;
 
         // XXX when im back on a branch with this
         //let mut vote_state = Box::new(VoteState::default());
@@ -253,9 +260,9 @@ impl Processor {
 
         match stake_state {
             StakeStateV2::Initialized(meta) => {
-                if meta.authorized.staker != *stake_authority_info.key {
-                    return Err(ProgramError::MissingRequiredSignature);
-                }
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
 
                 let ValidatedDelegatedInfo { stake_amount } =
                     validate_delegated_amount(&stake_account_info, &meta)?;
@@ -273,9 +280,9 @@ impl Processor {
                 )
             }
             StakeStateV2::Stake(meta, mut _stake, _stake_flags) => {
-                if meta.authorized.staker != *stake_authority_info.key {
-                    return Err(ProgramError::MissingRequiredSignature);
-                }
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
 
                 let ValidatedDelegatedInfo { stake_amount: _ } =
                     validate_delegated_amount(&stake_account_info, &meta)?;

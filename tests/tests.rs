@@ -14,7 +14,7 @@ use {
         signature::{Keypair, Signer},
         stake::{
             self,
-            state::{Authorized, Lockup, Meta, Stake, StakeStateV2},
+            state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
         transaction::{Transaction, TransactionError},
@@ -235,6 +235,31 @@ pub async fn create_independent_stake_account(
     lamports
 }
 
+pub async fn authorize_stake_account(
+    banks_client: &mut BanksClient,
+    payer: &Keypair,
+    recent_blockhash: &Hash,
+    stake: &Pubkey,
+    old_authority: &Keypair,
+    new_authority: &Pubkey,
+    authority_type: StakeAuthorize,
+    // XXX test this later
+    //custodian: Option<&Pubkey>,
+) {
+    let mut instruction = stake::instruction::authorize(
+        stake,
+        &old_authority.pubkey(),
+        new_authority,
+        authority_type,
+        None,
+    );
+    instruction.program_id = neostake::id();
+
+    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
+    transaction.sign(&[payer, old_authority], *recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+}
+
 pub async fn delegate_stake_account(
     banks_client: &mut BanksClient,
     payer: &Keypair,
@@ -292,6 +317,27 @@ async fn hana_test() {
     println!(
         "HANA {} after delegate: {:?}",
         accounts.alice_stake.pubkey(),
+        stake_info
+    );
+
+    authorize_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.alice,
+        &accounts.bob.pubkey(),
+        StakeAuthorize::Staker,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} changed staker from {} to {}: {:?}",
+        accounts.alice_stake.pubkey(),
+        accounts.alice.pubkey(),
+        accounts.bob.pubkey(),
         stake_info
     );
 }
