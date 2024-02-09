@@ -241,22 +241,39 @@ pub async fn authorize_stake_account(
     recent_blockhash: &Hash,
     stake: &Pubkey,
     old_authority: &Keypair,
-    new_authority: &Pubkey,
+    new_authority: &Keypair,
     authority_type: StakeAuthorize,
     // XXX test this later
     //custodian: Option<&Pubkey>,
+    checked: bool,
 ) {
-    let mut instruction = stake::instruction::authorize(
-        stake,
-        &old_authority.pubkey(),
-        new_authority,
-        authority_type,
-        None,
-    );
+    let mut instruction = if checked {
+        stake::instruction::authorize_checked(
+            stake,
+            &old_authority.pubkey(),
+            &new_authority.pubkey(),
+            authority_type,
+            None,
+        )
+    } else {
+        stake::instruction::authorize(
+            stake,
+            &old_authority.pubkey(),
+            &new_authority.pubkey(),
+            authority_type,
+            None,
+        )
+    };
     instruction.program_id = neostake::id();
 
     let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    transaction.sign(&[payer, old_authority], *recent_blockhash);
+    let signers = if checked {
+        vec![payer, old_authority, new_authority]
+    } else {
+        vec![payer, old_authority]
+    };
+
+    transaction.sign(&signers, *recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 }
 
@@ -326,8 +343,9 @@ async fn hana_test() {
         &context.last_blockhash,
         &accounts.alice_stake.pubkey(),
         &accounts.alice,
-        &accounts.bob.pubkey(),
+        &accounts.bob,
         StakeAuthorize::Staker,
+        false,
     )
     .await;
 
@@ -338,6 +356,28 @@ async fn hana_test() {
         accounts.alice_stake.pubkey(),
         accounts.alice.pubkey(),
         accounts.bob.pubkey(),
+        stake_info
+    );
+
+    authorize_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.bob,
+        &accounts.alice,
+        StakeAuthorize::Staker,
+        true,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} changed back staker from {} to {}: {:?}",
+        accounts.alice_stake.pubkey(),
+        accounts.bob.pubkey(),
+        accounts.alice.pubkey(),
         stake_info
     );
 }
