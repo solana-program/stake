@@ -115,6 +115,50 @@ fn validate_delegated_amount(
 
 /// XXX THIS SECTION is the new processor
 
+fn do_authorize(
+    stake_account_info: &AccountInfo,
+    signers: HashSet<Pubkey>,
+    new_authority: &Pubkey,
+    authority_type: StakeAuthorize,
+    custodian: Option<&Pubkey>,
+    clock: &Clock,
+) -> ProgramResult {
+    let stake_state = stake_account_info
+        .deserialize_data()
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+
+    match stake_state {
+        StakeStateV2::Initialized(mut meta) => {
+            meta.authorized
+                .authorize(
+                    &signers,
+                    &new_authority,
+                    authority_type,
+                    Some((&meta.lockup, clock, custodian)),
+                )
+                .map_err(InstructionError::turn_into)?;
+
+            set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
+        }
+        StakeStateV2::Stake(mut meta, stake, stake_flags) => {
+            meta.authorized
+                .authorize(
+                    &signers,
+                    &new_authority,
+                    authority_type,
+                    Some((&meta.lockup, clock, custodian)),
+                )
+                .map_err(InstructionError::turn_into)?;
+
+            set_stake_state(
+                stake_account_info,
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+            )
+        }
+        _ => Err(ProgramError::InvalidAccountData),
+    }
+}
+
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -188,40 +232,67 @@ impl Processor {
 
         signers = signers;
 
-        let stake_state = stake_account_info
-            .deserialize_data()
-            .map_err(|_| ProgramError::InvalidAccountData)?;
+        do_authorize(
+            stake_account_info,
+            signers,
+            &new_authority,
+            authority_type,
+            custodian,
+            clock,
+        )?;
 
-        match stake_state {
-            StakeStateV2::Initialized(mut meta) => {
-                meta.authorized
-                    .authorize(
-                        &signers,
-                        &new_authority,
-                        authority_type,
-                        Some((&meta.lockup, clock, custodian)),
-                    )
-                    .map_err(InstructionError::turn_into)?;
+        Ok(())
+    }
 
-                set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
+    fn process_authorize_checked(
+        _program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        authority_type: StakeAuthorize,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        let mut signers = HashSet::new();
+
+        if old_stake_or_withdraw_authority_info.is_signer {
+            signers.insert(*old_stake_or_withdraw_authority_info.key);
+        } else {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        if new_stake_or_withdraw_authority_info.is_signer {
+            signers.insert(*new_stake_or_withdraw_authority_info.key);
+        } else {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let custodian = if let Some(lockup_authority_info) = option_lockup_authority_info {
+            if lockup_authority_info.is_signer {
+                signers.insert(*lockup_authority_info.key);
+            } else {
+                return Err(ProgramError::MissingRequiredSignature);
             }
-            StakeStateV2::Stake(mut meta, stake, stake_flags) => {
-                meta.authorized
-                    .authorize(
-                        &signers,
-                        &new_authority,
-                        authority_type,
-                        Some((&meta.lockup, clock, custodian)),
-                    )
-                    .map_err(InstructionError::turn_into)?;
 
-                set_stake_state(
-                    stake_account_info,
-                    &StakeStateV2::Stake(meta, stake, stake_flags),
-                )
-            }
-            _ => Err(ProgramError::InvalidAccountData),
-        }?;
+            Some(lockup_authority_info.key)
+        } else {
+            None
+        };
+
+        signers = signers;
+
+        do_authorize(
+            stake_account_info,
+            signers,
+            new_stake_or_withdraw_authority_info.key,
+            authority_type,
+            custodian,
+            clock,
+        )?;
 
         Ok(())
     }
@@ -324,6 +395,10 @@ impl Processor {
                 }
 
                 Self::process_delegate(program_id, accounts)
+            }
+            StakeInstruction::AuthorizeChecked(authority_type) => {
+                msg!("Instruction: AuthorizeChecked");
+                Self::process_authorize_checked(program_id, accounts, authority_type)
             }
             _ => unimplemented!(),
         }
