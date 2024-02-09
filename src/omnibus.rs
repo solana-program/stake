@@ -57,12 +57,23 @@ fn set_stake_state(
 
 // XXX impl from<StakeError> for ProgramError. also idk if this is correct
 // i just want to keep the same errors in-place and then clean up later, instead of needing to hunt down the right ones
+// XXX there should also be a better wrapper for TryFrom<InstructionError> for ProgramError
+// like, if theres a matching error do the conversion, if custom do the custom conversion
+// otherwise unwrap into an error cnoversion error maybe. idk
 pub trait TurnInto {
-    fn turn_into(&self) -> ProgramError;
+    fn turn_into(self) -> ProgramError;
 }
 impl TurnInto for StakeError {
-    fn turn_into(&self) -> ProgramError {
+    fn turn_into(self) -> ProgramError {
         ProgramError::Custom(self.to_u32().unwrap())
+    }
+}
+impl TurnInto for InstructionError {
+    fn turn_into(self) -> ProgramError {
+        match ProgramError::try_from(self) {
+            Ok(program_error) => program_error,
+            Err(e) => panic!("HANA error conversion failed: {:?}", e),
+        }
     }
 }
 
@@ -129,8 +140,8 @@ impl Processor {
             if stake_account_info.lamports() >= rent_exempt_reserve {
                 let stake_state = StakeStateV2::Initialized(Meta {
                     rent_exempt_reserve,
-                    authorized: authorized,
-                    lockup: lockup,
+                    authorized,
+                    lockup,
                 });
 
                 set_stake_state(stake_account_info, &stake_state)?;
@@ -141,6 +152,72 @@ impl Processor {
             }
         } else {
             Err(ProgramError::InvalidAccountData)
+        }?;
+
+        Ok(())
+    }
+
+    fn process_authorize(
+        _program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        new_authority: Pubkey,
+        authority_type: StakeAuthorize,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        if !stake_or_withdraw_authority_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        if let Some(lockup_authority_info) = option_lockup_authority_info {
+            if !lockup_authority_info.is_signer {
+                return Err(ProgramError::MissingRequiredSignature);
+            }
+        }
+        let custodian = option_lockup_authority_info.map(|ai| ai.key);
+
+        let stake_state = stake_account_info
+            .deserialize_data()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+
+        let mut signers = HashSet::new();
+        signers.insert(*stake_or_withdraw_authority_info.key);
+        signers = signers;
+
+        match stake_state {
+            StakeStateV2::Initialized(mut meta) => {
+                meta.authorized
+                    .authorize(
+                        &signers,
+                        &new_authority,
+                        authority_type,
+                        Some((&meta.lockup, clock, custodian)),
+                    )
+                    .map_err(InstructionError::turn_into)?;
+
+                set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
+            }
+            StakeStateV2::Stake(mut meta, stake, stake_flags) => {
+                meta.authorized
+                    .authorize(
+                        &signers,
+                        &new_authority,
+                        authority_type,
+                        Some((&meta.lockup, clock, custodian)),
+                    )
+                    .map_err(InstructionError::turn_into)?;
+
+                set_stake_state(
+                    stake_account_info,
+                    &StakeStateV2::Stake(meta, stake, stake_flags),
+                )
+            }
+            _ => Err(ProgramError::InvalidAccountData),
         }?;
 
         Ok(())
@@ -170,11 +247,10 @@ impl Processor {
         //let vote_state = vote_state;
         let vote_state = VoteState::deserialize(&vote_account_info.data.borrow()).unwrap();
 
-        // XXX parse stake account, branch on enum, new stake or redelegate
-
         let stake_state = stake_account_info
             .deserialize_data()
             .map_err(|_| ProgramError::InvalidAccountData)?;
+
         match stake_state {
             StakeStateV2::Initialized(meta) => {
                 if meta.authorized.staker != *stake_authority_info.key {
@@ -196,12 +272,12 @@ impl Processor {
                     &StakeStateV2::Stake(meta, new_stake_state, StakeFlags::empty()),
                 )
             }
-            StakeStateV2::Stake(meta, mut stake, stake_flags) => {
+            StakeStateV2::Stake(meta, mut _stake, _stake_flags) => {
                 if meta.authorized.staker != *stake_authority_info.key {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
 
-                let ValidatedDelegatedInfo { stake_amount } =
+                let ValidatedDelegatedInfo { stake_amount: _ } =
                     validate_delegated_amount(&stake_account_info, &meta)?;
 
                 // TODO redelegate, then set state
@@ -217,12 +293,21 @@ impl Processor {
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-        let instruction = bincode::deserialize(data).unwrap(); // XXX limited_deserialize?
+        // XXX limited_deserialize?
+        let instruction =
+            bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
+        // TODO authorize, split, withdraw, deactivate, setlockup, merge
+        // getminimumdelegation, deactivatedelinquent, redelegate
+        // plus a handful of checked and seed variants
         match instruction {
-            StakeInstruction::Initialize(authorized, lockup) => {
+            StakeInstruction::Initialize(authorize, lockup) => {
                 msg!("Instruction: Initialize");
-                Self::process_initialize(program_id, accounts, authorized, lockup)
+                Self::process_initialize(program_id, accounts, authorize, lockup)
+            }
+            StakeInstruction::Authorize(new_authority, authority_type) => {
+                msg!("Instruction: Authorize");
+                Self::process_authorize(program_id, accounts, new_authority, authority_type)
             }
             StakeInstruction::DelegateStake => {
                 msg!("Instruction: DelegateStake");

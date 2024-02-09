@@ -265,7 +265,7 @@ async fn hana_test() {
         &accounts.alice_stake,
         &Authorized::auto(&accounts.alice.pubkey()),
         &Lockup::default(),
-        LAMPORTS_PER_SOL,
+        LAMPORTS_PER_SOL * 5,
     )
     .await;
 
