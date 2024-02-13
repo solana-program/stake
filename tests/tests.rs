@@ -14,6 +14,7 @@ use {
         signature::{Keypair, Signer},
         stake::{
             self,
+            instruction::{LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
             state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
@@ -277,6 +278,53 @@ pub async fn authorize_stake_account(
     banks_client.process_transaction(transaction).await.unwrap();
 }
 
+pub async fn set_stake_account_lockup(
+    banks_client: &mut BanksClient,
+    payer: &Keypair,
+    recent_blockhash: &Hash,
+    stake: &Pubkey,
+    old_authority: &Keypair,
+    new_authority: Option<&Keypair>,
+    checked: bool,
+) {
+    let lockup = LockupArgs {
+        unix_timestamp: if new_authority.is_some() {
+            Some(1)
+        } else {
+            Some(0)
+        },
+        epoch: if new_authority.is_some() {
+            Some(9999)
+        } else {
+            Some(0)
+        },
+        custodian: if let Some(new_authority) = new_authority {
+            Some(new_authority.pubkey())
+        } else {
+            Some(Pubkey::default())
+        },
+    };
+
+    println!("HANA lockup: {:#?}", lockup);
+
+    let mut instruction = if checked {
+        stake::instruction::set_lockup_checked(stake, &lockup, &old_authority.pubkey())
+    } else {
+        stake::instruction::set_lockup(stake, &lockup, &old_authority.pubkey())
+    };
+    instruction.program_id = neostake::id();
+
+    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
+    let signers = if checked {
+        vec![payer, old_authority, new_authority.unwrap()]
+    } else {
+        vec![payer, old_authority]
+    };
+
+    transaction.sign(&signers, *recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+}
+
 pub async fn delegate_stake_account(
     banks_client: &mut BanksClient,
     payer: &Keypair,
@@ -298,6 +346,11 @@ async fn hana_test() {
     let mut context = program_test(true).start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
+    println!(
+        "HANA alice: {}, bob: {}",
+        accounts.alice.pubkey(),
+        accounts.bob.pubkey()
+    );
 
     create_independent_stake_account(
         &mut context.banks_client,
@@ -378,6 +431,45 @@ async fn hana_test() {
         accounts.alice_stake.pubkey(),
         accounts.bob.pubkey(),
         accounts.alice.pubkey(),
+        stake_info
+    );
+
+    set_stake_account_lockup(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.alice,
+        Some(&accounts.bob),
+        true,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} added lockup owned by {}: {:?}",
+        accounts.alice_stake.pubkey(),
+        accounts.bob.pubkey(),
+        stake_info
+    );
+
+    set_stake_account_lockup(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.bob,
+        None,
+        false,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} removed lockup: {:?}",
+        accounts.alice_stake.pubkey(),
         stake_info
     );
 }

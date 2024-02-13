@@ -16,7 +16,7 @@ use {
         rent::Rent,
         stake::state::*,
         stake::{
-            instruction::{LockupArgs, StakeError, StakeInstruction},
+            instruction::{LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
             program::id,
             stake_flags::StakeFlags,
             state::{Authorized, Lockup},
@@ -148,6 +148,36 @@ fn do_authorize(
                     authority_type,
                     Some((&meta.lockup, clock, custodian)),
                 )
+                .map_err(InstructionError::turn_into)?;
+
+            set_stake_state(
+                stake_account_info,
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+            )
+        }
+        _ => Err(ProgramError::InvalidAccountData),
+    }
+}
+
+fn do_set_lockup(
+    stake_account_info: &AccountInfo,
+    signers: HashSet<Pubkey>,
+    lockup: &LockupArgs,
+    clock: &Clock,
+) -> ProgramResult {
+    let stake_state = stake_account_info
+        .deserialize_data()
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+
+    match stake_state {
+        StakeStateV2::Initialized(mut meta) => {
+            meta.set_lockup(lockup, &signers, clock)
+                .map_err(InstructionError::turn_into)?;
+
+            set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
+        }
+        StakeStateV2::Stake(mut meta, stake, stake_flags) => {
+            meta.set_lockup(lockup, &signers, clock)
                 .map_err(InstructionError::turn_into)?;
 
             set_stake_state(
@@ -367,6 +397,70 @@ impl Processor {
         Ok(())
     }
 
+    fn process_set_lockup(
+        _program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        lockup: LockupArgs,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
+        let clock = Clock::get()?;
+
+        let mut signers = HashSet::new();
+
+        if old_withdraw_or_lockup_authority_info.is_signer {
+            signers.insert(*old_withdraw_or_lockup_authority_info.key);
+        }
+
+        signers = signers;
+
+        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
+
+        Ok(())
+    }
+
+    fn process_set_lockup_checked(
+        _program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        lockup_checked: LockupCheckedArgs,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
+        let optional_new_lockup_authority_info = next_account_info(account_info_iter).ok();
+        let clock = Clock::get()?;
+
+        let mut signers = HashSet::new();
+
+        if old_withdraw_or_lockup_authority_info.is_signer {
+            signers.insert(*old_withdraw_or_lockup_authority_info.key);
+        }
+
+        let custodian = if let Some(new_lockup_authority_info) = optional_new_lockup_authority_info
+        {
+            if new_lockup_authority_info.is_signer {
+                signers.insert(*new_lockup_authority_info.key);
+            }
+
+            Some(*new_lockup_authority_info.key)
+        } else {
+            None
+        };
+
+        signers = signers;
+
+        let lockup = LockupArgs {
+            unix_timestamp: lockup_checked.unix_timestamp,
+            epoch: lockup_checked.epoch,
+            custodian,
+        };
+
+        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
@@ -375,7 +469,7 @@ impl Processor {
         let instruction =
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
-        // TODO authorize, split, withdraw, deactivate, setlockup, merge
+        // TODO split, withdraw, deactivate, merge
         // getminimumdelegation, deactivatedelinquent, redelegate
         // plus a handful of checked and seed variants
         match instruction {
@@ -396,9 +490,17 @@ impl Processor {
 
                 Self::process_delegate(program_id, accounts)
             }
+            StakeInstruction::SetLockup(lockup) => {
+                msg!("Instruction: SetLockup");
+                Self::process_set_lockup(program_id, accounts, lockup)
+            }
             StakeInstruction::AuthorizeChecked(authority_type) => {
                 msg!("Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(program_id, accounts, authority_type)
+            }
+            StakeInstruction::SetLockupChecked(lockup_checked) => {
+                msg!("Instruction: SetLockup");
+                Self::process_set_lockup_checked(program_id, accounts, lockup_checked)
             }
             _ => unimplemented!(),
         }
