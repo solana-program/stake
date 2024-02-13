@@ -469,9 +469,32 @@ impl Processor {
         let instruction =
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
-        // TODO split, withdraw, deactivate, merge
-        // getminimumdelegation, deactivatedelinquent, redelegate
+        // TODO
+        // * split: complictated but no blockers
+        // * withdraw: complicated, requires stake history
+        // * deactivate: fairly simple, requires stake history
+        // * merge: simple in program but i will need to mess with MergeKind. requires stake history
+        // * getminimumdelegation: probably trivial
+        // * deactivatedelinquent: simple but requires deactivate
+        // * redelegate: simple, requires stake history
         // plus a handful of checked and seed variants
+        //
+        // stake history doesnt seem too bad honestly
+        // i believe we only need get(), not add(). unclear if we need to be able to iterate
+        // for get() we need to binary search the vec for a given epoch entry
+        // each vec item is four u64: epoch and entry, which is (effective stake, activating stake, deactivating stake)
+        // this is fairly straightforward to implement with incremental parsing:
+        // * decode the vec length
+        // * jump to some offset
+        // * decode four u64, check values
+        // * repeat from 2 or return result
+        // we can also be sure the data is well-formed because we check the hardcoded account key
+        // how to use this with existing functions is somewhat trickier
+        // we could create a GetStakeHistoryEntry typeclass and change the function interfaces
+        // and make a new struct StakeHistoryAccountData or something which impls it
+        // we just want one function get_entry() which does the same thing as get()
+        // and then deprecate get(). itll be fun to write probably
+        // the part that will NOT be fun is getting a local monorepo to build because master is fucked rn
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
                 msg!("Instruction: Initialize");
