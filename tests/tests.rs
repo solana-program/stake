@@ -108,6 +108,12 @@ impl Default for Accounts {
     }
 }
 
+pub async fn advance_epoch(context: &mut ProgramTestContext) {
+    let root_slot = context.banks_client.get_root_slot().await.unwrap();
+    let slots_per_epoch = context.genesis_config().epoch_schedule.slots_per_epoch;
+    context.warp_to_slot(root_slot + slots_per_epoch).unwrap();
+}
+
 pub async fn create_vote(
     banks_client: &mut BanksClient,
     payer: &Keypair,
@@ -341,6 +347,21 @@ pub async fn delegate_stake_account(
     banks_client.process_transaction(transaction).await.unwrap();
 }
 
+pub async fn deactivate_stake_account(
+    banks_client: &mut BanksClient,
+    payer: &Keypair,
+    recent_blockhash: &Hash,
+    stake: &Pubkey,
+    authorized: &Keypair,
+) {
+    let mut instruction = stake::instruction::deactivate_stake(stake, &authorized.pubkey());
+    instruction.program_id = neostake::id();
+
+    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
+    transaction.sign(&[payer, authorized], *recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+}
+
 #[tokio::test]
 async fn hana_test() {
     let mut context = program_test(true).start_with_context().await;
@@ -469,6 +490,25 @@ async fn hana_test() {
         get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
     println!(
         "HANA {} removed lockup: {:?}",
+        accounts.alice_stake.pubkey(),
+        stake_info
+    );
+
+    advance_epoch(&mut context).await;
+
+    deactivate_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.alice,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} after deactivate: {:?}",
         accounts.alice_stake.pubkey(),
         stake_info
     );

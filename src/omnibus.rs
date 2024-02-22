@@ -22,7 +22,7 @@ use {
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        stake_history::{StakeHistory, StakeHistoryEntry},
+        stake_history::{StakeHistoryData, StakeHistoryEntry},
         sysvar::Sysvar,
         vote::program as solana_vote_program,
         vote::state::{VoteState, VoteStateVersions},
@@ -95,6 +95,30 @@ pub(crate) fn new_stake(
         delegation: Delegation::new(voter_pubkey, stake, activation_epoch),
         credits_observed: vote_state.credits(),
     }
+}
+
+// XXX this is stubbed out because it depends on invoke context and feature set
+// what this does is calls a feature_set.rs function also called `new_warmup_cooldown_rate_epoch`
+// which gets the slot that the `reduce_stake_warmup_cooldown` feature was activated at
+// and then passes the slot to `epoch_schedule.get_epoch()` to convert it to an epoch
+// in other words `new_warmup_cooldown_rate_epoch` does exactly what it says
+// this results in a Option<Epoch> that gets passed into various stake functions
+// get activating/deactivating, calculate rewards, etc
+//
+// ok so that means if the feature isnt active we return None. easy
+// if the feature *is* active then its tricky if we dont have access to the featureset
+// EpochSchedule has a sysvar get impl but we would need to... hardcode the epochs for the networks? idk
+//
+// TODO i need to look at wtf this number is actually used for
+// presumbly it is not as simple as just "are we active yet" otherwise there wouldnt be this dance
+// i assume the intent is stake history behaves differently before and after the cutover
+// but i *believe* all this stuff is to change it from "we have a 25% deactivation cap defined by stake config"
+// to "we have a 7% deactivation cap hardcoded" so we could deploy a second feature to get rid of the plumbing
+// once history has an epoch in it when there is less than 7% deactivation? idk
+// history is fucking confusing to me still
+// maybe i should write a post about it and have someone just factcheck me so i understand lol
+pub(crate) fn new_warmup_cooldown_rate_epoch() -> Option<Epoch> {
+    None
 }
 
 /// Ensure the stake delegation amount is valid.  This checks that the account meets the minimum
@@ -186,6 +210,60 @@ fn do_set_lockup(
             )
         }
         _ => Err(ProgramError::InvalidAccountData),
+    }
+}
+
+// HANA as noted... elsewhere... in a monorepo fork...
+// this is used by Deactivate and DeactivateDelinquent
+// it was added as part of the stake flags pr, to deal with potential abuse of redelegate to force early deactivation
+// unfortunately these instructions (and Redelegate) should require the stake history sysvar but dont
+// i should pr monorepo to get something in under the redelegate feature but i think the move with that is:
+// * redelegate requires stake history (nonbreaking, currently nonactive instruction)
+// * deactivate optionally requires stake history (only for accounts that have been redelegated)
+// * deactivate delinquent optionally requires stake history (only for accounts that have been redelegated)
+//   alternatively we allow deactivate deqlinquent to yolo it but probably the first approach is better
+//   it would technically break backwards compat but i cant imagine there are any workflows that depend on this
+fn do_deactivate_stake(
+    stake: &mut Stake,
+    stake_flags: &mut StakeFlags,
+    epoch: Epoch,
+    option_stake_history: Option<StakeHistoryData>,
+) -> ProgramResult {
+    if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
+        if stake_flags.contains(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED) {
+            let stake_history = match option_stake_history {
+                Some(stake_history) => stake_history,
+                None => return Err(ProgramError::NotEnoughAccountKeys),
+            };
+
+            // when MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED flag is set on stake_flags,
+            // deactivation is only permitted when the stake delegation activating amount is zero.
+            let status = stake.delegation.stake_activating_and_deactivating(
+                epoch,
+                &stake_history,
+                new_warmup_cooldown_rate_epoch(),
+            );
+
+            if status.activating != 0 {
+                Err(
+                    StakeError::RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted
+                        .turn_into(),
+                )
+            } else {
+                stake.deactivate(epoch).map_err(StakeError::turn_into)?;
+                // After deactivation, need to clear `MustFullyActivateBeforeDeactivationIsPermitted` flag if any.
+                // So that future activation and deactivation are not subject to that restriction.
+                stake_flags
+                    .remove(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED);
+                Ok(())
+            }
+        } else {
+            stake.deactivate(epoch).map_err(StakeError::turn_into)?;
+            Ok(())
+        }
+    } else {
+        stake.deactivate(epoch).map_err(StakeError::turn_into)?;
+        Ok(())
     }
 }
 
@@ -397,6 +475,53 @@ impl Processor {
         Ok(())
     }
 
+    fn process_deactivate(_program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+        let option_stake_history_info = next_account_info(account_info_iter).ok();
+
+        let mut signers = HashSet::new();
+
+        if stake_authority_info.is_signer {
+            signers.insert(*stake_authority_info.key);
+        }
+
+        signers = signers;
+
+        let option_stake_history = option_stake_history_info
+            .and_then(|info| StakeHistoryData::from_account_info(info).ok());
+
+        let stake_state = stake_account_info
+            .deserialize_data()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+
+        match stake_state {
+            StakeStateV2::Stake(meta, mut stake, mut stake_flags) => {
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
+
+                do_deactivate_stake(
+                    &mut stake,
+                    &mut stake_flags,
+                    clock.epoch,
+                    option_stake_history,
+                )?;
+
+                set_stake_state(
+                    stake_account_info,
+                    &StakeStateV2::Stake(meta, stake, stake_flags),
+                )
+            }
+            _ => Err(ProgramError::InvalidAccountData),
+        }?;
+
+        Ok(())
+    }
+
     fn process_set_lockup(
         _program_id: &Pubkey,
         accounts: &[AccountInfo],
@@ -428,7 +553,7 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
-        let optional_new_lockup_authority_info = next_account_info(account_info_iter).ok();
+        let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
         let clock = Clock::get()?;
 
         let mut signers = HashSet::new();
@@ -437,8 +562,7 @@ impl Processor {
             signers.insert(*old_withdraw_or_lockup_authority_info.key);
         }
 
-        let custodian = if let Some(new_lockup_authority_info) = optional_new_lockup_authority_info
-        {
+        let custodian = if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
             if new_lockup_authority_info.is_signer {
                 signers.insert(*new_lockup_authority_info.key);
             }
@@ -494,7 +618,6 @@ impl Processor {
         // and make a new struct StakeHistoryAccountData or something which impls it
         // we just want one function get_entry() which does the same thing as get()
         // and then deprecate get(). itll be fun to write probably
-        // the part that will NOT be fun is getting a local monorepo to build because master is fucked rn
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
                 msg!("Instruction: Initialize");
@@ -512,6 +635,11 @@ impl Processor {
                 }
 
                 Self::process_delegate(program_id, accounts)
+            }
+            StakeInstruction::Deactivate => {
+                msg!("Instruction: Deactivate");
+
+                Self::process_deactivate(program_id, accounts)
             }
             StakeInstruction::SetLockup(lockup) => {
                 msg!("Instruction: SetLockup");
