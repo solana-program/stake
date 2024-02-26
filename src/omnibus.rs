@@ -797,8 +797,6 @@ impl Processor {
             &stake_history,
         )?;
 
-        msg!("HANA dest mergekind: {:#?}", destination_merge_kind);
-
         // Authorized staker is allowed to split/merge accounts
         destination_merge_kind
             .meta()
@@ -814,11 +812,8 @@ impl Processor {
             &stake_history,
         )?;
 
-        msg!("HANA src mergekind: {:#?}", source_merge_kind);
-
         msg!("Merging stake accounts");
         if let Some(merged_state) = destination_merge_kind.merge(source_merge_kind, clock)? {
-            msg!("HANA merged: {:?}", merged_state);
             set_stake_state(destination_stake_account_info, &merged_state)?;
         }
 
@@ -856,9 +851,6 @@ impl Processor {
         // TODO
         // * split: complictated but no blockers
         // * withdraw: complicated, requires stake history
-        // * deactivate: fairly simple, requires stake history
-        // * merge: simple in program but i will need to mess with MergeKind. requires stake history
-        //   update lol mergekind is ours, not program or sdk. easy
         // * getminimumdelegation: probably trivial
         // * deactivatedelinquent: simple but requires deactivate
         // * redelegate: simple, requires stake history
