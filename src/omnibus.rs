@@ -62,6 +62,23 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
         .map_err(|_| ProgramError::InvalidAccountData)
 }
 
+fn collect_signers(
+    account_infos: &[&AccountInfo],
+    checked: bool,
+) -> Result<HashSet<Pubkey>, ProgramError> {
+    let mut signers = HashSet::new();
+
+    for account_info in account_infos {
+        if account_info.is_signer {
+            signers.insert(*account_info.key);
+        } else if checked {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+    }
+
+    Ok(signers)
+}
+
 // XXX impl from<StakeError> for ProgramError. also idk if this is correct
 // i just want to keep the same errors in-place and then clean up later, instead of needing to hunt down the right ones
 // XXX there should also be a better wrapper for TryFrom<InstructionError> for ProgramError
@@ -148,7 +165,7 @@ fn validate_delegated_amount(
 
 fn do_authorize(
     stake_account_info: &AccountInfo,
-    signers: HashSet<Pubkey>,
+    signers: &HashSet<Pubkey>,
     new_authority: &Pubkey,
     authority_type: StakeAuthorize,
     custodian: Option<&Pubkey>,
@@ -159,7 +176,7 @@ fn do_authorize(
             meta.authorized
                 .authorize(
                     &signers,
-                    &new_authority,
+                    new_authority,
                     authority_type,
                     Some((&meta.lockup, clock, custodian)),
                 )
@@ -171,7 +188,7 @@ fn do_authorize(
             meta.authorized
                 .authorize(
                     &signers,
-                    &new_authority,
+                    new_authority,
                     authority_type,
                     Some((&meta.lockup, clock, custodian)),
                 )
@@ -316,27 +333,25 @@ impl Processor {
         let stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let mut signers = HashSet::new();
-
-        if stake_or_withdraw_authority_info.is_signer {
-            signers.insert(*stake_or_withdraw_authority_info.key);
-        }
-
-        let custodian = if let Some(lockup_authority_info) = option_lockup_authority_info {
-            if lockup_authority_info.is_signer {
-                signers.insert(*lockup_authority_info.key);
-            }
-
-            Some(lockup_authority_info.key)
+        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
+        {
+            (
+                collect_signers(
+                    &[stake_or_withdraw_authority_info, lockup_authority_info],
+                    false,
+                )?,
+                Some(lockup_authority_info.key),
+            )
         } else {
-            None
+            (
+                collect_signers(&[stake_or_withdraw_authority_info], false)?,
+                None,
+            )
         };
-
-        let signers = signers;
 
         do_authorize(
             stake_account_info,
-            signers,
+            &signers,
             &new_authority,
             authority_type,
             custodian,
@@ -358,37 +373,35 @@ impl Processor {
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let mut signers = HashSet::new();
-
-        if old_stake_or_withdraw_authority_info.is_signer {
-            signers.insert(*old_stake_or_withdraw_authority_info.key);
+        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
+        {
+            (
+                collect_signers(
+                    &[
+                        old_stake_or_withdraw_authority_info,
+                        new_stake_or_withdraw_authority_info,
+                        lockup_authority_info,
+                    ],
+                    true,
+                )?,
+                Some(lockup_authority_info.key),
+            )
         } else {
-            return Err(ProgramError::MissingRequiredSignature);
-        }
-
-        if new_stake_or_withdraw_authority_info.is_signer {
-            signers.insert(*new_stake_or_withdraw_authority_info.key);
-        } else {
-            return Err(ProgramError::MissingRequiredSignature);
-        }
-
-        let custodian = if let Some(lockup_authority_info) = option_lockup_authority_info {
-            if lockup_authority_info.is_signer {
-                signers.insert(*lockup_authority_info.key);
-            } else {
-                return Err(ProgramError::MissingRequiredSignature);
-            }
-
-            Some(lockup_authority_info.key)
-        } else {
-            None
+            (
+                collect_signers(
+                    &[
+                        old_stake_or_withdraw_authority_info,
+                        new_stake_or_withdraw_authority_info,
+                    ],
+                    true,
+                )?,
+                None,
+            )
         };
-
-        let signers = signers;
 
         do_authorize(
             stake_account_info,
-            signers,
+            &signers,
             new_stake_or_withdraw_authority_info.key,
             authority_type,
             custodian,
@@ -412,13 +425,7 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
-        let mut signers = HashSet::new();
-
-        if stake_authority_info.is_signer {
-            signers.insert(*stake_authority_info.key);
-        }
-
-        let signers = signers;
+        let signers = collect_signers(&[stake_authority_info], false)?;
 
         // XXX when im back on a branch with this
         //let mut vote_state = Box::new(VoteState::default());
@@ -472,13 +479,7 @@ impl Processor {
         let stake_authority_info = next_account_info(account_info_iter)?;
         let option_stake_history_info = next_account_info(account_info_iter).ok();
 
-        let mut signers = HashSet::new();
-
-        if stake_authority_info.is_signer {
-            signers.insert(*stake_authority_info.key);
-        }
-
-        let signers = signers;
+        let signers = collect_signers(&[stake_authority_info], false)?;
 
         let option_stake_history = option_stake_history_info
             .and_then(|info| StakeHistoryData::from_account_info(info).ok());
@@ -513,13 +514,7 @@ impl Processor {
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
         let clock = Clock::get()?;
 
-        let mut signers = HashSet::new();
-
-        if old_withdraw_or_lockup_authority_info.is_signer {
-            signers.insert(*old_withdraw_or_lockup_authority_info.key);
-        }
-
-        let signers = signers;
+        let signers = collect_signers(&[old_withdraw_or_lockup_authority_info], false)?;
 
         do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
 
@@ -536,23 +531,24 @@ impl Processor {
         let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
         let clock = Clock::get()?;
 
-        let mut signers = HashSet::new();
-
-        if old_withdraw_or_lockup_authority_info.is_signer {
-            signers.insert(*old_withdraw_or_lockup_authority_info.key);
-        }
-
-        let custodian = if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
-            if new_lockup_authority_info.is_signer {
-                signers.insert(*new_lockup_authority_info.key);
-            }
-
-            Some(*new_lockup_authority_info.key)
-        } else {
-            None
-        };
-
-        let signers = signers;
+        let (signers, custodian) =
+            if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
+                (
+                    collect_signers(
+                        &[
+                            old_withdraw_or_lockup_authority_info,
+                            new_lockup_authority_info,
+                        ],
+                        true,
+                    )?,
+                    Some(*new_lockup_authority_info.key),
+                )
+            } else {
+                (
+                    collect_signers(&[old_withdraw_or_lockup_authority_info], true)?,
+                    None,
+                )
+            };
 
         let lockup = LockupArgs {
             unix_timestamp: lockup_checked.unix_timestamp,
@@ -573,6 +569,10 @@ impl Processor {
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
+
+        if source_stake_account_info.key == destination_stake_account_info.key {
+            return Err(ProgramError::InvalidArgument);
+        }
 
         let mut signers = HashSet::new();
 
