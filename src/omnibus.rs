@@ -440,60 +440,6 @@ fn do_set_lockup(
     }
 }
 
-// HANA as noted... elsewhere... in a monorepo fork...
-// this is used by Deactivate and DeactivateDelinquent
-// it was added as part of the stake flags pr, to deal with potential abuse of redelegate to force early deactivation
-// unfortunately these instructions (and Redelegate) should require the stake history sysvar but dont
-// i should pr monorepo to get something in under the redelegate feature but i think the move with that is:
-// * redelegate requires stake history (nonbreaking, currently nonactive instruction)
-// * deactivate optionally requires stake history (only for accounts that have been redelegated)
-// * deactivate delinquent optionally requires stake history (only for accounts that have been redelegated)
-//   alternatively we allow deactivate deqlinquent to yolo it but probably the first approach is better
-//   it would technically break backwards compat but i cant imagine there are any workflows that depend on this
-fn do_deactivate_stake(
-    stake: &mut Stake,
-    stake_flags: &mut StakeFlags,
-    epoch: Epoch,
-    option_stake_history: Option<StakeHistoryData>,
-) -> ProgramResult {
-    if crate::FEATURE_STAKE_REDELEGATE_INSTRUCTION {
-        if stake_flags.contains(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED) {
-            let stake_history = match option_stake_history {
-                Some(stake_history) => stake_history,
-                None => return Err(ProgramError::NotEnoughAccountKeys),
-            };
-
-            // when MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED flag is set on stake_flags,
-            // deactivation is only permitted when the stake delegation activating amount is zero.
-            let status = stake.delegation.stake_activating_and_deactivating(
-                epoch,
-                &stake_history,
-                new_warmup_cooldown_rate_epoch(),
-            );
-
-            if status.activating != 0 {
-                Err(
-                    StakeError::RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted
-                        .turn_into(),
-                )
-            } else {
-                stake.deactivate(epoch).map_err(StakeError::turn_into)?;
-                // After deactivation, need to clear `MustFullyActivateBeforeDeactivationIsPermitted` flag if any.
-                // So that future activation and deactivation are not subject to that restriction.
-                stake_flags
-                    .remove(StakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED);
-                Ok(())
-            }
-        } else {
-            stake.deactivate(epoch).map_err(StakeError::turn_into)?;
-            Ok(())
-        }
-    } else {
-        stake.deactivate(epoch).map_err(StakeError::turn_into)?;
-        Ok(())
-    }
-}
-
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -665,17 +611,6 @@ impl Processor {
                     &StakeStateV2::Stake(meta, new_stake_state, StakeFlags::empty()),
                 )
             }
-            StakeStateV2::Stake(meta, mut _stake, _stake_flags) => {
-                meta.authorized
-                    .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
-
-                let ValidatedDelegatedInfo { stake_amount: _ } =
-                    validate_delegated_amount(&stake_account_info, &meta)?;
-
-                // TODO redelegate, then set state
-                unimplemented!()
-            }
             _ => Err(ProgramError::InvalidAccountData),
         }?;
 
@@ -688,25 +623,18 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
-        let option_stake_history_info = next_account_info(account_info_iter).ok();
-
-        let option_stake_history = option_stake_history_info
-            .and_then(|info| StakeHistoryData::from_account_info(info).ok());
 
         let signers = collect_signers(&[stake_authority_info], false)?;
 
         match get_stake_state(stake_account_info)? {
-            StakeStateV2::Stake(meta, mut stake, mut stake_flags) => {
+            StakeStateV2::Stake(meta, mut stake, stake_flags) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(InstructionError::turn_into)?;
 
-                do_deactivate_stake(
-                    &mut stake,
-                    &mut stake_flags,
-                    clock.epoch,
-                    option_stake_history,
-                )?;
+                stake
+                    .deactivate(clock.epoch)
+                    .map_err(StakeError::turn_into)?;
 
                 set_stake_state(
                     stake_account_info,
@@ -854,6 +782,7 @@ impl Processor {
         // * getminimumdelegation: probably trivial
         // * deactivatedelinquent: simple but requires deactivate
         // * redelegate: simple, requires stake history
+        //   update we are officially NOT porting redelegate
         // plus a handful of checked and seed variants
         //
         // stake history doesnt seem too bad honestly
