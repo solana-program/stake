@@ -108,12 +108,6 @@ impl Default for Accounts {
     }
 }
 
-pub async fn advance_epoch(context: &mut ProgramTestContext) {
-    let root_slot = context.banks_client.get_root_slot().await.unwrap();
-    let slots_per_epoch = context.genesis_config().epoch_schedule.slots_per_epoch;
-    context.warp_to_slot(root_slot + slots_per_epoch).unwrap();
-}
-
 pub async fn create_vote(
     banks_client: &mut BanksClient,
     payer: &Keypair,
@@ -511,7 +505,44 @@ async fn hana_test() {
         stake_info
     );
 
-    advance_epoch(&mut context).await;
+    create_independent_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &accounts.alice,
+        &context.last_blockhash,
+        &accounts.bob_stake,
+        &Authorized::auto(&accounts.alice.pubkey()),
+        &Lockup::default(),
+        LAMPORTS_PER_SOL * 5,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.bob_stake.pubkey()).await;
+    println!("HANA {} wtf: {:?}", accounts.bob_stake.pubkey(), stake_info);
+
+    // XXX TODO FIXME lol i was absolutely going crazy for awhile
+    // this merge succeeds because its between inactive and activating
+    // and no mater how many epochs i skip it never changes... because this isnt the real stake program!!!
+    // the validator simulation never updates them lol. so testing in a separate repo will never work
+
+    merge_stake_account(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &accounts.alice_stake.pubkey(),
+        &accounts.bob_stake.pubkey(),
+        &accounts.alice,
+    )
+    .await;
+
+    let stake_info =
+        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
+    println!(
+        "HANA {} merged state: {:?}",
+        accounts.alice_stake.pubkey(),
+        stake_info
+    );
 
     deactivate_stake_account(
         &mut context.banks_client,
