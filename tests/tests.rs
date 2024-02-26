@@ -362,6 +362,23 @@ pub async fn deactivate_stake_account(
     banks_client.process_transaction(transaction).await.unwrap();
 }
 
+pub async fn merge_stake_account(
+    banks_client: &mut BanksClient,
+    payer: &Keypair,
+    recent_blockhash: &Hash,
+    destination_stake: &Pubkey,
+    source_stake: &Pubkey,
+    authorized: &Keypair,
+) {
+    let mut instructions =
+        stake::instruction::merge(destination_stake, source_stake, &authorized.pubkey());
+    instructions[0].program_id = neostake::id();
+
+    let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer.pubkey()));
+    transaction.sign(&[payer, authorized], *recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+}
+
 #[tokio::test]
 async fn hana_test() {
     let mut context = program_test(true).start_with_context().await;

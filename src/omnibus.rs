@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 
 use {
-    crate::{feature_set_die, stake_history_die},
+    crate::{feature_set_die, id, stake_history_die},
     num_traits::cast::ToPrimitive,
     solana_program::{
         account_info::{next_account_info, AccountInfo},
@@ -17,7 +17,6 @@ use {
         stake::state::*,
         stake::{
             instruction::{LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
-            program::id,
             stake_flags::StakeFlags,
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
@@ -40,11 +39,19 @@ use {
 
 /// XXX THIS SECTION is new utility functions and stuff like that
 
+// XXX check for more efficient parser
+fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, ProgramError> {
+    if *stake_account_info.owner != id() {
+        return Err(ProgramError::InvalidAccountOwner);
+    }
+
+    stake_account_info
+        .deserialize_data()
+        .map_err(|_| ProgramError::InvalidAccountData)
+}
+
 // XXX errors changed from GenericError
-fn set_stake_state(
-    stake_account_info: &AccountInfo,
-    new_state: &StakeStateV2,
-) -> Result<(), ProgramError> {
+fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -> ProgramResult {
     let serialized_size =
         bincode::serialized_size(new_state).map_err(|_| ProgramError::InvalidAccountData)?;
     if serialized_size > stake_account_info.data_len() as u64 {
@@ -147,11 +154,7 @@ fn do_authorize(
     custodian: Option<&Pubkey>,
     clock: &Clock,
 ) -> ProgramResult {
-    let stake_state = stake_account_info
-        .deserialize_data()
-        .map_err(|_| ProgramError::InvalidAccountData)?;
-
-    match stake_state {
+    match get_stake_state(stake_account_info)? {
         StakeStateV2::Initialized(mut meta) => {
             meta.authorized
                 .authorize(
@@ -189,11 +192,7 @@ fn do_set_lockup(
     lockup: &LockupArgs,
     clock: &Clock,
 ) -> ProgramResult {
-    let stake_state = stake_account_info
-        .deserialize_data()
-        .map_err(|_| ProgramError::InvalidAccountData)?;
-
-    match stake_state {
+    match get_stake_state(stake_account_info)? {
         StakeStateV2::Initialized(mut meta) => {
             meta.set_lockup(lockup, &signers, clock)
                 .map_err(InstructionError::turn_into)?;
@@ -270,7 +269,6 @@ fn do_deactivate_stake(
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
-        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         authorized: Authorized,
         lockup: Lockup,
@@ -284,10 +282,7 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        if let StakeStateV2::Uninitialized = stake_account_info
-            .deserialize_data()
-            .map_err(|_| ProgramError::InvalidAccountData)?
-        {
+        if let StakeStateV2::Uninitialized = get_stake_state(stake_account_info)? {
             let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
             if stake_account_info.lamports() >= rent_exempt_reserve {
                 let stake_state = StakeStateV2::Initialized(Meta {
@@ -310,7 +305,6 @@ impl Processor {
     }
 
     fn process_authorize(
-        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         new_authority: Pubkey,
         authority_type: StakeAuthorize,
@@ -338,7 +332,7 @@ impl Processor {
             None
         };
 
-        signers = signers;
+        let signers = signers;
 
         do_authorize(
             stake_account_info,
@@ -353,7 +347,6 @@ impl Processor {
     }
 
     fn process_authorize_checked(
-        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         authority_type: StakeAuthorize,
     ) -> ProgramResult {
@@ -391,7 +384,7 @@ impl Processor {
             None
         };
 
-        signers = signers;
+        let signers = signers;
 
         do_authorize(
             stake_account_info,
@@ -405,7 +398,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_delegate(_program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+    fn process_delegate(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
         let vote_account_info = next_account_info(account_info_iter)?;
@@ -425,7 +418,7 @@ impl Processor {
             signers.insert(*stake_authority_info.key);
         }
 
-        signers = signers;
+        let signers = signers;
 
         // XXX when im back on a branch with this
         //let mut vote_state = Box::new(VoteState::default());
@@ -433,11 +426,7 @@ impl Processor {
         //let vote_state = vote_state;
         let vote_state = VoteState::deserialize(&vote_account_info.data.borrow()).unwrap();
 
-        let stake_state = stake_account_info
-            .deserialize_data()
-            .map_err(|_| ProgramError::InvalidAccountData)?;
-
-        match stake_state {
+        match get_stake_state(stake_account_info)? {
             StakeStateV2::Initialized(meta) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
@@ -475,7 +464,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_deactivate(_program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+    fn process_deactivate(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
@@ -489,16 +478,12 @@ impl Processor {
             signers.insert(*stake_authority_info.key);
         }
 
-        signers = signers;
+        let signers = signers;
 
         let option_stake_history = option_stake_history_info
             .and_then(|info| StakeHistoryData::from_account_info(info).ok());
 
-        let stake_state = stake_account_info
-            .deserialize_data()
-            .map_err(|_| ProgramError::InvalidAccountData)?;
-
-        match stake_state {
+        match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, mut stake_flags) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
@@ -522,11 +507,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_set_lockup(
-        _program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        lockup: LockupArgs,
-    ) -> ProgramResult {
+    fn process_set_lockup(accounts: &[AccountInfo], lockup: LockupArgs) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
@@ -538,7 +519,7 @@ impl Processor {
             signers.insert(*old_withdraw_or_lockup_authority_info.key);
         }
 
-        signers = signers;
+        let signers = signers;
 
         do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
 
@@ -546,7 +527,6 @@ impl Processor {
     }
 
     fn process_set_lockup_checked(
-        _program_id: &Pubkey,
         accounts: &[AccountInfo],
         lockup_checked: LockupCheckedArgs,
     ) -> ProgramResult {
@@ -572,7 +552,7 @@ impl Processor {
             None
         };
 
-        signers = signers;
+        let signers = signers;
 
         let lockup = LockupArgs {
             unix_timestamp: lockup_checked.unix_timestamp,
@@ -585,10 +565,34 @@ impl Processor {
         Ok(())
     }
 
+    fn process_merge(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_history_info = next_account_info(account_info_iter)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        let mut signers = HashSet::new();
+
+        if stake_authority_info.is_signer {
+            signers.insert(*stake_authority_info.key);
+        }
+
+        let signers = signers;
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
+        if *program_id != id() {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+
         // XXX limited_deserialize?
         let instruction =
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
@@ -598,6 +602,7 @@ impl Processor {
         // * withdraw: complicated, requires stake history
         // * deactivate: fairly simple, requires stake history
         // * merge: simple in program but i will need to mess with MergeKind. requires stake history
+        //   update lol mergekind is ours, not program or sdk. easy
         // * getminimumdelegation: probably trivial
         // * deactivatedelinquent: simple but requires deactivate
         // * redelegate: simple, requires stake history
@@ -621,11 +626,11 @@ impl Processor {
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
                 msg!("Instruction: Initialize");
-                Self::process_initialize(program_id, accounts, authorize, lockup)
+                Self::process_initialize(accounts, authorize, lockup)
             }
             StakeInstruction::Authorize(new_authority, authority_type) => {
                 msg!("Instruction: Authorize");
-                Self::process_authorize(program_id, accounts, new_authority, authority_type)
+                Self::process_authorize(accounts, new_authority, authority_type)
             }
             StakeInstruction::DelegateStake => {
                 msg!("Instruction: DelegateStake");
@@ -634,24 +639,29 @@ impl Processor {
                     panic!("we only impl the `reduce_stake_warmup_cooldown` logic");
                 }
 
-                Self::process_delegate(program_id, accounts)
+                Self::process_delegate(accounts)
             }
             StakeInstruction::Deactivate => {
                 msg!("Instruction: Deactivate");
 
-                Self::process_deactivate(program_id, accounts)
+                Self::process_deactivate(accounts)
             }
             StakeInstruction::SetLockup(lockup) => {
                 msg!("Instruction: SetLockup");
-                Self::process_set_lockup(program_id, accounts, lockup)
+                Self::process_set_lockup(accounts, lockup)
+            }
+            StakeInstruction::Merge => {
+                msg!("Instruction: Merge");
+
+                Self::process_merge(accounts)
             }
             StakeInstruction::AuthorizeChecked(authority_type) => {
                 msg!("Instruction: AuthorizeChecked");
-                Self::process_authorize_checked(program_id, accounts, authority_type)
+                Self::process_authorize_checked(accounts, authority_type)
             }
             StakeInstruction::SetLockupChecked(lockup_checked) => {
                 msg!("Instruction: SetLockup");
-                Self::process_set_lockup_checked(program_id, accounts, lockup_checked)
+                Self::process_set_lockup_checked(accounts, lockup_checked)
             }
             _ => unimplemented!(),
         }
