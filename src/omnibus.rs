@@ -165,6 +165,89 @@ fn validate_delegated_amount(
     Ok(ValidatedDelegatedInfo { stake_amount })
 }
 
+/// After calling `validate_split_amount()`, this struct contains calculated values that are used
+/// by the caller.
+#[derive(Copy, Clone, Debug, Default)]
+struct ValidatedSplitInfo {
+    source_remaining_balance: u64,
+    destination_rent_exempt_reserve: u64,
+}
+
+/// Ensure the split amount is valid.  This checks the source and destination accounts meet the
+/// minimum balance requirements, which is the rent exempt reserve plus the minimum stake
+/// delegation, and that the source account has enough lamports for the request split amount.  If
+/// not, return an error.
+fn validate_split_amount(
+    source_lamports: u64,
+    destination_lamports: u64,
+    split_lamports: u64,
+    source_meta: &Meta,
+    destination_data_len: usize,
+    additional_required_lamports: u64,
+    source_is_active: bool,
+) -> Result<ValidatedSplitInfo, ProgramError> {
+    // Split amount has to be something
+    if split_lamports == 0 {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    // Obviously cannot split more than what the source account has
+    if split_lamports > source_lamports {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    // Verify that the source account still has enough lamports left after splitting:
+    // EITHER at least the minimum balance, OR zero (in this case the source
+    // account is transferring all lamports to new destination account, and the source
+    // account will be closed)
+    let source_minimum_balance = source_meta
+        .rent_exempt_reserve
+        .saturating_add(additional_required_lamports);
+    let source_remaining_balance = source_lamports.saturating_sub(split_lamports);
+    if source_remaining_balance == 0 {
+        // full amount is a withdrawal
+        // nothing to do here
+    } else if source_remaining_balance < source_minimum_balance {
+        // the remaining balance is too low to do the split
+        return Err(ProgramError::InsufficientFunds);
+    } else {
+        // all clear!
+        // nothing to do here
+    }
+
+    let rent = Rent::get()?;
+    let destination_rent_exempt_reserve = rent.minimum_balance(destination_data_len);
+
+    // As of feature `require_rent_exempt_split_destination`, if the source is active stake, one of
+    // these criteria must be met:
+    // 1. the destination account must be prefunded with at least the rent-exempt reserve, or
+    // 2. the split must consume 100% of the source
+    if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION
+        && source_is_active
+        && source_remaining_balance != 0
+        && destination_lamports < destination_rent_exempt_reserve
+    {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    // Verify the destination account meets the minimum balance requirements
+    // This must handle:
+    // 1. The destination account having a different rent exempt reserve due to data size changes
+    // 2. The destination account being prefunded, which would lower the minimum split amount
+    let destination_minimum_balance =
+        destination_rent_exempt_reserve.saturating_add(additional_required_lamports);
+    let destination_balance_deficit =
+        destination_minimum_balance.saturating_sub(destination_lamports);
+    if split_lamports < destination_balance_deficit {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    Ok(ValidatedSplitInfo {
+        source_remaining_balance,
+        destination_rent_exempt_reserve,
+    })
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum MergeKind {
     Inactive(Meta, u64, StakeFlags),
@@ -714,6 +797,8 @@ impl Processor {
             return Err(ProgramError::InvalidArgument);
         }
 
+        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
+        // do it after i can test this program lol
         let signers = collect_signers(&[stake_authority_info], false)?;
 
         msg!("Checking if destination stake is mergeable");
@@ -764,10 +849,199 @@ impl Processor {
         Ok(())
     }
 
+    fn process_split(accounts: &[AccountInfo], split_lamports: u64) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
+        let signers = collect_signers(&[stake_authority_info], false)?;
+
+        let destination_data_len = destination_stake_account_info.data_len();
+        if destination_data_len != StakeStateV2::size_of() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        if let StakeStateV2::Uninitialized = get_stake_state(destination_stake_account_info)? {
+            // we can split into this
+        } else {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let source_lamport_balance = source_stake_account_info.lamports();
+        let destination_lamport_balance = destination_stake_account_info.lamports();
+
+        if split_lamports > source_lamport_balance {
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        match get_stake_state(source_stake_account_info)? {
+            StakeStateV2::Stake(source_meta, mut source_stake, stake_flags) => {
+                source_meta
+                    .authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
+
+                let minimum_delegation = crate::get_minimum_delegation();
+
+                // XXX TODO FIXME get_stake_status turns out... to require stake history which isnt passed in as an account
+                // all of my wonderful plans are laid to waste. this is going to cause problems
+                // XXX ok maybe i can work around this. all we are trying to do is see if there is any effective stake at all
+                // i will need to actually understand stake history for this but
+                // it is possible we can just be more conservative. and say "if it looks like it might be active, its active"
+                // i think we can. this can *only* return false if we are gte our activation epoch but nothing is active yet
+                // which... basically never happens. and then this value is used in validate_split_amount
+                // which is like. "if feature is active and source is active and not splitting 100%
+                // *and* destination is below the reserve requirement then error
+                // which means without stake history we just say... wait thats unfortunately not true
+                // because a *deactivated* stake could never be split... and there are plausible usecases for that
+                // i think we are fucked. unless we just say. you have to pass in stake history if splitting deactive
+                let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
+                    let clock = Clock::get()?;
+                    let stake_history = &StakeHistoryData::default(); // FIXME
+                    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
+
+                    let status = source_stake.delegation.stake_activating_and_deactivating(
+                        clock.epoch,
+                        stake_history,
+                        new_rate_activation_epoch,
+                    );
+
+                    status.effective > 0
+                } else {
+                    false
+                };
+
+                // XXX note this function also internally summons Rent via syscall
+                let validated_split_info = validate_split_amount(
+                    source_lamport_balance,
+                    destination_lamport_balance,
+                    split_lamports,
+                    &source_meta,
+                    destination_data_len,
+                    minimum_delegation,
+                    is_active,
+                )?;
+
+                // split the stake, subtract rent_exempt_balance unless
+                // the destination account already has those lamports
+                // in place.
+                // this means that the new stake account will have a stake equivalent to
+                // lamports minus rent_exempt_reserve if it starts out with a zero balance
+                let (remaining_stake_delta, split_stake_amount) =
+                    if validated_split_info.source_remaining_balance == 0 {
+                        // If split amount equals the full source stake (as implied by 0
+                        // source_remaining_balance), the new split stake must equal the same
+                        // amount, regardless of any current lamport balance in the split account.
+                        // Since split accounts retain the state of their source account, this
+                        // prevents any magic activation of stake by prefunding the split account.
+                        //
+                        // The new split stake also needs to ignore any positive delta between the
+                        // original rent_exempt_reserve and the split_rent_exempt_reserve, in order
+                        // to prevent magic activation of stake by splitting between accounts of
+                        // different sizes.
+                        let remaining_stake_delta =
+                            split_lamports.saturating_sub(source_meta.rent_exempt_reserve);
+                        (remaining_stake_delta, remaining_stake_delta)
+                    } else {
+                        // Otherwise, the new split stake should reflect the entire split
+                        // requested, less any lamports needed to cover the split_rent_exempt_reserve.
+                        if source_stake.delegation.stake.saturating_sub(split_lamports)
+                            < minimum_delegation
+                        {
+                            return Err(StakeError::InsufficientDelegation.turn_into());
+                        }
+
+                        (
+                            split_lamports,
+                            split_lamports.saturating_sub(
+                                validated_split_info
+                                    .destination_rent_exempt_reserve
+                                    .saturating_sub(destination_lamport_balance),
+                            ),
+                        )
+                    };
+
+                if split_stake_amount < minimum_delegation {
+                    return Err(StakeError::InsufficientDelegation.turn_into());
+                }
+
+                let destination_stake = source_stake
+                    .split(remaining_stake_delta, split_stake_amount)
+                    .map_err(StakeError::turn_into)?;
+
+                let mut destination_meta = source_meta;
+                destination_meta.rent_exempt_reserve =
+                    validated_split_info.destination_rent_exempt_reserve;
+
+                set_stake_state(
+                    source_stake_account_info,
+                    &StakeStateV2::Stake(source_meta, source_stake, stake_flags),
+                )?;
+
+                set_stake_state(
+                    destination_stake_account_info,
+                    &StakeStateV2::Stake(destination_meta, destination_stake, stake_flags),
+                )?;
+            }
+            StakeStateV2::Initialized(source_meta) => {
+                source_meta
+                    .authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
+
+                // XXX note this function also internally summons Rent via syscall
+                let validated_split_info = validate_split_amount(
+                    source_lamport_balance,
+                    destination_lamport_balance,
+                    split_lamports,
+                    &source_meta,
+                    destination_data_len,
+                    0,     // additional_required_lamports
+                    false, // is_active
+                )?;
+
+                let mut destination_meta = source_meta;
+                destination_meta.rent_exempt_reserve =
+                    validated_split_info.destination_rent_exempt_reserve;
+
+                set_stake_state(
+                    destination_stake_account_info,
+                    &StakeStateV2::Initialized(destination_meta),
+                )?;
+            }
+            StakeStateV2::Uninitialized => {
+                if !signers.contains(source_stake_account_info.key) {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
+        }
+
+        // Deinitialize state upon zero balance
+        if split_lamports == source_lamport_balance {
+            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+        }
+
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
+        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
+        **source_lamports = source_lamports
+            .checked_sub(split_lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
+        **destination_lamports = destination_lamports
+            .checked_add(split_lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        Ok(())
+    }
+
     fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let recipient_account_info = next_account_info(account_info_iter)?;
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
@@ -790,7 +1064,7 @@ impl Processor {
             (collect_signers(&[withdraw_authority_info], true)?, None)
         };
 
-        let (lockup, reserve, is_staked) = match get_stake_state(stake_account_info)? {
+        let (lockup, reserve, is_staked) = match get_stake_state(source_stake_account_info)? {
             StakeStateV2::Stake(meta, stake, _stake_flag) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Withdrawer)
@@ -818,7 +1092,7 @@ impl Processor {
                 (meta.lockup, meta.rent_exempt_reserve, false)
             }
             StakeStateV2::Uninitialized => {
-                if !signers.contains(stake_account_info.key) {
+                if !signers.contains(source_stake_account_info.key) {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
                 (Lockup::default(), 0, false) // no lockup, no restrictions
@@ -833,7 +1107,7 @@ impl Processor {
         }
 
         let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
-        let stake_account_lamports = stake_account_info.lamports();
+        let stake_account_lamports = source_stake_account_info.lamports();
 
         // if the stake is active, we mustn't allow the account to go away
         if is_staked && withdraw_lamports_and_reserve > stake_account_lamports {
@@ -851,16 +1125,16 @@ impl Processor {
 
         // Deinitialize state upon zero balance
         if withdraw_lamports == stake_account_lamports {
-            set_stake_state(stake_account_info, &StakeStateV2::Uninitialized)?;
+            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
         }
 
         // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = stake_account_info.try_borrow_mut_lamports()?;
+        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
         **source_lamports = source_lamports
             .checked_sub(withdraw_lamports)
             .ok_or(ProgramError::InsufficientFunds)?;
 
-        let mut destination_lamports = recipient_account_info.try_borrow_mut_lamports()?;
+        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
         **destination_lamports = destination_lamports
             .checked_add(withdraw_lamports)
             .ok_or(ProgramError::InsufficientFunds)?;
@@ -936,6 +1210,11 @@ impl Processor {
                 msg!("Instruction: Merge");
 
                 Self::process_merge(accounts)
+            }
+            StakeInstruction::Split(lamports) => {
+                msg!("Instruction: Split");
+
+                Self::process_split(accounts, lamports)
             }
             StakeInstruction::Withdraw(lamports) => {
                 msg!("Instruction: Withdraw");
