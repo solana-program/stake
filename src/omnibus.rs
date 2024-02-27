@@ -10,6 +10,7 @@ use {
         entrypoint::ProgramResult,
         instruction::InstructionError,
         msg,
+        program::set_return_data,
         program_error::ProgramError,
         program_utils::limited_deserialize,
         pubkey::Pubkey,
@@ -48,6 +49,18 @@ fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, Pro
     stake_account_info
         .deserialize_data()
         .map_err(|_| ProgramError::InvalidAccountData)
+}
+
+fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
+    if *vote_account_info.owner != solana_vote_program::id() {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    let mut vote_state = Box::new(VoteState::default());
+    VoteState::deserialize_into(&vote_account_info.data.borrow(), &mut vote_state)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+
+    Ok(vote_state)
 }
 
 // XXX errors changed from GenericError
@@ -661,17 +674,9 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        if *vote_account_info.owner != solana_vote_program::id() {
-            return Err(ProgramError::IncorrectProgramId);
-        }
-
         let signers = collect_signers(&[stake_authority_info], false)?;
 
-        // XXX when im back on a branch with this
-        //let mut vote_state = Box::new(VoteState::default());
-        //VoteState::deserialize_into(&vote_account_info.data.borrow(), &mut vote_state).unwrap();
-        //let vote_state = vote_state;
-        let vote_state = VoteState::deserialize(&vote_account_info.data.borrow()).unwrap();
+        let vote_state = get_vote_state(vote_account_info)?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Initialized(meta) => {
@@ -725,6 +730,49 @@ impl Processor {
                 )
             }
             _ => Err(ProgramError::InvalidAccountData),
+        }?;
+
+        Ok(())
+    }
+
+    fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
+        let reference_vote_account_info = next_account_info(account_info_iter)?;
+        let clock = Clock::get()?;
+
+        let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
+        let reference_vote_state = get_vote_state(reference_vote_account_info)?;
+
+        if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
+            return Err(StakeError::InsufficientReferenceVotes.turn_into());
+        }
+
+        if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
+            get_stake_state(stake_account_info)?
+        {
+            if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
+                return Err(StakeError::VoteAddressMismatch.turn_into());
+            }
+
+            // Deactivate the stake account if its delegated vote account has never voted or has not
+            // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
+            if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
+            {
+                stake
+                    .deactivate(clock.epoch)
+                    .map_err(StakeError::turn_into)?;
+
+                set_stake_state(
+                    stake_account_info,
+                    &StakeStateV2::Stake(meta, stake, stake_flags),
+                )
+            } else {
+                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.turn_into())
+            }
+        } else {
+            Err(ProgramError::InvalidAccountData)
         }?;
 
         Ok(())
@@ -1156,9 +1204,6 @@ impl Processor {
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
         // TODO
-        // * split: complictated but no blockers
-        // * withdraw: complicated, requires stake history
-        // * getminimumdelegation: probably trivial
         // * deactivatedelinquent: simple but requires deactivate
         // * redelegate: simple, requires stake history
         //   update we are officially NOT porting redelegate
@@ -1202,23 +1247,25 @@ impl Processor {
 
                 Self::process_deactivate(accounts)
             }
+            StakeInstruction::DeactivateDelinquent => {
+                msg!("Instruction: DeactivateDelinquent");
+
+                Self::process_deactivate_delinquent(accounts)
+            }
             StakeInstruction::SetLockup(lockup) => {
                 msg!("Instruction: SetLockup");
                 Self::process_set_lockup(accounts, lockup)
             }
             StakeInstruction::Merge => {
                 msg!("Instruction: Merge");
-
                 Self::process_merge(accounts)
             }
             StakeInstruction::Split(lamports) => {
                 msg!("Instruction: Split");
-
                 Self::process_split(accounts, lamports)
             }
             StakeInstruction::Withdraw(lamports) => {
                 msg!("Instruction: Withdraw");
-
                 Self::process_withdraw(accounts, lamports)
             }
             StakeInstruction::AuthorizeChecked(authority_type) => {
@@ -1229,7 +1276,16 @@ impl Processor {
                 msg!("Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
             }
-            _ => unimplemented!(),
+            StakeInstruction::Redelegate => unimplemented!(), // wontfix
+            StakeInstruction::GetMinimumDelegation => {
+                msg!("Instruction: GetMinimumDelegation");
+                let minimum_delegation = crate::get_minimum_delegation();
+                set_return_data(&minimum_delegation.to_le_bytes());
+                Ok(())
+            }
+            StakeInstruction::AuthorizeWithSeed(_) => todo!(),
+            StakeInstruction::InitializeChecked => todo!(),
+            StakeInstruction::AuthorizeCheckedWithSeed(_) => todo!(),
         }
     }
 }
