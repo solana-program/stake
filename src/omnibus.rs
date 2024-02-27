@@ -75,21 +75,38 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
         .map_err(|_| ProgramError::InvalidAccountData)
 }
 
-fn collect_signers(
-    account_infos: &[&AccountInfo],
+// various monorepo functions expect a HashSet of signer pubkeys. this constructs it
+// the unchecked mode doesnt add pubkeys of non-signers, relying on downstream errors if a required signer is missing
+// the checked mode expects every AccountInfo passed in should be a signer and errors if any is not
+fn collect_signers<'a>(
+    accounts: &[&'a AccountInfo],
+    optional_account: Option<&'a AccountInfo>,
     checked: bool,
-) -> Result<HashSet<Pubkey>, ProgramError> {
+) -> Result<(HashSet<Pubkey>, Option<&'a Pubkey>), ProgramError> {
     let mut signers = HashSet::new();
 
-    for account_info in account_infos {
-        if account_info.is_signer {
-            signers.insert(*account_info.key);
+    for account in accounts {
+        if account.is_signer {
+            signers.insert(*account.key);
         } else if checked {
             return Err(ProgramError::MissingRequiredSignature);
         }
     }
 
-    Ok(signers)
+    let custodian = if let Some(account) = optional_account {
+        if account.is_signer {
+            signers.insert(*account.key);
+            Some(account.key)
+        } else if checked {
+            return Err(ProgramError::MissingRequiredSignature);
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    Ok((signers, custodian))
 }
 
 pub fn checked_add(a: u64, b: u64) -> Result<u64, ProgramError> {
@@ -586,21 +603,11 @@ impl Processor {
         let stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
-        {
-            (
-                collect_signers(
-                    &[stake_or_withdraw_authority_info, lockup_authority_info],
-                    false,
-                )?,
-                Some(lockup_authority_info.key),
-            )
-        } else {
-            (
-                collect_signers(&[stake_or_withdraw_authority_info], false)?,
-                None,
-            )
-        };
+        let (signers, custodian) = collect_signers(
+            &[stake_or_withdraw_authority_info],
+            option_lockup_authority_info,
+            false,
+        )?;
 
         do_authorize(
             stake_account_info,
@@ -624,7 +631,7 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        let signers = collect_signers(&[stake_authority_info], false)?;
+        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         let vote_state = get_vote_state(vote_account_info)?;
 
@@ -662,7 +669,7 @@ impl Processor {
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
-        let signers = collect_signers(&[stake_authority_info], false)?;
+        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         let destination_data_len = destination_stake_account_info.data_len();
         if destination_data_len != StakeStateV2::size_of() {
@@ -860,15 +867,11 @@ impl Processor {
 
         // this is somewhat subtle, but if the stake account is Uninitialized, you pass it twice and sign
         // ie, Initialized or Stake, we use real withdraw authority. Uninitialized, stake account is its own authority
-        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
-        {
-            (
-                collect_signers(&[withdraw_authority_info, lockup_authority_info], true)?,
-                Some(lockup_authority_info.key),
-            )
-        } else {
-            (collect_signers(&[withdraw_authority_info], true)?, None)
-        };
+        let (signers, custodian) = collect_signers(
+            &[withdraw_authority_info],
+            option_lockup_authority_info,
+            true,
+        )?;
 
         let (lockup, reserve, is_staked) = match get_stake_state(source_stake_account_info)? {
             StakeStateV2::Stake(meta, stake, _stake_flag) => {
@@ -955,7 +958,7 @@ impl Processor {
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        let signers = collect_signers(&[stake_authority_info], false)?;
+        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
@@ -984,7 +987,7 @@ impl Processor {
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
         let clock = Clock::get()?;
 
-        let signers = collect_signers(&[old_withdraw_or_lockup_authority_info], false)?;
+        let (signers, _) = collect_signers(&[old_withdraw_or_lockup_authority_info], None, false)?;
 
         do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
 
@@ -1007,7 +1010,7 @@ impl Processor {
 
         // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
         // do it after i can test this program lol
-        let signers = collect_signers(&[stake_authority_info], false)?;
+        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         msg!("Checking if destination stake is mergeable");
         let destination_merge_kind = MergeKind::get_if_mergeable(
@@ -1073,31 +1076,14 @@ impl Processor {
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
-        {
-            (
-                collect_signers(
-                    &[
-                        old_stake_or_withdraw_authority_info,
-                        new_stake_or_withdraw_authority_info,
-                        lockup_authority_info,
-                    ],
-                    true,
-                )?,
-                Some(lockup_authority_info.key),
-            )
-        } else {
-            (
-                collect_signers(
-                    &[
-                        old_stake_or_withdraw_authority_info,
-                        new_stake_or_withdraw_authority_info,
-                    ],
-                    true,
-                )?,
-                None,
-            )
-        };
+        let (signers, custodian) = collect_signers(
+            &[
+                old_stake_or_withdraw_authority_info,
+                new_stake_or_withdraw_authority_info,
+            ],
+            option_lockup_authority_info,
+            true,
+        )?;
 
         do_authorize(
             stake_account_info,
@@ -1123,29 +1109,16 @@ impl Processor {
         let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
         let clock = Clock::get()?;
 
-        let (signers, custodian) =
-            if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
-                (
-                    collect_signers(
-                        &[
-                            old_withdraw_or_lockup_authority_info,
-                            new_lockup_authority_info,
-                        ],
-                        true,
-                    )?,
-                    Some(*new_lockup_authority_info.key),
-                )
-            } else {
-                (
-                    collect_signers(&[old_withdraw_or_lockup_authority_info], true)?,
-                    None,
-                )
-            };
+        let (signers, custodian) = collect_signers(
+            &[old_withdraw_or_lockup_authority_info],
+            option_new_lockup_authority_info,
+            true,
+        )?;
 
         let lockup = LockupArgs {
             unix_timestamp: lockup_checked.unix_timestamp,
             epoch: lockup_checked.epoch,
-            custodian,
+            custodian: custodian.copied(),
         };
 
         do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
