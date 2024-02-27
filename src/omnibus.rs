@@ -487,6 +487,34 @@ fn stake_weighted_credits_observed(
 
 /// XXX THIS SECTION is the new processor
 
+fn do_initialize(
+    stake_account_info: &AccountInfo,
+    authorized: Authorized,
+    lockup: Lockup,
+    rent: &Rent,
+) -> ProgramResult {
+    if stake_account_info.data_len() != StakeStateV2::size_of() {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    if let StakeStateV2::Uninitialized = get_stake_state(stake_account_info)? {
+        let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
+        if stake_account_info.lamports() >= rent_exempt_reserve {
+            let stake_state = StakeStateV2::Initialized(Meta {
+                rent_exempt_reserve,
+                authorized,
+                lockup,
+            });
+
+            set_stake_state(stake_account_info, &stake_state)
+        } else {
+            Err(ProgramError::InsufficientFunds)
+        }
+    } else {
+        Err(ProgramError::InvalidAccountData)
+    }
+}
+
 fn do_authorize(
     stake_account_info: &AccountInfo,
     signers: &HashSet<Pubkey>,
@@ -565,28 +593,7 @@ impl Processor {
         let rent_info = next_account_info(account_info_iter)?;
         let rent = &Rent::from_account_info(rent_info)?;
 
-        if stake_account_info.data_len() != StakeStateV2::size_of() {
-            return Err(ProgramError::InvalidAccountData);
-        }
-
-        if let StakeStateV2::Uninitialized = get_stake_state(stake_account_info)? {
-            let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
-            if stake_account_info.lamports() >= rent_exempt_reserve {
-                let stake_state = StakeStateV2::Initialized(Meta {
-                    rent_exempt_reserve,
-                    authorized,
-                    lockup,
-                });
-
-                set_stake_state(stake_account_info, &stake_state)?;
-
-                Ok(()) // XXX the above error as-written is InstructionError::GenericError
-            } else {
-                Err(ProgramError::InsufficientFunds)
-            }
-        } else {
-            Err(ProgramError::InvalidAccountData)
-        }?;
+        do_initialize(stake_account_info, authorized, lockup, rent)?;
 
         Ok(())
     }
@@ -1062,7 +1069,27 @@ impl Processor {
 
     // TODO auth with seed
 
-    // TODO init checked
+    fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let rent_info = next_account_info(account_info_iter)?;
+        let rent = &Rent::from_account_info(rent_info)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+        let withdraw_authority_info = next_account_info(account_info_iter)?;
+
+        if !withdraw_authority_info.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let authorized = Authorized {
+            staker: *stake_authority_info.key,
+            withdrawer: *withdraw_authority_info.key,
+        };
+
+        do_initialize(stake_account_info, authorized, Lockup::default(), rent)?;
+
+        Ok(())
+    }
 
     fn process_authorize_checked(
         accounts: &[AccountInfo],
@@ -1237,7 +1264,10 @@ impl Processor {
                 Self::process_merge(accounts)
             }
             StakeInstruction::AuthorizeWithSeed(_) => todo!(),
-            StakeInstruction::InitializeChecked => todo!(),
+            StakeInstruction::InitializeChecked => {
+                msg!("Instruction: InitializeChecked");
+                Self::process_initialize_checked(accounts)
+            }
             StakeInstruction::AuthorizeChecked(authority_type) => {
                 msg!("Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(accounts, authority_type)
