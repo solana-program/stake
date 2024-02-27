@@ -614,56 +614,6 @@ impl Processor {
         Ok(())
     }
 
-    fn process_authorize_checked(
-        accounts: &[AccountInfo],
-        authority_type: StakeAuthorize,
-    ) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
-        let old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
-        {
-            (
-                collect_signers(
-                    &[
-                        old_stake_or_withdraw_authority_info,
-                        new_stake_or_withdraw_authority_info,
-                        lockup_authority_info,
-                    ],
-                    true,
-                )?,
-                Some(lockup_authority_info.key),
-            )
-        } else {
-            (
-                collect_signers(
-                    &[
-                        old_stake_or_withdraw_authority_info,
-                        new_stake_or_withdraw_authority_info,
-                    ],
-                    true,
-                )?,
-                None,
-            )
-        };
-
-        do_authorize(
-            stake_account_info,
-            &signers,
-            new_stake_or_withdraw_authority_info.key,
-            authority_type,
-            custodian,
-            clock,
-        )?;
-
-        Ok(())
-    }
-
     fn process_delegate(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let stake_account_info = next_account_info(account_info_iter)?;
@@ -701,198 +651,6 @@ impl Processor {
             }
             _ => Err(ProgramError::InvalidAccountData),
         }?;
-
-        Ok(())
-    }
-
-    fn process_deactivate(accounts: &[AccountInfo]) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
-
-        let signers = collect_signers(&[stake_authority_info], false)?;
-
-        match get_stake_state(stake_account_info)? {
-            StakeStateV2::Stake(meta, mut stake, stake_flags) => {
-                meta.authorized
-                    .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
-
-                stake
-                    .deactivate(clock.epoch)
-                    .map_err(StakeError::turn_into)?;
-
-                set_stake_state(
-                    stake_account_info,
-                    &StakeStateV2::Stake(meta, stake, stake_flags),
-                )
-            }
-            _ => Err(ProgramError::InvalidAccountData),
-        }?;
-
-        Ok(())
-    }
-
-    fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
-        let reference_vote_account_info = next_account_info(account_info_iter)?;
-        let clock = Clock::get()?;
-
-        let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
-        let reference_vote_state = get_vote_state(reference_vote_account_info)?;
-
-        if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
-            return Err(StakeError::InsufficientReferenceVotes.turn_into());
-        }
-
-        if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
-            get_stake_state(stake_account_info)?
-        {
-            if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
-                return Err(StakeError::VoteAddressMismatch.turn_into());
-            }
-
-            // Deactivate the stake account if its delegated vote account has never voted or has not
-            // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
-            if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
-            {
-                stake
-                    .deactivate(clock.epoch)
-                    .map_err(StakeError::turn_into)?;
-
-                set_stake_state(
-                    stake_account_info,
-                    &StakeStateV2::Stake(meta, stake, stake_flags),
-                )
-            } else {
-                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.turn_into())
-            }
-        } else {
-            Err(ProgramError::InvalidAccountData)
-        }?;
-
-        Ok(())
-    }
-
-    fn process_set_lockup(accounts: &[AccountInfo], lockup: LockupArgs) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
-        let clock = Clock::get()?;
-
-        let signers = collect_signers(&[old_withdraw_or_lockup_authority_info], false)?;
-
-        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
-
-        Ok(())
-    }
-
-    fn process_set_lockup_checked(
-        accounts: &[AccountInfo],
-        lockup_checked: LockupCheckedArgs,
-    ) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
-        let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
-        let clock = Clock::get()?;
-
-        let (signers, custodian) =
-            if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
-                (
-                    collect_signers(
-                        &[
-                            old_withdraw_or_lockup_authority_info,
-                            new_lockup_authority_info,
-                        ],
-                        true,
-                    )?,
-                    Some(*new_lockup_authority_info.key),
-                )
-            } else {
-                (
-                    collect_signers(&[old_withdraw_or_lockup_authority_info], true)?,
-                    None,
-                )
-            };
-
-        let lockup = LockupArgs {
-            unix_timestamp: lockup_checked.unix_timestamp,
-            epoch: lockup_checked.epoch,
-            custodian,
-        };
-
-        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
-
-        Ok(())
-    }
-
-    fn process_merge(accounts: &[AccountInfo]) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let destination_stake_account_info = next_account_info(account_info_iter)?;
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
-        let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
-
-        if source_stake_account_info.key == destination_stake_account_info.key {
-            return Err(ProgramError::InvalidArgument);
-        }
-
-        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
-        // do it after i can test this program lol
-        let signers = collect_signers(&[stake_authority_info], false)?;
-
-        msg!("Checking if destination stake is mergeable");
-        let destination_merge_kind = MergeKind::get_if_mergeable(
-            &get_stake_state(destination_stake_account_info)?,
-            destination_stake_account_info.lamports(),
-            clock,
-            stake_history,
-        )?;
-
-        // Authorized staker is allowed to split/merge accounts
-        destination_merge_kind
-            .meta()
-            .authorized
-            .check(&signers, StakeAuthorize::Staker)
-            .map_err(|_| ProgramError::MissingRequiredSignature)?;
-
-        msg!("Checking if source stake is mergeable");
-        let source_merge_kind = MergeKind::get_if_mergeable(
-            &get_stake_state(source_stake_account_info)?,
-            source_stake_account_info.lamports(),
-            clock,
-            stake_history,
-        )?;
-
-        msg!("Merging stake accounts");
-        if let Some(merged_state) = destination_merge_kind.merge(source_merge_kind, clock)? {
-            set_stake_state(destination_stake_account_info, &merged_state)?;
-        }
-
-        // Source is about to be drained, deinitialize its state
-        set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
-
-        // Drain the source stake account
-        let lamports = source_stake_account_info.lamports();
-
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-        **source_lamports = source_lamports
-            .checked_sub(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
-
-        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
-        **destination_lamports = destination_lamports
-            .checked_add(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
 
         Ok(())
     }
@@ -1190,6 +948,254 @@ impl Processor {
         Ok(())
     }
 
+    fn process_deactivate(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        let signers = collect_signers(&[stake_authority_info], false)?;
+
+        match get_stake_state(stake_account_info)? {
+            StakeStateV2::Stake(meta, mut stake, stake_flags) => {
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
+
+                stake
+                    .deactivate(clock.epoch)
+                    .map_err(StakeError::turn_into)?;
+
+                set_stake_state(
+                    stake_account_info,
+                    &StakeStateV2::Stake(meta, stake, stake_flags),
+                )
+            }
+            _ => Err(ProgramError::InvalidAccountData),
+        }?;
+
+        Ok(())
+    }
+
+    fn process_set_lockup(accounts: &[AccountInfo], lockup: LockupArgs) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
+        let clock = Clock::get()?;
+
+        let signers = collect_signers(&[old_withdraw_or_lockup_authority_info], false)?;
+
+        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
+
+        Ok(())
+    }
+
+    fn process_merge(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        if source_stake_account_info.key == destination_stake_account_info.key {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
+        // do it after i can test this program lol
+        let signers = collect_signers(&[stake_authority_info], false)?;
+
+        msg!("Checking if destination stake is mergeable");
+        let destination_merge_kind = MergeKind::get_if_mergeable(
+            &get_stake_state(destination_stake_account_info)?,
+            destination_stake_account_info.lamports(),
+            clock,
+            stake_history,
+        )?;
+
+        // Authorized staker is allowed to split/merge accounts
+        destination_merge_kind
+            .meta()
+            .authorized
+            .check(&signers, StakeAuthorize::Staker)
+            .map_err(|_| ProgramError::MissingRequiredSignature)?;
+
+        msg!("Checking if source stake is mergeable");
+        let source_merge_kind = MergeKind::get_if_mergeable(
+            &get_stake_state(source_stake_account_info)?,
+            source_stake_account_info.lamports(),
+            clock,
+            stake_history,
+        )?;
+
+        msg!("Merging stake accounts");
+        if let Some(merged_state) = destination_merge_kind.merge(source_merge_kind, clock)? {
+            set_stake_state(destination_stake_account_info, &merged_state)?;
+        }
+
+        // Source is about to be drained, deinitialize its state
+        set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+
+        // Drain the source stake account
+        let lamports = source_stake_account_info.lamports();
+
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
+        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
+        **source_lamports = source_lamports
+            .checked_sub(lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
+        **destination_lamports = destination_lamports
+            .checked_add(lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        Ok(())
+    }
+
+    // TODO auth with seed
+
+    // TODO init checked
+
+    fn process_authorize_checked(
+        accounts: &[AccountInfo],
+        authority_type: StakeAuthorize,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
+        {
+            (
+                collect_signers(
+                    &[
+                        old_stake_or_withdraw_authority_info,
+                        new_stake_or_withdraw_authority_info,
+                        lockup_authority_info,
+                    ],
+                    true,
+                )?,
+                Some(lockup_authority_info.key),
+            )
+        } else {
+            (
+                collect_signers(
+                    &[
+                        old_stake_or_withdraw_authority_info,
+                        new_stake_or_withdraw_authority_info,
+                    ],
+                    true,
+                )?,
+                None,
+            )
+        };
+
+        do_authorize(
+            stake_account_info,
+            &signers,
+            new_stake_or_withdraw_authority_info.key,
+            authority_type,
+            custodian,
+            clock,
+        )?;
+
+        Ok(())
+    }
+
+    // TODO auth checked with seed
+
+    fn process_set_lockup_checked(
+        accounts: &[AccountInfo],
+        lockup_checked: LockupCheckedArgs,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
+        let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
+        let clock = Clock::get()?;
+
+        let (signers, custodian) =
+            if let Some(new_lockup_authority_info) = option_new_lockup_authority_info {
+                (
+                    collect_signers(
+                        &[
+                            old_withdraw_or_lockup_authority_info,
+                            new_lockup_authority_info,
+                        ],
+                        true,
+                    )?,
+                    Some(*new_lockup_authority_info.key),
+                )
+            } else {
+                (
+                    collect_signers(&[old_withdraw_or_lockup_authority_info], true)?,
+                    None,
+                )
+            };
+
+        let lockup = LockupArgs {
+            unix_timestamp: lockup_checked.unix_timestamp,
+            epoch: lockup_checked.epoch,
+            custodian,
+        };
+
+        do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
+
+        Ok(())
+    }
+
+    fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
+        let reference_vote_account_info = next_account_info(account_info_iter)?;
+        let clock = Clock::get()?;
+
+        let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
+        let reference_vote_state = get_vote_state(reference_vote_account_info)?;
+
+        if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
+            return Err(StakeError::InsufficientReferenceVotes.turn_into());
+        }
+
+        if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
+            get_stake_state(stake_account_info)?
+        {
+            if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
+                return Err(StakeError::VoteAddressMismatch.turn_into());
+            }
+
+            // Deactivate the stake account if its delegated vote account has never voted or has not
+            // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
+            if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
+            {
+                stake
+                    .deactivate(clock.epoch)
+                    .map_err(StakeError::turn_into)?;
+
+                set_stake_state(
+                    stake_account_info,
+                    &StakeStateV2::Stake(meta, stake, stake_flags),
+                )
+            } else {
+                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.turn_into())
+            }
+        } else {
+            Err(ProgramError::InvalidAccountData)
+        }?;
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
@@ -1235,30 +1241,7 @@ impl Processor {
             }
             StakeInstruction::DelegateStake => {
                 msg!("Instruction: DelegateStake");
-
-                if !crate::FEATURE_REDUCE_STAKE_WARMUP_COOLDOWN {
-                    panic!("we only impl the `reduce_stake_warmup_cooldown` logic");
-                }
-
                 Self::process_delegate(accounts)
-            }
-            StakeInstruction::Deactivate => {
-                msg!("Instruction: Deactivate");
-
-                Self::process_deactivate(accounts)
-            }
-            StakeInstruction::DeactivateDelinquent => {
-                msg!("Instruction: DeactivateDelinquent");
-
-                Self::process_deactivate_delinquent(accounts)
-            }
-            StakeInstruction::SetLockup(lockup) => {
-                msg!("Instruction: SetLockup");
-                Self::process_set_lockup(accounts, lockup)
-            }
-            StakeInstruction::Merge => {
-                msg!("Instruction: Merge");
-                Self::process_merge(accounts)
             }
             StakeInstruction::Split(lamports) => {
                 msg!("Instruction: Split");
@@ -1268,24 +1251,40 @@ impl Processor {
                 msg!("Instruction: Withdraw");
                 Self::process_withdraw(accounts, lamports)
             }
+            StakeInstruction::Deactivate => {
+                msg!("Instruction: Deactivate");
+                Self::process_deactivate(accounts)
+            }
+            StakeInstruction::SetLockup(lockup) => {
+                msg!("Instruction: SetLockup");
+                Self::process_set_lockup(accounts, lockup)
+            }
+            StakeInstruction::Merge => {
+                msg!("Instruction: Merge");
+                Self::process_merge(accounts)
+            }
+            StakeInstruction::AuthorizeWithSeed(_) => todo!(),
+            StakeInstruction::InitializeChecked => todo!(),
             StakeInstruction::AuthorizeChecked(authority_type) => {
                 msg!("Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(accounts, authority_type)
             }
+            StakeInstruction::AuthorizeCheckedWithSeed(_) => todo!(),
             StakeInstruction::SetLockupChecked(lockup_checked) => {
                 msg!("Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
             }
-            StakeInstruction::Redelegate => unimplemented!(), // wontfix
             StakeInstruction::GetMinimumDelegation => {
                 msg!("Instruction: GetMinimumDelegation");
                 let minimum_delegation = crate::get_minimum_delegation();
                 set_return_data(&minimum_delegation.to_le_bytes());
                 Ok(())
             }
-            StakeInstruction::AuthorizeWithSeed(_) => todo!(),
-            StakeInstruction::InitializeChecked => todo!(),
-            StakeInstruction::AuthorizeCheckedWithSeed(_) => todo!(),
+            StakeInstruction::DeactivateDelinquent => {
+                msg!("Instruction: DeactivateDelinquent");
+                Self::process_deactivate_delinquent(accounts)
+            }
+            StakeInstruction::Redelegate => unimplemented!(), // wontfix
         }
     }
 }
