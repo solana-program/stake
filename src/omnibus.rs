@@ -17,7 +17,10 @@ use {
         rent::Rent,
         stake::state::*,
         stake::{
-            instruction::{LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
+            instruction::{
+                AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs, LockupArgs, LockupCheckedArgs,
+                StakeError, StakeInstruction,
+            },
             stake_flags::StakeFlags,
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
@@ -1067,7 +1070,38 @@ impl Processor {
         Ok(())
     }
 
-    // TODO auth with seed
+    fn process_authorize_with_seed(
+        accounts: &[AccountInfo],
+        authorize_args: AuthorizeWithSeedArgs,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        let (mut signers, custodian) = collect_signers(&[], option_lockup_authority_info, false)?;
+
+        if stake_or_withdraw_authority_base_info.is_signer {
+            signers.insert(Pubkey::create_with_seed(
+                stake_or_withdraw_authority_base_info.key,
+                &authorize_args.authority_seed,
+                &authorize_args.authority_owner,
+            )?);
+        }
+
+        do_authorize(
+            stake_account_info,
+            &signers,
+            &authorize_args.new_authorized_pubkey,
+            authorize_args.stake_authorize,
+            custodian,
+            clock,
+        )?;
+
+        Ok(())
+    }
 
     fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
@@ -1124,7 +1158,43 @@ impl Processor {
         Ok(())
     }
 
-    // TODO auth checked with seed
+    fn process_authorize_checked_with_seed(
+        accounts: &[AccountInfo],
+        authorize_args: AuthorizeCheckedWithSeedArgs,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let old_stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        let (mut signers, custodian) = collect_signers(
+            &[new_stake_or_withdraw_authority_info],
+            option_lockup_authority_info,
+            false,
+        )?;
+
+        if old_stake_or_withdraw_authority_base_info.is_signer {
+            signers.insert(Pubkey::create_with_seed(
+                old_stake_or_withdraw_authority_base_info.key,
+                &authorize_args.authority_seed,
+                &authorize_args.authority_owner,
+            )?);
+        }
+
+        do_authorize(
+            stake_account_info,
+            &signers,
+            new_stake_or_withdraw_authority_info.key,
+            authorize_args.stake_authorize,
+            custodian,
+            clock,
+        )?;
+
+        Ok(())
+    }
 
     fn process_set_lockup_checked(
         accounts: &[AccountInfo],
@@ -1263,7 +1333,10 @@ impl Processor {
                 msg!("Instruction: Merge");
                 Self::process_merge(accounts)
             }
-            StakeInstruction::AuthorizeWithSeed(_) => todo!(),
+            StakeInstruction::AuthorizeWithSeed(args) => {
+                msg!("Instruction: AuthorizeWithSeed");
+                Self::process_authorize_with_seed(accounts, args)
+            }
             StakeInstruction::InitializeChecked => {
                 msg!("Instruction: InitializeChecked");
                 Self::process_initialize_checked(accounts)
@@ -1272,7 +1345,10 @@ impl Processor {
                 msg!("Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(accounts, authority_type)
             }
-            StakeInstruction::AuthorizeCheckedWithSeed(_) => todo!(),
+            StakeInstruction::AuthorizeCheckedWithSeed(args) => {
+                msg!("Instruction: AuthorizeCheckedWithSeed");
+                Self::process_authorize_checked_with_seed(accounts, args)
+            }
             StakeInstruction::SetLockupChecked(lockup_checked) => {
                 msg!("Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
