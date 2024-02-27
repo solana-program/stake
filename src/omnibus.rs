@@ -707,13 +707,12 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {
             return Err(ProgramError::InvalidArgument);
         }
-
-        let stake_history = StakeHistoryData::from_account_info(stake_history_info)?;
 
         let signers = collect_signers(&[stake_authority_info], false)?;
 
@@ -722,7 +721,7 @@ impl Processor {
             &get_stake_state(destination_stake_account_info)?,
             destination_stake_account_info.lamports(),
             clock,
-            &stake_history,
+            stake_history,
         )?;
 
         // Authorized staker is allowed to split/merge accounts
@@ -737,7 +736,7 @@ impl Processor {
             &get_stake_state(source_stake_account_info)?,
             source_stake_account_info.lamports(),
             clock,
-            &stake_history,
+            stake_history,
         )?;
 
         msg!("Merging stake accounts");
@@ -751,6 +750,7 @@ impl Processor {
         // Drain the source stake account
         let lamports = source_stake_account_info.lamports();
 
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
         let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
         **source_lamports = source_lamports
             .checked_sub(lamports)
@@ -764,10 +764,115 @@ impl Processor {
         Ok(())
     }
 
+    fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let recipient_account_info = next_account_info(account_info_iter)?;
+        let clock_info = next_account_info(account_info_iter)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
+        let withdraw_authority_info = next_account_info(account_info_iter)?;
+        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+
+        // XXX as noted in the function itself, this is stubbed out and needs to be solved in monorepo
+        let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
+
+        // this is somewhat subtle, but if the stake account is Uninitialized, you pass it twice and sign
+        // ie, Initialized or Stake, we use real withdraw authority. Uninitialized, stake account is its own authority
+        let (signers, custodian) = if let Some(lockup_authority_info) = option_lockup_authority_info
+        {
+            (
+                collect_signers(&[withdraw_authority_info, lockup_authority_info], true)?,
+                Some(lockup_authority_info.key),
+            )
+        } else {
+            (collect_signers(&[withdraw_authority_info], true)?, None)
+        };
+
+        let (lockup, reserve, is_staked) = match get_stake_state(stake_account_info)? {
+            StakeStateV2::Stake(meta, stake, _stake_flag) => {
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Withdrawer)
+                    .map_err(InstructionError::turn_into)?;
+                // if we have a deactivation epoch and we're in cooldown
+                let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
+                    stake
+                        .delegation
+                        .stake(clock.epoch, stake_history, new_rate_activation_epoch)
+                } else {
+                    // Assume full stake if the stake account hasn't been
+                    //  de-activated, because in the future the exposed stake
+                    //  might be higher than stake.stake() due to warmup
+                    stake.delegation.stake
+                };
+
+                let staked_and_reserve = checked_add(staked, meta.rent_exempt_reserve)?;
+                (meta.lockup, staked_and_reserve, staked != 0)
+            }
+            StakeStateV2::Initialized(meta) => {
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Withdrawer)
+                    .map_err(InstructionError::turn_into)?;
+                // stake accounts must have a balance >= rent_exempt_reserve
+                (meta.lockup, meta.rent_exempt_reserve, false)
+            }
+            StakeStateV2::Uninitialized => {
+                if !signers.contains(stake_account_info.key) {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+                (Lockup::default(), 0, false) // no lockup, no restrictions
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        // verify that lockup has expired or that the withdrawal is signed by the custodian
+        // both epoch and unix_timestamp must have passed
+        if lockup.is_in_force(clock, custodian) {
+            return Err(StakeError::LockupInForce.turn_into());
+        }
+
+        let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
+        let stake_account_lamports = stake_account_info.lamports();
+
+        // if the stake is active, we mustn't allow the account to go away
+        if is_staked && withdraw_lamports_and_reserve > stake_account_lamports {
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        // a partial withdrawal must not deplete the reserve
+        if withdraw_lamports != stake_account_lamports
+            && withdraw_lamports_and_reserve > stake_account_lamports
+        {
+            // XXX why is this assert here...
+            assert!(!is_staked);
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        // Deinitialize state upon zero balance
+        if withdraw_lamports == stake_account_lamports {
+            set_stake_state(stake_account_info, &StakeStateV2::Uninitialized)?;
+        }
+
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
+        let mut source_lamports = stake_account_info.try_borrow_mut_lamports()?;
+        **source_lamports = source_lamports
+            .checked_sub(withdraw_lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        let mut destination_lamports = recipient_account_info.try_borrow_mut_lamports()?;
+        **destination_lamports = destination_lamports
+            .checked_add(withdraw_lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
+        // convenience so we can safely use id() everywhere
         if *program_id != id() {
             return Err(ProgramError::IncorrectProgramId);
         }
@@ -831,6 +936,11 @@ impl Processor {
                 msg!("Instruction: Merge");
 
                 Self::process_merge(accounts)
+            }
+            StakeInstruction::Withdraw(lamports) => {
+                msg!("Instruction: Withdraw");
+
+                Self::process_withdraw(accounts, lamports)
             }
             StakeInstruction::AuthorizeChecked(authority_type) => {
                 msg!("Instruction: AuthorizeChecked");
