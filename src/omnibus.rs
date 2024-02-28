@@ -178,8 +178,19 @@ pub(crate) fn new_stake(
 // once history has an epoch in it when there is less than 7% deactivation? idk
 // history is fucking confusing to me still
 // maybe i should write a post about it and have someone just factcheck me so i understand lol
+//
+// XXX ok the way this works is like...
+// say its current epoch 100. and the new rate was activated in epoch 50
+// `stake_and_activating()` first gets the activation epoch of the delegation, assuming we are ahead of it
+// then the loop is used to cumulatively sum the effective stake of the delegation at each subsequent epoch
+// basically, the warmup rate sets a cap, 25% or 9% of total effective stake at that time
+// so we... only sort of need to preserve the new warmup cooldown
+// on the one hand, keeping it ensures all historical calculations are correct
+// but on the other, they dont need to be correct as far as i can tell?
+// all we really care about is whether stake is active. so as long as theres one epoch below the threshhold
+// we can say "ok all stake was in its proper state by this point, whenever that was"
 pub(crate) fn new_warmup_cooldown_rate_epoch() -> Option<Epoch> {
-    None
+    Some(1)
 }
 
 /// Ensure the stake delegation amount is valid.  This checks that the account meets the minimum
