@@ -13,22 +13,6 @@ pub use solana_program;
 
 solana_program::declare_id!("7837mbBVYX9n2m8iy2Lf2QfooTutj3WprowcsFkvLrZA");
 
-// XXX placeholder for feature_set
-#[macro_export]
-macro_rules! feature_set_die {
-    () => {
-        panic!("feature_set not supported")
-    };
-}
-
-// XXX placeholder for stake_history
-#[macro_export]
-macro_rules! stake_history_die {
-    () => {
-        panic!("stake_history not supported")
-    };
-}
-
 // XXX placeholders for features
 // we have FOUR features in the current stake program we care about:
 // * stake_raise_minimum_delegation_to_1_sol / 9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i

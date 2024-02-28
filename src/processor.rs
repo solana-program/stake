@@ -331,8 +331,16 @@ impl Processor {
                 // because a *deactivated* stake could never be split... and there are plausible usecases for that
                 // i think we are fucked. unless we just say. you have to pass in stake history if splitting deactive
                 let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
+                    // XXX placeholder for testing
                     let clock = Clock::get()?;
-                    let stake_history = &StakeHistoryData::default(); // FIXME
+                    if source_stake.delegation.deactivation_epoch < clock.epoch {
+                        true
+                    } else {
+                        false
+                    }
+
+                    /*
+                    let stake_history = unimplemented!();
                     let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
 
                     let status = source_stake.delegation.stake_activating_and_deactivating(
@@ -342,6 +350,7 @@ impl Processor {
                     );
 
                     status.effective > 0
+                    */
                 } else {
                     false
                 };

@@ -6,10 +6,9 @@
 // XXX THIS FILE IS NOT PART OF THE PROGRAM
 // this contains the remaining functions that (probably, mostly) are needed by the runtime
 // ideally we can relocate them to a new namespace rather than keeping them under programs/stake
-// then again if the bpf caore programs are moving to a new repo then maybe it doesnt matter
+// then again if the bpf core programs are moving to a new repo then maybe it doesnt matter
 
 use {
-    crate::{feature_set_die, stake_history_die},
     solana_program::{
         account::{AccountSharedData, ReadableAccount, WritableAccount},
         account_utils::StateMut,
