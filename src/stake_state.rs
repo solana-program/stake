@@ -7,6 +7,10 @@
 // this contains the remaining functions that (probably, mostly) are needed by the runtime
 // ideally we can relocate them to a new namespace rather than keeping them under programs/stake
 // then again if the bpf core programs are moving to a new repo then maybe it doesnt matter
+//
+// we should also retain the stake_state.rs unit tests, for the most part
+// since a lot of them are testing functionality related to Stake, Delegation etc
+// rather than anything to do with the program itself
 
 use {
     solana_program::{
