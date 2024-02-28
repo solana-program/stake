@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 
 use {
-    neostake::omnibus::Processor,
+    neostake::processor::Processor,
     solana_program_test::*,
     solana_sdk::{
         account::Account as SolanaAccount,
