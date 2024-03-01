@@ -6,15 +6,20 @@ use {
     solana_program_test::*,
     solana_sdk::{
         account::Account as SolanaAccount,
+        entrypoint::ProgramResult,
         feature_set::stake_raise_minimum_delegation_to_1_sol,
         hash::Hash,
+        instruction::Instruction,
         native_token::LAMPORTS_PER_SOL,
         program_error::ProgramError,
         pubkey::Pubkey,
         signature::{Keypair, Signer},
+        signers::Signers,
         stake::{
             self,
-            instruction::{LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
+            instruction::{
+                self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
+            },
             state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
@@ -51,10 +56,6 @@ pub struct Accounts {
     pub voter: Keypair,
     pub withdrawer: Keypair,
     pub vote_account: Keypair,
-    pub alice: Keypair,
-    pub bob: Keypair,
-    pub alice_stake: Keypair,
-    pub bob_stake: Keypair,
 }
 
 impl Accounts {
@@ -72,42 +73,18 @@ impl Accounts {
             &self.vote_account,
         )
         .await;
-
-        transfer(
-            &mut context.banks_client,
-            &context.payer,
-            &context.last_blockhash,
-            &self.alice.pubkey(),
-            USER_STARTING_LAMPORTS,
-        )
-        .await;
-
-        transfer(
-            &mut context.banks_client,
-            &context.payer,
-            &context.last_blockhash,
-            &self.bob.pubkey(),
-            USER_STARTING_LAMPORTS,
-        )
-        .await;
     }
 }
 
 impl Default for Accounts {
     fn default() -> Self {
         let vote_account = Keypair::new();
-        let alice = Keypair::new();
-        let bob = Keypair::new();
 
         Self {
             validator: Keypair::new(),
             voter: Keypair::new(),
             withdrawer: Keypair::new(),
             vote_account,
-            alice_stake: Keypair::new(),
-            bob_stake: Keypair::new(),
-            alice,
-            bob,
         }
     }
 }
@@ -211,24 +188,35 @@ pub async fn get_stake_account_rent(banks_client: &mut BanksClient) -> u64 {
     rent.minimum_balance(std::mem::size_of::<stake::state::StakeStateV2>())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn create_independent_stake_account(
-    banks_client: &mut BanksClient,
-    fee_payer: &Keypair,
-    rent_payer: &Keypair,
-    recent_blockhash: &Hash,
-    stake: &Keypair,
-    authorized: &stake::state::Authorized,
-    lockup: &stake::state::Lockup,
+    context: &mut ProgramTestContext,
+    authorized: &Authorized,
     stake_amount: u64,
-) -> u64 {
-    let lamports = get_stake_account_rent(banks_client).await + stake_amount;
+) -> Pubkey {
+    create_independent_stake_account_with_lockup(
+        context,
+        authorized,
+        &Lockup::default(),
+        stake_amount,
+    )
+    .await
+}
+
+pub async fn create_independent_stake_account_with_lockup(
+    context: &mut ProgramTestContext,
+    authorized: &Authorized,
+    lockup: &Lockup,
+    stake_amount: u64,
+) -> Pubkey {
+    let stake = Keypair::new();
+    let lamports = get_stake_account_rent(&mut context.banks_client).await + stake_amount;
+
     let instructions = vec![
         system_instruction::create_account(
-            &rent_payer.pubkey(),
+            &context.payer.pubkey(),
             &stake.pubkey(),
             lamports,
-            StakeStateV2::size_of() as u64,
+            std::mem::size_of::<stake::state::StakeStateV2>() as u64,
             &neostake::id(),
         ),
         stake::instruction::initialize(&stake.pubkey(), authorized, lockup),
@@ -236,330 +224,159 @@ pub async fn create_independent_stake_account(
 
     let transaction = Transaction::new_signed_with_payer(
         &instructions,
-        Some(&fee_payer.pubkey()),
-        &[fee_payer, rent_payer, stake],
-        *recent_blockhash,
+        Some(&context.payer.pubkey()),
+        &[&context.payer, &stake],
+        context.last_blockhash,
     );
-    banks_client.process_transaction(transaction).await.unwrap();
 
-    lamports
+    context
+        .banks_client
+        .process_transaction(transaction)
+        .await
+        .unwrap();
+
+    stake.pubkey()
 }
 
-pub async fn authorize_stake_account(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    stake: &Pubkey,
-    old_authority: &Keypair,
-    new_authority: &Keypair,
-    authority_type: StakeAuthorize,
-    // XXX test this later
-    //custodian: Option<&Pubkey>,
-    checked: bool,
-) {
-    let instruction = if checked {
-        stake::instruction::authorize_checked(
-            stake,
-            &old_authority.pubkey(),
-            &new_authority.pubkey(),
-            authority_type,
-            None,
-        )
-    } else {
-        stake::instruction::authorize(
-            stake,
-            &old_authority.pubkey(),
-            &new_authority.pubkey(),
-            authority_type,
-            None,
-        )
-    };
+pub async fn create_blank_stake_account(context: &mut ProgramTestContext) -> Pubkey {
+    let stake = Keypair::new();
+    let lamports = get_stake_account_rent(&mut context.banks_client).await;
 
-    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    let signers = if checked {
-        vec![payer, old_authority, new_authority]
-    } else {
-        vec![payer, old_authority]
-    };
+    let transaction = Transaction::new_signed_with_payer(
+        &[system_instruction::create_account(
+            &context.payer.pubkey(),
+            &stake.pubkey(),
+            lamports,
+            std::mem::size_of::<stake::state::StakeStateV2>() as u64,
+            &neostake::id(),
+        )],
+        Some(&context.payer.pubkey()),
+        &[&context.payer, &stake],
+        context.last_blockhash,
+    );
 
-    transaction.sign(&signers, *recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap();
+    context
+        .banks_client
+        .process_transaction(transaction)
+        .await
+        .unwrap();
+
+    stake.pubkey()
 }
 
-pub async fn set_stake_account_lockup(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    stake: &Pubkey,
-    old_authority: &Keypair,
-    new_authority: Option<&Keypair>,
-    checked: bool,
-) {
-    let lockup = LockupArgs {
-        unix_timestamp: if new_authority.is_some() {
-            Some(1)
-        } else {
-            Some(0)
-        },
-        epoch: if new_authority.is_some() {
-            Some(9999)
-        } else {
-            Some(0)
-        },
-        custodian: if let Some(new_authority) = new_authority {
-            Some(new_authority.pubkey())
-        } else {
-            Some(Pubkey::default())
-        },
-    };
+pub async fn process_instruction<T: Signers + ?Sized>(
+    context: &mut ProgramTestContext,
+    instruction: &Instruction,
+    additional_signers: &T,
+) -> ProgramResult {
+    let mut transaction =
+        Transaction::new_with_payer(&[instruction.clone()], Some(&context.payer.pubkey()));
 
-    let instruction = if checked {
-        stake::instruction::set_lockup_checked(stake, &lockup, &old_authority.pubkey())
-    } else {
-        stake::instruction::set_lockup(stake, &lockup, &old_authority.pubkey())
-    };
+    transaction.partial_sign(&[&context.payer], context.last_blockhash);
+    transaction.sign(additional_signers, context.last_blockhash);
 
-    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    let signers = if checked {
-        vec![payer, old_authority, new_authority.unwrap()]
-    } else {
-        vec![payer, old_authority]
-    };
-
-    transaction.sign(&signers, *recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap();
-}
-
-pub async fn delegate_stake_account(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    stake: &Pubkey,
-    authorized: &Keypair,
-    vote: &Pubkey,
-) {
-    let instruction = stake::instruction::delegate_stake(stake, &authorized.pubkey(), vote);
-
-    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    transaction.sign(&[payer, authorized], *recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap();
-}
-
-pub async fn deactivate_stake_account(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    stake: &Pubkey,
-    authorized: &Keypair,
-) {
-    let instruction = stake::instruction::deactivate_stake(stake, &authorized.pubkey());
-
-    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    transaction.sign(&[payer, authorized], *recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap();
-}
-
-pub async fn merge_stake_account(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    destination_stake: &Pubkey,
-    source_stake: &Pubkey,
-    authorized: &Keypair,
-) {
-    let instructions =
-        stake::instruction::merge(destination_stake, source_stake, &authorized.pubkey());
-
-    let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer.pubkey()));
-    transaction.sign(&[payer, authorized], *recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap();
+    match context.banks_client.process_transaction(transaction).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            // banks client error -> transaction error -> instruction error -> program error
+            if let TransactionError::InstructionError(_, e) = e.unwrap() {
+                Err(e.try_into().unwrap())
+            } else {
+                panic!("couldnt convert {:?} to ProgramError", e,)
+            }
+        }
+    }
 }
 
 #[tokio::test]
-async fn hana_test() {
+async fn test_stake_checked_instructions() {
     let mut context = program_test(true).start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
-    println!(
-        "HANA alice: {}, bob: {}",
-        accounts.alice.pubkey(),
-        accounts.bob.pubkey()
-    );
 
-    create_independent_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &accounts.alice,
-        &context.last_blockhash,
-        &accounts.alice_stake,
-        &Authorized::auto(&accounts.alice.pubkey()),
-        &Lockup::default(),
-        LAMPORTS_PER_SOL * 5,
-    )
-    .await;
+    let no_signers: [&Keypair; 0] = [];
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} after init: {:?}",
-        accounts.alice_stake.pubkey(),
-        stake_info
-    );
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+    let authorized_keypair = Keypair::new();
 
-    delegate_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.alice,
-        &accounts.vote_account.pubkey(),
-    )
-    .await;
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+    let authorized = authorized_keypair.pubkey();
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} after delegate: {:?}",
-        accounts.alice_stake.pubkey(),
-        stake_info
-    );
+    // Test InitializeChecked with non-signing withdrawer
+    let stake = create_blank_stake_account(&mut context).await;
+    let mut instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
+    instruction.accounts[3].is_signer = false;
 
-    authorize_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.alice,
-        &accounts.bob,
-        StakeAuthorize::Staker,
-        false,
-    )
-    .await;
+    let e = process_instruction(&mut context, &instruction, &no_signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::MissingRequiredSignature);
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} changed staker from {} to {}: {:?}",
-        accounts.alice_stake.pubkey(),
-        accounts.alice.pubkey(),
-        accounts.bob.pubkey(),
-        stake_info
-    );
+    // Test InitializeChecked with withdrawer signer
+    let stake = create_blank_stake_account(&mut context).await;
+    let instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
 
-    authorize_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.bob,
-        &accounts.alice,
-        StakeAuthorize::Staker,
-        true,
-    )
-    .await;
+    process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+        .await
+        .unwrap();
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} changed back staker from {} to {}: {:?}",
-        accounts.alice_stake.pubkey(),
-        accounts.bob.pubkey(),
-        accounts.alice.pubkey(),
-        stake_info
-    );
+    // Test AuthorizeChecked with non-signing authority
+    let stake =
+        create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
+    let mut instruction =
+        ixn::authorize_checked(&stake, &staker, &authorized, StakeAuthorize::Staker, None);
+    instruction.accounts[3].is_signer = false;
 
-    set_stake_account_lockup(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.alice,
-        Some(&accounts.bob),
-        true,
-    )
-    .await;
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::MissingRequiredSignature);
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} added lockup owned by {}: {:?}",
-        accounts.alice_stake.pubkey(),
-        accounts.bob.pubkey(),
-        stake_info
-    );
-
-    set_stake_account_lockup(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.bob,
+    let mut instruction = ixn::authorize_checked(
+        &stake,
+        &withdrawer,
+        &authorized,
+        StakeAuthorize::Withdrawer,
         None,
-        false,
-    )
-    .await;
+    );
+    instruction.accounts[3].is_signer = false;
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} removed lockup: {:?}",
-        accounts.alice_stake.pubkey(),
-        stake_info
+    let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::MissingRequiredSignature);
+
+    // Test AuthorizeChecked with authority signer
+    let stake =
+        create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
+    let instruction =
+        ixn::authorize_checked(&stake, &staker, &authorized, StakeAuthorize::Staker, None);
+
+    process_instruction(
+        &mut context,
+        &instruction,
+        &vec![&staker_keypair, &authorized_keypair],
+    )
+    .await
+    .unwrap();
+
+    let instruction = ixn::authorize_checked(
+        &stake,
+        &withdrawer,
+        &authorized,
+        StakeAuthorize::Withdrawer,
+        None,
     );
 
-    create_independent_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &accounts.alice,
-        &context.last_blockhash,
-        &accounts.bob_stake,
-        &Authorized::auto(&accounts.alice.pubkey()),
-        &Lockup::default(),
-        LAMPORTS_PER_SOL * 5,
+    process_instruction(
+        &mut context,
+        &instruction,
+        &vec![&withdrawer_keypair, &authorized_keypair],
     )
-    .await;
+    .await
+    .unwrap();
 
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.bob_stake.pubkey()).await;
-    println!("HANA {} wtf: {:?}", accounts.bob_stake.pubkey(), stake_info);
-
-    // XXX TODO FIXME lol i was absolutely going crazy for awhile
-    // this merge succeeds because its between inactive and activating
-    // and no mater how many epochs i skip it never changes... because this isnt the real stake program!!!
-    // the validator simulation never updates them lol. so testing in a separate repo will never work
-
-    merge_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.bob_stake.pubkey(),
-        &accounts.alice,
-    )
-    .await;
-
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} merged state: {:?}",
-        accounts.alice_stake.pubkey(),
-        stake_info
-    );
-
-    deactivate_stake_account(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
-        &accounts.alice_stake.pubkey(),
-        &accounts.alice,
-    )
-    .await;
-
-    let stake_info =
-        get_stake_account(&mut context.banks_client, &accounts.alice_stake.pubkey()).await;
-    println!(
-        "HANA {} after deactivate: {:?}",
-        accounts.alice_stake.pubkey(),
-        stake_info
-    );
+    // XXX continue at line 1303 of stake_instruction.rs
 }
