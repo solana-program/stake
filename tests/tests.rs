@@ -30,9 +30,13 @@ pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 
 pub fn program_test(enable_minimum_delegation: bool) -> ProgramTest {
     let mut program_test = ProgramTest::default();
-
-    program_test.add_program("neostake", neostake::id(), processor!(Processor::process));
     program_test.prefer_bpf(false);
+
+    program_test.add_program(
+        "stake_program",
+        neostake::id(),
+        processor!(Processor::process),
+    );
 
     if !enable_minimum_delegation {
         program_test.deactivate_feature(stake_raise_minimum_delegation_to_1_sol::id());
@@ -174,6 +178,12 @@ pub async fn transfer(
     banks_client.process_transaction(transaction).await.unwrap();
 }
 
+pub async fn advance_epoch(context: &mut ProgramTestContext) {
+    let root_slot = context.banks_client.get_root_slot().await.unwrap();
+    let slots_per_epoch = context.genesis_config().epoch_schedule.slots_per_epoch;
+    context.warp_to_slot(root_slot + slots_per_epoch).unwrap();
+}
+
 pub async fn get_account(banks_client: &mut BanksClient, pubkey: &Pubkey) -> SolanaAccount {
     banks_client
         .get_account(*pubkey)
@@ -213,7 +223,7 @@ pub async fn create_independent_stake_account(
     stake_amount: u64,
 ) -> u64 {
     let lamports = get_stake_account_rent(banks_client).await + stake_amount;
-    let mut instructions = vec![
+    let instructions = vec![
         system_instruction::create_account(
             &rent_payer.pubkey(),
             &stake.pubkey(),
@@ -223,7 +233,6 @@ pub async fn create_independent_stake_account(
         ),
         stake::instruction::initialize(&stake.pubkey(), authorized, lockup),
     ];
-    instructions[1].program_id = neostake::id();
 
     let transaction = Transaction::new_signed_with_payer(
         &instructions,
@@ -248,7 +257,7 @@ pub async fn authorize_stake_account(
     //custodian: Option<&Pubkey>,
     checked: bool,
 ) {
-    let mut instruction = if checked {
+    let instruction = if checked {
         stake::instruction::authorize_checked(
             stake,
             &old_authority.pubkey(),
@@ -265,7 +274,6 @@ pub async fn authorize_stake_account(
             None,
         )
     };
-    instruction.program_id = neostake::id();
 
     let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
     let signers = if checked {
@@ -305,14 +313,11 @@ pub async fn set_stake_account_lockup(
         },
     };
 
-    println!("HANA lockup: {:#?}", lockup);
-
-    let mut instruction = if checked {
+    let instruction = if checked {
         stake::instruction::set_lockup_checked(stake, &lockup, &old_authority.pubkey())
     } else {
         stake::instruction::set_lockup(stake, &lockup, &old_authority.pubkey())
     };
-    instruction.program_id = neostake::id();
 
     let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
     let signers = if checked {
@@ -333,8 +338,7 @@ pub async fn delegate_stake_account(
     authorized: &Keypair,
     vote: &Pubkey,
 ) {
-    let mut instruction = stake::instruction::delegate_stake(stake, &authorized.pubkey(), vote);
-    instruction.program_id = neostake::id();
+    let instruction = stake::instruction::delegate_stake(stake, &authorized.pubkey(), vote);
 
     let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
     transaction.sign(&[payer, authorized], *recent_blockhash);
@@ -348,8 +352,7 @@ pub async fn deactivate_stake_account(
     stake: &Pubkey,
     authorized: &Keypair,
 ) {
-    let mut instruction = stake::instruction::deactivate_stake(stake, &authorized.pubkey());
-    instruction.program_id = neostake::id();
+    let instruction = stake::instruction::deactivate_stake(stake, &authorized.pubkey());
 
     let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
     transaction.sign(&[payer, authorized], *recent_blockhash);
@@ -364,9 +367,8 @@ pub async fn merge_stake_account(
     source_stake: &Pubkey,
     authorized: &Keypair,
 ) {
-    let mut instructions =
+    let instructions =
         stake::instruction::merge(destination_stake, source_stake, &authorized.pubkey());
-    instructions[0].program_id = neostake::id();
 
     let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer.pubkey()));
     transaction.sign(&[payer, authorized], *recent_blockhash);

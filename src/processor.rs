@@ -487,7 +487,7 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
+        let stake_history = &StakeHistoryData::take_account_info(stake_history_info)?;
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
@@ -630,7 +630,7 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistoryData::from_account_info(stake_history_info)?;
+        let stake_history = &StakeHistoryData::take_account_info(stake_history_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {

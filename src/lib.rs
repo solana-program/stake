@@ -11,7 +11,7 @@ pub mod entrypoint;
 
 pub use solana_program;
 
-solana_program::declare_id!("7837mbBVYX9n2m8iy2Lf2QfooTutj3WprowcsFkvLrZA");
+solana_program::declare_id!("Stake11111111111111111111111111111111111111");
 
 // XXX placeholders for features
 // we have FOUR features in the current stake program we care about:
