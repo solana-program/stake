@@ -288,80 +288,76 @@ pub async fn process_instruction<T: Signers + ?Sized>(
     }
 }
 
+pub async fn test_instruction_with_missing_signers(
+    context: &mut ProgramTestContext,
+    instruction: &Instruction,
+    additional_signers: &Vec<&Keypair>,
+) {
+    // remove every signer one by one and ensure we always fail
+    for i in 0..instruction.accounts.len() {
+        if instruction.accounts[i].is_signer {
+            let mut instruction = instruction.clone();
+            instruction.accounts[i].is_signer = false;
+            let reduced_signers: Vec<_> = additional_signers
+                .iter()
+                .filter(|s| s.pubkey() != instruction.accounts[i].pubkey)
+                .collect();
+
+            let e = process_instruction(context, &instruction, &reduced_signers)
+                .await
+                .unwrap_err();
+            assert_eq!(e, ProgramError::MissingRequiredSignature);
+        }
+    }
+
+    // now make sure the instruction succeeds
+    process_instruction(context, instruction, additional_signers)
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn test_stake_checked_instructions() {
     let mut context = program_test(true).start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
-    let no_signers: [&Keypair; 0] = [];
-
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
     let authorized_keypair = Keypair::new();
+    let seed_base_keypair = Keypair::new();
 
     let staker = staker_keypair.pubkey();
     let withdrawer = withdrawer_keypair.pubkey();
     let authorized = authorized_keypair.pubkey();
+    let seed_base = seed_base_keypair.pubkey();
+
+    let seed = "test seed";
+    let seeded_address = Pubkey::create_with_seed(&seed_base, seed, &system_program::id()).unwrap();
 
     // Test InitializeChecked with non-signing withdrawer
     let stake = create_blank_stake_account(&mut context).await;
-    let mut instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
-    instruction.accounts[3].is_signer = false;
-
-    let e = process_instruction(&mut context, &instruction, &no_signers)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::MissingRequiredSignature);
-
-    // Test InitializeChecked with withdrawer signer
-    let stake = create_blank_stake_account(&mut context).await;
     let instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
 
-    process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
-        .await
-        .unwrap();
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&withdrawer_keypair])
+        .await;
 
-    // Test AuthorizeChecked with non-signing authority
-    let stake =
-        create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
-    let mut instruction =
-        ixn::authorize_checked(&stake, &staker, &authorized, StakeAuthorize::Staker, None);
-    instruction.accounts[3].is_signer = false;
-
-    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::MissingRequiredSignature);
-
-    let mut instruction = ixn::authorize_checked(
-        &stake,
-        &withdrawer,
-        &authorized,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    instruction.accounts[3].is_signer = false;
-
-    let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::MissingRequiredSignature);
-
-    // Test AuthorizeChecked with authority signer
+    // Test AuthorizeChecked with non-signing staker
     let stake =
         create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
     let instruction =
         ixn::authorize_checked(&stake, &staker, &authorized, StakeAuthorize::Staker, None);
 
-    process_instruction(
+    test_instruction_with_missing_signers(
         &mut context,
         &instruction,
         &vec![&staker_keypair, &authorized_keypair],
     )
-    .await
-    .unwrap();
+    .await;
 
+    // Test AuthorizeChecked with non-signing withdrawer
+    let stake =
+        create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
     let instruction = ixn::authorize_checked(
         &stake,
         &withdrawer,
@@ -370,13 +366,30 @@ async fn test_stake_checked_instructions() {
         None,
     );
 
-    process_instruction(
+    test_instruction_with_missing_signers(
         &mut context,
         &instruction,
         &vec![&withdrawer_keypair, &authorized_keypair],
     )
-    .await
-    .unwrap();
+    .await;
 
-    // XXX continue at line 1303 of stake_instruction.rs
+    // Test AuthorizeCheckedWithSeed with non-signing authority
+    let stake =
+        create_independent_stake_account(&mut context, &Authorized::auto(&seeded_address), 0).await;
+    let instruction = ixn::authorize_checked_with_seed(
+        &stake,
+        &seed_base,
+        seed.to_string(),
+        &system_program::id(),
+        &authorized,
+        StakeAuthorize::Staker,
+        None,
+    );
+
+    test_instruction_with_missing_signers(
+        &mut context,
+        &instruction,
+        &vec![&seed_base_keypair, &authorized_keypair],
+    )
+    .await;
 }

@@ -792,7 +792,7 @@ impl Processor {
         let (mut signers, custodian) = collect_signers(
             &[new_stake_or_withdraw_authority_info],
             option_lockup_authority_info,
-            false,
+            true,
         )?;
 
         if old_stake_or_withdraw_authority_base_info.is_signer {
