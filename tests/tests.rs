@@ -326,11 +326,13 @@ async fn test_stake_checked_instructions() {
     let withdrawer_keypair = Keypair::new();
     let authorized_keypair = Keypair::new();
     let seed_base_keypair = Keypair::new();
+    let custodian_keypair = Keypair::new();
 
     let staker = staker_keypair.pubkey();
     let withdrawer = withdrawer_keypair.pubkey();
     let authorized = authorized_keypair.pubkey();
     let seed_base = seed_base_keypair.pubkey();
+    let custodian = custodian_keypair.pubkey();
 
     let seed = "test seed";
     let seeded_address = Pubkey::create_with_seed(&seed_base, seed, &system_program::id()).unwrap();
@@ -374,22 +376,45 @@ async fn test_stake_checked_instructions() {
     .await;
 
     // Test AuthorizeCheckedWithSeed with non-signing authority
+    for authority_type in [StakeAuthorize::Staker, StakeAuthorize::Withdrawer] {
+        let stake =
+            create_independent_stake_account(&mut context, &Authorized::auto(&seeded_address), 0)
+                .await;
+        let instruction = ixn::authorize_checked_with_seed(
+            &stake,
+            &seed_base,
+            seed.to_string(),
+            &system_program::id(),
+            &authorized,
+            authority_type,
+            None,
+        );
+
+        test_instruction_with_missing_signers(
+            &mut context,
+            &instruction,
+            &vec![&seed_base_keypair, &authorized_keypair],
+        )
+        .await;
+    }
+
+    // Test SetLockupChecked with non-signing lockup custodian
     let stake =
-        create_independent_stake_account(&mut context, &Authorized::auto(&seeded_address), 0).await;
-    let instruction = ixn::authorize_checked_with_seed(
+        create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
+    let instruction = ixn::set_lockup_checked(
         &stake,
-        &seed_base,
-        seed.to_string(),
-        &system_program::id(),
-        &authorized,
-        StakeAuthorize::Staker,
-        None,
+        &LockupArgs {
+            unix_timestamp: None,
+            epoch: Some(1),
+            custodian: Some(custodian),
+        },
+        &withdrawer,
     );
 
     test_instruction_with_missing_signers(
         &mut context,
         &instruction,
-        &vec![&seed_base_keypair, &authorized_keypair],
+        &vec![&withdrawer_keypair, &custodian_keypair],
     )
     .await;
 }
