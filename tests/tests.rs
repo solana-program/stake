@@ -2,7 +2,6 @@
 #![allow(unused_imports)]
 
 use {
-    neostake::processor::Processor,
     solana_program_test::*,
     solana_sdk::{
         account::Account as SolanaAccount,
@@ -29,17 +28,18 @@ use {
         self, vote_instruction,
         vote_state::{VoteInit, VoteState, VoteStateVersions},
     },
+    stake_program::processor::Processor,
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 
 pub fn program_test(enable_minimum_delegation: bool) -> ProgramTest {
     let mut program_test = ProgramTest::default();
-    program_test.prefer_bpf(false);
+    // XXX HANA program_test.prefer_bpf(false);
 
     program_test.add_program(
         "stake_program",
-        neostake::id(),
+        stake_program::id(),
         processor!(Processor::process),
     );
 
@@ -217,7 +217,7 @@ pub async fn create_independent_stake_account_with_lockup(
             &stake.pubkey(),
             lamports,
             std::mem::size_of::<stake::state::StakeStateV2>() as u64,
-            &neostake::id(),
+            &stake_program::id(),
         ),
         stake::instruction::initialize(&stake.pubkey(), authorized, lockup),
     ];
@@ -248,7 +248,7 @@ pub async fn create_blank_stake_account(context: &mut ProgramTestContext) -> Pub
             &stake.pubkey(),
             lamports,
             std::mem::size_of::<stake::state::StakeStateV2>() as u64,
-            &neostake::id(),
+            &stake_program::id(),
         )],
         Some(&context.payer.pubkey()),
         &[&context.payer, &stake],

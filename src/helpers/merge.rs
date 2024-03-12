@@ -7,7 +7,7 @@ use {
         program_error::ProgramError,
         stake::state::*,
         stake::{instruction::StakeError, stake_flags::StakeFlags},
-        stake_history::StakeHistoryData,
+        stake_history::StakeHistorySyscall,
     },
     std::convert::TryFrom,
 };
@@ -40,7 +40,7 @@ impl MergeKind {
         stake_state: &StakeStateV2,
         stake_lamports: u64,
         clock: &Clock,
-        stake_history: &StakeHistoryData,
+        stake_history: &StakeHistorySyscall,
     ) -> Result<Self, ProgramError> {
         match stake_state {
             StakeStateV2::Stake(meta, stake, stake_flags) => {

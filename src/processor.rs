@@ -20,7 +20,7 @@ use {
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        stake_history::StakeHistoryData,
+        stake_history::StakeHistorySyscall,
         sysvar::Sysvar,
         vote::program as solana_vote_program,
         vote::state::VoteState,
@@ -486,8 +486,8 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
-        let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistoryData::take_account_info(stake_history_info)?;
+        let _stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistorySyscall::default();
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
@@ -629,8 +629,8 @@ impl Processor {
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
-        let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistoryData::take_account_info(stake_history_info)?;
+        let _stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistorySyscall::default();
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {

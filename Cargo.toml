@@ -1,5 +1,5 @@
 [package]
-name = "neostake"
+name = "stake_program"
 version = "1.0.0"
 description = "hana neostake"
 authors = ["Solana Labs Maintainers <maintainers@solanalabs.com>"]
