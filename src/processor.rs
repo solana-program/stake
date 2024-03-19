@@ -251,6 +251,8 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
+        let stake_history = &StakeHistorySyscall::default();
+
         let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         let vote_state = get_vote_state(vote_account_info)?;
@@ -264,7 +266,7 @@ impl Processor {
                 let ValidatedDelegatedInfo { stake_amount } =
                     validate_delegated_amount(stake_account_info, &meta)?;
 
-                let new_stake_state = new_stake(
+                let stake = new_stake(
                     stake_amount,
                     vote_account_info.key,
                     &vote_state,
@@ -273,8 +275,27 @@ impl Processor {
 
                 set_stake_state(
                     stake_account_info,
-                    &StakeStateV2::Stake(meta, new_stake_state, StakeFlags::empty()),
+                    &StakeStateV2::Stake(meta, stake, StakeFlags::empty()),
                 )
+            }
+            StakeStateV2::Stake(meta, mut stake, flags) => {
+                meta.authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(InstructionError::turn_into)?;
+
+                let ValidatedDelegatedInfo { stake_amount } =
+                    validate_delegated_amount(stake_account_info, &meta)?;
+
+                redelegate_stake(
+                    &mut stake,
+                    stake_amount,
+                    vote_account_info.key,
+                    &vote_state,
+                    clock.epoch,
+                    &stake_history,
+                )?;
+
+                set_stake_state(stake_account_info, &StakeStateV2::Stake(meta, stake, flags))
             }
             // XXX TODO FIXME this is incorrect, obviously we need to be able to delegate a deactivated account
             // but when i was adapting the code, this goes through redelegate, which we removed

@@ -1,5 +1,5 @@
 use {
-    crate::helpers::TurnInto,
+    crate::helpers::{new_warmup_cooldown_rate_epoch, TurnInto},
     solana_program::{
         account_info::AccountInfo,
         clock::Epoch,
@@ -7,6 +7,7 @@ use {
         pubkey::Pubkey,
         stake::instruction::StakeError,
         stake::state::{Delegation, Meta, Stake},
+        stake_history::StakeHistorySyscall,
         vote::state::VoteState,
     },
 };
@@ -27,6 +28,50 @@ pub(crate) fn new_stake(
         delegation: Delegation::new(voter_pubkey, stake, activation_epoch),
         credits_observed: vote_state.credits(),
     }
+}
+
+pub(crate) fn redelegate_stake(
+    stake: &mut Stake,
+    stake_lamports: u64,
+    voter_pubkey: &Pubkey,
+    vote_state: &VoteState,
+    epoch: Epoch,
+    stake_history: &StakeHistorySyscall,
+) -> Result<(), ProgramError> {
+    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
+    // If stake is currently active:
+    if stake.stake(epoch, stake_history, new_rate_activation_epoch) != 0 {
+        // If pubkey of new voter is the same as current,
+        // and we are scheduled to start deactivating this epoch,
+        // we rescind deactivation
+        solana_program::msg!(
+            "HANA pubkey: {} == {}, epoch: {} == {}",
+            stake.delegation.voter_pubkey,
+            *voter_pubkey,
+            epoch,
+            stake.delegation.deactivation_epoch
+        );
+
+        if stake.delegation.voter_pubkey == *voter_pubkey
+            && epoch == stake.delegation.deactivation_epoch
+        {
+            stake.delegation.deactivation_epoch = std::u64::MAX;
+            return Ok(());
+        } else {
+            // can't redelegate to another pubkey if stake is active.
+            return Err(StakeError::TooSoonToRedelegate.turn_into());
+        }
+    }
+    // Either the stake is freshly activated, is active but has been
+    // deactivated this epoch, or has fully de-activated.
+    // Redelegation implies either re-activation or un-deactivation
+
+    stake.delegation.stake = stake_lamports;
+    stake.delegation.activation_epoch = epoch;
+    stake.delegation.deactivation_epoch = std::u64::MAX;
+    stake.delegation.voter_pubkey = *voter_pubkey;
+    stake.credits_observed = vote_state.credits();
+    Ok(())
 }
 
 /// Ensure the stake delegation amount is valid.  This checks that the account meets the minimum
