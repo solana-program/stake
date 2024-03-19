@@ -919,67 +919,70 @@ impl Processor {
         // and make a new struct StakeHistoryAccountData or something which impls it
         // we just want one function get_entry() which does the same thing as get()
         // and then deprecate get(). itll be fun to write probably
+        //
+        // XXX TODO FIXME remove neostake from the msg! commands
+        // this is just so i can be sure its hitting the right program while testing
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
-                msg!("Instruction: Initialize");
+                msg!("NEOSTAKE Instruction: Initialize");
                 Self::process_initialize(accounts, authorize, lockup)
             }
             StakeInstruction::Authorize(new_authority, authority_type) => {
-                msg!("Instruction: Authorize");
+                msg!("NEOSTAKE Instruction: Authorize");
                 Self::process_authorize(accounts, new_authority, authority_type)
             }
             StakeInstruction::DelegateStake => {
-                msg!("Instruction: DelegateStake");
+                msg!("NEOSTAKE Instruction: DelegateStake");
                 Self::process_delegate(accounts)
             }
             StakeInstruction::Split(lamports) => {
-                msg!("Instruction: Split");
+                msg!("NEOSTAKE Instruction: Split");
                 Self::process_split(accounts, lamports)
             }
             StakeInstruction::Withdraw(lamports) => {
-                msg!("Instruction: Withdraw");
+                msg!("NEOSTAKE Instruction: Withdraw");
                 Self::process_withdraw(accounts, lamports)
             }
             StakeInstruction::Deactivate => {
-                msg!("Instruction: Deactivate");
+                msg!("NEOSTAKE Instruction: Deactivate");
                 Self::process_deactivate(accounts)
             }
             StakeInstruction::SetLockup(lockup) => {
-                msg!("Instruction: SetLockup");
+                msg!("NEOSTAKE Instruction: SetLockup");
                 Self::process_set_lockup(accounts, lockup)
             }
             StakeInstruction::Merge => {
-                msg!("Instruction: Merge");
+                msg!("NEOSTAKE Instruction: Merge");
                 Self::process_merge(accounts)
             }
             StakeInstruction::AuthorizeWithSeed(args) => {
-                msg!("Instruction: AuthorizeWithSeed");
+                msg!("NEOSTAKE Instruction: AuthorizeWithSeed");
                 Self::process_authorize_with_seed(accounts, args)
             }
             StakeInstruction::InitializeChecked => {
-                msg!("Instruction: InitializeChecked");
+                msg!("NEOSTAKE Instruction: InitializeChecked");
                 Self::process_initialize_checked(accounts)
             }
             StakeInstruction::AuthorizeChecked(authority_type) => {
-                msg!("Instruction: AuthorizeChecked");
+                msg!("NEOSTAKE Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(accounts, authority_type)
             }
             StakeInstruction::AuthorizeCheckedWithSeed(args) => {
-                msg!("Instruction: AuthorizeCheckedWithSeed");
+                msg!("NEOSTAKE Instruction: AuthorizeCheckedWithSeed");
                 Self::process_authorize_checked_with_seed(accounts, args)
             }
             StakeInstruction::SetLockupChecked(lockup_checked) => {
-                msg!("Instruction: SetLockup");
+                msg!("NEOSTAKE Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
             }
             StakeInstruction::GetMinimumDelegation => {
-                msg!("Instruction: GetMinimumDelegation");
+                msg!("NEOSTAKE Instruction: GetMinimumDelegation");
                 let minimum_delegation = crate::get_minimum_delegation();
                 set_return_data(&minimum_delegation.to_le_bytes());
                 Ok(())
             }
             StakeInstruction::DeactivateDelinquent => {
-                msg!("Instruction: DeactivateDelinquent");
+                msg!("NEOSTAKE Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
             StakeInstruction::Redelegate => unimplemented!(), // wontfix
