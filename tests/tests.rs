@@ -19,17 +19,18 @@ use {
             instruction::{
                 self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
             },
-            state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+            state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
-        sysvar::rent::Rent,
+        sysvar::{clock::Clock, rent::Rent},
         transaction::{Transaction, TransactionError},
     },
     solana_vote_program::{
         self, vote_instruction,
-        vote_state::{VoteInit, VoteState, VoteStateVersions},
+        vote_state::{self, VoteInit, VoteState, VoteStateVersions},
     },
     stake_program::processor::Processor,
+    test_case::test_case,
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
@@ -197,6 +198,28 @@ pub async fn get_stake_account_rent(banks_client: &mut BanksClient) -> u64 {
     rent.minimum_balance(std::mem::size_of::<stake::state::StakeStateV2>())
 }
 
+async fn get_minimum_delegation(context: &mut ProgramTestContext) -> u64 {
+    let transaction = Transaction::new_signed_with_payer(
+        &[stake::instruction::get_minimum_delegation()],
+        Some(&context.payer.pubkey()),
+        &[&context.payer],
+        context.last_blockhash,
+    );
+    let mut data = context
+        .banks_client
+        .simulate_transaction(transaction)
+        .await
+        .unwrap()
+        .simulation_details
+        .unwrap()
+        .return_data
+        .unwrap()
+        .data;
+    data.resize(8, 0);
+
+    data.try_into().map(u64::from_le_bytes).unwrap()
+}
+
 pub async fn create_independent_stake_account(
     context: &mut ProgramTestContext,
     authorized: &Authorized,
@@ -327,9 +350,11 @@ pub async fn test_instruction_with_missing_signers(
         .unwrap();
 }
 
+#[test_case(true; "all_enabled")]
+#[test_case(false; "no_min_delegation")]
 #[tokio::test]
-async fn test_stake_checked_instructions() {
-    let mut context = program_test(true).start_with_context().await;
+async fn test_stake_checked_instructions(min_delegation: bool) {
+    let mut context = program_test(min_delegation).start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -430,9 +455,11 @@ async fn test_stake_checked_instructions() {
     .await;
 }
 
+#[test_case(true; "all_enabled")]
+#[test_case(false; "no_min_delegation")]
 #[tokio::test]
-async fn test_stake_initialize() {
-    let mut context = program_test(true).start_with_context().await;
+async fn test_stake_initialize(min_delegation: bool) {
+    let mut context = program_test(min_delegation).start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -539,4 +566,95 @@ async fn test_stake_initialize() {
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
+}
+
+// TODO authorize tests
+
+#[test_case(true; "all_enabled")]
+#[test_case(false; "no_min_delegation")]
+#[tokio::test]
+async fn test_stake_delegate(min_delegation: bool) {
+    let mut context = program_test(min_delegation).start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let vote_account2 = Keypair::new();
+    create_vote(
+        &mut context.banks_client,
+        &context.payer,
+        &context.last_blockhash,
+        &Keypair::new(),
+        &Pubkey::new_unique(),
+        &Pubkey::new_unique(),
+        &vote_account2,
+    )
+    .await;
+
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+
+    let authorized = Authorized { staker, withdrawer };
+
+    let vote_state_credits = 100;
+    context.increment_vote_account_credits(&accounts.vote_account.pubkey(), vote_state_credits);
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+
+    let stake =
+        create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
+    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+
+    // verify that delegate() looks right
+    let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+    let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
+    assert_eq!(
+        stake_data.unwrap(),
+        Stake {
+            delegation: Delegation {
+                voter_pubkey: accounts.vote_account.pubkey(),
+                stake: minimum_delegation,
+                activation_epoch: clock.epoch,
+                deactivation_epoch: std::u64::MAX,
+                ..Delegation::default()
+            },
+            credits_observed: vote_state_credits,
+        }
+    );
+
+    // verify that delegate fails as stake is active and not deactivating
+    advance_epoch(&mut context).await;
+    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
+
+    // deactivate
+    let instruction = ixn::deactivate_stake(&stake, &staker);
+    process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap();
+
+    // verify that delegate to a different vote account fails during deactivation
+    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
+
+    // XXX TODO FIXME is this supposed to succeed? looking at the code, i think it is
+    // the current neostake is broken because we need to be able to delegate a deactivated account
+    // im 80% sure we should be able to delegate a *deactivating* account, but check...
+
+    /*
+        // verify that delegate succeeds to same vote account when stake is deactivating
+        let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap();
+    */
 }
