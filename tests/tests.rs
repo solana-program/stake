@@ -22,6 +22,7 @@ use {
             state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
+        sysvar::rent::Rent,
         transaction::{Transaction, TransactionError},
     },
     solana_vote_program::{
@@ -35,7 +36,7 @@ pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 
 pub fn program_test(enable_minimum_delegation: bool) -> ProgramTest {
     let mut program_test = ProgramTest::default();
-    // XXX HANA program_test.prefer_bpf(false);
+    // XXX do i not need this? program_test.prefer_bpf(false);
 
     program_test.add_program(
         "stake_program",
@@ -161,6 +162,14 @@ pub async fn advance_epoch(context: &mut ProgramTestContext) {
     context.warp_to_slot(root_slot + slots_per_epoch).unwrap();
 }
 
+pub async fn refresh_blockhash(context: &mut ProgramTestContext) {
+    context.last_blockhash = context
+        .banks_client
+        .get_new_latest_blockhash(&context.last_blockhash)
+        .await
+        .unwrap();
+}
+
 pub async fn get_account(banks_client: &mut BanksClient, pubkey: &Pubkey) -> SolanaAccount {
     banks_client
         .get_account(*pubkey)
@@ -247,7 +256,7 @@ pub async fn create_blank_stake_account(context: &mut ProgramTestContext) -> Pub
             &context.payer.pubkey(),
             &stake.pubkey(),
             lamports,
-            std::mem::size_of::<stake::state::StakeStateV2>() as u64,
+            StakeStateV2::size_of() as u64,
             &stake_program::id(),
         )],
         Some(&context.payer.pubkey()),
@@ -279,10 +288,12 @@ pub async fn process_instruction<T: Signers + ?Sized>(
         Ok(_) => Ok(()),
         Err(e) => {
             // banks client error -> transaction error -> instruction error -> program error
-            if let TransactionError::InstructionError(_, e) = e.unwrap() {
-                Err(e.try_into().unwrap())
-            } else {
-                panic!("couldnt convert {:?} to ProgramError", e,)
+            match e.unwrap() {
+                TransactionError::InstructionError(_, e) => Err(e.try_into().unwrap()),
+                TransactionError::InsufficientFundsForRent { .. } => {
+                    Err(ProgramError::InsufficientFunds)
+                }
+                _ => panic!("couldnt convert {:?} to ProgramError", e),
             }
         }
     }
@@ -417,4 +428,115 @@ async fn test_stake_checked_instructions() {
         &vec![&withdrawer_keypair, &custodian_keypair],
     )
     .await;
+}
+
+#[tokio::test]
+async fn test_stake_initialize() {
+    let mut context = program_test(true).start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let no_signers: &[Keypair] = &[];
+
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+    let custodian_keypair = Keypair::new();
+
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+    let custodian = custodian_keypair.pubkey();
+
+    let authorized = Authorized { staker, withdrawer };
+
+    let lockup = Lockup {
+        epoch: 1,
+        unix_timestamp: 0,
+        custodian,
+    };
+
+    let stake = create_blank_stake_account(&mut context).await;
+    let instruction = ixn::initialize(&stake, &authorized, &lockup);
+
+    // should pass
+    process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap();
+
+    // check that we see what we expect
+    let account = get_account(&mut context.banks_client, &stake).await;
+    let stake_state: StakeStateV2 = bincode::deserialize(&account.data).unwrap();
+    assert_eq!(
+        stake_state,
+        StakeStateV2::Initialized(Meta {
+            authorized,
+            rent_exempt_reserve,
+            lockup,
+        }),
+    );
+
+    // 2nd time fails, can't move it from anything other than uninit->init
+    refresh_blockhash(&mut context).await;
+    let e = process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
+
+    // not enough balance for rent
+    let stake = Pubkey::new_unique();
+    let account = SolanaAccount {
+        lamports: rent_exempt_reserve / 2,
+        data: vec![0; StakeStateV2::size_of()],
+        owner: stake_program::id(),
+        executable: false,
+        rent_epoch: 1000,
+    };
+    context.set_account(&stake, &account.into());
+
+    let instruction = ixn::initialize(&stake, &authorized, &lockup);
+    let e = process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InsufficientFunds);
+
+    // incorrect account sizes
+    let stake_keypair = Keypair::new();
+    let stake = stake_keypair.pubkey();
+
+    let instruction = system_instruction::create_account(
+        &context.payer.pubkey(),
+        &stake,
+        rent_exempt_reserve * 2,
+        StakeStateV2::size_of() as u64 + 1,
+        &stake_program::id(),
+    );
+    process_instruction(&mut context, &instruction, &vec![&stake_keypair])
+        .await
+        .unwrap();
+
+    let instruction = ixn::initialize(&stake, &authorized, &lockup);
+    let e = process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
+
+    let stake_keypair = Keypair::new();
+    let stake = stake_keypair.pubkey();
+
+    let instruction = system_instruction::create_account(
+        &context.payer.pubkey(),
+        &stake,
+        rent_exempt_reserve,
+        StakeStateV2::size_of() as u64 - 1,
+        &stake_program::id(),
+    );
+    process_instruction(&mut context, &instruction, &vec![&stake_keypair])
+        .await
+        .unwrap();
+
+    let instruction = ixn::initialize(&stake, &authorized, &lockup);
+    let e = process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
 }
