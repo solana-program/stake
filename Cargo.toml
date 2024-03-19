@@ -18,13 +18,13 @@ borsh = { version = "1.2.1", features = ["derive", "unstable__schema"] }
 num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.1"
-solana-program = { version = "1.18.0", path = "/home/hana/work/solana/solana/sdk/program" }
+solana-program = { version = "2.0.0", path = "/home/hana/work/solana/solana/sdk/program" }
 thiserror = "1.0.52"
 
 [dev-dependencies]
-solana-program-test = { version = "1.18.0", path = "/home/hana/work/solana/solana/program-test" }
-solana-sdk = { version = "1.18.0", path = "/home/hana/work/solana/solana/sdk" }
-solana-vote-program = { version = "1.18.0", path = "/home/hana/work/solana/solana/programs/vote" }
+solana-program-test = { version = "2.0.0", path = "/home/hana/work/solana/solana/program-test" }
+solana-sdk = { version = "2.0.0", path = "/home/hana/work/solana/solana/sdk" }
+solana-vote-program = { version = "2.0.0", path = "/home/hana/work/solana/solana/programs/vote" }
 test-case = "3.3"
 
 [patch.crates-io]
