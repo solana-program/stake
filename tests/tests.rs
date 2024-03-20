@@ -158,6 +158,8 @@ pub async fn transfer(
 }
 
 pub async fn advance_epoch(context: &mut ProgramTestContext) {
+    refresh_blockhash(context).await;
+
     let root_slot = context.banks_client.get_root_slot().await.unwrap();
     let slots_per_epoch = context.genesis_config().epoch_schedule.slots_per_epoch;
     context.warp_to_slot(root_slot + slots_per_epoch).unwrap();
@@ -301,8 +303,6 @@ pub async fn process_instruction<T: Signers + ?Sized>(
     instruction: &Instruction,
     additional_signers: &T,
 ) -> ProgramResult {
-    refresh_blockhash(context).await;
-
     let mut transaction =
         Transaction::new_with_payer(&[instruction.clone()], Some(&context.payer.pubkey()));
 
@@ -505,6 +505,7 @@ async fn test_stake_initialize(min_delegation: bool) {
     );
 
     // 2nd time fails, can't move it from anything other than uninit->init
+    refresh_blockhash(&mut context).await;
     let e = process_instruction(&mut context, &instruction, no_signers)
         .await
         .unwrap_err();
@@ -650,10 +651,70 @@ async fn test_stake_delegate(min_delegation: bool) {
     assert_eq!(e, ProgramError::Custom(3));
 
     // verify that delegate succeeds to same vote account when stake is deactivating
+    refresh_blockhash(&mut context).await;
     let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
     process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap();
 
-    // XXX continue
+    // verify that deactivation has been cleared
+    let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
+    assert_eq!(stake_data.unwrap().delegation.deactivation_epoch, u64::MAX);
+
+    // verify that delegate to a different vote account fails if stake is still active
+    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+    assert_eq!(e, ProgramError::Custom(3));
+
+    // delegate still fails after stake is fully activated; redelegate is not supported
+    advance_epoch(&mut context).await;
+    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+    assert_eq!(e, ProgramError::Custom(3));
+
+    // delegate to spoofed vote account fails (not owned by vote program)
+    let mut fake_vote_account =
+        get_account(&mut context.banks_client, &accounts.vote_account.pubkey()).await;
+    fake_vote_account.owner = Pubkey::new_unique();
+    let fake_vote_address = Pubkey::new_unique();
+    context.set_account(&fake_vote_address, &fake_vote_account.into());
+
+    let stake =
+        create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
+    let instruction = ixn::delegate_stake(&stake, &staker, &fake_vote_address);
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::IncorrectProgramId);
+
+    // delegate stake program-owned non-stake account fails
+    let rewards_pool_address = Pubkey::new_unique();
+    let rewards_pool = SolanaAccount {
+        lamports: get_stake_account_rent(&mut context.banks_client).await,
+        data: bincode::serialize(&StakeStateV2::RewardsPool)
+            .unwrap()
+            .to_vec(),
+        owner: stake_program::id(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    };
+    context.set_account(&rewards_pool_address, &rewards_pool.into());
+
+    let instruction = ixn::delegate_stake(
+        &rewards_pool_address,
+        &staker,
+        &accounts.vote_account.pubkey(),
+    );
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
 }
