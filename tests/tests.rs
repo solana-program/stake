@@ -19,10 +19,13 @@ use {
             instruction::{
                 self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
             },
-            state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+            state::{
+                Authorized, Delegation, Lockup, Meta, Stake, StakeActivationStatus, StakeAuthorize,
+                StakeStateV2,
+            },
         },
         system_instruction, system_program,
-        sysvar::{clock::Clock, rent::Rent},
+        sysvar::{clock::Clock, rent::Rent, stake_history::StakeHistory},
         transaction::{Transaction, TransactionError},
     },
     solana_vote_program::{
@@ -137,24 +140,22 @@ pub async fn create_vote(
     let _ = banks_client.process_transaction(transaction).await;
 }
 
-pub async fn transfer(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
-    recipient: &Pubkey,
-    amount: u64,
-) {
+pub async fn transfer(context: &mut ProgramTestContext, recipient: &Pubkey, amount: u64) {
     let transaction = Transaction::new_signed_with_payer(
         &[system_instruction::transfer(
-            &payer.pubkey(),
+            &context.payer.pubkey(),
             recipient,
             amount,
         )],
-        Some(&payer.pubkey()),
-        &[payer],
-        *recent_blockhash,
+        Some(&context.payer.pubkey()),
+        &[&context.payer],
+        context.last_blockhash,
     );
-    banks_client.process_transaction(transaction).await.unwrap();
+    context
+        .banks_client
+        .process_transaction(transaction)
+        .await
+        .unwrap();
 }
 
 pub async fn advance_epoch(context: &mut ProgramTestContext) {
@@ -198,6 +199,21 @@ pub async fn get_stake_account(
 pub async fn get_stake_account_rent(banks_client: &mut BanksClient) -> u64 {
     let rent = banks_client.get_rent().await.unwrap();
     rent.minimum_balance(std::mem::size_of::<stake::state::StakeStateV2>())
+}
+
+pub async fn get_effective_stake(banks_client: &mut BanksClient, pubkey: &Pubkey) -> u64 {
+    let clock = banks_client.get_sysvar::<Clock>().await.unwrap();
+    let stake_history = banks_client.get_sysvar::<StakeHistory>().await.unwrap();
+    let stake_account = get_account(banks_client, pubkey).await;
+    match bincode::deserialize::<StakeStateV2>(&stake_account.data).unwrap() {
+        StakeStateV2::Stake(_, stake, _) => {
+            stake
+                .delegation
+                .stake_activating_and_deactivating(clock.epoch, &stake_history, Some(0))
+                .effective
+        }
+        _ => 0,
+    }
 }
 
 async fn get_minimum_delegation(context: &mut ProgramTestContext) -> u64 {
@@ -274,6 +290,13 @@ pub async fn create_independent_stake_account_with_lockup(
 
 pub async fn create_blank_stake_account(context: &mut ProgramTestContext) -> Pubkey {
     let stake = Keypair::new();
+    create_blank_stake_account_from_keypair(context, &stake).await
+}
+
+pub async fn create_blank_stake_account_from_keypair(
+    context: &mut ProgramTestContext,
+    stake: &Keypair,
+) -> Pubkey {
     let lamports = get_stake_account_rent(&mut context.banks_client).await;
 
     let transaction = Transaction::new_signed_with_payer(
@@ -717,4 +740,226 @@ async fn test_stake_delegate(min_delegation: bool) {
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SplitSource {
+    Uninitialized = 0,
+    Initialized,
+    Activating,
+    Active,
+    Deactivating,
+    Deactive,
+}
+impl SplitSource {
+    // NOTE the program enforces that a deactive stake adheres to the minimum, albeit spuriously
+    // after solana-program/stake-program #1 is addressed, Self::Deactive should move to false
+    pub fn minimum_enforced(&self) -> bool {
+        match self {
+            Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
+            Self::Uninitialized | Self::Initialized => false,
+        }
+    }
+}
+
+// XXX TODO FIXME i was today days into this project when i realized i cant test minimum delegation
+// because bpf programs cant access features so i just have it hardcoded as off
+// consider if we can backdoor edit it in a reasonably clean way or just dont worry about it
+// TODO test whole-balance split
+#[test_case(SplitSource::Uninitialized, true; "uninitialized::all_enabled")]
+#[test_case(SplitSource::Initialized, true; "initialized::all_enabled")]
+#[test_case(SplitSource::Activating, true; "activating::all_enabled")]
+#[test_case(SplitSource::Active, true; "active::all_enabled")]
+#[test_case(SplitSource::Deactivating, true; "deactivating::all_enabled")]
+#[test_case(SplitSource::Deactive, true; "deactive::all_enabled")]
+#[test_case(SplitSource::Uninitialized, false; "uninitialized::no_min_delegation")]
+#[test_case(SplitSource::Initialized, false; "initialized::no_min_delegation")]
+#[test_case(SplitSource::Activating, false; "activating::no_min_delegation")]
+#[test_case(SplitSource::Active, false; "active::no_min_delegation")]
+#[test_case(SplitSource::Deactivating, false; "deactivating::no_min_delegation")]
+#[test_case(SplitSource::Deactive, false; "deactive::no_min_delegation")]
+#[tokio::test]
+async fn test_split(split_source_type: SplitSource, min_delegation: bool) {
+    let mut context = program_test(min_delegation).start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+
+    let authorized = Authorized { staker, withdrawer };
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+    let staked_amount = minimum_delegation * 2;
+
+    let uninitialized_source_keypair = Keypair::new();
+    let split_source = if split_source_type == SplitSource::Uninitialized {
+        let split_source =
+            create_blank_stake_account_from_keypair(&mut context, &uninitialized_source_keypair)
+                .await;
+        transfer(&mut context, &split_source, staked_amount).await;
+        split_source
+    } else {
+        create_independent_stake_account(&mut context, &authorized, staked_amount).await
+    };
+
+    if split_source_type >= SplitSource::Activating {
+        let instruction =
+            ixn::delegate_stake(&split_source, &staker, &accounts.vote_account.pubkey());
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap();
+    }
+
+    if split_source_type >= SplitSource::Active {
+        advance_epoch(&mut context).await;
+        assert_eq!(
+            get_effective_stake(&mut context.banks_client, &split_source).await,
+            staked_amount,
+        );
+    }
+
+    if split_source_type >= SplitSource::Deactivating {
+        let instruction = ixn::deactivate_stake(&split_source, &staker);
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap();
+    }
+
+    if split_source_type == SplitSource::Deactive {
+        advance_epoch(&mut context).await;
+        assert_eq!(
+            get_effective_stake(&mut context.banks_client, &split_source).await,
+            0,
+        );
+    }
+
+    let split_dest = create_blank_stake_account(&mut context).await;
+
+    let signers = match split_source_type {
+        SplitSource::Uninitialized => vec![&uninitialized_source_keypair],
+        _ => vec![&staker_keypair],
+    };
+
+    // fail, split more than available (even if not active, would kick source out of rent exemption)
+    let instruction = &ixn::split(
+        &split_source,
+        &signers[0].pubkey(),
+        staked_amount + 1,
+        &split_dest,
+    )[2];
+
+    let e = process_instruction(&mut context, &instruction, &signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InsufficientFunds);
+
+    // an active or transitioning stake account cannot have less than the minimum delegation
+    // note this is NOT dependent on the minimum delegation feature. there was ALWAYS a minimum. it was one lamport!
+    if split_source_type.minimum_enforced() {
+        // zero split fails
+        let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
+        let e = process_instruction(&mut context, &instruction, &signers)
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InsufficientFunds);
+
+        // underfunded destination fails
+        let instruction = &ixn::split(
+            &split_source,
+            &signers[0].pubkey(),
+            minimum_delegation - 1,
+            &split_dest,
+        )[2];
+
+        let e = process_instruction(&mut context, &instruction, &signers)
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InsufficientFunds);
+
+        // underfunded source fails
+        let instruction = &ixn::split(
+            &split_source,
+            &signers[0].pubkey(),
+            minimum_delegation + 1,
+            &split_dest,
+        )[2];
+
+        let e = process_instruction(&mut context, &instruction, &signers)
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InsufficientFunds);
+    }
+
+    // split to non-owned account fails
+    let mut fake_split_dest_account = get_account(&mut context.banks_client, &split_dest).await;
+    fake_split_dest_account.owner = Pubkey::new_unique();
+    let fake_split_dest = Pubkey::new_unique();
+    context.set_account(&fake_split_dest, &fake_split_dest_account.into());
+
+    let instruction = &ixn::split(
+        &split_source,
+        &signers[0].pubkey(),
+        staked_amount / 2,
+        &fake_split_dest,
+    )[2];
+
+    let e = process_instruction(&mut context, &instruction, &signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountOwner);
+
+    // success
+    let instruction = &ixn::split(
+        &split_source,
+        &signers[0].pubkey(),
+        staked_amount / 2,
+        &split_dest,
+    )[2];
+    test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+
+    // source lost split amount
+    let source_lamports = get_account(&mut context.banks_client, &split_source)
+        .await
+        .lamports;
+    assert_eq!(source_lamports, staked_amount / 2 + rent_exempt_reserve);
+
+    // destination gained split amount
+    let dest_lamports = get_account(&mut context.banks_client, &split_dest)
+        .await
+        .lamports;
+    assert_eq!(dest_lamports, staked_amount / 2 + rent_exempt_reserve);
+
+    // destination meta has been set properly if ever delegated
+    if split_source_type >= SplitSource::Initialized {
+        let (source_meta, source_stake, _) =
+            get_stake_account(&mut context.banks_client, &split_source).await;
+        let (dest_meta, dest_stake, _) =
+            get_stake_account(&mut context.banks_client, &split_dest).await;
+        assert_eq!(dest_meta, source_meta);
+
+        // delegations are set properly if activating or active
+        if split_source_type >= SplitSource::Activating && split_source_type < SplitSource::Deactive
+        {
+            assert_eq!(source_stake.unwrap().delegation.stake, staked_amount / 2);
+            assert_eq!(dest_stake.unwrap().delegation.stake, staked_amount / 2);
+        }
+    }
+
+    // nothing has been deactivated if active
+    if split_source_type >= SplitSource::Active && split_source_type < SplitSource::Deactive {
+        assert_eq!(
+            get_effective_stake(&mut context.banks_client, &split_source).await,
+            staked_amount / 2,
+        );
+
+        assert_eq!(
+            get_effective_stake(&mut context.banks_client, &split_dest).await,
+            staked_amount / 2,
+        );
+    }
 }

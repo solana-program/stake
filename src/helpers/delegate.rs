@@ -44,14 +44,6 @@ pub(crate) fn redelegate_stake(
         // If pubkey of new voter is the same as current,
         // and we are scheduled to start deactivating this epoch,
         // we rescind deactivation
-        solana_program::msg!(
-            "HANA pubkey: {} == {}, epoch: {} == {}",
-            stake.delegation.voter_pubkey,
-            *voter_pubkey,
-            epoch,
-            stake.delegation.deactivation_epoch
-        );
-
         if stake.delegation.voter_pubkey == *voter_pubkey
             && epoch == stake.delegation.deactivation_epoch
         {
