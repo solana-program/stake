@@ -38,7 +38,7 @@ use {
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 
-pub fn program_test(enable_minimum_delegation: bool) -> ProgramTest {
+pub fn program_test() -> ProgramTest {
     let mut program_test = ProgramTest::default();
     // XXX do i not need this? program_test.prefer_bpf(false);
 
@@ -47,10 +47,6 @@ pub fn program_test(enable_minimum_delegation: bool) -> ProgramTest {
         stake_program::id(),
         processor!(Processor::process),
     );
-
-    if !enable_minimum_delegation {
-        program_test.deactivate_feature(stake_raise_minimum_delegation_to_1_sol::id());
-    }
 
     program_test
 }
@@ -375,11 +371,9 @@ pub async fn test_instruction_with_missing_signers(
         .unwrap();
 }
 
-#[test_case(true; "all_enabled")]
-#[test_case(false; "no_min_delegation")]
 #[tokio::test]
-async fn test_stake_checked_instructions(min_delegation: bool) {
-    let mut context = program_test(min_delegation).start_with_context().await;
+async fn test_stake_checked_instructions() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -480,11 +474,9 @@ async fn test_stake_checked_instructions(min_delegation: bool) {
     .await;
 }
 
-#[test_case(true; "all_enabled")]
-#[test_case(false; "no_min_delegation")]
 #[tokio::test]
-async fn test_stake_initialize(min_delegation: bool) {
-    let mut context = program_test(min_delegation).start_with_context().await;
+async fn test_stake_initialize() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -595,11 +587,9 @@ async fn test_stake_initialize(min_delegation: bool) {
 
 // TODO authorize tests
 
-#[test_case(true; "all_enabled")]
-#[test_case(false; "no_min_delegation")]
 #[tokio::test]
-async fn test_stake_delegate(min_delegation: bool) {
-    let mut context = program_test(min_delegation).start_with_context().await;
+async fn test_stake_delegate() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -766,21 +756,15 @@ impl SplitSource {
 // because bpf programs cant access features so i just have it hardcoded as off
 // consider if we can backdoor edit it in a reasonably clean way or just dont worry about it
 // TODO test whole-balance split (there are a lot more split tests i didnt port yet tho)
-#[test_case(SplitSource::Uninitialized, true; "uninitialized::all_enabled")]
-#[test_case(SplitSource::Initialized, true; "initialized::all_enabled")]
-#[test_case(SplitSource::Activating, true; "activating::all_enabled")]
-#[test_case(SplitSource::Active, true; "active::all_enabled")]
-#[test_case(SplitSource::Deactivating, true; "deactivating::all_enabled")]
-#[test_case(SplitSource::Deactive, true; "deactive::all_enabled")]
-#[test_case(SplitSource::Uninitialized, false; "uninitialized::no_min_delegation")]
-#[test_case(SplitSource::Initialized, false; "initialized::no_min_delegation")]
-#[test_case(SplitSource::Activating, false; "activating::no_min_delegation")]
-#[test_case(SplitSource::Active, false; "active::no_min_delegation")]
-#[test_case(SplitSource::Deactivating, false; "deactivating::no_min_delegation")]
-#[test_case(SplitSource::Deactive, false; "deactive::no_min_delegation")]
+#[test_case(SplitSource::Uninitialized; "uninitialized")]
+#[test_case(SplitSource::Initialized; "initialized")]
+#[test_case(SplitSource::Activating; "activating")]
+#[test_case(SplitSource::Active; "active")]
+#[test_case(SplitSource::Deactivating; "deactivating")]
+#[test_case(SplitSource::Deactive; "deactive")]
 #[tokio::test]
-async fn test_split(split_source_type: SplitSource, min_delegation: bool) {
-    let mut context = program_test(min_delegation).start_with_context().await;
+async fn test_split(split_source_type: SplitSource) {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -970,7 +954,7 @@ async fn test_split(split_source_type: SplitSource, min_delegation: bool) {
 
 #[tokio::test]
 async fn test_withdraw_stake() {
-    let mut context = program_test(false).start_with_context().await;
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
