@@ -733,7 +733,7 @@ async fn test_stake_delegate() {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SplitSource {
+pub enum StakeLifecycle {
     Uninitialized = 0,
     Initialized,
     Activating,
@@ -741,10 +741,68 @@ pub enum SplitSource {
     Deactivating,
     Deactive,
 }
-impl SplitSource {
-    // NOTE the program enforces that a deactive stake adheres to the minimum, albeit spuriously
+impl StakeLifecycle {
+    pub async fn new_stake_account(
+        self,
+        context: &mut ProgramTestContext,
+        vote_account: &Pubkey,
+        staked_amount: u64,
+    ) -> (Keypair, Keypair, Keypair) {
+        let no_signers: &[Keypair] = &[];
+        let stake_keypair = Keypair::new();
+        let staker_keypair = Keypair::new();
+        let withdrawer_keypair = Keypair::new();
+        let authorized = Authorized {
+            staker: staker_keypair.pubkey(),
+            withdrawer: withdrawer_keypair.pubkey(),
+        };
+
+        let stake = create_blank_stake_account_from_keypair(context, &stake_keypair).await;
+        transfer(context, &stake, staked_amount).await;
+
+        if self >= StakeLifecycle::Initialized {
+            let instruction = ixn::initialize(&stake, &authorized, &Lockup::default());
+            process_instruction(context, &instruction, no_signers)
+                .await
+                .unwrap();
+        }
+
+        if self >= StakeLifecycle::Activating {
+            let instruction = ixn::delegate_stake(&stake, &staker_keypair.pubkey(), vote_account);
+            process_instruction(context, &instruction, &vec![&staker_keypair])
+                .await
+                .unwrap();
+        }
+
+        if self >= StakeLifecycle::Active {
+            advance_epoch(context).await;
+            assert_eq!(
+                get_effective_stake(&mut context.banks_client, &stake).await,
+                staked_amount,
+            );
+        }
+
+        if self >= StakeLifecycle::Deactivating {
+            let instruction = ixn::deactivate_stake(&stake, &staker_keypair.pubkey());
+            process_instruction(context, &instruction, &vec![&staker_keypair])
+                .await
+                .unwrap();
+        }
+
+        if self == StakeLifecycle::Deactive {
+            advance_epoch(context).await;
+            assert_eq!(
+                get_effective_stake(&mut context.banks_client, &stake).await,
+                0,
+            );
+        }
+
+        (stake_keypair, staker_keypair, withdrawer_keypair)
+    }
+
+    // NOTE the program enforces that a deactive stake adheres to the split minimum, albeit spuriously
     // after solana-program/stake-program #1 is addressed, Self::Deactive should move to false
-    pub fn minimum_enforced(&self) -> bool {
+    pub fn split_minimum_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
             Self::Uninitialized | Self::Initialized => false,
@@ -752,80 +810,32 @@ impl SplitSource {
     }
 }
 
-// XXX TODO FIXME i was today days into this project when i realized i cant test minimum delegation
-// because bpf programs cant access features so i just have it hardcoded as off
-// consider if we can backdoor edit it in a reasonably clean way or just dont worry about it
 // TODO test whole-balance split (there are a lot more split tests i didnt port yet tho)
-#[test_case(SplitSource::Uninitialized; "uninitialized")]
-#[test_case(SplitSource::Initialized; "initialized")]
-#[test_case(SplitSource::Activating; "activating")]
-#[test_case(SplitSource::Active; "active")]
-#[test_case(SplitSource::Deactivating; "deactivating")]
-#[test_case(SplitSource::Deactive; "deactive")]
+#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
+#[test_case(StakeLifecycle::Initialized; "initialized")]
+#[test_case(StakeLifecycle::Activating; "activating")]
+#[test_case(StakeLifecycle::Active; "active")]
+#[test_case(StakeLifecycle::Deactivating; "deactivating")]
+#[test_case(StakeLifecycle::Deactive; "deactive")]
 #[tokio::test]
-async fn test_split(split_source_type: SplitSource) {
+async fn test_split(split_source_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
-
-    let staker_keypair = Keypair::new();
-    let withdrawer_keypair = Keypair::new();
-
-    let staker = staker_keypair.pubkey();
-    let withdrawer = withdrawer_keypair.pubkey();
-
-    let authorized = Authorized { staker, withdrawer };
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
     let staked_amount = minimum_delegation * 2;
 
-    let uninitialized_source_keypair = Keypair::new();
-    let split_source = if split_source_type == SplitSource::Uninitialized {
-        let split_source =
-            create_blank_stake_account_from_keypair(&mut context, &uninitialized_source_keypair)
-                .await;
-        transfer(&mut context, &split_source, staked_amount).await;
-        split_source
-    } else {
-        create_independent_stake_account(&mut context, &authorized, staked_amount).await
-    };
+    let (split_source_keypair, staker_keypair, _) = split_source_type
+        .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
+        .await;
 
-    if split_source_type >= SplitSource::Activating {
-        let instruction =
-            ixn::delegate_stake(&split_source, &staker, &accounts.vote_account.pubkey());
-        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
-            .await
-            .unwrap();
-    }
-
-    if split_source_type >= SplitSource::Active {
-        advance_epoch(&mut context).await;
-        assert_eq!(
-            get_effective_stake(&mut context.banks_client, &split_source).await,
-            staked_amount,
-        );
-    }
-
-    if split_source_type >= SplitSource::Deactivating {
-        let instruction = ixn::deactivate_stake(&split_source, &staker);
-        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
-            .await
-            .unwrap();
-    }
-
-    if split_source_type == SplitSource::Deactive {
-        advance_epoch(&mut context).await;
-        assert_eq!(
-            get_effective_stake(&mut context.banks_client, &split_source).await,
-            0,
-        );
-    }
-
+    let split_source = split_source_keypair.pubkey();
     let split_dest = create_blank_stake_account(&mut context).await;
 
     let signers = match split_source_type {
-        SplitSource::Uninitialized => vec![&uninitialized_source_keypair],
+        StakeLifecycle::Uninitialized => vec![&split_source_keypair],
         _ => vec![&staker_keypair],
     };
 
@@ -844,7 +854,7 @@ async fn test_split(split_source_type: SplitSource) {
 
     // an active or transitioning stake account cannot have less than the minimum delegation
     // note this is NOT dependent on the minimum delegation feature. there was ALWAYS a minimum. it was one lamport!
-    if split_source_type.minimum_enforced() {
+    if split_source_type.split_minimum_enforced() {
         // zero split fails
         let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
         let e = process_instruction(&mut context, &instruction, &signers)
@@ -919,7 +929,7 @@ async fn test_split(split_source_type: SplitSource) {
     assert_eq!(dest_lamports, staked_amount / 2 + rent_exempt_reserve);
 
     // destination meta has been set properly if ever delegated
-    if split_source_type >= SplitSource::Initialized {
+    if split_source_type >= StakeLifecycle::Initialized {
         let (source_meta, source_stake, _) =
             get_stake_account(&mut context.banks_client, &split_source).await;
         let (dest_meta, dest_stake, _) =
@@ -927,7 +937,8 @@ async fn test_split(split_source_type: SplitSource) {
         assert_eq!(dest_meta, source_meta);
 
         // delegations are set properly if activating or active
-        if split_source_type >= SplitSource::Activating && split_source_type < SplitSource::Deactive
+        if split_source_type >= StakeLifecycle::Activating
+            && split_source_type < StakeLifecycle::Deactive
         {
             assert_eq!(source_stake.unwrap().delegation.stake, staked_amount / 2);
             assert_eq!(dest_stake.unwrap().delegation.stake, staked_amount / 2);
@@ -935,7 +946,7 @@ async fn test_split(split_source_type: SplitSource) {
     }
 
     // nothing has been deactivated if active
-    if split_source_type >= SplitSource::Active && split_source_type < SplitSource::Deactive {
+    if split_source_type >= StakeLifecycle::Active && split_source_type < StakeLifecycle::Deactive {
         assert_eq!(
             get_effective_stake(&mut context.banks_client, &split_source).await,
             staked_amount / 2,
