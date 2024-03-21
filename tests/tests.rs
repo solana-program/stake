@@ -802,10 +802,18 @@ impl StakeLifecycle {
 
     // NOTE the program enforces that a deactive stake adheres to the split minimum, albeit spuriously
     // after solana-program/stake-program #1 is addressed, Self::Deactive should move to false
+    // equivalently this could be combined with withdraw_minimum_enforced into a function minimum_enforced
     pub fn split_minimum_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
             Self::Uninitialized | Self::Initialized => false,
+        }
+    }
+
+    pub fn withdraw_minimum_enforced(&self) -> bool {
+        match self {
+            Self::Activating | Self::Active | Self::Deactivating => true,
+            Self::Uninitialized | Self::Initialized | Self::Deactive => false,
         }
     }
 }
@@ -959,30 +967,22 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns
-// i want to do withdraw, deactivate, merge, set lockup, deactivate delinquent
+// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw
+// i want to do deactivate, merge, set lockup, deactivate delinquent
 // and then i think i will be ready to coax other people into looking at the program while i keep porting tests
 
+// TODO lockup... unenforced and enforced? also maybe for split
+#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
+#[test_case(StakeLifecycle::Initialized; "initialized")]
+#[test_case(StakeLifecycle::Activating; "activating")]
+#[test_case(StakeLifecycle::Active; "active")]
+#[test_case(StakeLifecycle::Deactivating; "deactivating")]
+#[test_case(StakeLifecycle::Deactive; "deactive")]
 #[tokio::test]
-async fn test_withdraw_stake() {
+async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
-
-    let staker_keypair = Keypair::new();
-    let withdrawer_keypair = Keypair::new();
-    let custodian_keypair = Keypair::new();
-
-    let staker = staker_keypair.pubkey();
-    let withdrawer = withdrawer_keypair.pubkey();
-    let custodian = custodian_keypair.pubkey();
-
-    let authorized = Authorized { staker, withdrawer };
-    let lockup = Lockup {
-        unix_timestamp: 0,
-        epoch: 0,
-        custodian,
-    };
 
     let stake_rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -995,50 +995,146 @@ async fn test_withdraw_stake() {
         .unwrap()
         .minimum_balance(0);
 
-    // withdraw from uninit succeeds
-    // withdraw more than available fails
-    // delegate, transfer in rewards. withdraw rewards works
-    // deactivate, skip epoch, withdraw more than available fails
-    // withdraw full (not including rent) succeeds and leaves uninit
-    // withdraw from rewardspool fails
-
-    // withdraw from uninitialized succeeds
-    let source_keypair = Keypair::new();
-    let source = create_blank_stake_account_from_keypair(&mut context, &source_keypair).await;
-    transfer(&mut context, &source, staked_amount).await;
+    let (withdraw_source_keypair, _, withdrawer_keypair) = withdraw_source_type
+        .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
+        .await;
+    let withdraw_source = withdraw_source_keypair.pubkey();
 
     let recipient = Pubkey::new_unique();
     transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
 
-    let instruction = ixn::withdraw(&source, &source, &recipient, staked_amount, None);
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&source_keypair]).await;
+    let signers = match withdraw_source_type {
+        StakeLifecycle::Uninitialized => vec![&withdraw_source_keypair],
+        _ => vec![&withdrawer_keypair],
+    };
 
-    let recipient_lamports = get_account(&mut context.banks_client, &recipient)
-        .await
-        .lamports;
-    assert_eq!(
-        recipient_lamports,
-        staked_amount + wallet_rent_exempt_reserve
+    // withdraw that would end rent-exemption always fails
+    let instruction = ixn::withdraw(
+        &withdraw_source,
+        &signers[0].pubkey(),
+        &recipient,
+        staked_amount + 1,
+        None,
     );
-
-    // initialize stake
-    let source = create_independent_stake_account(&mut context, &authorized, staked_amount).await;
-
-    // should fail, signed keyed account and locked up, more than available
-    let instruction = ixn::withdraw(&source, &withdrawer, &recipient, staked_amount + 1, None);
-    let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+    let e = process_instruction(&mut context, &instruction, &signers)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InsufficientFunds);
 
-    /*
-        // Stake some lamports (available lamports for withdrawals will reduce to zero)
-        let instruction =
-            ixn::delegate_stake(&source, &staker, &accounts.vote_account.pubkey());
-        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+    if withdraw_source_type.withdraw_minimum_enforced() {
+        // withdraw active or activating stake fails
+        let instruction = ixn::withdraw(
+            &withdraw_source,
+            &signers[0].pubkey(),
+            &recipient,
+            staked_amount,
+            None,
+        );
+        let e = process_instruction(&mut context, &instruction, &signers)
             .await
-            .unwrap();
-    */
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InsufficientFunds);
 
-    //transfer(&mut context, &split_source, staked_amount).await;
+        // grant rewards
+        let reward_amount = 10;
+        transfer(&mut context, &withdraw_source, reward_amount).await;
+
+        // withdraw in excess of rewards is not allowed
+        let instruction = ixn::withdraw(
+            &withdraw_source,
+            &signers[0].pubkey(),
+            &recipient,
+            reward_amount + 1,
+            None,
+        );
+        let e = process_instruction(&mut context, &instruction, &signers)
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InsufficientFunds);
+
+        // withdraw rewards is allowed
+        let instruction = ixn::withdraw(
+            &withdraw_source,
+            &signers[0].pubkey(),
+            &recipient,
+            reward_amount,
+            None,
+        );
+        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+
+        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
+            .await
+            .lamports;
+        assert_eq!(
+            recipient_lamports,
+            reward_amount + wallet_rent_exempt_reserve,
+        );
+    } else {
+        // withdraw that leaves rent behind is allowed
+        let instruction = ixn::withdraw(
+            &withdraw_source,
+            &signers[0].pubkey(),
+            &recipient,
+            staked_amount,
+            None,
+        );
+        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+
+        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
+            .await
+            .lamports;
+        assert_eq!(
+            recipient_lamports,
+            staked_amount + wallet_rent_exempt_reserve,
+        );
+
+        // full withdraw is allowed
+        refresh_blockhash(&mut context).await;
+        transfer(&mut context, &withdraw_source, staked_amount).await;
+
+        let recipient = Pubkey::new_unique();
+        transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
+
+        let instruction = ixn::withdraw(
+            &withdraw_source,
+            &signers[0].pubkey(),
+            &recipient,
+            staked_amount + stake_rent_exempt_reserve,
+            None,
+        );
+        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+
+        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
+            .await
+            .lamports;
+        assert_eq!(
+            recipient_lamports,
+            staked_amount + stake_rent_exempt_reserve + wallet_rent_exempt_reserve,
+        );
+    }
+
+    // withdraw from program-owned non-stake not allowed
+    let rewards_pool_address = Pubkey::new_unique();
+    let rewards_pool = SolanaAccount {
+        lamports: get_stake_account_rent(&mut context.banks_client).await + staked_amount,
+        data: bincode::serialize(&StakeStateV2::RewardsPool)
+            .unwrap()
+            .to_vec(),
+        owner: stake_program::id(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    };
+    context.set_account(&rewards_pool_address, &rewards_pool.into());
+
+    let instruction = ixn::withdraw(
+        &rewards_pool_address,
+        &signers[0].pubkey(),
+        &recipient,
+        staked_amount,
+        None,
+    );
+    let e = process_instruction(&mut context, &instruction, &signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
 }
