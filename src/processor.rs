@@ -580,7 +580,6 @@ impl Processor {
         if withdraw_lamports != stake_account_lamports
             && withdraw_lamports_and_reserve > stake_account_lamports
         {
-            // XXX why is this assert here...
             assert!(!is_staked);
             return Err(ProgramError::InsufficientFunds);
         }

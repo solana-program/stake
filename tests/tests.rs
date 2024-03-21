@@ -765,7 +765,7 @@ impl SplitSource {
 // XXX TODO FIXME i was today days into this project when i realized i cant test minimum delegation
 // because bpf programs cant access features so i just have it hardcoded as off
 // consider if we can backdoor edit it in a reasonably clean way or just dont worry about it
-// TODO test whole-balance split
+// TODO test whole-balance split (there are a lot more split tests i didnt port yet tho)
 #[test_case(SplitSource::Uninitialized, true; "uninitialized::all_enabled")]
 #[test_case(SplitSource::Initialized, true; "initialized::all_enabled")]
 #[test_case(SplitSource::Activating, true; "activating::all_enabled")]
@@ -962,4 +962,88 @@ async fn test_split(split_source_type: SplitSource, min_delegation: bool) {
             staked_amount / 2,
         );
     }
+}
+
+// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns
+// i want to do withdraw, deactivate, merge, set lockup, deactivate delinquent
+// and then i think i will be ready to coax other people into looking at the program while i keep porting tests
+
+#[tokio::test]
+async fn test_withdraw_stake() {
+    let mut context = program_test(false).start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+    let custodian_keypair = Keypair::new();
+
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+    let custodian = custodian_keypair.pubkey();
+
+    let authorized = Authorized { staker, withdrawer };
+    let lockup = Lockup {
+        unix_timestamp: 0,
+        epoch: 0,
+        custodian,
+    };
+
+    let stake_rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+    let staked_amount = minimum_delegation;
+
+    let wallet_rent_exempt_reserve = context
+        .banks_client
+        .get_rent()
+        .await
+        .unwrap()
+        .minimum_balance(0);
+
+    // withdraw from uninit succeeds
+    // withdraw more than available fails
+    // delegate, transfer in rewards. withdraw rewards works
+    // deactivate, skip epoch, withdraw more than available fails
+    // withdraw full (not including rent) succeeds and leaves uninit
+    // withdraw from rewardspool fails
+
+    // withdraw from uninitialized succeeds
+    let source_keypair = Keypair::new();
+    let source = create_blank_stake_account_from_keypair(&mut context, &source_keypair).await;
+    transfer(&mut context, &source, staked_amount).await;
+
+    let recipient = Pubkey::new_unique();
+    transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
+
+    let instruction = ixn::withdraw(&source, &source, &recipient, staked_amount, None);
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&source_keypair]).await;
+
+    let recipient_lamports = get_account(&mut context.banks_client, &recipient)
+        .await
+        .lamports;
+    assert_eq!(
+        recipient_lamports,
+        staked_amount + wallet_rent_exempt_reserve
+    );
+
+    // initialize stake
+    let source = create_independent_stake_account(&mut context, &authorized, staked_amount).await;
+
+    // should fail, signed keyed account and locked up, more than available
+    let instruction = ixn::withdraw(&source, &withdrawer, &recipient, staked_amount + 1, None);
+    let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InsufficientFunds);
+
+    /*
+        // Stake some lamports (available lamports for withdrawals will reduce to zero)
+        let instruction =
+            ixn::delegate_stake(&source, &staker, &accounts.vote_account.pubkey());
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap();
+    */
+
+    //transfer(&mut context, &split_source, staked_amount).await;
 }
