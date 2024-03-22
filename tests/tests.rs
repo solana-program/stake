@@ -585,7 +585,153 @@ async fn test_stake_initialize() {
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
-// TODO authorize tests
+#[tokio::test]
+async fn test_authorize() {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let no_signers: &[Keypair] = &[];
+
+    let stakers: [_; 3] = std::array::from_fn(|_| Keypair::new());
+    let withdrawers: [_; 3] = std::array::from_fn(|_| Keypair::new());
+
+    let stake_keypair = Keypair::new();
+    let stake = create_blank_stake_account_from_keypair(&mut context, &stake_keypair).await;
+
+    // authorize uninitialized fails
+    for (authority, authority_type) in [
+        (&stakers[0], StakeAuthorize::Staker),
+        (&withdrawers[0], StakeAuthorize::Withdrawer),
+    ] {
+        let instruction = ixn::authorize(&stake, &stake, &authority.pubkey(), authority_type, None);
+        let e = process_instruction(&mut context, &instruction, &vec![&stake_keypair])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InvalidAccountData);
+    }
+
+    let authorized = Authorized {
+        staker: stakers[0].pubkey(),
+        withdrawer: withdrawers[0].pubkey(),
+    };
+
+    let instruction = ixn::initialize(&stake, &authorized, &Lockup::default());
+    process_instruction(&mut context, &instruction, no_signers)
+        .await
+        .unwrap();
+
+    // changing authority works
+    for (old_authority, new_authority, authority_type) in [
+        (&stakers[0], &stakers[1], StakeAuthorize::Staker),
+        (&withdrawers[0], &withdrawers[1], StakeAuthorize::Withdrawer),
+    ] {
+        let instruction = ixn::authorize(
+            &stake,
+            &old_authority.pubkey(),
+            &new_authority.pubkey(),
+            authority_type,
+            None,
+        );
+        test_instruction_with_missing_signers(&mut context, &instruction, &vec![old_authority])
+            .await;
+
+        let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
+        let actual_authority = match authority_type {
+            StakeAuthorize::Staker => meta.authorized.staker,
+            StakeAuthorize::Withdrawer => meta.authorized.withdrawer,
+        };
+        assert_eq!(actual_authority, new_authority.pubkey());
+    }
+
+    // old authority no longer works
+    for (old_authority, new_authority, authority_type) in [
+        (&stakers[0], Pubkey::new_unique(), StakeAuthorize::Staker),
+        (
+            &withdrawers[0],
+            Pubkey::new_unique(),
+            StakeAuthorize::Withdrawer,
+        ),
+    ] {
+        let instruction = ixn::authorize(
+            &stake,
+            &old_authority.pubkey(),
+            &new_authority,
+            authority_type,
+            None,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![old_authority])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::MissingRequiredSignature);
+    }
+
+    // changing authority again works
+    for (old_authority, new_authority, authority_type) in [
+        (&stakers[1], &stakers[2], StakeAuthorize::Staker),
+        (&withdrawers[1], &withdrawers[2], StakeAuthorize::Withdrawer),
+    ] {
+        let instruction = ixn::authorize(
+            &stake,
+            &old_authority.pubkey(),
+            &new_authority.pubkey(),
+            authority_type,
+            None,
+        );
+        test_instruction_with_missing_signers(&mut context, &instruction, &vec![old_authority])
+            .await;
+
+        let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
+        let actual_authority = match authority_type {
+            StakeAuthorize::Staker => meta.authorized.staker,
+            StakeAuthorize::Withdrawer => meta.authorized.withdrawer,
+        };
+        assert_eq!(actual_authority, new_authority.pubkey());
+    }
+
+    // changing withdrawer using staker fails
+    let instruction = ixn::authorize(
+        &stake,
+        &stakers[2].pubkey(),
+        &Pubkey::new_unique(),
+        StakeAuthorize::Withdrawer,
+        None,
+    );
+    let e = process_instruction(&mut context, &instruction, &vec![&stakers[2]])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::MissingRequiredSignature);
+
+    // changing staker using withdrawer is fine
+    let instruction = ixn::authorize(
+        &stake,
+        &withdrawers[2].pubkey(),
+        &stakers[0].pubkey(),
+        StakeAuthorize::Staker,
+        None,
+    );
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&withdrawers[2]]).await;
+
+    let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
+    assert_eq!(meta.authorized.staker, stakers[0].pubkey());
+
+    // withdraw using staker fails
+    for staker in stakers {
+        let recipient = Pubkey::new_unique();
+        let instruction = ixn::withdraw(
+            &stake,
+            &staker.pubkey(),
+            &recipient,
+            rent_exempt_reserve,
+            None,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::MissingRequiredSignature);
+    }
+}
 
 #[tokio::test]
 async fn test_stake_delegate() {
@@ -967,7 +1113,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw
+// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw, authorize
 // i want to do deactivate, merge, set lockup, deactivate delinquent
 // and then i think i will be ready to coax other people into looking at the program while i keep porting tests
 
