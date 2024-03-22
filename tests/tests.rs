@@ -33,7 +33,7 @@ use {
         vote_state::{self, VoteInit, VoteState, VoteStateVersions},
     },
     stake_program::processor::Processor,
-    test_case::test_case,
+    test_case::{test_case, test_matrix},
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
@@ -888,6 +888,7 @@ pub enum StakeLifecycle {
     Deactive,
 }
 impl StakeLifecycle {
+    // (stake, staker, withdrawer)
     pub async fn new_stake_account(
         self,
         context: &mut ProgramTestContext,
@@ -1113,8 +1114,8 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw, authorize
-// i want to do deactivate, merge, set lockup, deactivate delinquent
+// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw, authorize, deactivate, merge
+// i want to do set lockup, deactivate delinquent
 // and then i think i will be ready to coax other people into looking at the program while i keep porting tests
 
 // TODO lockup... unenforced and enforced? also maybe for split
@@ -1334,9 +1335,7 @@ async fn test_deactivate(activate: bool) {
 
     // deactivate succeeds
     let instruction = ixn::deactivate_stake(&stake, &staker);
-    process_instruction(&mut context, &instruction, &vec![&staker_keypair])
-        .await
-        .unwrap();
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
 
     let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
     let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
@@ -1361,4 +1360,119 @@ async fn test_deactivate(activate: bool) {
         .unwrap_err();
     // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
     assert_eq!(e, ProgramError::Custom(2));
+}
+
+// XXX the original test_merge is a stupid test
+// the real thing is test_merge_active_stake which actively controls clock and stake_history
+// but im just trying to smoke test rn so lets do something simpler
+#[test_matrix(
+    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
+     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
+     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
+)]
+#[tokio::test]
+async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+    let staked_amount = minimum_delegation;
+
+    // stake accounts can be merged unconditionally:
+    // * inactive and inactive
+    // * inactive into activating
+    // can be merged IF vote pubkey and credits match:
+    // * active and active
+    // * activating and activating, IF activating in the same epoch
+    // in all cases, authorized and lockup also must match
+    // uninitialized stakes cannot be merged at all
+    let is_merge_allowed_by_type = match (merge_source_type, merge_dest_type) {
+        // inactive and inactive
+        (StakeLifecycle::Initialized, StakeLifecycle::Initialized)
+        | (StakeLifecycle::Initialized, StakeLifecycle::Deactive)
+        | (StakeLifecycle::Deactive, StakeLifecycle::Initialized)
+        | (StakeLifecycle::Deactive, StakeLifecycle::Deactive) => true,
+
+        // activating into inactive is also allowed although this isnt clear from docs
+        (StakeLifecycle::Activating, StakeLifecycle::Initialized)
+        | (StakeLifecycle::Activating, StakeLifecycle::Deactive) => true,
+
+        // inactive into activating
+        (StakeLifecycle::Initialized, StakeLifecycle::Activating)
+        | (StakeLifecycle::Deactive, StakeLifecycle::Activating) => true,
+
+        // active and active
+        (StakeLifecycle::Active, StakeLifecycle::Active) => true,
+
+        // activating and activating
+        (StakeLifecycle::Activating, StakeLifecycle::Activating) => true,
+
+        // better luck next time
+        _ => false,
+    };
+
+    // create source first
+    let (merge_source_keypair, _, _) = merge_source_type
+        .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
+        .await;
+    let merge_source = merge_source_keypair.pubkey();
+
+    // retrieve its data
+    let mut source_account = get_account(&mut context.banks_client, &merge_source).await;
+    let mut source_stake_state: StakeStateV2 = bincode::deserialize(&source_account.data).unwrap();
+
+    // create dest. this may mess source up if its in a transient state, but its fine
+    let (merge_dest_keypair, staker_keypair, withdrawer_keypair) = merge_dest_type
+        .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
+        .await;
+    let merge_dest = merge_dest_keypair.pubkey();
+
+    // now we change source authorized to match dest
+    // we can also true up the epoch if source should have been transient
+    let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+    match &mut source_stake_state {
+        StakeStateV2::Initialized(ref mut meta) => {
+            meta.authorized.staker = staker_keypair.pubkey();
+            meta.authorized.withdrawer = withdrawer_keypair.pubkey();
+        }
+        StakeStateV2::Stake(ref mut meta, ref mut stake, _) => {
+            meta.authorized.staker = staker_keypair.pubkey();
+            meta.authorized.withdrawer = withdrawer_keypair.pubkey();
+
+            match merge_source_type {
+                StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
+                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = 69420,
+                _ => (),
+            }
+        }
+        _ => (),
+    }
+
+    // and store
+    source_account.data = bincode::serialize(&source_stake_state).unwrap();
+    context.set_account(&merge_source, &source_account.into());
+
+    // attempt to merge
+    let instruction = ixn::merge(&merge_dest, &merge_source, &staker_keypair.pubkey())
+        .into_iter()
+        .nth(0)
+        .unwrap();
+
+    // failure can result in various different errors... dont worry about it for now
+    if is_merge_allowed_by_type {
+        test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
+            .await;
+
+        let dest_lamports = get_account(&mut context.banks_client, &merge_dest)
+            .await
+            .lamports;
+        assert_eq!(dest_lamports, staked_amount * 2 + rent_exempt_reserve * 2);
+    } else {
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+    }
 }
