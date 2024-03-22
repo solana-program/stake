@@ -1284,3 +1284,81 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
+
+#[test_case(false; "activating")]
+#[test_case(true; "active")]
+#[tokio::test]
+async fn test_deactivate(activate: bool) {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+
+    let staker = staker_keypair.pubkey();
+    let withdrawer = withdrawer_keypair.pubkey();
+
+    let authorized = Authorized { staker, withdrawer };
+
+    let stake =
+        create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
+
+    // deactivating an undelegated account fails
+    let instruction = ixn::deactivate_stake(&stake, &staker);
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
+
+    // delegate
+    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap();
+
+    if activate {
+        advance_epoch(&mut context).await;
+    } else {
+        refresh_blockhash(&mut context).await;
+    }
+
+    // deactivate with withdrawer fails
+    let instruction = ixn::deactivate_stake(&stake, &withdrawer);
+    let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::MissingRequiredSignature);
+
+    // deactivate succeeds
+    let instruction = ixn::deactivate_stake(&stake, &staker);
+    process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap();
+
+    let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+    let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
+    assert_eq!(
+        stake_data.unwrap().delegation.deactivation_epoch,
+        clock.epoch
+    );
+
+    // deactivate again fails
+    refresh_blockhash(&mut context).await;
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+    assert_eq!(e, ProgramError::Custom(2));
+
+    advance_epoch(&mut context).await;
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+    assert_eq!(e, ProgramError::Custom(2));
+}
