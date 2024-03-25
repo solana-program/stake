@@ -342,18 +342,6 @@ impl Processor {
 
                 let minimum_delegation = crate::get_minimum_delegation();
 
-                // XXX TODO FIXME get_stake_status turns out... to require stake history which isnt passed in as an account
-                // all of my wonderful plans are laid to waste. this is going to cause problems
-                // XXX ok maybe i can work around this. all we are trying to do is see if there is any effective stake at all
-                // i will need to actually understand stake history for this but
-                // it is possible we can just be more conservative. and say "if it looks like it might be active, its active"
-                // i think we can. this can *only* return false if we are gte our activation epoch but nothing is active yet
-                // which... basically never happens. and then this value is used in validate_split_amount
-                // which is like. "if feature is active and source is active and not splitting 100%
-                // *and* destination is below the reserve requirement then error
-                // which means without stake history we just say... wait thats unfortunately not true
-                // because a *deactivated* stake could never be split... and there are plausible usecases for that
-                // i think we are fucked. unless we just say. you have to pass in stake history if splitting deactive
                 let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
                     let clock = Clock::get()?;
                     let stake_history = &StakeHistorySyscall::default();
