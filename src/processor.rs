@@ -1,5 +1,5 @@
 use {
-    crate::{helpers::*, id},
+    crate::{helpers::*, id, PERPETUAL_NEW_WARMUP},
     solana_program::{
         account_info::{next_account_info, AccountInfo},
         clock::Clock,
@@ -292,7 +292,7 @@ impl Processor {
                     vote_account_info.key,
                     &vote_state,
                     clock.epoch,
-                    &stake_history,
+                    stake_history,
                 )?;
 
                 set_stake_state(stake_account_info, &StakeStateV2::Stake(meta, stake, flags))
@@ -355,26 +355,16 @@ impl Processor {
                 // because a *deactivated* stake could never be split... and there are plausible usecases for that
                 // i think we are fucked. unless we just say. you have to pass in stake history if splitting deactive
                 let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
-                    // XXX placeholder for testing
                     let clock = Clock::get()?;
-                    if source_stake.delegation.deactivation_epoch < clock.epoch {
-                        true
-                    } else {
-                        false
-                    }
-
-                    /*
-                    let stake_history = unimplemented!();
-                    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
+                    let stake_history = &StakeHistorySyscall::default();
 
                     let status = source_stake.delegation.stake_activating_and_deactivating(
                         clock.epoch,
                         stake_history,
-                        new_rate_activation_epoch,
+                        PERPETUAL_NEW_WARMUP,
                     );
 
                     status.effective > 0
-                    */
                 } else {
                     false
                 };
@@ -515,9 +505,6 @@ impl Processor {
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        // XXX as noted in the function itself, this is stubbed out and needs to be solved in monorepo
-        let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
-
         // this is somewhat subtle, but if the stake account is Uninitialized, you pass it twice and sign
         // ie, Initialized or Stake, we use real withdraw authority. Uninitialized, stake account is its own authority
         let (signers, custodian) = collect_signers(
@@ -535,7 +522,7 @@ impl Processor {
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
                     stake
                         .delegation
-                        .stake(clock.epoch, stake_history, new_rate_activation_epoch)
+                        .stake(clock.epoch, stake_history, PERPETUAL_NEW_WARMUP)
                 } else {
                     // Assume full stake if the stake account hasn't been
                     //  de-activated, because in the future the exposed stake

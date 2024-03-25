@@ -1,5 +1,8 @@
 use {
-    crate::helpers::{checked_add, new_warmup_cooldown_rate_epoch, TurnInto},
+    crate::{
+        helpers::{checked_add, TurnInto},
+        PERPETUAL_NEW_WARMUP,
+    },
     solana_program::{
         clock::{Clock, Epoch},
         entrypoint::ProgramResult,
@@ -49,7 +52,7 @@ impl MergeKind {
                 let status = stake.delegation.stake_activating_and_deactivating(
                     clock.epoch,
                     stake_history,
-                    new_warmup_cooldown_rate_epoch(),
+                    PERPETUAL_NEW_WARMUP,
                 );
 
                 match (status.effective, status.activating, status.deactivating) {

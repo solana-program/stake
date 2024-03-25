@@ -31,6 +31,15 @@ solana_program::declare_id!("Stake11111111111111111111111111111111111111");
 const FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL: bool = false;
 const FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION: bool = false;
 
+// feature_set::reduce_stake_warmup_cooldown changed the warmup cooldown from 25% to 9%
+// a function is provided by the sdk, new_warmup_cooldown_rate_epoch(), which returns the epoch this change happened
+// this function is not available to bpf programs. however, we dont need it
+// the number is necessary to calculate historical effective stake from stake history
+// but we only care that stake we are dealing with in the present epoch has been fully (de)activated
+// this means, as long as one epoch has passed since activation where all prior stake had escaped cooldown...
+// ...we can pretend the rate has always beein 9% without issue. so we do that
+const PERPETUAL_NEW_WARMUP: Option<u64> = Some(1);
+
 /// The minimum stake amount that can be delegated, in lamports.
 /// NOTE: This is also used to calculate the minimum balance of a stake account, which is the
 /// rent exempt reserve _plus_ the minimum stake delegation.

@@ -1,5 +1,5 @@
 use {
-    crate::helpers::{new_warmup_cooldown_rate_epoch, TurnInto},
+    crate::{helpers::TurnInto, PERPETUAL_NEW_WARMUP},
     solana_program::{
         account_info::AccountInfo,
         clock::Epoch,
@@ -38,9 +38,8 @@ pub(crate) fn redelegate_stake(
     epoch: Epoch,
     stake_history: &StakeHistorySyscall,
 ) -> Result<(), ProgramError> {
-    let new_rate_activation_epoch = new_warmup_cooldown_rate_epoch();
     // If stake is currently active:
-    if stake.stake(epoch, stake_history, new_rate_activation_epoch) != 0 {
+    if stake.stake(epoch, stake_history, PERPETUAL_NEW_WARMUP) != 0 {
         // If pubkey of new voter is the same as current,
         // and we are scheduled to start deactivating this epoch,
         // we rescind deactivation
