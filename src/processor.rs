@@ -20,7 +20,7 @@ use {
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        stake_history::StakeHistorySyscall,
+        stake_history::{StakeHistory, StakeHistorySyscall},
         sysvar::Sysvar,
         vote::program as solana_vote_program,
         vote::state::VoteState,
@@ -251,7 +251,7 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        let stake_history = &StakeHistorySyscall::default();
+        let stake_history = &StakeHistorySyscall::new(clock.epoch);
 
         let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
@@ -344,7 +344,7 @@ impl Processor {
 
                 let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
                     let clock = Clock::get()?;
-                    let stake_history = &StakeHistorySyscall::default();
+                    let stake_history = &StakeHistorySyscall::new(clock.epoch);
 
                     let status = source_stake.delegation.stake_activating_and_deactivating(
                         clock.epoch,
@@ -488,8 +488,8 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistorySyscall::default();
+        let stake_history_info = next_account_info(account_info_iter)?;
+        let stake_history = &StakeHistorySyscall::new(clock.epoch);
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
@@ -508,9 +508,22 @@ impl Processor {
                     .map_err(InstructionError::turn_into)?;
                 // if we have a deactivation epoch and we're in cooldown
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
-                    stake
-                        .delegation
-                        .stake(clock.epoch, stake_history, PERPETUAL_NEW_WARMUP)
+                    msg!(
+                        "HANA getting stake. clock {}, act {}, deact {}",
+                        clock.epoch,
+                        stake.delegation.activation_epoch,
+                        stake.delegation.deactivation_epoch
+                    );
+                    let x =
+                        stake
+                            .delegation
+                            .stake(clock.epoch, stake_history, PERPETUAL_NEW_WARMUP);
+                    msg!(
+                        "HANA done! btw true stake history: {:?}",
+                        bincode::deserialize::<StakeHistory>(&stake_history_info.data.borrow())
+                            .unwrap()
+                    );
+                    x
                 } else {
                     // Assume full stake if the stake account hasn't been
                     //  de-activated, because in the future the exposed stake
@@ -628,7 +641,7 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let _stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistorySyscall::default();
+        let stake_history = &StakeHistorySyscall::new(clock.epoch);
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {

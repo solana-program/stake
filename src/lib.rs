@@ -49,7 +49,7 @@ pub fn get_minimum_delegation() -> u64 {
         const MINIMUM_DELEGATION_SOL: u64 = 1;
         MINIMUM_DELEGATION_SOL * LAMPORTS_PER_SOL
     } else {
-        #[allow(deprecated)]
-        solana_program::stake::MINIMUM_STAKE_DELEGATION
+        // FIXME the global for this got removed, check new logic
+        1
     }
 }
