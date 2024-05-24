@@ -37,6 +37,7 @@ use {
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
+pub const NO_SIGNERS: &[Keypair] = &[];
 
 pub fn program_test() -> ProgramTest {
     let mut program_test = ProgramTest::default();
@@ -481,7 +482,6 @@ async fn test_stake_initialize() {
     accounts.initialize(&mut context).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
-    let no_signers: &[Keypair] = &[];
 
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
@@ -503,7 +503,7 @@ async fn test_stake_initialize() {
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
 
     // should pass
-    process_instruction(&mut context, &instruction, no_signers)
+    process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap();
 
@@ -521,7 +521,7 @@ async fn test_stake_initialize() {
 
     // 2nd time fails, can't move it from anything other than uninit->init
     refresh_blockhash(&mut context).await;
-    let e = process_instruction(&mut context, &instruction, no_signers)
+    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
@@ -538,7 +538,7 @@ async fn test_stake_initialize() {
     context.set_account(&stake, &account.into());
 
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, no_signers)
+    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InsufficientFunds);
@@ -559,7 +559,7 @@ async fn test_stake_initialize() {
         .unwrap();
 
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, no_signers)
+    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
@@ -579,7 +579,7 @@ async fn test_stake_initialize() {
         .unwrap();
 
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, no_signers)
+    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
@@ -592,7 +592,6 @@ async fn test_authorize() {
     accounts.initialize(&mut context).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
-    let no_signers: &[Keypair] = &[];
 
     let stakers: [_; 3] = std::array::from_fn(|_| Keypair::new());
     let withdrawers: [_; 3] = std::array::from_fn(|_| Keypair::new());
@@ -618,7 +617,7 @@ async fn test_authorize() {
     };
 
     let instruction = ixn::initialize(&stake, &authorized, &Lockup::default());
-    process_instruction(&mut context, &instruction, no_signers)
+    process_instruction(&mut context, &instruction, NO_SIGNERS)
         .await
         .unwrap();
 
@@ -895,10 +894,34 @@ impl StakeLifecycle {
         vote_account: &Pubkey,
         staked_amount: u64,
     ) -> (Keypair, Keypair, Keypair) {
-        let no_signers: &[Keypair] = &[];
         let stake_keypair = Keypair::new();
         let staker_keypair = Keypair::new();
         let withdrawer_keypair = Keypair::new();
+
+        self.new_stake_account_fully_specified(
+            context,
+            vote_account,
+            staked_amount,
+            &stake_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+
+        (stake_keypair, staker_keypair, withdrawer_keypair)
+    }
+
+    pub async fn new_stake_account_fully_specified(
+        self,
+        context: &mut ProgramTestContext,
+        vote_account: &Pubkey,
+        staked_amount: u64,
+        stake_keypair: &Keypair,
+        staker_keypair: &Keypair,
+        withdrawer_keypair: &Keypair,
+        lockup: &Lockup,
+    ) {
         let authorized = Authorized {
             staker: staker_keypair.pubkey(),
             withdrawer: withdrawer_keypair.pubkey(),
@@ -908,8 +931,8 @@ impl StakeLifecycle {
         transfer(context, &stake, staked_amount).await;
 
         if self >= StakeLifecycle::Initialized {
-            let instruction = ixn::initialize(&stake, &authorized, &Lockup::default());
-            process_instruction(context, &instruction, no_signers)
+            let instruction = ixn::initialize(&stake, &authorized, lockup);
+            process_instruction(context, &instruction, NO_SIGNERS)
                 .await
                 .unwrap();
         }
@@ -943,8 +966,6 @@ impl StakeLifecycle {
                 0,
             );
         }
-
-        (stake_keypair, staker_keypair, withdrawer_keypair)
     }
 
     // NOTE the program enforces that a deactive stake adheres to the split minimum, albeit spuriously
@@ -1060,7 +1081,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
     let e = process_instruction(&mut context, &instruction, &signers)
         .await
         .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidAccountOwner);
+    assert_eq!(e, ProgramError::IncorrectProgramId); // FIXME HANA changed for native stake program
 
     // success
     let instruction = &ixn::split(
@@ -1444,7 +1465,7 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
 
             match merge_source_type {
                 StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
-                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = 69420,
+                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
                 _ => (),
             }
         }
