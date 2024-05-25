@@ -912,6 +912,7 @@ impl StakeLifecycle {
         (stake_keypair, staker_keypair, withdrawer_keypair)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn new_stake_account_fully_specified(
         self,
         context: &mut ProgramTestContext,
@@ -927,8 +928,10 @@ impl StakeLifecycle {
             withdrawer: withdrawer_keypair.pubkey(),
         };
 
-        let stake = create_blank_stake_account_from_keypair(context, &stake_keypair).await;
-        transfer(context, &stake, staked_amount).await;
+        let stake = create_blank_stake_account_from_keypair(context, stake_keypair).await;
+        if staked_amount > 0 {
+            transfer(context, &stake, staked_amount).await;
+        }
 
         if self >= StakeLifecycle::Initialized {
             let instruction = ixn::initialize(&stake, &authorized, lockup);
@@ -939,7 +942,7 @@ impl StakeLifecycle {
 
         if self >= StakeLifecycle::Activating {
             let instruction = ixn::delegate_stake(&stake, &staker_keypair.pubkey(), vote_account);
-            process_instruction(context, &instruction, &vec![&staker_keypair])
+            process_instruction(context, &instruction, &vec![staker_keypair])
                 .await
                 .unwrap();
         }
@@ -954,7 +957,7 @@ impl StakeLifecycle {
 
         if self >= StakeLifecycle::Deactivating {
             let instruction = ixn::deactivate_stake(&stake, &staker_keypair.pubkey());
-            process_instruction(context, &instruction, &vec![&staker_keypair])
+            process_instruction(context, &instruction, &vec![staker_keypair])
                 .await
                 .unwrap();
         }
@@ -1023,7 +1026,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
         &split_dest,
     )[2];
 
-    let e = process_instruction(&mut context, &instruction, &signers)
+    let e = process_instruction(&mut context, instruction, &signers)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InsufficientFunds);
@@ -1033,7 +1036,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
     if split_source_type.split_minimum_enforced() {
         // zero split fails
         let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
-        let e = process_instruction(&mut context, &instruction, &signers)
+        let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
         assert_eq!(e, ProgramError::InsufficientFunds);
@@ -1046,7 +1049,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
             &split_dest,
         )[2];
 
-        let e = process_instruction(&mut context, &instruction, &signers)
+        let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
         assert_eq!(e, ProgramError::InsufficientFunds);
@@ -1059,7 +1062,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
             &split_dest,
         )[2];
 
-        let e = process_instruction(&mut context, &instruction, &signers)
+        let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
         assert_eq!(e, ProgramError::InsufficientFunds);
@@ -1078,7 +1081,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
         &fake_split_dest,
     )[2];
 
-    let e = process_instruction(&mut context, &instruction, &signers)
+    let e = process_instruction(&mut context, instruction, &signers)
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::IncorrectProgramId); // FIXME HANA changed for native stake program
@@ -1090,7 +1093,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
         staked_amount / 2,
         &split_dest,
     )[2];
-    test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+    test_instruction_with_missing_signers(&mut context, instruction, &signers).await;
 
     // source lost split amount
     let source_lamports = get_account(&mut context.banks_client, &split_source)
@@ -1479,7 +1482,7 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     // attempt to merge
     let instruction = ixn::merge(&merge_dest, &merge_source, &staker_keypair.pubkey())
         .into_iter()
-        .nth(0)
+        .next()
         .unwrap();
 
     // failure can result in various different errors... dont worry about it for now
@@ -1495,5 +1498,187 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
         process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
+    }
+}
+
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [false, true]
+)]
+#[tokio::test]
+async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+
+    // source has 2x minimum so we can easily test an unfunded destination
+    let source_staked_amount = minimum_delegation * 2;
+
+    // this is the amount of *staked* lamports for test checks
+    // destinations may have excess lamports but these are *never* activated by move
+    let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
+        minimum_delegation
+    } else {
+        0
+    };
+
+    // we put an extra minimum in every account, unstaked, to test that no new lamports activate
+    // name them here so our asserts are readable
+    let source_excess = minimum_delegation;
+    let dest_excess = minimum_delegation;
+
+    let move_source_keypair = Keypair::new();
+    let move_dest_keypair = Keypair::new();
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+
+    StakeLifecycle::Active
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            source_staked_amount,
+            &move_source_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_source = move_source_keypair.pubkey();
+
+    move_dest_type
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            minimum_delegation,
+            &move_dest_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_dest = move_dest_keypair.pubkey();
+
+    // our inactive accounts have extra lamports, lets not let active feel left out
+    if move_dest_type == StakeLifecycle::Active {
+        transfer(&mut context, &move_dest, dest_excess).await;
+    }
+
+    // hey why not spread the love around to everyone
+    transfer(&mut context, &move_source, source_excess).await;
+
+    // source has 2x minimum (always 2 sol because these tests dont have featuresets)
+    // so first for inactive accounts lets undershoot and fail for underfunded dest
+    if move_dest_type != StakeLifecycle::Active {
+        let instruction = ixn::move_stake(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation - 1,
+        )
+        .into_iter()
+        .next()
+        .unwrap();
+
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InvalidArgument);
+    }
+
+    // now lets overshoot and fail for underfunded source
+    let instruction = ixn::move_stake(
+        &move_source,
+        &move_dest,
+        &staker_keypair.pubkey(),
+        minimum_delegation + 1,
+    )
+    .into_iter()
+    .next()
+    .unwrap();
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidArgument);
+
+    // now we do it juuust right
+    let instruction = ixn::move_stake(
+        &move_source,
+        &move_dest,
+        &staker_keypair.pubkey(),
+        if full_move {
+            source_staked_amount
+        } else {
+            minimum_delegation
+        },
+    )
+    .into_iter()
+    .next()
+    .unwrap();
+
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+
+    if full_move {
+        let (_, option_source_stake, source_lamports) =
+            get_stake_account(&mut context.banks_client, &move_source).await;
+
+        // source is deactivated and rent/excess stay behind
+        assert!(option_source_stake.is_none());
+        assert_eq!(source_lamports, source_excess + rent_exempt_reserve);
+
+        let (_, Some(dest_stake), dest_lamports) =
+            get_stake_account(&mut context.banks_client, &move_dest).await
+        else {
+            panic!("dest should be active")
+        };
+        let dest_effective_stake = get_effective_stake(&mut context.banks_client, &move_dest).await;
+
+        // dest captured the entire source delegation, kept its rent/excess, didnt activate its excess
+        assert_eq!(
+            dest_stake.delegation.stake,
+            source_staked_amount + dest_staked_amount
+        );
+        assert_eq!(dest_effective_stake, dest_stake.delegation.stake);
+        assert_eq!(
+            dest_lamports,
+            dest_effective_stake + dest_excess + rent_exempt_reserve
+        );
+    } else {
+        let (_, Some(source_stake), source_lamports) =
+            get_stake_account(&mut context.banks_client, &move_source).await
+        else {
+            panic!("source should be active")
+        };
+        let source_effective_stake =
+            get_effective_stake(&mut context.banks_client, &move_source).await;
+
+        // half of source delegation moved over, excess stayed behind
+        assert_eq!(source_stake.delegation.stake, source_staked_amount / 2);
+        assert_eq!(source_effective_stake, source_stake.delegation.stake);
+        assert_eq!(
+            source_lamports,
+            source_effective_stake + source_excess + rent_exempt_reserve
+        );
+
+        let (_, Some(dest_stake), dest_lamports) =
+            get_stake_account(&mut context.banks_client, &move_dest).await
+        else {
+            panic!("dest should be active")
+        };
+        let dest_effective_stake = get_effective_stake(&mut context.banks_client, &move_dest).await;
+
+        // dest mirrors our observations
+        assert_eq!(
+            dest_stake.delegation.stake,
+            source_staked_amount / 2 + dest_staked_amount
+        );
+        assert_eq!(dest_effective_stake, dest_stake.delegation.stake);
+        assert_eq!(
+            dest_lamports,
+            dest_effective_stake + dest_excess + rent_exempt_reserve
+        );
     }
 }
