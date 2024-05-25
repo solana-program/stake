@@ -1501,12 +1501,25 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     }
 }
 
+// XXX HANA note im crossing streams, there doesnt exist a branch with the new ixns *and* the stake history syscall
+// also clearly im just testing against the native stake program because i didnt impl this in neostake
+// unfortunately my stake program test setup is both a) better than monorepo, and b) too unfinished to put in monorepo
+//
+// NOTE we dont test uninitialized here because the signers would be weird, can do in its own function
+// we should also test authority fail, lockup fail, and different vote account fail
 #[test_matrix(
-    [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [false, true]
 )]
 #[tokio::test]
-async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
+async fn test_move_stake(
+    move_source_type: StakeLifecycle,
+    move_dest_type: StakeLifecycle,
+    full_move: bool,
+) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1535,7 +1548,8 @@ async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
 
-    StakeLifecycle::Active
+    // create source stake
+    move_source_type
         .new_stake_account_fully_specified(
             &mut context,
             &accounts.vote_account.pubkey(),
@@ -1547,7 +1561,10 @@ async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
         )
         .await;
     let move_source = move_source_keypair.pubkey();
+    let mut source_account = get_account(&mut context.banks_client, &move_source).await;
+    let mut source_stake_state: StakeStateV2 = bincode::deserialize(&source_account.data).unwrap();
 
+    // create dest stake with same authorities
     move_dest_type
         .new_stake_account_fully_specified(
             &mut context,
@@ -1561,6 +1578,24 @@ async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
         .await;
     let move_dest = move_dest_keypair.pubkey();
 
+    // true up source epoch if transient
+    if move_source_type == StakeLifecycle::Activating
+        || move_source_type == StakeLifecycle::Deactivating
+    {
+        let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+        match &mut source_stake_state {
+            StakeStateV2::Stake(_, ref mut stake, _) => match move_source_type {
+                StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
+                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
+                _ => (),
+            },
+            _ => (),
+        }
+
+        source_account.data = bincode::serialize(&source_stake_state).unwrap();
+        context.set_account(&move_source, &source_account.into());
+    }
+
     // our inactive accounts have extra lamports, lets not let active feel left out
     if move_dest_type == StakeLifecycle::Active {
         transfer(&mut context, &move_dest, dest_excess).await;
@@ -1568,6 +1603,36 @@ async fn test_move_stake(move_dest_type: StakeLifecycle, full_move: bool) {
 
     // hey why not spread the love around to everyone
     transfer(&mut context, &move_source, source_excess).await;
+
+    // alright first things first, clear out all the state failures
+    match (move_source_type, move_dest_type) {
+        // valid
+        (StakeLifecycle::Active, StakeLifecycle::Initialized)
+        | (StakeLifecycle::Active, StakeLifecycle::Active)
+        | (StakeLifecycle::Active, StakeLifecycle::Deactive) => (),
+        // invalid! get outta my test
+        _ => {
+            let instruction = ixn::move_stake(
+                &move_source,
+                &move_dest,
+                &staker_keypair.pubkey(),
+                if full_move {
+                    source_staked_amount
+                } else {
+                    minimum_delegation
+                },
+            )
+            .into_iter()
+            .next()
+            .unwrap();
+
+            // this is InvalidAccountData sometimes and Custom(5) sometimes but i dont care
+            process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+                .await
+                .unwrap_err();
+            return;
+        }
+    }
 
     // source has 2x minimum (always 2 sol because these tests dont have featuresets)
     // so first for inactive accounts lets undershoot and fail for underfunded dest
