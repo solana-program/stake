@@ -1621,10 +1621,7 @@ async fn test_move_stake(
                 } else {
                     minimum_delegation
                 },
-            )
-            .into_iter()
-            .next()
-            .unwrap();
+            );
 
             // this is InvalidAccountData sometimes and Custom(5) sometimes but i dont care
             process_instruction(&mut context, &instruction, &vec![&staker_keypair])
@@ -1642,10 +1639,7 @@ async fn test_move_stake(
             &move_dest,
             &staker_keypair.pubkey(),
             minimum_delegation - 1,
-        )
-        .into_iter()
-        .next()
-        .unwrap();
+        );
 
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
@@ -1659,10 +1653,7 @@ async fn test_move_stake(
         &move_dest,
         &staker_keypair.pubkey(),
         minimum_delegation + 1,
-    )
-    .into_iter()
-    .next()
-    .unwrap();
+    );
 
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
@@ -1679,10 +1670,7 @@ async fn test_move_stake(
         } else {
             minimum_delegation
         },
-    )
-    .into_iter()
-    .next()
-    .unwrap();
+    );
 
     test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
 
