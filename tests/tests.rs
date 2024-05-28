@@ -1735,3 +1735,178 @@ async fn test_move_stake(
         );
     }
 }
+
+// TODO different vote accounts
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
+)]
+#[tokio::test]
+async fn test_move_lamports(move_source_type: StakeLifecycle, move_dest_type: StakeLifecycle) {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+
+    // put minimum in both accounts if theyre active
+    let source_staked_amount = if move_source_type == StakeLifecycle::Active {
+        minimum_delegation
+    } else {
+        0
+    };
+
+    let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
+        minimum_delegation
+    } else {
+        0
+    };
+
+    // we put an extra minimum in every account, unstaked, to test moving them
+    let source_excess = minimum_delegation;
+    let dest_excess = minimum_delegation;
+
+    let move_source_keypair = Keypair::new();
+    let move_dest_keypair = Keypair::new();
+    let staker_keypair = Keypair::new();
+    let withdrawer_keypair = Keypair::new();
+
+    // create source stake
+    move_source_type
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            minimum_delegation,
+            &move_source_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_source = move_source_keypair.pubkey();
+    let mut source_account = get_account(&mut context.banks_client, &move_source).await;
+    let mut source_stake_state: StakeStateV2 = bincode::deserialize(&source_account.data).unwrap();
+
+    // create dest stake with same authorities
+    move_dest_type
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            minimum_delegation,
+            &move_dest_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_dest = move_dest_keypair.pubkey();
+
+    // true up source epoch if transient
+    if move_source_type == StakeLifecycle::Activating
+        || move_source_type == StakeLifecycle::Deactivating
+    {
+        let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+        match &mut source_stake_state {
+            StakeStateV2::Stake(_, ref mut stake, _) => match move_source_type {
+                StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
+                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
+                _ => (),
+            },
+            _ => (),
+        }
+
+        source_account.data = bincode::serialize(&source_stake_state).unwrap();
+        context.set_account(&move_source, &source_account.into());
+    }
+
+    // if we activated the initial amount we need to top up with the test lamports
+    if move_source_type == StakeLifecycle::Active {
+        transfer(&mut context, &move_source, source_excess).await;
+    }
+    if move_dest_type == StakeLifecycle::Active {
+        transfer(&mut context, &move_dest, dest_excess).await;
+    }
+
+    // clear out state failures
+    if move_source_type == StakeLifecycle::Activating
+        || move_source_type == StakeLifecycle::Deactivating
+        || move_dest_type == StakeLifecycle::Deactivating
+    {
+        let instruction = ixn::move_lamports(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            source_excess,
+        );
+
+        process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        return;
+    }
+
+    // overshoot and fail for underfunded source
+    let instruction = ixn::move_lamports(
+        &move_source,
+        &move_dest,
+        &staker_keypair.pubkey(),
+        source_excess + 1,
+    );
+
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidArgument);
+
+    let (_, _, before_source_lamports) =
+        get_stake_account(&mut context.banks_client, &move_source).await;
+    let (_, _, before_dest_lamports) =
+        get_stake_account(&mut context.banks_client, &move_dest).await;
+
+    // now properly move the full excess
+    let instruction = ixn::move_lamports(
+        &move_source,
+        &move_dest,
+        &staker_keypair.pubkey(),
+        source_excess,
+    );
+
+    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+
+    let (_, _, after_source_lamports) =
+        get_stake_account(&mut context.banks_client, &move_source).await;
+    let source_effective_stake = get_effective_stake(&mut context.banks_client, &move_source).await;
+
+    // source activation didnt change
+    assert_eq!(source_effective_stake, source_staked_amount);
+
+    // source lamports are right
+    assert_eq!(
+        after_source_lamports,
+        before_source_lamports - minimum_delegation
+    );
+    assert_eq!(
+        after_source_lamports,
+        source_effective_stake + rent_exempt_reserve
+    );
+
+    let (_, _, after_dest_lamports) =
+        get_stake_account(&mut context.banks_client, &move_dest).await;
+    let dest_effective_stake = get_effective_stake(&mut context.banks_client, &move_dest).await;
+
+    // dest activation didnt change
+    assert_eq!(dest_effective_stake, dest_staked_amount);
+
+    // dest lamports are right
+    assert_eq!(
+        after_dest_lamports,
+        before_dest_lamports + minimum_delegation
+    );
+    assert_eq!(
+        after_dest_lamports,
+        dest_effective_stake + rent_exempt_reserve + source_excess + dest_excess
+    );
+}
