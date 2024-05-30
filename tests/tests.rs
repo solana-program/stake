@@ -66,9 +66,7 @@ impl Accounts {
         context.warp_to_slot(slot).unwrap();
 
         create_vote(
-            &mut context.banks_client,
-            &context.payer,
-            &context.last_blockhash,
+            context,
             &self.validator,
             &self.voter.pubkey(),
             &self.withdrawer.pubkey(),
@@ -92,26 +90,24 @@ impl Default for Accounts {
 }
 
 pub async fn create_vote(
-    banks_client: &mut BanksClient,
-    payer: &Keypair,
-    recent_blockhash: &Hash,
+    context: &mut ProgramTestContext,
     validator: &Keypair,
     voter: &Pubkey,
     withdrawer: &Pubkey,
     vote_account: &Keypair,
 ) {
-    let rent = banks_client.get_rent().await.unwrap();
+    let rent = context.banks_client.get_rent().await.unwrap();
     let rent_voter = rent.minimum_balance(VoteState::size_of());
 
     let mut instructions = vec![system_instruction::create_account(
-        &payer.pubkey(),
+        &context.payer.pubkey(),
         &validator.pubkey(),
         rent.minimum_balance(0),
         0,
         &system_program::id(),
     )];
     instructions.append(&mut vote_instruction::create_account_with_config(
-        &payer.pubkey(),
+        &context.payer.pubkey(),
         &vote_account.pubkey(),
         &VoteInit {
             node_pubkey: validator.pubkey(),
@@ -128,13 +124,13 @@ pub async fn create_vote(
 
     let transaction = Transaction::new_signed_with_payer(
         &instructions,
-        Some(&payer.pubkey()),
-        &[validator, vote_account, payer],
-        *recent_blockhash,
+        Some(&context.payer.pubkey()),
+        &[validator, vote_account, &context.payer],
+        context.last_blockhash,
     );
 
     // ignore errors for idempotency
-    let _ = banks_client.process_transaction(transaction).await;
+    let _ = context.banks_client.process_transaction(transaction).await;
 }
 
 pub async fn transfer(context: &mut ProgramTestContext, recipient: &Pubkey, amount: u64) {
@@ -740,9 +736,7 @@ async fn test_stake_delegate() {
 
     let vote_account2 = Keypair::new();
     create_vote(
-        &mut context.banks_client,
-        &context.payer,
-        &context.last_blockhash,
+        &mut context,
         &Keypair::new(),
         &Pubkey::new_unique(),
         &Pubkey::new_unique(),
@@ -1741,10 +1735,15 @@ async fn test_move_stake(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
-     StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [false, true]
 )]
 #[tokio::test]
-async fn test_move_lamports(move_source_type: StakeLifecycle, move_dest_type: StakeLifecycle) {
+async fn test_move_lamports(
+    move_source_type: StakeLifecycle,
+    move_dest_type: StakeLifecycle,
+    different_votes: bool,
+) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1774,6 +1773,23 @@ async fn test_move_lamports(move_source_type: StakeLifecycle, move_dest_type: St
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
 
+    // make a separate vote account if needed
+    let destination_vote_account = if different_votes {
+        let vote_account = Keypair::new();
+        create_vote(
+            &mut context,
+            &Keypair::new(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &vote_account,
+        )
+        .await;
+
+        vote_account.pubkey()
+    } else {
+        accounts.vote_account.pubkey()
+    };
+
     // create source stake
     move_source_type
         .new_stake_account_fully_specified(
@@ -1794,7 +1810,7 @@ async fn test_move_lamports(move_source_type: StakeLifecycle, move_dest_type: St
     move_dest_type
         .new_stake_account_fully_specified(
             &mut context,
-            &accounts.vote_account.pubkey(),
+            &destination_vote_account,
             minimum_delegation,
             &move_dest_keypair,
             &staker_keypair,
