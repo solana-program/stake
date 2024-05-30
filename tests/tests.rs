@@ -1506,6 +1506,7 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [false, true],
     [false, true]
 )]
 #[tokio::test]
@@ -1513,6 +1514,7 @@ async fn test_move_stake(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     full_move: bool,
+    has_lockup: bool,
 ) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
@@ -1530,6 +1532,21 @@ async fn test_move_stake(
         minimum_delegation
     } else {
         0
+    };
+
+    // test with and without lockup. both of these cases pass, we test failures elsewhere
+    let lockup = if has_lockup {
+        let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+        let lockup = Lockup {
+            unix_timestamp: 0,
+            epoch: clock.epoch + 100,
+            custodian: Pubkey::new_unique(),
+        };
+
+        assert!(lockup.is_in_force(&clock, None));
+        lockup
+    } else {
+        Lockup::default()
     };
 
     // we put an extra minimum in every account, unstaked, to test that no new lamports activate
@@ -1551,7 +1568,7 @@ async fn test_move_stake(
             &move_source_keypair,
             &staker_keypair,
             &withdrawer_keypair,
-            &Lockup::default(),
+            &lockup,
         )
         .await;
     let move_source = move_source_keypair.pubkey();
@@ -1567,7 +1584,7 @@ async fn test_move_stake(
             &move_dest_keypair,
             &staker_keypair,
             &withdrawer_keypair,
-            &Lockup::default(),
+            &lockup,
         )
         .await;
     let move_dest = move_dest_keypair.pubkey();
@@ -1736,6 +1753,7 @@ async fn test_move_stake(
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [false, true],
     [false, true]
 )]
 #[tokio::test]
@@ -1743,6 +1761,7 @@ async fn test_move_lamports(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     different_votes: bool,
+    has_lockup: bool,
 ) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
@@ -1762,6 +1781,21 @@ async fn test_move_lamports(
         minimum_delegation
     } else {
         0
+    };
+
+    // test with and without lockup. both of these cases pass, we test failures elsewhere
+    let lockup = if has_lockup {
+        let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+        let lockup = Lockup {
+            unix_timestamp: 0,
+            epoch: clock.epoch + 100,
+            custodian: Pubkey::new_unique(),
+        };
+
+        assert!(lockup.is_in_force(&clock, None));
+        lockup
+    } else {
+        Lockup::default()
     };
 
     // we put an extra minimum in every account, unstaked, to test moving them
@@ -1799,7 +1833,7 @@ async fn test_move_lamports(
             &move_source_keypair,
             &staker_keypair,
             &withdrawer_keypair,
-            &Lockup::default(),
+            &lockup,
         )
         .await;
     let move_source = move_source_keypair.pubkey();
@@ -1815,7 +1849,7 @@ async fn test_move_lamports(
             &move_dest_keypair,
             &staker_keypair,
             &withdrawer_keypair,
-            &Lockup::default(),
+            &lockup,
         )
         .await;
     let move_dest = move_dest_keypair.pubkey();

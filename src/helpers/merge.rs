@@ -10,7 +10,7 @@ use {
         program_error::ProgramError,
         stake::state::*,
         stake::{instruction::StakeError, stake_flags::StakeFlags},
-        stake_history::StakeHistoryGetEntry,
+        stake_history::StakeHistory,
     },
     std::convert::TryFrom,
 };
@@ -39,11 +39,11 @@ impl MergeKind {
         }
     }
 
-    pub(crate) fn get_if_mergeable<T: StakeHistoryGetEntry>(
+    pub(crate) fn get_if_mergeable(
         stake_state: &StakeStateV2,
         stake_lamports: u64,
         clock: &Clock,
-        stake_history: &T,
+        stake_history: &StakeHistory,
     ) -> Result<Self, ProgramError> {
         match stake_state {
             StakeStateV2::Stake(meta, stake, stake_flags) => {
