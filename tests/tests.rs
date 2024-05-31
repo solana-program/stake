@@ -1747,7 +1747,6 @@ async fn test_move_stake(
     }
 }
 
-// TODO different vote accounts
 #[test_matrix(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
@@ -1959,4 +1958,83 @@ async fn test_move_lamports(
         after_dest_lamports,
         dest_effective_stake + rent_exempt_reserve + source_excess + dest_excess
     );
+}
+
+// TODO ok what do i need now then
+// i want to test...
+// different lockups, different authorities, different vote accounts for movestake
+// amount 0, bad account owner, uninitialized, same source/dest
+// we only need to test the valid state combinations because the invalid ones are already failure-tested
+// and we expect all of these to fail so no math needed. easy!
+// do uninit as its own test. then one big test for all failures that does a matrix of states and stake/lamp
+
+#[test_matrix(
+    [(StakeLifecycle::Active, StakeLifecycle::Uninitialized),
+     (StakeLifecycle::Uninitialized, StakeLifecycle::Initialized),
+     (StakeLifecycle::Uninitialized, StakeLifecycle::Uninitialized)],
+    [false, true]
+)]
+#[tokio::test]
+async fn test_moves_uninitialized(
+    move_types: (StakeLifecycle, StakeLifecycle),
+    move_lamports: bool,
+) {
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+    let source_staked_amount = minimum_delegation * 2;
+
+    let (move_source_type, move_dest_type) = move_types;
+
+    let (move_source_keypair, staker_keypair, withdrawer_keypair) = move_source_type
+        .new_stake_account(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            source_staked_amount,
+        )
+        .await;
+    let move_source = move_source_keypair.pubkey();
+
+    let move_dest_keypair = Keypair::new();
+    move_dest_type
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            0,
+            &move_dest_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_dest = move_dest_keypair.pubkey();
+
+    let source_signer = if move_source_type == StakeLifecycle::Uninitialized {
+        &move_source_keypair
+    } else {
+        &staker_keypair
+    };
+
+    let instruction = if move_lamports {
+        ixn::move_lamports(
+            &move_source,
+            &move_dest,
+            &source_signer.pubkey(),
+            minimum_delegation,
+        )
+    } else {
+        ixn::move_stake(
+            &move_source,
+            &move_dest,
+            &source_signer.pubkey(),
+            minimum_delegation,
+        )
+    };
+
+    let e = process_instruction(&mut context, &instruction, &vec![source_signer])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidAccountData);
 }
