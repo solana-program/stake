@@ -1498,9 +1498,6 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
 // XXX HANA note im crossing streams, there doesnt exist a branch with the new ixns *and* the stake history syscall
 // also clearly im just testing against the native stake program because i didnt impl this in neostake
 // unfortunately my stake program test setup is both a) better than monorepo, and b) too unfinished to put in monorepo
-//
-// NOTE we dont test uninitialized here because the signers would be weird, can do in its own function
-// we should also test authority fail, lockup fail, and different vote account fail
 #[test_matrix(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
@@ -1807,7 +1804,7 @@ async fn test_move_lamports(
     let withdrawer_keypair = Keypair::new();
 
     // make a separate vote account if needed
-    let destination_vote_account = if different_votes {
+    let dest_vote_account = if different_votes {
         let vote_account = Keypair::new();
         create_vote(
             &mut context,
@@ -1843,7 +1840,7 @@ async fn test_move_lamports(
     move_dest_type
         .new_stake_account_fully_specified(
             &mut context,
-            &destination_vote_account,
+            &dest_vote_account,
             minimum_delegation,
             &move_dest_keypair,
             &staker_keypair,
@@ -1960,14 +1957,6 @@ async fn test_move_lamports(
     );
 }
 
-// TODO ok what do i need now then
-// i want to test...
-// different lockups, different authorities, different vote accounts for movestake
-// amount 0, bad account owner, uninitialized, same source/dest
-// we only need to test the valid state combinations because the invalid ones are already failure-tested
-// and we expect all of these to fail so no math needed. easy!
-// do uninit as its own test. then one big test for all failures that does a matrix of states and stake/lamp
-
 #[test_matrix(
     [(StakeLifecycle::Active, StakeLifecycle::Uninitialized),
      (StakeLifecycle::Uninitialized, StakeLifecycle::Initialized),
@@ -1975,7 +1964,7 @@ async fn test_move_lamports(
     [false, true]
 )]
 #[tokio::test]
-async fn test_moves_uninitialized(
+async fn test_move_uninitialized_fail(
     move_types: (StakeLifecycle, StakeLifecycle),
     move_lamports: bool,
 ) {
@@ -2037,4 +2026,293 @@ async fn test_moves_uninitialized(
         .await
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidAccountData);
+}
+
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [false, true]
+)]
+#[tokio::test]
+async fn test_move_general_fail(
+    move_source_type: StakeLifecycle,
+    move_dest_type: StakeLifecycle,
+    move_lamports: bool,
+) {
+    // clear the states that are only valid for move_lamports
+    if !move_lamports {
+        if move_source_type != StakeLifecycle::Active
+            || move_dest_type == StakeLifecycle::Activating
+        {
+            return;
+        }
+    }
+
+    let mut context = program_test().start_with_context().await;
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+
+    let source_staked_amount = minimum_delegation * 2;
+    let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
+        minimum_delegation
+    } else {
+        0
+    };
+
+    let in_force_lockup = {
+        let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
+        Lockup {
+            unix_timestamp: 0,
+            epoch: clock.epoch + 1_000_000,
+            custodian: Pubkey::new_unique(),
+        }
+    };
+
+    let mk_ixn = if move_lamports {
+        ixn::move_lamports
+    } else {
+        ixn::move_stake
+    };
+
+    // we can reuse source but will need a lot of dest
+    let (move_source_keypair, staker_keypair, withdrawer_keypair) = move_source_type
+        .new_stake_account(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            source_staked_amount,
+        )
+        .await;
+    let move_source = move_source_keypair.pubkey();
+    transfer(&mut context, &move_source, minimum_delegation).await;
+
+    // self-move fails
+    // NOTE this error type is an artifact of the native program interface
+    // when we move to bpf, it should actually hit the processor error
+    let instruction = mk_ixn(
+        &move_source,
+        &move_source,
+        &staker_keypair.pubkey(),
+        minimum_delegation,
+    );
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::AccountBorrowFailed);
+
+    // first we make a "normal" move dest
+    {
+        let move_dest_keypair = Keypair::new();
+        move_dest_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &accounts.vote_account.pubkey(),
+                minimum_delegation,
+                &move_dest_keypair,
+                &staker_keypair,
+                &withdrawer_keypair,
+                &Lockup::default(),
+            )
+            .await;
+        let move_dest = move_dest_keypair.pubkey();
+
+        // zero move fails
+        let instruction = mk_ixn(&move_source, &move_dest, &staker_keypair.pubkey(), 0);
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::InvalidArgument);
+
+        // sign with withdrawer fails
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &withdrawer_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&withdrawer_keypair])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::MissingRequiredSignature);
+
+        // good place to test source lockup
+        let move_locked_source_keypair = Keypair::new();
+        move_source_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &accounts.vote_account.pubkey(),
+                source_staked_amount,
+                &move_locked_source_keypair,
+                &staker_keypair,
+                &withdrawer_keypair,
+                &in_force_lockup,
+            )
+            .await;
+        let move_locked_source = move_locked_source_keypair.pubkey();
+        transfer(&mut context, &move_locked_source, minimum_delegation).await;
+
+        let instruction = mk_ixn(
+            &move_locked_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+        assert_eq!(e, ProgramError::Custom(6));
+    }
+
+    // staker mismatch
+    {
+        let move_dest_keypair = Keypair::new();
+        let throwaway = Keypair::new();
+        move_dest_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &accounts.vote_account.pubkey(),
+                minimum_delegation,
+                &move_dest_keypair,
+                &throwaway,
+                &withdrawer_keypair,
+                &Lockup::default(),
+            )
+            .await;
+        let move_dest = move_dest_keypair.pubkey();
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+        assert_eq!(e, ProgramError::Custom(6));
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &throwaway.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&throwaway])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::MissingRequiredSignature);
+    }
+
+    // withdrawer mismatch
+    {
+        let move_dest_keypair = Keypair::new();
+        let throwaway = Keypair::new();
+        move_dest_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &accounts.vote_account.pubkey(),
+                minimum_delegation,
+                &move_dest_keypair,
+                &staker_keypair,
+                &throwaway,
+                &Lockup::default(),
+            )
+            .await;
+        let move_dest = move_dest_keypair.pubkey();
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+        assert_eq!(e, ProgramError::Custom(6));
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &throwaway.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&throwaway])
+            .await
+            .unwrap_err();
+        assert_eq!(e, ProgramError::MissingRequiredSignature);
+    }
+
+    // dest lockup
+    {
+        let move_dest_keypair = Keypair::new();
+        move_dest_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &accounts.vote_account.pubkey(),
+                minimum_delegation,
+                &move_dest_keypair,
+                &staker_keypair,
+                &withdrawer_keypair,
+                &in_force_lockup,
+            )
+            .await;
+        let move_dest = move_dest_keypair.pubkey();
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+        assert_eq!(e, ProgramError::Custom(6));
+    }
+
+    // lastly we test different vote accounts for move_stake
+    if !move_lamports && move_dest_type == StakeLifecycle::Active {
+        let dest_vote_account_keypair = Keypair::new();
+        create_vote(
+            &mut context,
+            &Keypair::new(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &dest_vote_account_keypair,
+        )
+        .await;
+
+        let move_dest_keypair = Keypair::new();
+        move_dest_type
+            .new_stake_account_fully_specified(
+                &mut context,
+                &dest_vote_account_keypair.pubkey(),
+                minimum_delegation,
+                &move_dest_keypair,
+                &staker_keypair,
+                &withdrawer_keypair,
+                &Lockup::default(),
+            )
+            .await;
+        let move_dest = move_dest_keypair.pubkey();
+
+        let instruction = mk_ixn(
+            &move_source,
+            &move_dest,
+            &staker_keypair.pubkey(),
+            minimum_delegation,
+        );
+        let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+            .await
+            .unwrap_err();
+        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
+        assert_eq!(e, ProgramError::Custom(10));
+    }
 }
