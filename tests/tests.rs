@@ -785,8 +785,7 @@ async fn test_stake_delegate() {
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(3));
+    assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
     // deactivate
     let instruction = ixn::deactivate_stake(&stake, &staker);
@@ -799,8 +798,7 @@ async fn test_stake_delegate() {
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(3));
+    assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
     // verify that delegate succeeds to same vote account when stake is deactivating
     refresh_blockhash(&mut context).await;
@@ -818,8 +816,7 @@ async fn test_stake_delegate() {
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(3));
+    assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
     // delegate still fails after stake is fully activated; redelegate is not supported
     advance_epoch(&mut context).await;
@@ -827,8 +824,7 @@ async fn test_stake_delegate() {
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(3));
+    assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
     // delegate to spoofed vote account fails (not owned by vote program)
     let mut fake_vote_account =
@@ -1368,16 +1364,14 @@ async fn test_deactivate(activate: bool) {
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(2));
+    assert_eq!(e, StakeError::AlreadyDeactivated.into());
 
     advance_epoch(&mut context).await;
 
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-    assert_eq!(e, ProgramError::Custom(2));
+    assert_eq!(e, StakeError::AlreadyDeactivated.into());
 }
 
 // XXX the original test_merge is a stupid test
@@ -2052,15 +2046,8 @@ async fn test_move_general_fail(
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
-    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
-
     let source_staked_amount = minimum_delegation * 2;
-    let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
-        minimum_delegation
-    } else {
-        0
-    };
 
     let in_force_lockup = {
         let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
@@ -2162,8 +2149,7 @@ async fn test_move_general_fail(
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
-        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-        assert_eq!(e, ProgramError::Custom(6));
+        assert_eq!(e, StakeError::MergeMismatch.into());
     }
 
     // staker mismatch
@@ -2192,8 +2178,7 @@ async fn test_move_general_fail(
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
-        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-        assert_eq!(e, ProgramError::Custom(6));
+        assert_eq!(e, StakeError::MergeMismatch.into());
 
         let instruction = mk_ixn(
             &move_source,
@@ -2233,8 +2218,7 @@ async fn test_move_general_fail(
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
-        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-        assert_eq!(e, ProgramError::Custom(6));
+        assert_eq!(e, StakeError::MergeMismatch.into());
 
         let instruction = mk_ixn(
             &move_source,
@@ -2273,8 +2257,7 @@ async fn test_move_general_fail(
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
-        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-        assert_eq!(e, ProgramError::Custom(6));
+        assert_eq!(e, StakeError::MergeMismatch.into());
     }
 
     // lastly we test different vote accounts for move_stake
@@ -2312,7 +2295,6 @@ async fn test_move_general_fail(
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
             .await
             .unwrap_err();
-        // XXX TODO FIXME pr the fucking stakerror conversion this is driving me insane
-        assert_eq!(e, ProgramError::Custom(10));
+        assert_eq!(e, StakeError::VoteAddressMismatch.into());
     }
 }
