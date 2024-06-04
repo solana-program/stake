@@ -6,7 +6,7 @@ use {
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
-        feature_set::stake_raise_minimum_delegation_to_1_sol,
+        feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
         hash::Hash,
         instruction::Instruction,
         native_token::LAMPORTS_PER_SOL,
@@ -40,8 +40,16 @@ pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 pub const NO_SIGNERS: &[Keypair] = &[];
 
 pub fn program_test() -> ProgramTest {
+    program_test_without_features(&[])
+}
+
+pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
     let mut program_test = ProgramTest::default();
     // XXX do i not need this? program_test.prefer_bpf(false);
+
+    for feature_id in feature_ids {
+        program_test.deactivate_feature(*feature_id);
+    }
 
     program_test.add_program(
         "stake_program",
@@ -2297,4 +2305,77 @@ async fn test_move_general_fail(
             .unwrap_err();
         assert_eq!(e, StakeError::VoteAddressMismatch.into());
     }
+}
+
+// this test is only to be sure the feature gate is safe
+// once the feature has been activated, this can all be deleted
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [false, true]
+)]
+#[tokio::test]
+async fn test_move_feature_gate_fail(
+    move_source_type: StakeLifecycle,
+    move_dest_type: StakeLifecycle,
+    move_lamports: bool,
+) {
+    if !move_lamports {
+        if move_source_type != StakeLifecycle::Active
+            || move_dest_type == StakeLifecycle::Activating
+        {
+            return;
+        }
+    }
+
+    let mut context = program_test_without_features(&[move_stake_and_move_lamports_ixs::id()])
+        .start_with_context()
+        .await;
+
+    let accounts = Accounts::default();
+    accounts.initialize(&mut context).await;
+
+    let minimum_delegation = get_minimum_delegation(&mut context).await;
+    let source_staked_amount = minimum_delegation * 2;
+
+    let mk_ixn = if move_lamports {
+        ixn::move_lamports
+    } else {
+        ixn::move_stake
+    };
+
+    let (move_source_keypair, staker_keypair, withdrawer_keypair) = move_source_type
+        .new_stake_account(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            source_staked_amount,
+        )
+        .await;
+    let move_source = move_source_keypair.pubkey();
+    transfer(&mut context, &move_source, minimum_delegation).await;
+
+    let move_dest_keypair = Keypair::new();
+    move_dest_type
+        .new_stake_account_fully_specified(
+            &mut context,
+            &accounts.vote_account.pubkey(),
+            minimum_delegation,
+            &move_dest_keypair,
+            &staker_keypair,
+            &withdrawer_keypair,
+            &Lockup::default(),
+        )
+        .await;
+    let move_dest = move_dest_keypair.pubkey();
+
+    let instruction = mk_ixn(
+        &move_source,
+        &move_dest,
+        &staker_keypair.pubkey(),
+        minimum_delegation,
+    );
+    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InvalidInstructionData);
 }
