@@ -7,7 +7,7 @@ use {
         pubkey::Pubkey,
         stake::instruction::StakeError,
         stake::state::{Delegation, Meta, Stake},
-        stake_history::StakeHistory,
+        stake_history::StakeHistorySyscall,
         vote::state::VoteState,
     },
 };
@@ -36,7 +36,7 @@ pub(crate) fn redelegate_stake(
     voter_pubkey: &Pubkey,
     vote_state: &VoteState,
     epoch: Epoch,
-    stake_history: &StakeHistory,
+    stake_history: &StakeHistorySyscall,
 ) -> Result<(), ProgramError> {
     // If stake is currently active:
     if stake.stake(epoch, stake_history, PERPETUAL_NEW_WARMUP) != 0 {
