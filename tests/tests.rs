@@ -6,7 +6,10 @@ use {
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
-        feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
+        feature_set::{
+            /* HANA move_stake_and_move_lamports_ixs, */
+            stake_raise_minimum_delegation_to_1_sol,
+        },
         hash::Hash,
         instruction::Instruction,
         native_token::LAMPORTS_PER_SOL,
@@ -1497,6 +1500,9 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     }
 }
 
+/* HANA now im back on a branch without these ixns but with StakeHistoryGetEntry... very exciting
+   will i make branches for neostake? no!!!
+
 // XXX HANA note im crossing streams, there doesnt exist a branch with the new ixns *and* the stake history syscall
 // also clearly im just testing against the native stake program because i didnt impl this in neostake
 // unfortunately my stake program test setup is both a) better than monorepo, and b) too unfinished to put in monorepo
@@ -2379,3 +2385,5 @@ async fn test_move_feature_gate_fail(
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidInstructionData);
 }
+
+*/
