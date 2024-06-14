@@ -48,7 +48,7 @@ pub fn program_test() -> ProgramTest {
 
 pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
     let mut program_test = ProgramTest::default();
-    // XXX do i not need this? program_test.prefer_bpf(false);
+    program_test.prefer_bpf(true);
 
     for feature_id in feature_ids {
         program_test.deactivate_feature(*feature_id);
@@ -1085,7 +1085,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
     let e = process_instruction(&mut context, instruction, &signers)
         .await
         .unwrap_err();
-    assert_eq!(e, ProgramError::IncorrectProgramId); // FIXME HANA changed for native stake program
+    assert_eq!(e, ProgramError::InvalidAccountOwner);
 
     // success
     let instruction = &ixn::split(
