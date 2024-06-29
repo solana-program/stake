@@ -251,7 +251,7 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        let stake_history = &StakeHistorySysvar::new(clock.epoch)?;
+        let stake_history = &StakeHistorySysvar(clock.epoch);
 
         let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
@@ -344,7 +344,7 @@ impl Processor {
 
                 let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
                     let clock = Clock::get()?;
-                    let stake_history = &StakeHistorySysvar::new(clock.epoch)?;
+                    let stake_history = &StakeHistorySysvar(clock.epoch);
 
                     let status = source_stake.delegation.stake_activating_and_deactivating(
                         clock.epoch,
@@ -489,7 +489,7 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistorySysvar::new(clock.epoch)?;
+        let stake_history = &StakeHistorySysvar(clock.epoch);
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
@@ -641,7 +641,7 @@ impl Processor {
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
         let _stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistorySysvar::new(clock.epoch)?;
+        let stake_history = &StakeHistorySysvar(clock.epoch);
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {
