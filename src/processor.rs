@@ -21,7 +21,7 @@ use {
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
         stake_history::StakeHistory,
-        sysvar::{stake_history::StakeHistorySysvar, Sysvar},
+        sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
         vote::program as solana_vote_program,
         vote::state::VoteState,
     },
@@ -342,20 +342,17 @@ impl Processor {
 
                 let minimum_delegation = crate::get_minimum_delegation();
 
-                let is_active = if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION {
-                    let clock = Clock::get()?;
-                    let stake_history = &StakeHistorySysvar(clock.epoch);
+                // XXX move these up top maybe, there used to be a feature gate here
+                let clock = Clock::get()?;
+                let stake_history = &StakeHistorySysvar(clock.epoch);
 
-                    let status = source_stake.delegation.stake_activating_and_deactivating(
-                        clock.epoch,
-                        stake_history,
-                        PERPETUAL_NEW_WARMUP,
-                    );
+                let status = source_stake.delegation.stake_activating_and_deactivating(
+                    clock.epoch,
+                    stake_history,
+                    PERPETUAL_NEW_WARMUP,
+                );
 
-                    status.effective > 0
-                } else {
-                    false
-                };
+                let is_active = status.effective > 0;
 
                 // XXX note this function also internally summons Rent via syscall
                 let validated_split_info = validate_split_amount(
@@ -905,32 +902,18 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
+        let epoch_rewards_active = EpochRewards::get()
+            .map(|epoch_rewards| epoch_rewards.active)
+            .unwrap_or(false);
+
         // XXX limited_deserialize?
         let instruction =
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
-        // TODO
-        // * deactivatedelinquent: simple but requires deactivate
-        // * redelegate: simple, requires stake history
-        //   update we are officially NOT porting redelegate
-        // plus a handful of checked and seed variants
-        //
-        // stake history doesnt seem too bad honestly
-        // i believe we only need get(), not add(). unclear if we need to be able to iterate
-        // for get() we need to binary search the vec for a given epoch entry
-        // each vec item is four u64: epoch and entry, which is (effective stake, activating stake, deactivating stake)
-        // this is fairly straightforward to implement with incremental parsing:
-        // * decode the vec length
-        // * jump to some offset
-        // * decode four u64, check values
-        // * repeat from 2 or return result
-        // we can also be sure the data is well-formed because we check the hardcoded account key
-        // how to use this with existing functions is somewhat trickier
-        // we could create a GetStakeHistoryEntry typeclass and change the function interfaces
-        // and make a new struct StakeHistoryAccountData or something which impls it
-        // we just want one function get_entry() which does the same thing as get()
-        // and then deprecate get(). itll be fun to write probably
-        //
+        if epoch_rewards_active && !matches!(instruction, StakeInstruction::GetMinimumDelegation) {
+            return Err(StakeError::EpochRewardsActive.into());
+        }
+
         // XXX TODO FIXME remove neostake from the msg! commands
         // this is just so i can be sure its hitting the right program while testing
         match instruction {
@@ -996,6 +979,7 @@ impl Processor {
                 msg!("NEOSTAKE Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
+            StakeInstruction::MoveLamports(_) | StakeInstruction::MoveStake(_) => todo!(),
             StakeInstruction::Redelegate => unimplemented!(), // wontfix
         }
     }

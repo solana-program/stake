@@ -46,7 +46,7 @@ pub(crate) fn redelegate_stake(
         if stake.delegation.voter_pubkey == *voter_pubkey
             && epoch == stake.delegation.deactivation_epoch
         {
-            stake.delegation.deactivation_epoch = std::u64::MAX;
+            stake.delegation.deactivation_epoch = u64::MAX;
             return Ok(());
         } else {
             // can't redelegate to another pubkey if stake is active.
@@ -59,7 +59,7 @@ pub(crate) fn redelegate_stake(
 
     stake.delegation.stake = stake_lamports;
     stake.delegation.activation_epoch = epoch;
-    stake.delegation.deactivation_epoch = std::u64::MAX;
+    stake.delegation.deactivation_epoch = u64::MAX;
     stake.delegation.voter_pubkey = *voter_pubkey;
     stake.credits_observed = vote_state.credits();
     Ok(())

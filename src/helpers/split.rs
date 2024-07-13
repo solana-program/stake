@@ -53,12 +53,10 @@ pub(crate) fn validate_split_amount(
     let rent = Rent::get()?;
     let destination_rent_exempt_reserve = rent.minimum_balance(destination_data_len);
 
-    // As of feature `require_rent_exempt_split_destination`, if the source is active stake, one of
-    // these criteria must be met:
+    // If the source is active stake, one of these criteria must be met:
     // 1. the destination account must be prefunded with at least the rent-exempt reserve, or
     // 2. the split must consume 100% of the source
-    if crate::FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION
-        && source_is_active
+    if source_is_active
         && source_remaining_balance != 0
         && destination_lamports < destination_rent_exempt_reserve
     {

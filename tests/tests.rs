@@ -783,7 +783,7 @@ async fn test_stake_delegate() {
                 voter_pubkey: accounts.vote_account.pubkey(),
                 stake: minimum_delegation,
                 activation_epoch: clock.epoch,
-                deactivation_epoch: std::u64::MAX,
+                deactivation_epoch: u64::MAX,
                 ..Delegation::default()
             },
             credits_observed: vote_state_credits,

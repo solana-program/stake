@@ -28,8 +28,8 @@ solana_program::declare_id!("Stake11111111111111111111111111111111111111");
 // * require_rent_exempt_split_destination / D2aip4BBr8NPWtU9vLrwrBvbuaQ8w1zV38zFLxx4pfBV
 //   this should be active by time we are done. its confined to the program
 //   we use a placeholder to draw attention to it because its effects are rather tricky
+// FIXME UPDATE warmpus and split are both active now
 const FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL: bool = false;
-const FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION: bool = false;
 
 // feature_set::reduce_stake_warmup_cooldown changed the warmup cooldown from 25% to 9%
 // a function is provided by the sdk, new_warmup_cooldown_rate_epoch(), which returns the epoch this change happened
@@ -41,15 +41,14 @@ const FEATURE_REQUIRE_RENT_EXEMPT_SPLIT_DESTINATION: bool = false;
 const PERPETUAL_NEW_WARMUP: Option<u64> = Some(1);
 
 /// The minimum stake amount that can be delegated, in lamports.
-/// NOTE: This is also used to calculate the minimum balance of a stake account, which is the
-/// rent exempt reserve _plus_ the minimum stake delegation.
+/// NOTE: This is also used to calculate the minimum balance of a delegated stake account,
+/// which is the rent exempt reserve _plus_ the minimum stake delegation.
 #[inline(always)]
 pub fn get_minimum_delegation() -> u64 {
     if FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL {
         const MINIMUM_DELEGATION_SOL: u64 = 1;
         MINIMUM_DELEGATION_SOL * LAMPORTS_PER_SOL
     } else {
-        // FIXME the global for this got removed, check new logic
         1
     }
 }
