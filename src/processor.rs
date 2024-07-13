@@ -194,6 +194,72 @@ fn do_set_lockup(
     }
 }
 
+fn move_stake_or_lamports_shared_checks(
+    source_stake_account_info: &AccountInfo,
+    lamports: u64,
+    destination_stake_account_info: &AccountInfo,
+    stake_authority_info: &AccountInfo,
+) -> Result<(MergeKind, MergeKind), ProgramError> {
+    // authority must sign
+    let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
+
+    // check owners
+    if *source_stake_account_info.owner != id() || *destination_stake_account_info.owner != id() {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    // confirm not the same account
+    if *source_stake_account_info.key == *destination_stake_account_info.key {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    // source and destination must be writable
+    if !source_stake_account_info.is_writable || !destination_stake_account_info.is_writable {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    // must move something
+    if lamports == 0 {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let clock = Clock::get()?;
+    let stake_history = StakeHistorySysvar(clock.epoch);
+
+    // get_if_mergeable ensures accounts are not partly activated or in any form of deactivating
+    // we still need to exclude activating state ourselves
+    let source_merge_kind = MergeKind::get_if_mergeable(
+        &get_stake_state(source_stake_account_info)?,
+        source_stake_account_info.lamports(),
+        &clock,
+        &stake_history,
+    )?;
+
+    // Authorized staker is allowed to move stake
+    source_merge_kind
+        .meta()
+        .authorized
+        .check(&signers, StakeAuthorize::Staker)
+        .map_err(InstructionError::turn_into)?;
+
+    // same transient assurance as with source
+    let destination_merge_kind = MergeKind::get_if_mergeable(
+        &get_stake_state(destination_stake_account_info)?,
+        destination_stake_account_info.lamports(),
+        &clock,
+        &stake_history,
+    )?;
+
+    // ensure all authorities match and lockups match if lockup is in force
+    MergeKind::metas_can_merge(
+        source_merge_kind.meta(),
+        destination_merge_kind.meta(),
+        &clock,
+    )?;
+
+    Ok((source_merge_kind, destination_merge_kind))
+}
+
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -893,6 +959,151 @@ impl Processor {
         Ok(())
     }
 
+    fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        let (source_merge_kind, destination_merge_kind) = move_stake_or_lamports_shared_checks(
+            &source_stake_account_info,
+            lamports,
+            &destination_stake_account_info,
+            stake_authority_info,
+        )?;
+
+        // ensure source and destination are the right size for the current version of StakeState
+        // this a safeguard in case there is a new version of the struct that cannot fit into an old account
+        if source_stake_account_info.data_len() != StakeStateV2::size_of()
+            || destination_stake_account_info.data_len() != StakeStateV2::size_of()
+        {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        // source must be fully active
+        let MergeKind::FullyActive(source_meta, mut source_stake) = source_merge_kind else {
+            return Err(ProgramError::InvalidAccountData);
+        };
+
+        let minimum_delegation = crate::get_minimum_delegation();
+        let source_effective_stake = source_stake.delegation.stake;
+
+        // source cannot move more stake than it has, regardless of how many lamports it has
+        let source_final_stake = source_effective_stake
+            .checked_sub(lamports)
+            .ok_or(ProgramError::InvalidArgument)?;
+
+        // unless all stake is being moved, source must retain at least the minimum delegation
+        if source_final_stake != 0 && source_final_stake < minimum_delegation {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // destination must be fully active or fully inactive
+        let destination_meta = match destination_merge_kind {
+            MergeKind::FullyActive(destination_meta, mut destination_stake) => {
+                // if active, destination must be delegated to the same vote account as source
+                if source_stake.delegation.voter_pubkey != destination_stake.delegation.voter_pubkey
+                {
+                    return Err(StakeError::VoteAddressMismatch.into());
+                }
+
+                let destination_effective_stake = destination_stake.delegation.stake;
+                let destination_final_stake = destination_effective_stake
+                    .checked_add(lamports)
+                    .ok_or(ProgramError::ArithmeticOverflow)?;
+
+                // ensure destination meets miniumum delegation
+                // since it is already active, this only really applies if the minimum is raised
+                if destination_final_stake < minimum_delegation {
+                    return Err(ProgramError::InvalidArgument);
+                }
+
+                merge_delegation_stake_and_credits_observed(
+                    &mut destination_stake,
+                    lamports,
+                    source_stake.credits_observed,
+                )?;
+
+                // StakeFlags::empty() is valid here because the only existing stake flag,
+                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to active stakes
+                set_stake_state(
+                    destination_stake_account_info,
+                    &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
+                )?;
+
+                destination_meta
+            }
+            MergeKind::Inactive(destination_meta, _, _) => {
+                // if destination is inactive, it must be given at least the minimum delegation
+                if lamports < minimum_delegation {
+                    return Err(ProgramError::InvalidArgument);
+                }
+
+                let mut destination_stake = source_stake;
+                destination_stake.delegation.stake = lamports;
+
+                // StakeFlags::empty() is valid here because the only existing stake flag,
+                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, is cleared when a stake is activated
+                set_stake_state(
+                    destination_stake_account_info,
+                    &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
+                )?;
+
+                destination_meta
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        if source_final_stake == 0 {
+            set_stake_state(
+                source_stake_account_info,
+                &StakeStateV2::Initialized(source_meta),
+            )?;
+        } else {
+            source_stake.delegation.stake = source_final_stake;
+
+            // StakeFlags::empty() is valid here because the only existing stake flag,
+            // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to active stakes
+            set_stake_state(
+                source_stake_account_info,
+                &StakeStateV2::Stake(source_meta, source_stake, StakeFlags::empty()),
+            )?;
+        }
+
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
+        {
+            let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
+            **source_lamports = source_lamports
+                .checked_sub(lamports)
+                .ok_or(ProgramError::InsufficientFunds)?;
+
+            let mut destination_lamports =
+                destination_stake_account_info.try_borrow_mut_lamports()?;
+            **destination_lamports = destination_lamports
+                .checked_add(lamports)
+                .ok_or(ProgramError::InsufficientFunds)?;
+        }
+
+        // this should be impossible, but because we do all our math with delegations, best to guard it
+        if source_stake_account_info.lamports() < source_meta.rent_exempt_reserve
+            || destination_stake_account_info.lamports() < destination_meta.rent_exempt_reserve
+        {
+            msg!("Delegation calculations violated lamport balance assumptions");
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        Ok(())
+    }
+
+    fn process_move_lamports(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let source_stake_account_info = next_account_info(account_info_iter)?;
+        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        let stake_authority_info = next_account_info(account_info_iter)?;
+
+        Ok(())
+    }
+
     /// Processes [Instruction](enum.Instruction.html).
     // XXX the existing program returns InstructionError not ProgramError
     // look into if theres a trait i can impl to not break the interface but modrenize
@@ -979,7 +1190,14 @@ impl Processor {
                 msg!("NEOSTAKE Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
-            StakeInstruction::MoveLamports(_) | StakeInstruction::MoveStake(_) => todo!(),
+            StakeInstruction::MoveStake(lamports) => {
+                msg!("NEOSTAKE Instruction: MoveStake");
+                Self::process_move_stake(accounts, lamports)
+            }
+            StakeInstruction::MoveLamports(lamports) => {
+                msg!("NEOSTAKE Instruction: MoveLamports");
+                Self::process_move_lamports(accounts, lamports)
+            }
             StakeInstruction::Redelegate => unimplemented!(), // wontfix
         }
     }

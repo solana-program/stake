@@ -1637,14 +1637,31 @@ async fn test_move_stake(
         }
     }
 
-    // source has 2x minimum (always 2 sol because these tests dont have featuresets)
-    // so first for inactive accounts lets undershoot and fail for underfunded dest
-    if move_dest_type != StakeLifecycle::Active {
+    // the below checks are conceptually incoherent with a 1 lamport minimum
+    // the first one fails successfully (but only because its a zero move)
+    // then the second one succeeds failedly (because its a full move)
+    if minimum_delegation > 1 {
+        // first for inactive accounts lets undershoot and fail for underfunded dest
+        if move_dest_type != StakeLifecycle::Active {
+            let instruction = ixn::move_stake(
+                &move_source,
+                &move_dest,
+                &staker_keypair.pubkey(),
+                minimum_delegation - 1,
+            );
+
+            let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
+                .await
+                .unwrap_err();
+            assert_eq!(e, ProgramError::InvalidArgument);
+        }
+
+        // now lets overshoot and fail for underfunded source
         let instruction = ixn::move_stake(
             &move_source,
             &move_dest,
             &staker_keypair.pubkey(),
-            minimum_delegation - 1,
+            minimum_delegation + 1,
         );
 
         let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
@@ -1652,19 +1669,6 @@ async fn test_move_stake(
             .unwrap_err();
         assert_eq!(e, ProgramError::InvalidArgument);
     }
-
-    // now lets overshoot and fail for underfunded source
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest,
-        &staker_keypair.pubkey(),
-        minimum_delegation + 1,
-    );
-
-    let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidArgument);
 
     // now we do it juuust right
     let instruction = ixn::move_stake(
