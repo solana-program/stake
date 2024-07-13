@@ -6,10 +6,7 @@ use {
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
-        feature_set::{
-            /* HANA move_stake_and_move_lamports_ixs, */
-            stake_raise_minimum_delegation_to_1_sol,
-        },
+        feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
         hash::Hash,
         instruction::Instruction,
         native_token::LAMPORTS_PER_SOL,
@@ -1500,12 +1497,6 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     }
 }
 
-/* HANA now im back on a branch without these ixns but with StakeHistoryGetEntry... very exciting
-   will i make branches for neostake? no!!!
-
-// XXX HANA note im crossing streams, there doesnt exist a branch with the new ixns *and* the stake history syscall
-// also clearly im just testing against the native stake program because i didnt impl this in neostake
-// unfortunately my stake program test setup is both a) better than monorepo, and b) too unfinished to put in monorepo
 #[test_matrix(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
@@ -1599,13 +1590,12 @@ async fn test_move_stake(
         || move_source_type == StakeLifecycle::Deactivating
     {
         let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
-        match &mut source_stake_state {
-            StakeStateV2::Stake(_, ref mut stake, _) => match move_source_type {
+        if let StakeStateV2::Stake(_, ref mut stake, _) = &mut source_stake_state {
+            match move_source_type {
                 StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
                 StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
                 _ => (),
-            },
-            _ => (),
+            }
         }
 
         source_account.data = bincode::serialize(&source_stake_state).unwrap();
@@ -1863,13 +1853,12 @@ async fn test_move_lamports(
         || move_source_type == StakeLifecycle::Deactivating
     {
         let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
-        match &mut source_stake_state {
-            StakeStateV2::Stake(_, ref mut stake, _) => match move_source_type {
+        if let StakeStateV2::Stake(_, ref mut stake, _) = &mut source_stake_state {
+            match move_source_type {
                 StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
                 StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
                 _ => (),
-            },
-            _ => (),
+            }
         }
 
         source_account.data = bincode::serialize(&source_stake_state).unwrap();
@@ -2047,13 +2036,15 @@ async fn test_move_general_fail(
     move_dest_type: StakeLifecycle,
     move_lamports: bool,
 ) {
-    // clear the states that are only valid for move_lamports
-    if !move_lamports {
-        if move_source_type != StakeLifecycle::Active
-            || move_dest_type == StakeLifecycle::Activating
-        {
-            return;
-        }
+    // the test_matrix includes all valid source/dest combinations for MoveLamports
+    // we dont test invalid combinations because they would fail regardless of the fail cases we test here
+    // valid source/dest for MoveStake are a strict subset of MoveLamports
+    // source must be active, and dest must be active or inactive. so we skip the additional invalid MoveStake cases
+    if !move_lamports
+        && (move_source_type != StakeLifecycle::Active
+            || move_dest_type == StakeLifecycle::Activating)
+    {
+        return;
     }
 
     let mut context = program_test().start_with_context().await;
@@ -2326,12 +2317,15 @@ async fn test_move_feature_gate_fail(
     move_dest_type: StakeLifecycle,
     move_lamports: bool,
 ) {
-    if !move_lamports {
-        if move_source_type != StakeLifecycle::Active
-            || move_dest_type == StakeLifecycle::Activating
-        {
-            return;
-        }
+    // the test_matrix includes all valid source/dest combinations for MoveLamports
+    // we dont test invalid combinations because they would fail regardless of the fail cases we test here
+    // valid source/dest for MoveStake are a strict subset of MoveLamports
+    // source must be active, and dest must be active or inactive. so we skip the additional invalid MoveStake cases
+    if !move_lamports
+        && (move_source_type != StakeLifecycle::Active
+            || move_dest_type == StakeLifecycle::Activating)
+    {
+        return;
     }
 
     let mut context = program_test_without_features(&[move_stake_and_move_lamports_ixs::id()])
@@ -2385,5 +2379,3 @@ async fn test_move_feature_gate_fail(
         .unwrap_err();
     assert_eq!(e, ProgramError::InvalidInstructionData);
 }
-
-*/
