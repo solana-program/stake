@@ -1223,6 +1223,7 @@ impl Processor {
                 msg!("NEOSTAKE Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
+            // XXX NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is activated
             StakeInstruction::MoveStake(lamports) => {
                 msg!("NEOSTAKE Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)
