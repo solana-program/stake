@@ -1101,6 +1101,39 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
+        let (source_merge_kind, _) = move_stake_or_lamports_shared_checks(
+            &source_stake_account_info,
+            lamports,
+            &destination_stake_account_info,
+            stake_authority_info,
+        )?;
+
+        let source_free_lamports = match source_merge_kind {
+            MergeKind::FullyActive(source_meta, source_stake) => source_stake_account_info
+                .lamports()
+                .saturating_sub(source_stake.delegation.stake)
+                .saturating_sub(source_meta.rent_exempt_reserve),
+            MergeKind::Inactive(source_meta, source_lamports, _) => {
+                source_lamports.saturating_sub(source_meta.rent_exempt_reserve)
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
+        };
+
+        if lamports > source_free_lamports {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
+        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
+        **source_lamports = source_lamports
+            .checked_sub(lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
+        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
+        **destination_lamports = destination_lamports
+            .checked_add(lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+
         Ok(())
     }
 
