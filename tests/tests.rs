@@ -51,6 +51,9 @@ pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
         program_test.deactivate_feature(*feature_id);
     }
 
+    // XXX this only works on our special monorepo fork. need to check if theres a way to override a builtin now
+    // there is code now tho for core bpf migration so maybe we need to do that
+    // also... need to figure out how that stuff all works so i can link up with monorepo and spl ci... and all that...
     program_test.add_program(
         "stake_program",
         stake_program::id(),
