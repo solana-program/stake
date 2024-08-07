@@ -3164,6 +3164,7 @@ dependencies = [
 [[package]]
 name = "solana-account-decoder"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -3187,6 +3188,7 @@ dependencies = [
 [[package]]
 name = "solana-accounts-db"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "ahash",
  "bincode",
@@ -3222,6 +3224,7 @@ dependencies = [
  "solana-nohash-hasher",
  "solana-rayon-threadlimit",
  "solana-sdk",
+ "solana-svm-transaction",
  "static_assertions",
  "tar",
  "tempfile",
@@ -3231,6 +3234,7 @@ dependencies = [
 [[package]]
 name = "solana-address-lookup-table-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -3248,6 +3252,7 @@ dependencies = [
 [[package]]
 name = "solana-atomic-u64"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "parking_lot",
 ]
@@ -3255,6 +3260,7 @@ dependencies = [
 [[package]]
 name = "solana-banks-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "borsh 1.5.1",
  "futures",
@@ -3270,6 +3276,7 @@ dependencies = [
 [[package]]
 name = "solana-banks-interface"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "serde",
  "serde_derive",
@@ -3280,6 +3287,7 @@ dependencies = [
 [[package]]
 name = "solana-banks-server"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "crossbeam-channel",
@@ -3298,6 +3306,7 @@ dependencies = [
 [[package]]
 name = "solana-bn254"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -3311,6 +3320,7 @@ dependencies = [
 [[package]]
 name = "solana-bpf-loader-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "byteorder",
@@ -3335,6 +3345,7 @@ dependencies = [
 [[package]]
 name = "solana-bucket-map"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bv",
  "bytemuck",
@@ -3350,8 +3361,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-builtins-default-costs"
+version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+dependencies = [
+ "ahash",
+ "lazy_static",
+ "log",
+ "rustc_version",
+ "solana-address-lookup-table-program",
+ "solana-bpf-loader-program",
+ "solana-compute-budget-program",
+ "solana-config-program",
+ "solana-loader-v4-program",
+ "solana-sdk",
+ "solana-stake-program",
+ "solana-system-program",
+ "solana-vote-program",
+]
+
+[[package]]
 name = "solana-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3383,6 +3415,7 @@ dependencies = [
 [[package]]
 name = "solana-compute-budget"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "rustc_version",
  "solana-sdk",
@@ -3391,6 +3424,7 @@ dependencies = [
 [[package]]
 name = "solana-compute-budget-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "solana-program-runtime",
  "solana-sdk",
@@ -3399,6 +3433,7 @@ dependencies = [
 [[package]]
 name = "solana-config-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "chrono",
@@ -3413,6 +3448,7 @@ dependencies = [
 [[package]]
 name = "solana-connection-cache"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-trait",
  "bincode",
@@ -3432,27 +3468,24 @@ dependencies = [
 [[package]]
 name = "solana-cost-model"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "ahash",
  "lazy_static",
  "log",
  "rustc_version",
- "solana-address-lookup-table-program",
- "solana-bpf-loader-program",
+ "solana-builtins-default-costs",
  "solana-compute-budget",
- "solana-compute-budget-program",
- "solana-config-program",
- "solana-loader-v4-program",
  "solana-metrics",
+ "solana-runtime-transaction",
  "solana-sdk",
- "solana-stake-program",
- "solana-system-program",
  "solana-vote-program",
 ]
 
 [[package]]
 name = "solana-curve25519"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bytemuck",
  "bytemuck_derive",
@@ -3464,6 +3497,7 @@ dependencies = [
 [[package]]
 name = "solana-decode-error"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "num-traits",
 ]
@@ -3471,10 +3505,21 @@ dependencies = [
 [[package]]
 name = "solana-define-syscall"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+
+[[package]]
+name = "solana-fee"
+version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+dependencies = [
+ "solana-sdk",
+ "solana-svm-transaction",
+]
 
 [[package]]
 name = "solana-inline-spl"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bytemuck",
  "solana-program",
@@ -3483,6 +3528,7 @@ dependencies = [
 [[package]]
 name = "solana-lattice-hash"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -3492,6 +3538,7 @@ dependencies = [
 [[package]]
 name = "solana-loader-v4-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "log",
  "solana-compute-budget",
@@ -3506,6 +3553,7 @@ dependencies = [
 [[package]]
 name = "solana-log-collector"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "log",
 ]
@@ -3513,6 +3561,7 @@ dependencies = [
 [[package]]
 name = "solana-logger"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "env_logger",
  "lazy_static",
@@ -3522,6 +3571,7 @@ dependencies = [
 [[package]]
 name = "solana-measure"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "log",
  "solana-sdk",
@@ -3530,6 +3580,7 @@ dependencies = [
 [[package]]
 name = "solana-metrics"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "crossbeam-channel",
  "gethostname",
@@ -3541,8 +3592,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-msg"
+version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+dependencies = [
+ "solana-define-syscall",
+]
+
+[[package]]
 name = "solana-net-utils"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "crossbeam-channel",
@@ -3566,6 +3626,7 @@ checksum = "8b8a731ed60e89177c8a7ab05fe0f1511cedd3e70e773f288f9de33a9cfdc21e"
 [[package]]
 name = "solana-perf"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "ahash",
  "bincode",
@@ -3592,6 +3653,7 @@ dependencies = [
 [[package]]
 name = "solana-poseidon"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "ark-bn254",
  "light-poseidon",
@@ -3602,6 +3664,7 @@ dependencies = [
 [[package]]
 name = "solana-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3635,6 +3698,7 @@ dependencies = [
  "solana-atomic-u64",
  "solana-decode-error",
  "solana-define-syscall",
+ "solana-msg",
  "solana-program-memory",
  "solana-sanitize",
  "solana-sdk-macro",
@@ -3647,6 +3711,7 @@ dependencies = [
 [[package]]
 name = "solana-program-memory"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "num-traits",
  "solana-define-syscall",
@@ -3655,6 +3720,7 @@ dependencies = [
 [[package]]
 name = "solana-program-runtime"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3683,6 +3749,7 @@ dependencies = [
 [[package]]
 name = "solana-program-test"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "assert_matches",
  "async-trait",
@@ -3715,6 +3782,7 @@ dependencies = [
 [[package]]
 name = "solana-pubsub-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "crossbeam-channel",
  "futures-util",
@@ -3738,6 +3806,7 @@ dependencies = [
 [[package]]
 name = "solana-quic-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-mutex",
  "async-trait",
@@ -3762,6 +3831,7 @@ dependencies = [
 [[package]]
 name = "solana-rayon-threadlimit"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "lazy_static",
  "num_cpus",
@@ -3770,6 +3840,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3795,6 +3866,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client-api"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3817,6 +3889,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client-nonce-utils"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "solana-rpc-client",
  "solana-sdk",
@@ -3826,6 +3899,7 @@ dependencies = [
 [[package]]
 name = "solana-runtime"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "aquamarine",
  "arrayref",
@@ -3872,6 +3946,7 @@ dependencies = [
  "solana-compute-budget-program",
  "solana-config-program",
  "solana-cost-model",
+ "solana-fee",
  "solana-inline-spl",
  "solana-loader-v4-program",
  "solana-measure",
@@ -3879,6 +3954,7 @@ dependencies = [
  "solana-perf",
  "solana-program-runtime",
  "solana-rayon-threadlimit",
+ "solana-runtime-transaction",
  "solana-sdk",
  "solana-stake-program",
  "solana-svm",
@@ -3903,12 +3979,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-runtime-transaction"
+version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+dependencies = [
+ "log",
+ "rustc_version",
+ "solana-compute-budget",
+ "solana-sdk",
+ "thiserror",
+]
+
+[[package]]
 name = "solana-sanitize"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 
 [[package]]
 name = "solana-sdk"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "bitflags 2.6.0",
@@ -3961,6 +4051,7 @@ dependencies = [
 [[package]]
 name = "solana-sdk-macro"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bs58",
  "proc-macro2",
@@ -3971,6 +4062,7 @@ dependencies = [
 [[package]]
 name = "solana-secp256k1-recover"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "borsh 1.5.1",
  "libsecp256k1",
@@ -3988,6 +4080,7 @@ checksum = "468aa43b7edb1f9b7b7b686d5c3aeb6630dc1708e86e31343499dd5c4d775183"
 [[package]]
 name = "solana-send-transaction-service"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "crossbeam-channel",
  "log",
@@ -4003,6 +4096,7 @@ dependencies = [
 [[package]]
 name = "solana-short-vec"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "rustc_version",
  "serde",
@@ -4011,6 +4105,7 @@ dependencies = [
 [[package]]
 name = "solana-stake-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "log",
@@ -4026,6 +4121,7 @@ dependencies = [
 [[package]]
 name = "solana-streamer"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-channel",
  "bytes",
@@ -4060,6 +4156,7 @@ dependencies = [
 [[package]]
 name = "solana-svm"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "itertools 0.12.1",
  "log",
@@ -4069,21 +4166,34 @@ dependencies = [
  "serde_derive",
  "solana-bpf-loader-program",
  "solana-compute-budget",
+ "solana-fee",
  "solana-loader-v4-program",
  "solana-log-collector",
  "solana-measure",
  "solana-metrics",
  "solana-program-runtime",
+ "solana-runtime-transaction",
  "solana-sdk",
+ "solana-svm-transaction",
  "solana-system-program",
  "solana-timings",
  "solana-type-overrides",
  "solana-vote",
+ "thiserror",
+]
+
+[[package]]
+name = "solana-svm-transaction"
+version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
+dependencies = [
+ "solana-sdk",
 ]
 
 [[package]]
 name = "solana-system-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "log",
@@ -4098,6 +4208,7 @@ dependencies = [
 [[package]]
 name = "solana-thin-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "log",
@@ -4111,6 +4222,7 @@ dependencies = [
 [[package]]
 name = "solana-timings"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "eager",
  "enum-iterator",
@@ -4120,6 +4232,7 @@ dependencies = [
 [[package]]
 name = "solana-tpu-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-trait",
  "bincode",
@@ -4142,6 +4255,7 @@ dependencies = [
 [[package]]
 name = "solana-transaction-metrics-tracker"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -4156,6 +4270,7 @@ dependencies = [
 [[package]]
 name = "solana-transaction-status"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -4181,6 +4296,7 @@ dependencies = [
 [[package]]
 name = "solana-type-overrides"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "lazy_static",
  "rand 0.8.5",
@@ -4189,6 +4305,7 @@ dependencies = [
 [[package]]
 name = "solana-udp-client"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "async-trait",
  "solana-connection-cache",
@@ -4202,6 +4319,7 @@ dependencies = [
 [[package]]
 name = "solana-version"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "log",
  "rustc_version",
@@ -4215,6 +4333,7 @@ dependencies = [
 [[package]]
 name = "solana-vote"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "itertools 0.12.1",
  "log",
@@ -4228,6 +4347,7 @@ dependencies = [
 [[package]]
 name = "solana-vote-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bincode",
  "log",
@@ -4246,6 +4366,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-elgamal-proof-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bytemuck",
  "num-derive",
@@ -4259,6 +4380,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-sdk"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
@@ -4286,6 +4408,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-token-proof-program"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "bytemuck",
  "num-derive",
@@ -4299,6 +4422,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-token-sdk"
 version = "2.1.0"
+source = "git+https://github.com/2501babe/solana?branch=hana-neostake-checkpoint#f6412955162f3397519469d8a2e78d904b612689"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",

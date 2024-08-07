@@ -18,19 +18,19 @@ borsh = { version = "1.5.1", features = ["derive", "unstable__schema"] }
 num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.3"
-solana-program = { version = "2.0.0", path = "/home/hana/work/solana/solana/sdk/program" }
+solana-program = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
 thiserror = "1.0.63"
 
 [dev-dependencies]
-solana-program-test = { version = "2.0.0", path = "/home/hana/work/solana/solana/program-test" }
-solana-sdk = { version = "2.0.0", path = "/home/hana/work/solana/solana/sdk" }
-solana-vote-program = { version = "2.0.0", path = "/home/hana/work/solana/solana/programs/vote" }
+solana-program-test = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-sdk = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-vote-program = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
 test-case = "3.3.1"
 
 [patch.crates-io]
-solana-program = { path = "/home/hana/work/solana/solana/sdk/program" }
-solana-sdk = { path = "/home/hana/work/solana/solana/sdk" }
-solana-zk-token-sdk = { path = "/home/hana/work/solana/solana/zk-token-sdk" }
+solana-program = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-sdk = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-zk-token-sdk = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
 
 [lib]
 crate-type = ["cdylib", "lib"]
