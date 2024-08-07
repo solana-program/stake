@@ -29,7 +29,7 @@ use {
 
 // TODO a nice change would be to pop an account off the queue and discard if its a gettable sysvar
 // ie, allow people to omit them from the accounts list without breaking compat
-// perhaps now, perhaps after first release? we keep the existing interface for all instructions for now
+// to be done after release, we keep the existing interface for all instructions for compat with firedancer
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
@@ -388,7 +388,7 @@ impl Processor {
     }
 
     // TODO after release we would like to substantially refactor this function, it can be much simpler
-    // for now however we follow the existing impl precisely, since bpfization is already a risky move
+    // for now however we follow the existing impl precisely
     fn process_split(accounts: &[AccountInfo], split_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let source_stake_account_info = next_account_info(account_info_iter)?;
@@ -1126,80 +1126,78 @@ impl Processor {
             return Err(StakeError::EpochRewardsActive.into());
         }
 
-        // TODO remove neostake from the msg! commands after testing is complete
-        // this is just so i can be sure its always hitting the right program while testing
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
-                msg!("NEOSTAKE Instruction: Initialize");
+                msg!("Instruction: Initialize");
                 Self::process_initialize(accounts, authorize, lockup)
             }
             StakeInstruction::Authorize(new_authority, authority_type) => {
-                msg!("NEOSTAKE Instruction: Authorize");
+                msg!("Instruction: Authorize");
                 Self::process_authorize(accounts, new_authority, authority_type)
             }
             StakeInstruction::DelegateStake => {
-                msg!("NEOSTAKE Instruction: DelegateStake");
+                msg!("Instruction: DelegateStake");
                 Self::process_delegate(accounts)
             }
             StakeInstruction::Split(lamports) => {
-                msg!("NEOSTAKE Instruction: Split");
+                msg!("Instruction: Split");
                 Self::process_split(accounts, lamports)
             }
             StakeInstruction::Withdraw(lamports) => {
-                msg!("NEOSTAKE Instruction: Withdraw");
+                msg!("Instruction: Withdraw");
                 Self::process_withdraw(accounts, lamports)
             }
             StakeInstruction::Deactivate => {
-                msg!("NEOSTAKE Instruction: Deactivate");
+                msg!("Instruction: Deactivate");
                 Self::process_deactivate(accounts)
             }
             StakeInstruction::SetLockup(lockup) => {
-                msg!("NEOSTAKE Instruction: SetLockup");
+                msg!("Instruction: SetLockup");
                 Self::process_set_lockup(accounts, lockup)
             }
             StakeInstruction::Merge => {
-                msg!("NEOSTAKE Instruction: Merge");
+                msg!("Instruction: Merge");
                 Self::process_merge(accounts)
             }
             StakeInstruction::AuthorizeWithSeed(args) => {
-                msg!("NEOSTAKE Instruction: AuthorizeWithSeed");
+                msg!("Instruction: AuthorizeWithSeed");
                 Self::process_authorize_with_seed(accounts, args)
             }
             StakeInstruction::InitializeChecked => {
-                msg!("NEOSTAKE Instruction: InitializeChecked");
+                msg!("Instruction: InitializeChecked");
                 Self::process_initialize_checked(accounts)
             }
             StakeInstruction::AuthorizeChecked(authority_type) => {
-                msg!("NEOSTAKE Instruction: AuthorizeChecked");
+                msg!("Instruction: AuthorizeChecked");
                 Self::process_authorize_checked(accounts, authority_type)
             }
             StakeInstruction::AuthorizeCheckedWithSeed(args) => {
-                msg!("NEOSTAKE Instruction: AuthorizeCheckedWithSeed");
+                msg!("Instruction: AuthorizeCheckedWithSeed");
                 Self::process_authorize_checked_with_seed(accounts, args)
             }
             StakeInstruction::SetLockupChecked(lockup_checked) => {
-                msg!("NEOSTAKE Instruction: SetLockup");
+                msg!("Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
             }
             StakeInstruction::GetMinimumDelegation => {
-                msg!("NEOSTAKE Instruction: GetMinimumDelegation");
+                msg!("Instruction: GetMinimumDelegation");
                 let minimum_delegation = crate::get_minimum_delegation();
                 set_return_data(&minimum_delegation.to_le_bytes());
                 Ok(())
             }
             StakeInstruction::DeactivateDelinquent => {
-                msg!("NEOSTAKE Instruction: DeactivateDelinquent");
+                msg!("Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
             #[allow(deprecated)]
             StakeInstruction::Redelegate => Err(ProgramError::InvalidInstructionData),
             // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is activated
             StakeInstruction::MoveStake(lamports) => {
-                msg!("NEOSTAKE Instruction: MoveStake");
+                msg!("Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)
             }
             StakeInstruction::MoveLamports(lamports) => {
-                msg!("NEOSTAKE Instruction: MoveLamports");
+                msg!("Instruction: MoveLamports");
                 Self::process_move_lamports(accounts, lamports)
             }
         }
