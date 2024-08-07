@@ -381,9 +381,6 @@ impl Processor {
 
                 set_stake_state(stake_account_info, &StakeStateV2::Stake(meta, stake, flags))
             }
-            // XXX TODO FIXME this is incorrect, obviously we need to be able to delegate a deactivated account
-            // but when i was adapting the code, this goes through redelegate, which we removed
-            // i need to look at what the program did *before* redelegate was added and copy *that*
             _ => Err(ProgramError::InvalidAccountData),
         }?;
 
