@@ -1,5 +1,5 @@
 use {
-    crate::{helpers::TurnInto, PERPETUAL_NEW_WARMUP},
+    crate::PERPETUAL_NEW_WARMUP,
     solana_program::{
         account_info::AccountInfo,
         clock::Epoch,
@@ -50,7 +50,7 @@ pub(crate) fn redelegate_stake(
             return Ok(());
         } else {
             // can't redelegate to another pubkey if stake is active.
-            return Err(StakeError::TooSoonToRedelegate.turn_into());
+            return Err(StakeError::TooSoonToRedelegate.into());
         }
     }
     // Either the stake is freshly activated, is active but has been
@@ -76,7 +76,7 @@ pub(crate) fn validate_delegated_amount(
     // Stake accounts may be initialized with a stake amount below the minimum delegation so check
     // that the minimum is met before delegation.
     if stake_amount < crate::get_minimum_delegation() {
-        return Err(StakeError::InsufficientDelegation.turn_into());
+        return Err(StakeError::InsufficientDelegation.into());
     }
     Ok(ValidatedDelegatedInfo { stake_amount })
 }

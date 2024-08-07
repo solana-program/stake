@@ -29,6 +29,7 @@ use {
 
 // TODO a nice change would be to pop an account off the queue and discard if its a gettable sysvar
 // ie, allow people to omit them from the accounts list without breaking compat
+// perhaps now, perhaps after first release? we keep the existing interface for all instructions for now
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
@@ -334,7 +335,9 @@ impl Processor {
 
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
-        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
+        // NOTE the existing program behaves as if this were false
+        // it should not break compat to check here, but may change errors
+        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         let vote_state = get_vote_state(vote_account_info)?;
 
@@ -387,14 +390,20 @@ impl Processor {
         Ok(())
     }
 
+    // TODO after release we would like to substantially refactor this function, it can be much simpler
+    // for now however we follow the existing impl precisely, since bpfization is already a risky move
     fn process_split(accounts: &[AccountInfo], split_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
-        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
+        let clock = Clock::get()?;
+        let stake_history = &StakeHistorySysvar(clock.epoch);
+
+        // NOTE the existing program behaves as if this were false
+        // it should not break compat to check here, but may change errors
+        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         let destination_data_len = destination_stake_account_info.data_len();
         if destination_data_len != StakeStateV2::size_of() {
@@ -423,10 +432,6 @@ impl Processor {
 
                 let minimum_delegation = crate::get_minimum_delegation();
 
-                // XXX move these up top maybe, there used to be a feature gate here
-                let clock = Clock::get()?;
-                let stake_history = &StakeHistorySysvar(clock.epoch);
-
                 let status = source_stake.delegation.stake_activating_and_deactivating(
                     clock.epoch,
                     stake_history,
@@ -435,7 +440,7 @@ impl Processor {
 
                 let is_active = status.effective > 0;
 
-                // XXX note this function also internally summons Rent via syscall
+                // NOTE this function also internally summons Rent via syscall
                 let validated_split_info = validate_split_amount(
                     source_lamport_balance,
                     destination_lamport_balance,
@@ -472,7 +477,7 @@ impl Processor {
                         if source_stake.delegation.stake.saturating_sub(split_lamports)
                             < minimum_delegation
                         {
-                            return Err(StakeError::InsufficientDelegation.turn_into());
+                            return Err(StakeError::InsufficientDelegation.into());
                         }
 
                         (
@@ -486,12 +491,11 @@ impl Processor {
                     };
 
                 if split_stake_amount < minimum_delegation {
-                    return Err(StakeError::InsufficientDelegation.turn_into());
+                    return Err(StakeError::InsufficientDelegation.into());
                 }
 
-                let destination_stake = source_stake
-                    .split(remaining_stake_delta, split_stake_amount)
-                    .map_err(StakeError::turn_into)?;
+                let destination_stake =
+                    source_stake.split(remaining_stake_delta, split_stake_amount)?;
 
                 let mut destination_meta = source_meta;
                 destination_meta.rent_exempt_reserve =
@@ -513,7 +517,7 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(InstructionError::turn_into)?;
 
-                // XXX note this function also internally summons Rent via syscall
+                // NOTE this function also internally summons Rent via syscall
                 let validated_split_info = validate_split_amount(
                     source_lamport_balance,
                     destination_lamport_balance,
@@ -613,7 +617,7 @@ impl Processor {
         // verify that lockup has expired or that the withdrawal is signed by the custodian
         // both epoch and unix_timestamp must have passed
         if lockup.is_in_force(clock, custodian) {
-            return Err(StakeError::LockupInForce.turn_into());
+            return Err(StakeError::LockupInForce.into());
         }
 
         let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -653,7 +657,9 @@ impl Processor {
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
-        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
+        // NOTE the existing program behaves as if this were false
+        // it should not break compat to check here, but may change errors
+        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
@@ -661,9 +667,7 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(InstructionError::turn_into)?;
 
-                stake
-                    .deactivate(clock.epoch)
-                    .map_err(StakeError::turn_into)?;
+                stake.deactivate(clock.epoch)?;
 
                 set_stake_state(
                     stake_account_info,
@@ -703,8 +707,9 @@ impl Processor {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
-        let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
+        // NOTE the existing program behaves as if this were false
+        // it should not break compat to check here, but may change errors
+        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         msg!("Checking if destination stake is mergeable");
         let destination_merge_kind = MergeKind::get_if_mergeable(
@@ -911,30 +916,28 @@ impl Processor {
         let reference_vote_state = get_vote_state(reference_vote_account_info)?;
 
         if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
-            return Err(StakeError::InsufficientReferenceVotes.turn_into());
+            return Err(StakeError::InsufficientReferenceVotes.into());
         }
 
         if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
             get_stake_state(stake_account_info)?
         {
             if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
-                return Err(StakeError::VoteAddressMismatch.turn_into());
+                return Err(StakeError::VoteAddressMismatch.into());
             }
 
             // Deactivate the stake account if its delegated vote account has never voted or has not
             // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
             if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
             {
-                stake
-                    .deactivate(clock.epoch)
-                    .map_err(StakeError::turn_into)?;
+                stake.deactivate(clock.epoch)?;
 
                 set_stake_state(
                     stake_account_info,
                     &StakeStateV2::Stake(meta, stake, stake_flags),
                 )
             } else {
-                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.turn_into())
+                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into())
             }
         } else {
             Err(ProgramError::InvalidAccountData)
@@ -1126,8 +1129,8 @@ impl Processor {
             return Err(StakeError::EpochRewardsActive.into());
         }
 
-        // XXX TODO FIXME remove neostake from the msg! commands
-        // this is just so i can be sure its hitting the right program while testing
+        // TODO remove neostake from the msg! commands after testing is complete
+        // this is just so i can be sure its always hitting the right program while testing
         match instruction {
             StakeInstruction::Initialize(authorize, lockup) => {
                 msg!("NEOSTAKE Instruction: Initialize");

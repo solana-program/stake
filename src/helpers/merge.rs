@@ -1,8 +1,5 @@
 use {
-    crate::{
-        helpers::{checked_add, TurnInto},
-        PERPETUAL_NEW_WARMUP,
-    },
+    crate::{helpers::checked_add, PERPETUAL_NEW_WARMUP},
     solana_program::{
         clock::{Clock, Epoch},
         entrypoint::ProgramResult,
@@ -62,7 +59,7 @@ impl MergeKind {
                     _ => {
                         let err = StakeError::MergeTransientStake;
                         msg!("{}", err);
-                        Err(err.turn_into())
+                        Err(err.into())
                     }
                 }
             }
@@ -86,7 +83,7 @@ impl MergeKind {
             Ok(())
         } else {
             msg!("Unable to merge due to metadata mismatch");
-            Err(StakeError::MergeMismatch.turn_into())
+            Err(StakeError::MergeMismatch.into())
         }
     }
 
@@ -96,13 +93,13 @@ impl MergeKind {
     ) -> ProgramResult {
         if stake.voter_pubkey != source.voter_pubkey {
             msg!("Unable to merge due to voter mismatch");
-            Err(StakeError::MergeMismatch.turn_into())
+            Err(StakeError::MergeMismatch.into())
         } else if stake.deactivation_epoch == Epoch::MAX && source.deactivation_epoch == Epoch::MAX
         {
             Ok(())
         } else {
             msg!("Unable to merge due to stake deactivation");
-            Err(StakeError::MergeMismatch.turn_into())
+            Err(StakeError::MergeMismatch.into())
         }
     }
 
@@ -163,7 +160,7 @@ impl MergeKind {
                 )?;
                 Some(StakeStateV2::Stake(meta, stake, StakeFlags::empty()))
             }
-            _ => return Err(StakeError::MergeMismatch.turn_into()),
+            _ => return Err(StakeError::MergeMismatch.into()),
         };
         Ok(merged_state)
     }
@@ -560,7 +557,7 @@ mod tests {
                     &stake_history
                 )
                 .unwrap_err(),
-                StakeError::MergeTransientStake.turn_into(),
+                StakeError::MergeTransientStake.into(),
             );
         }
 
@@ -606,7 +603,7 @@ mod tests {
                 &stake_history
             )
             .unwrap_err(),
-            StakeError::MergeTransientStake.turn_into(),
+            StakeError::MergeTransientStake.into(),
         );
 
         // all transient, deactivating epochs fail
@@ -637,7 +634,7 @@ mod tests {
                     &stake_history
                 )
                 .unwrap_err(),
-                StakeError::MergeTransientStake.turn_into(),
+                StakeError::MergeTransientStake.into(),
             );
         }
 
