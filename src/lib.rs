@@ -2,7 +2,6 @@
 #![allow(clippy::arithmetic_side_effects)] // XXX remove?
 use solana_program::native_token::LAMPORTS_PER_SOL;
 
-// XXX split into processor, state, some other files probably
 pub mod helpers;
 pub mod processor;
 

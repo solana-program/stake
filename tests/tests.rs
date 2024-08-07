@@ -1136,10 +1136,6 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// XXX ok so far i have basic tests for: initialize, delegate, split, checked ixns, withdraw, authorize, deactivate, merge
-// i want to do set lockup, deactivate delinquent
-// and then i think i will be ready to coax other people into looking at the program while i keep porting tests
-
 // TODO lockup... unenforced and enforced? also maybe for split
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
@@ -1638,8 +1634,8 @@ async fn test_move_stake(
     }
 
     // the below checks are conceptually incoherent with a 1 lamport minimum
-    // the first one fails successfully (but only because its a zero move)
-    // then the second one succeeds failedly (because its a full move)
+    // the undershoot fails successfully (but because its a zero move, not because the destination ends underfunded)
+    // then the second one succeeds failedly (because its a full move, so the "underfunded" source is actually closed)
     if minimum_delegation > 1 {
         // first for inactive accounts lets undershoot and fail for underfunded dest
         if move_dest_type != StakeLifecycle::Active {

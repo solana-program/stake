@@ -20,7 +20,6 @@ use {
             state::{Authorized, Lockup},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        stake_history::StakeHistory,
         sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
         vote::program as solana_vote_program,
         vote::state::VoteState,
@@ -28,7 +27,7 @@ use {
     std::collections::HashSet,
 };
 
-// XXX a nice change would be to pop an account off the queue and discard if its a gettable sysvar
+// TODO a nice change would be to pop an account off the queue and discard if its a gettable sysvar
 // ie, allow people to omit them from the accounts list without breaking compat
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
@@ -43,7 +42,6 @@ fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, Pro
     Ok(vote_state)
 }
 
-// XXX check for more efficient parser
 fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, ProgramError> {
     if *stake_account_info.owner != id() {
         return Err(ProgramError::InvalidAccountOwner);
@@ -54,7 +52,6 @@ fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, Pro
         .map_err(|_| ProgramError::InvalidAccountData)
 }
 
-// XXX errors changed from GenericError
 fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -> ProgramResult {
     let serialized_size =
         bincode::serialized_size(new_state).map_err(|_| ProgramError::InvalidAccountData)?;
@@ -64,6 +61,24 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
 
     bincode::serialize_into(&mut stake_account_info.data.borrow_mut()[..], new_state)
         .map_err(|_| ProgramError::InvalidAccountData)
+}
+
+fn move_lamports(
+    source_account_info: &AccountInfo,
+    destination_account_info: &AccountInfo,
+    lamports: u64,
+) -> ProgramResult {
+    let mut source_lamports = source_account_info.try_borrow_mut_lamports()?;
+    **source_lamports = source_lamports
+        .checked_sub(lamports)
+        .ok_or(ProgramError::InsufficientFunds)?;
+
+    let mut destination_lamports = destination_account_info.try_borrow_mut_lamports()?;
+    **destination_lamports = destination_lamports
+        .checked_add(lamports)
+        .ok_or(ProgramError::ArithmeticOverflow)?;
+
+    Ok(())
 }
 
 // various monorepo functions expect a HashSet of signer pubkeys. this constructs it
@@ -531,16 +546,11 @@ impl Processor {
             set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
         }
 
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-        **source_lamports = source_lamports
-            .checked_sub(split_lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
-
-        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
-        **destination_lamports = destination_lamports
-            .checked_add(split_lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
+        move_lamports(
+            source_stake_account_info,
+            destination_stake_account_info,
+            split_lamports,
+        )?;
 
         Ok(())
     }
@@ -551,7 +561,7 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
-        let stake_history_info = next_account_info(account_info_iter)?;
+        let _stake_history_info = next_account_info(account_info_iter)?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
@@ -571,22 +581,9 @@ impl Processor {
                     .map_err(InstructionError::turn_into)?;
                 // if we have a deactivation epoch and we're in cooldown
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
-                    msg!(
-                        "HANA getting stake. clock {}, act {}, deact {}",
-                        clock.epoch,
-                        stake.delegation.activation_epoch,
-                        stake.delegation.deactivation_epoch
-                    );
-                    let x =
-                        stake
-                            .delegation
-                            .stake(clock.epoch, stake_history, PERPETUAL_NEW_WARMUP);
-                    msg!(
-                        "HANA done! btw true stake history: {:?}",
-                        bincode::deserialize::<StakeHistory>(&stake_history_info.data.borrow())
-                            .unwrap()
-                    );
-                    x
+                    stake
+                        .delegation
+                        .stake(clock.epoch, stake_history, PERPETUAL_NEW_WARMUP)
                 } else {
                     // Assume full stake if the stake account hasn't been
                     //  de-activated, because in the future the exposed stake
@@ -640,16 +637,11 @@ impl Processor {
             set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
         }
 
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-        **source_lamports = source_lamports
-            .checked_sub(withdraw_lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
-
-        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
-        **destination_lamports = destination_lamports
-            .checked_add(withdraw_lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
+        move_lamports(
+            source_stake_account_info,
+            destination_stake_account_info,
+            withdraw_lamports,
+        )?;
 
         Ok(())
     }
@@ -712,7 +704,6 @@ impl Processor {
         }
 
         // XXX TODO FIXME this replicates the behavior of the existing program but probably better to check
-        // do it after i can test this program lol
         let (signers, _) = collect_signers(&[stake_authority_info], None, false)?;
 
         msg!("Checking if destination stake is mergeable");
@@ -747,18 +738,11 @@ impl Processor {
         set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
 
         // Drain the source stake account
-        let lamports = source_stake_account_info.lamports();
-
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-        **source_lamports = source_lamports
-            .checked_sub(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
-
-        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
-        **destination_lamports = destination_lamports
-            .checked_add(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
+        move_lamports(
+            source_stake_account_info,
+            destination_stake_account_info,
+            source_stake_account_info.lamports(),
+        )?;
 
         Ok(())
     }
@@ -966,9 +950,9 @@ impl Processor {
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         let (source_merge_kind, destination_merge_kind) = move_stake_or_lamports_shared_checks(
-            &source_stake_account_info,
+            source_stake_account_info,
             lamports,
-            &destination_stake_account_info,
+            destination_stake_account_info,
             stake_authority_info,
         )?;
 
@@ -1070,19 +1054,11 @@ impl Processor {
             )?;
         }
 
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        {
-            let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-            **source_lamports = source_lamports
-                .checked_sub(lamports)
-                .ok_or(ProgramError::InsufficientFunds)?;
-
-            let mut destination_lamports =
-                destination_stake_account_info.try_borrow_mut_lamports()?;
-            **destination_lamports = destination_lamports
-                .checked_add(lamports)
-                .ok_or(ProgramError::InsufficientFunds)?;
-        }
+        move_lamports(
+            source_stake_account_info,
+            destination_stake_account_info,
+            lamports,
+        )?;
 
         // this should be impossible, but because we do all our math with delegations, best to guard it
         if source_stake_account_info.lamports() < source_meta.rent_exempt_reserve
@@ -1102,9 +1078,9 @@ impl Processor {
         let stake_authority_info = next_account_info(account_info_iter)?;
 
         let (source_merge_kind, _) = move_stake_or_lamports_shared_checks(
-            &source_stake_account_info,
+            source_stake_account_info,
             lamports,
-            &destination_stake_account_info,
+            destination_stake_account_info,
             stake_authority_info,
         )?;
 
@@ -1123,23 +1099,16 @@ impl Processor {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // XXX are there nicer helpers for AccountInfo? checked_{add,sub}_lamports dont exist
-        let mut source_lamports = source_stake_account_info.try_borrow_mut_lamports()?;
-        **source_lamports = source_lamports
-            .checked_sub(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
-
-        let mut destination_lamports = destination_stake_account_info.try_borrow_mut_lamports()?;
-        **destination_lamports = destination_lamports
-            .checked_add(lamports)
-            .ok_or(ProgramError::InsufficientFunds)?;
+        move_lamports(
+            source_stake_account_info,
+            destination_stake_account_info,
+            lamports,
+        )?;
 
         Ok(())
     }
 
     /// Processes [Instruction](enum.Instruction.html).
-    // XXX the existing program returns InstructionError not ProgramError
-    // look into if theres a trait i can impl to not break the interface but modrenize
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         // convenience so we can safely use id() everywhere
         if *program_id != id() {
@@ -1150,7 +1119,6 @@ impl Processor {
             .map(|epoch_rewards| epoch_rewards.active)
             .unwrap_or(false);
 
-        // XXX limited_deserialize?
         let instruction =
             bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
 
@@ -1223,7 +1191,9 @@ impl Processor {
                 msg!("NEOSTAKE Instruction: DeactivateDelinquent");
                 Self::process_deactivate_delinquent(accounts)
             }
-            // XXX NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is activated
+            #[allow(deprecated)]
+            StakeInstruction::Redelegate => Err(ProgramError::InvalidInstructionData),
+            // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is activated
             StakeInstruction::MoveStake(lamports) => {
                 msg!("NEOSTAKE Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)
@@ -1232,7 +1202,6 @@ impl Processor {
                 msg!("NEOSTAKE Instruction: MoveLamports");
                 Self::process_move_lamports(accounts, lamports)
             }
-            StakeInstruction::Redelegate => unimplemented!(), // wontfix
         }
     }
 }
