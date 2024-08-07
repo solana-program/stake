@@ -64,7 +64,8 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
         .map_err(|_| ProgramError::InvalidAccountData)
 }
 
-fn move_lamports(
+// dont call this "move" because we have an instruction MoveLamports
+fn relocate_lamports(
     source_account_info: &AccountInfo,
     destination_account_info: &AccountInfo,
     lamports: u64,
@@ -547,7 +548,7 @@ impl Processor {
             set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
         }
 
-        move_lamports(
+        relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
             split_lamports,
@@ -638,7 +639,7 @@ impl Processor {
             set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
         }
 
-        move_lamports(
+        relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
             withdraw_lamports,
@@ -740,7 +741,7 @@ impl Processor {
         set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
 
         // Drain the source stake account
-        move_lamports(
+        relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
             source_stake_account_info.lamports(),
@@ -1054,7 +1055,7 @@ impl Processor {
             )?;
         }
 
-        move_lamports(
+        relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
             lamports,
@@ -1099,7 +1100,7 @@ impl Processor {
             return Err(ProgramError::InvalidArgument);
         }
 
-        move_lamports(
+        relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
             lamports,
