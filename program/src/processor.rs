@@ -29,12 +29,16 @@ use {
 // its a gettable sysvar ie, allow people to omit them from the accounts list
 // without breaking compat to be done after release, we keep the existing
 // interface for all instructions for compat with firedancer
+// JC: agreed!
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
 
+    // JC: I think the code was added after this commit, but can we switch to
+    // `deserialize_into_uninit` to avoid the overhead of creating a
+    // `VoteState::default`?
     let mut vote_state = Box::<VoteState>::default();
     VoteState::deserialize_into(&vote_account_info.data.borrow(), &mut vote_state)
         .map_err(|_| ProgramError::InvalidAccountData)?;
@@ -69,15 +73,25 @@ fn relocate_lamports(
     destination_account_info: &AccountInfo,
     lamports: u64,
 ) -> ProgramResult {
-    let mut source_lamports = source_account_info.try_borrow_mut_lamports()?;
-    **source_lamports = source_lamports
-        .checked_sub(lamports)
-        .ok_or(ProgramError::InsufficientFunds)?;
+    // JC: can we put this in separate blocks to make sure that we don't have a
+    // double mutable borrow? Along with a comment like this:
+    //
+    // If source and destination are the same account, there's a possibility to
+    // have two mutable borrows at the same time. To avoid that case, we use
+    // two separate blocks and ensure that the mutable borrow is dropped.
+    {
+        let mut source_lamports = source_account_info.try_borrow_mut_lamports()?;
+        **source_lamports = source_lamports
+            .checked_sub(lamports)
+            .ok_or(ProgramError::InsufficientFunds)?;
+    }
 
-    let mut destination_lamports = destination_account_info.try_borrow_mut_lamports()?;
-    **destination_lamports = destination_lamports
-        .checked_add(lamports)
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    {
+        let mut destination_lamports = destination_account_info.try_borrow_mut_lamports()?;
+        **destination_lamports = destination_lamports
+            .checked_add(lamports)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+    }
 
     Ok(())
 }
@@ -86,8 +100,18 @@ fn relocate_lamports(
 // constructs it the unchecked mode doesnt add pubkeys of non-signers, relying
 // on downstream errors if a required signer is missing the checked mode expects
 // every AccountInfo passed in should be a signer and errors if any is not
+// JC: I kept having to re-read what this was doing to be sure it was ok in
+// every context that it's used.
+// I appreciate that this is more work for you, but could you add a comment for
+// every single time it's called with `checked` as `false` and explain where the
+// signer will be checked? Ie. "unchecked because meta.authorize() will check
+// that the stake or withdraw authority signed".
+// It would certainly make me feel better and help ensure that we preserve all
+// signer checks.
 fn collect_signers<'a>(
     accounts: &[&'a AccountInfo],
+    // JC nit: can we call this `optional_custodian` or `optional_lockup_authority`
+    // to make it a bit clearer?
     optional_account: Option<&'a AccountInfo>,
     checked: bool,
 ) -> Result<(HashSet<Pubkey>, Option<&'a Pubkey>), ProgramError> {
@@ -187,6 +211,8 @@ fn do_authorize(
 
 fn do_set_lockup(
     stake_account_info: &AccountInfo,
+    // JC nit: typically these functions are taking `signers` by ref, may as
+    // well do the same thing here
     signers: HashSet<Pubkey>,
     lockup: &LockupArgs,
     clock: &Clock,
@@ -221,6 +247,9 @@ fn move_stake_or_lamports_shared_checks(
     let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
     // check owners
+    // JC nit: up to you, but the explicit owner check is removed in a lot of
+    // other places, in favor of `get_stake_state`'s check, so this can be
+    // safely removed
     if *source_stake_account_info.owner != id() || *destination_stake_account_info.owner != id() {
         return Err(ProgramError::IncorrectProgramId);
     }
@@ -231,6 +260,8 @@ fn move_stake_or_lamports_shared_checks(
     }
 
     // source and destination must be writable
+    // JC nit: we can probably remove these too since the runtime will definitely
+    // catch this
     if !source_stake_account_info.is_writable || !destination_stake_account_info.is_writable {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -285,6 +316,10 @@ impl Processor {
         lockup: Lockup,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+        // JC nit: this is missing an account owner check that normally comes from
+        // `get_stake_account`, but it looks OK since `do_initialize` will
+        // always change the state (ie. it never no-ops)
+        // Do you mind adding a comment to that effect?
         let stake_account_info = next_account_info(account_info_iter)?;
         let rent_info = next_account_info(account_info_iter)?;
         let rent = &Rent::from_account_info(rent_info)?;
@@ -334,6 +369,7 @@ impl Processor {
         let _stake_config_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
+        // JC: gotta say, this usage is pretty slick
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         // NOTE the existing program behaves as if this were false
@@ -561,6 +597,8 @@ impl Processor {
     fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let source_stake_account_info = next_account_info(account_info_iter)?;
+        // JC nit: this doesn't need to be a stake, so can it be called `destination_account_info`
+        // or `destination_info`?
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
         let clock = &Clock::from_account_info(clock_info)?;
@@ -572,6 +610,10 @@ impl Processor {
         // this is somewhat subtle, but if the stake account is Uninitialized, you pass
         // it twice and sign ie, Initialized or Stake, we use real withdraw
         // authority. Uninitialized, stake account is its own authority
+        // JC: do you actually need to pass it twice? I imagine in the current
+        // version, you could just pass it once as a signer and it would Just Work,
+        // but this falls in the same camp as the other similar comments: if
+        // people are depending on that current weird behavior, we break 'em.
         let (signers, custodian) = collect_signers(
             &[withdraw_authority_info],
             option_lockup_authority_info,
@@ -606,6 +648,9 @@ impl Processor {
                 (meta.lockup, meta.rent_exempt_reserve, false)
             }
             StakeStateV2::Uninitialized => {
+                // JC nit: how about doing `!source_stake_account_info.is_signer`
+                // to avoid the hashmap overhead? Unless you prefer to always
+                // go through the hashmap
                 if !signers.contains(source_stake_account_info.key) {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
@@ -686,6 +731,11 @@ impl Processor {
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
         let clock = Clock::get()?;
 
+        // JC: just like in `authorize_checked`, this could change the behavior for
+        // self-owned stake accounts, but I think it's reasonable to tell people
+        // to fix their stuff.
+        // We'll need to make it clear that in some edge cases, people might see
+        // different behavior.
         let (signers, _) = collect_signers(&[old_withdraw_or_lockup_authority_info], None, false)?;
 
         do_set_lockup(stake_account_info, signers, &lockup, &clock)?;
@@ -763,6 +813,15 @@ impl Processor {
         let clock = &Clock::from_account_info(clock_info)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
+        // JC: I hope I'm missing something, but is this instruction currently broken
+        // if there's a lockup in force and you want to change the withdraw
+        // authority? It looks like you're fixing it here!
+        // In the old implementation, I don't think it'll ever add the lockup
+        // authority to the signers hashset.
+        // But to make it consistent with `authorize_checked_with_seed`, how about
+        // passing `true` for checked? I don't think it ends up making a difference,
+        // since if the lockup is not in force anymore, you can just not pass
+        // the custodian at all, and it'll work.
         let (mut signers, custodian) = collect_signers(&[], option_lockup_authority_info, false)?;
 
         if stake_or_withdraw_authority_base_info.is_signer {
@@ -787,6 +846,10 @@ impl Processor {
 
     fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+        // JC nit: same as during `process_initialize`, this doesn't have the
+        // owner check, but it's fine because `do_initialize` will always change
+        // the state of the account. Do you mind adding a comment to that
+        // effect?
         let stake_account_info = next_account_info(account_info_iter)?;
         let rent_info = next_account_info(account_info_iter)?;
         let rent = &Rent::from_account_info(rent_info)?;
@@ -819,6 +882,19 @@ impl Processor {
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
+        // JC: Correct me if I'm wrong, but I think this is slightly different,
+        // since the old version's `instruction_context.get_signers(...)` gets
+        // *all* of the signers, but this only collects from a subset of the accounts.
+        // In the old version, it might be possible to pass in a self-owned
+        // stake account as a signer, followed by the clock, followed by *anything*,
+        // instead of the old authority as a signer.
+        // Even though it's different, I think we can reasonably go forward with this,
+        // then respond to any complaints with: "No, you're doing it wrong, fix
+        // your code". But we should also warn people. What do you think?
+        // On the other hand, we could also pass all of the account infos here?
+        // Note that it might also be possible to pass in the old authority *after*
+        // the lockup authority as a signer and also work, so we might be breaking
+        // some weird cases even if we do that.
         let (signers, custodian) = collect_signers(
             &[
                 old_stake_or_withdraw_authority_info,
@@ -888,6 +964,11 @@ impl Processor {
         let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
         let clock = Clock::get()?;
 
+        // JC: just like in `authorize_checked`, this could change the behavior for
+        // self-owned stake accounts, but I think it's reasonable to tell people
+        // to fix their stuff.
+        // We'll need to make it clear that in some edge cases, people might see
+        // different behavior.
         let (signers, custodian) = collect_signers(
             &[old_withdraw_or_lockup_authority_info],
             option_new_lockup_authority_info,
@@ -1187,6 +1268,7 @@ impl Processor {
                 Self::process_authorize_checked_with_seed(accounts, args)
             }
             StakeInstruction::SetLockupChecked(lockup_checked) => {
+                // JC nit: `SetLockupChecked`
                 msg!("Instruction: SetLockup");
                 Self::process_set_lockup_checked(accounts, lockup_checked)
             }
