@@ -12,6 +12,7 @@ const [idl, ...additionalIdls] = getAllProgramIdls().map((idl) =>
 );
 const codama = c.createFromRoot(idl, additionalIdls);
 
+/*
 // Update programs.
 codama.update(
   c.updateProgramsVisitor({
@@ -63,6 +64,7 @@ codama.update(
     counter: key('counter'),
   })
 );
+*/
 
 // Render JavaScript.
 const jsClient = path.join(__dirname, '..', 'clients', 'js');
