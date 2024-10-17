@@ -25,7 +25,6 @@ import {
   type ParsedInitializeCheckedInstruction,
   type ParsedInitializeInstruction,
   type ParsedMergeInstruction,
-  type ParsedRedelegateInstruction,
   type ParsedSetLockupCheckedInstruction,
   type ParsedSetLockupInstruction,
   type ParsedSplitInstruction,
@@ -51,7 +50,6 @@ export enum StakeProgramInstruction {
   SetLockupChecked,
   GetMinimumDelegation,
   DeactivateDelinquent,
-  Redelegate,
 }
 
 export function identifyStakeProgramInstruction(
@@ -223,17 +221,6 @@ export function identifyStakeProgramInstruction(
   ) {
     return StakeProgramInstruction.DeactivateDelinquent;
   }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([212, 82, 51, 160, 228, 80, 116, 35])
-      ),
-      0
-    )
-  ) {
-    return StakeProgramInstruction.Redelegate;
-  }
   throw new Error(
     'The provided instruction could not be identified as a stakeProgram instruction.'
   );
@@ -286,7 +273,4 @@ export type ParsedStakeProgramInstruction<
     } & ParsedGetMinimumDelegationInstruction<TProgram>)
   | ({
       instructionType: StakeProgramInstruction.DeactivateDelinquent;
-    } & ParsedDeactivateDelinquentInstruction<TProgram>)
-  | ({
-      instructionType: StakeProgramInstruction.Redelegate;
-    } & ParsedRedelegateInstruction<TProgram>);
+    } & ParsedDeactivateDelinquentInstruction<TProgram>);

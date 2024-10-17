@@ -440,41 +440,6 @@
             "desc": "Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs"
           }
         ]
-      },
-      {
-        "name": "Redelegate",
-        "accounts": [
-          {
-            "name": "stake",
-            "isMut": true,
-            "isSigner": false,
-            "desc": "The delegated stake account to be redelegated. The account must be fully activated and carry a balance greater than or equal to the minimum delegation amount plus rent exempt minimum"
-          },
-          {
-            "name": "uninitializedStake",
-            "isMut": true,
-            "isSigner": false,
-            "desc": "Uninitialized stake account that will hold the redelegated stake"
-          },
-          {
-            "name": "vote",
-            "isMut": false,
-            "isSigner": false,
-            "desc": "Vote account to which stake will be redelegated"
-          },
-          {
-            "name": "stakeConfig",
-            "isMut": false,
-            "isSigner": false,
-            "desc": "Stake config native program"
-          },
-          {
-            "name": "stakeAuthority",
-            "isMut": false,
-            "isSigner": true,
-            "desc": "stake's stake authority"
-          }
-        ]
       }
     ],
     "types": [
