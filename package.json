@@ -25,8 +25,8 @@
   },
   "devDependencies": {
     "@codama/nodes-from-anchor": "^1.0.0",
-    "@codama/renderers-js": "^1.0.0",
-    "@codama/renderers-rust": "^1.0.0",
+    "@codama/renderers-js": "^1.0.1",
+    "@codama/renderers-rust": "^1.0.2",
     "@iarna/toml": "^2.2.5",
     "@metaplex-foundation/shank-js": "^0.1.7",
     "codama": "^1.0.0",

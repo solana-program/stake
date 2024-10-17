@@ -109,27 +109,29 @@ jobs:
       - name: Test Programs
         run: pnpm programs:test
 
-  generate_idls:
-    name: Check IDL Generation
-    runs-on: ubuntu-latest
-    needs: format_and_lint_programs
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          cargo-cache-key: cargo-programs
-          cargo-cache-local-key: cargo-local
-
-      - name: Generate IDLs
-        run: pnpm generate:idls
-
-      - name: Check Working Directory
-        run: |
-          git status --porcelain
-          test -z "$(git status --porcelain)"
+  # Currently using a manual IDL.
+  #
+  #generate_idls:
+  #  name: Check IDL Generation
+  #  runs-on: ubuntu-latest
+  #  needs: format_and_lint_programs
+  #  steps:
+  #    - name: Git Checkout
+  #      uses: actions/checkout@v4
+  #
+  #    - name: Setup Environment
+  #      uses: ./.github/actions/setup
+  #      with:
+  #        cargo-cache-key: cargo-programs
+  #        cargo-cache-local-key: cargo-local
+  #
+  #    - name: Generate IDLs
+  #      run: pnpm generate:idls
+  #
+  #    - name: Check Working Directory
+  #      run: |
+  #        git status --porcelain
+  #        test -z "$(git status --porcelain)"
 
   generate_clients:
     name: Check Client Generation

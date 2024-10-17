@@ -60,6 +60,7 @@ runs:
       with:
         version: ${{ env.SOLANA_VERSION }}
         cache: true
+        base_url: "https://release.anza.xyz"
 
     - name: Cache Cargo Dependencies
       if: ${{ inputs.cargo-cache-key && !inputs.cargo-cache-fallback-key }}
