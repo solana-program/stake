@@ -3,16 +3,15 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct Merge {
     /// The destination stake account to merge into
     pub to: solana_program::pubkey::Pubkey,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// The stake account to merge from. Must have exact same lockup and
+    /// authority as to. This account will be drained.
     pub from: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock: solana_program::pubkey::Pubkey,
@@ -108,7 +107,8 @@ impl MergeBuilder {
         self.to = Some(to);
         self
     }
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// The stake account to merge from. Must have exact same lockup and
+    /// authority as to. This account will be drained.
     #[inline(always)]
     pub fn from(&mut self, from: solana_program::pubkey::Pubkey) -> &mut Self {
         self.from = Some(from);
@@ -171,7 +171,8 @@ impl MergeBuilder {
 pub struct MergeCpiAccounts<'a, 'b> {
     /// The destination stake account to merge into
     pub to: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// The stake account to merge from. Must have exact same lockup and
+    /// authority as to. This account will be drained.
     pub from: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
@@ -187,7 +188,8 @@ pub struct MergeCpi<'a, 'b> {
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The destination stake account to merge into
     pub to: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// The stake account to merge from. Must have exact same lockup and
+    /// authority as to. This account will be drained.
     pub from: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
@@ -331,7 +333,8 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
         self.instruction.to = Some(to);
         self
     }
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// The stake account to merge from. Must have exact same lockup and
+    /// authority as to. This account will be drained.
     #[inline(always)]
     pub fn from(&mut self, from: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.from = Some(from);
@@ -376,8 +379,9 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
+    /// indicating whether the account is writable or not, and a `bool`
+    /// indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

@@ -815,14 +815,16 @@ async fn test_stake_delegate() {
     let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
     assert_eq!(stake_data.unwrap().delegation.deactivation_epoch, u64::MAX);
 
-    // verify that delegate to a different vote account fails if stake is still active
+    // verify that delegate to a different vote account fails if stake is still
+    // active
     let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
     assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
-    // delegate still fails after stake is fully activated; redelegate is not supported
+    // delegate still fails after stake is fully activated; redelegate is not
+    // supported
     advance_epoch(&mut context).await;
     let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
@@ -965,9 +967,10 @@ impl StakeLifecycle {
         }
     }
 
-    // NOTE the program enforces that a deactive stake adheres to the split minimum, albeit spuriously
-    // after solana-program/stake-program #1 is addressed, Self::Deactive should move to false
-    // equivalently this could be combined with withdraw_minimum_enforced into a function minimum_enforced
+    // NOTE the program enforces that a deactive stake adheres to the split minimum,
+    // albeit spuriously after solana-program/stake-program #1 is addressed,
+    // Self::Deactive should move to false equivalently this could be combined
+    // with withdraw_minimum_enforced into a function minimum_enforced
     pub fn split_minimum_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
@@ -983,7 +986,8 @@ impl StakeLifecycle {
     }
 }
 
-// TODO test whole-balance split (there are a lot more split tests i didnt port yet tho)
+// TODO test whole-balance split (there are a lot more split tests i didnt port
+// yet tho)
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
@@ -1012,7 +1016,8 @@ async fn test_split(split_source_type: StakeLifecycle) {
         _ => vec![&staker_keypair],
     };
 
-    // fail, split more than available (even if not active, would kick source out of rent exemption)
+    // fail, split more than available (even if not active, would kick source out of
+    // rent exemption)
     let instruction = &ixn::split(
         &split_source,
         &signers[0].pubkey(),
@@ -1025,8 +1030,9 @@ async fn test_split(split_source_type: StakeLifecycle) {
         .unwrap_err();
     assert_eq!(e, ProgramError::InsufficientFunds);
 
-    // an active or transitioning stake account cannot have less than the minimum delegation
-    // note this is NOT dependent on the minimum delegation feature. there was ALWAYS a minimum. it was one lamport!
+    // an active or transitioning stake account cannot have less than the minimum
+    // delegation note this is NOT dependent on the minimum delegation feature.
+    // there was ALWAYS a minimum. it was one lamport!
     if split_source_type.split_minimum_enforced() {
         // zero split fails
         let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
@@ -1375,8 +1381,9 @@ async fn test_deactivate(activate: bool) {
 }
 
 // XXX the original test_merge is a stupid test
-// the real thing is test_merge_active_stake which actively controls clock and stake_history
-// but im just trying to smoke test rn so lets do something simpler
+// the real thing is test_merge_active_stake which actively controls clock and
+// stake_history but im just trying to smoke test rn so lets do something
+// simpler
 #[test_matrix(
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
@@ -1436,7 +1443,8 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     let mut source_account = get_account(&mut context.banks_client, &merge_source).await;
     let mut source_stake_state: StakeStateV2 = bincode::deserialize(&source_account.data).unwrap();
 
-    // create dest. this may mess source up if its in a transient state, but its fine
+    // create dest. this may mess source up if its in a transient state, but its
+    // fine
     let (merge_dest_keypair, staker_keypair, withdrawer_keypair) = merge_dest_type
         .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
         .await;
@@ -1522,7 +1530,8 @@ async fn test_move_stake(
         0
     };
 
-    // test with and without lockup. both of these cases pass, we test failures elsewhere
+    // test with and without lockup. both of these cases pass, we test failures
+    // elsewhere
     let lockup = if has_lockup {
         let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
         let lockup = Lockup {
@@ -1537,8 +1546,8 @@ async fn test_move_stake(
         Lockup::default()
     };
 
-    // we put an extra minimum in every account, unstaked, to test that no new lamports activate
-    // name them here so our asserts are readable
+    // we put an extra minimum in every account, unstaked, to test that no new
+    // lamports activate name them here so our asserts are readable
     let source_excess = minimum_delegation;
     let dest_excess = minimum_delegation;
 
@@ -1630,8 +1639,9 @@ async fn test_move_stake(
     }
 
     // the below checks are conceptually incoherent with a 1 lamport minimum
-    // the undershoot fails successfully (but because its a zero move, not because the destination ends underfunded)
-    // then the second one succeeds failedly (because its a full move, so the "underfunded" source is actually closed)
+    // the undershoot fails successfully (but because its a zero move, not because
+    // the destination ends underfunded) then the second one succeeds failedly
+    // (because its a full move, so the "underfunded" source is actually closed)
     if minimum_delegation > 1 {
         // first for inactive accounts lets undershoot and fail for underfunded dest
         if move_dest_type != StakeLifecycle::Active {
@@ -1691,7 +1701,8 @@ async fn test_move_stake(
         };
         let dest_effective_stake = get_effective_stake(&mut context.banks_client, &move_dest).await;
 
-        // dest captured the entire source delegation, kept its rent/excess, didnt activate its excess
+        // dest captured the entire source delegation, kept its rent/excess, didnt
+        // activate its excess
         assert_eq!(
             dest_stake.delegation.stake,
             source_staked_amount + dest_staked_amount
@@ -1773,7 +1784,8 @@ async fn test_move_lamports(
         0
     };
 
-    // test with and without lockup. both of these cases pass, we test failures elsewhere
+    // test with and without lockup. both of these cases pass, we test failures
+    // elsewhere
     let lockup = if has_lockup {
         let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
         let lockup = Lockup {
@@ -2033,9 +2045,10 @@ async fn test_move_general_fail(
     move_lamports: bool,
 ) {
     // the test_matrix includes all valid source/dest combinations for MoveLamports
-    // we dont test invalid combinations because they would fail regardless of the fail cases we test here
-    // valid source/dest for MoveStake are a strict subset of MoveLamports
-    // source must be active, and dest must be active or inactive. so we skip the additional invalid MoveStake cases
+    // we dont test invalid combinations because they would fail regardless of the
+    // fail cases we test here valid source/dest for MoveStake are a strict
+    // subset of MoveLamports source must be active, and dest must be active or
+    // inactive. so we skip the additional invalid MoveStake cases
     if !move_lamports
         && (move_source_type != StakeLifecycle::Active
             || move_dest_type == StakeLifecycle::Activating)

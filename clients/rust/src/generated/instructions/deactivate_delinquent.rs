@@ -3,10 +3,8 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct DeactivateDelinquent {
@@ -14,7 +12,8 @@ pub struct DeactivateDelinquent {
     pub stake: solana_program::pubkey::Pubkey,
     /// stake's delinquent vote account
     pub vote: solana_program::pubkey::Pubkey,
-    /// Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
+    /// Reference vote account that has voted at least once in the last
+    /// MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
     pub reference_vote: solana_program::pubkey::Pubkey,
 }
 
@@ -101,7 +100,8 @@ impl DeactivateDelinquentBuilder {
         self.vote = Some(vote);
         self
     }
-    /// Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
+    /// Reference vote account that has voted at least once in the last
+    /// MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
     #[inline(always)]
     pub fn reference_vote(&mut self, reference_vote: solana_program::pubkey::Pubkey) -> &mut Self {
         self.reference_vote = Some(reference_vote);
@@ -143,7 +143,8 @@ pub struct DeactivateDelinquentCpiAccounts<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// stake's delinquent vote account
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
+    /// Reference vote account that has voted at least once in the last
+    /// MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
     pub reference_vote: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -155,7 +156,8 @@ pub struct DeactivateDelinquentCpi<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// stake's delinquent vote account
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
+    /// Reference vote account that has voted at least once in the last
+    /// MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
     pub reference_vote: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -285,7 +287,8 @@ impl<'a, 'b> DeactivateDelinquentCpiBuilder<'a, 'b> {
         self.instruction.vote = Some(vote);
         self
     }
-    /// Reference vote account that has voted at least once in the last MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
+    /// Reference vote account that has voted at least once in the last
+    /// MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION epochs
     #[inline(always)]
     pub fn reference_vote(
         &mut self,
@@ -309,8 +312,9 @@ impl<'a, 'b> DeactivateDelinquentCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
+    /// indicating whether the account is writable or not, and a `bool`
+    /// indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

@@ -3,16 +3,15 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct Split {
     /// The stake account to split. Must be in the Initialized or Stake state
     pub from: solana_program::pubkey::Pubkey,
-    /// The uninitialized stake account to split to. Must be rent-exempt starting from solana 1.17.
+    /// The uninitialized stake account to split to. Must be rent-exempt
+    /// starting from solana 1.17.
     pub to: solana_program::pubkey::Pubkey,
     /// from's stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
@@ -106,7 +105,8 @@ impl SplitBuilder {
         self.from = Some(from);
         self
     }
-    /// The uninitialized stake account to split to. Must be rent-exempt starting from solana 1.17.
+    /// The uninitialized stake account to split to. Must be rent-exempt
+    /// starting from solana 1.17.
     #[inline(always)]
     pub fn to(&mut self, to: solana_program::pubkey::Pubkey) -> &mut Self {
         self.to = Some(to);
@@ -163,7 +163,8 @@ impl SplitBuilder {
 pub struct SplitCpiAccounts<'a, 'b> {
     /// The stake account to split. Must be in the Initialized or Stake state
     pub from: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The uninitialized stake account to split to. Must be rent-exempt starting from solana 1.17.
+    /// The uninitialized stake account to split to. Must be rent-exempt
+    /// starting from solana 1.17.
     pub to: &'b solana_program::account_info::AccountInfo<'a>,
     /// from's stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -175,7 +176,8 @@ pub struct SplitCpi<'a, 'b> {
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The stake account to split. Must be in the Initialized or Stake state
     pub from: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The uninitialized stake account to split to. Must be rent-exempt starting from solana 1.17.
+    /// The uninitialized stake account to split to. Must be rent-exempt
+    /// starting from solana 1.17.
     pub to: &'b solana_program::account_info::AccountInfo<'a>,
     /// from's stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -306,7 +308,8 @@ impl<'a, 'b> SplitCpiBuilder<'a, 'b> {
         self.instruction.from = Some(from);
         self
     }
-    /// The uninitialized stake account to split to. Must be rent-exempt starting from solana 1.17.
+    /// The uninitialized stake account to split to. Must be rent-exempt
+    /// starting from solana 1.17.
     #[inline(always)]
     pub fn to(&mut self, to: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.to = Some(to);
@@ -341,8 +344,9 @@ impl<'a, 'b> SplitCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
+    /// indicating whether the account is writable or not, and a `bool`
+    /// indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

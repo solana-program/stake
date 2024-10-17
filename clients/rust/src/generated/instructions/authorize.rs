@@ -3,12 +3,12 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use crate::generated::types::StakeAuthorize;
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
-use solana_program::pubkey::Pubkey;
+use {
+    crate::generated::types::StakeAuthorize,
+    borsh::{BorshDeserialize, BorshSerialize},
+    solana_program::pubkey::Pubkey,
+};
 
 /// Accounts.
 pub struct Authorize {
@@ -16,7 +16,9 @@ pub struct Authorize {
     pub stake: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock: solana_program::pubkey::Pubkey,
-    /// stake's current stake or withdraw authority to change away from. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer
+    /// stake's current stake or withdraw authority to change away from. If
+    /// stake Lockup is active, the signing lockup authority must follow if
+    /// updating withdrawer
     pub authority: solana_program::pubkey::Pubkey,
 }
 
@@ -116,7 +118,9 @@ impl AuthorizeBuilder {
         self.clock = Some(clock);
         self
     }
-    /// stake's current stake or withdraw authority to change away from. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer
+    /// stake's current stake or withdraw authority to change away from. If
+    /// stake Lockup is active, the signing lockup authority must follow if
+    /// updating withdrawer
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
@@ -178,7 +182,9 @@ pub struct AuthorizeCpiAccounts<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's current stake or withdraw authority to change away from. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer
+    /// stake's current stake or withdraw authority to change away from. If
+    /// stake Lockup is active, the signing lockup authority must follow if
+    /// updating withdrawer
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -190,7 +196,9 @@ pub struct AuthorizeCpi<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's current stake or withdraw authority to change away from. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer
+    /// stake's current stake or withdraw authority to change away from. If
+    /// stake Lockup is active, the signing lockup authority must follow if
+    /// updating withdrawer
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: AuthorizeInstructionArgs,
@@ -326,7 +334,9 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self.instruction.clock = Some(clock);
         self
     }
-    /// stake's current stake or withdraw authority to change away from. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer
+    /// stake's current stake or withdraw authority to change away from. If
+    /// stake Lockup is active, the signing lockup authority must follow if
+    /// updating withdrawer
     #[inline(always)]
     pub fn authority(
         &mut self,
@@ -360,8 +370,9 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
+    /// indicating whether the account is writable or not, and a `bool`
+    /// indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

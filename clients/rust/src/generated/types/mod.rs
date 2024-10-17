@@ -3,7 +3,6 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
 pub(crate) mod r#stake_authorize;
 

@@ -3,20 +3,22 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use crate::generated::types::StakeAuthorize;
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
-use solana_program::pubkey::Pubkey;
+use {
+    crate::generated::types::StakeAuthorize,
+    borsh::{BorshDeserialize, BorshSerialize},
+    solana_program::pubkey::Pubkey,
+};
 
 /// Accounts.
 pub struct AuthorizeWithSeed {
-    /// The stake account to be updated, with the authority to be updated being an account created with Pubkey::create_with_seed()
+    /// The stake account to be updated, with the authority to be updated being
+    /// an account created with Pubkey::create_with_seed()
     pub stake: solana_program::pubkey::Pubkey,
     /// Base account of stake's authority to be updated
     pub authority_base: solana_program::pubkey::Pubkey,
-    /// Clock sysvar. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
+    /// Clock sysvar. If stake Lockup is active, the signing lockup authority
+    /// must follow if updating withdrawer.
     pub clock: solana_program::pubkey::Pubkey,
 }
 
@@ -110,7 +112,8 @@ impl AuthorizeWithSeedBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The stake account to be updated, with the authority to be updated being an account created with Pubkey::create_with_seed()
+    /// The stake account to be updated, with the authority to be updated being
+    /// an account created with Pubkey::create_with_seed()
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
@@ -122,7 +125,8 @@ impl AuthorizeWithSeedBuilder {
         self.authority_base = Some(authority_base);
         self
     }
-    /// Clock sysvar. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
+    /// Clock sysvar. If stake Lockup is active, the signing lockup authority
+    /// must follow if updating withdrawer.
     #[inline(always)]
     pub fn clock(&mut self, clock: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock = Some(clock);
@@ -198,11 +202,13 @@ impl AuthorizeWithSeedBuilder {
 
 /// `authorize_with_seed` CPI accounts.
 pub struct AuthorizeWithSeedCpiAccounts<'a, 'b> {
-    /// The stake account to be updated, with the authority to be updated being an account created with Pubkey::create_with_seed()
+    /// The stake account to be updated, with the authority to be updated being
+    /// an account created with Pubkey::create_with_seed()
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Base account of stake's authority to be updated
     pub authority_base: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Clock sysvar. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
+    /// Clock sysvar. If stake Lockup is active, the signing lockup authority
+    /// must follow if updating withdrawer.
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -210,11 +216,13 @@ pub struct AuthorizeWithSeedCpiAccounts<'a, 'b> {
 pub struct AuthorizeWithSeedCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to be updated, with the authority to be updated being an account created with Pubkey::create_with_seed()
+    /// The stake account to be updated, with the authority to be updated being
+    /// an account created with Pubkey::create_with_seed()
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Base account of stake's authority to be updated
     pub authority_base: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Clock sysvar. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
+    /// Clock sysvar. If stake Lockup is active, the signing lockup authority
+    /// must follow if updating withdrawer.
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: AuthorizeWithSeedInstructionArgs,
@@ -342,7 +350,8 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
-    /// The stake account to be updated, with the authority to be updated being an account created with Pubkey::create_with_seed()
+    /// The stake account to be updated, with the authority to be updated being
+    /// an account created with Pubkey::create_with_seed()
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
@@ -357,7 +366,8 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         self.instruction.authority_base = Some(authority_base);
         self
     }
-    /// Clock sysvar. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
+    /// Clock sysvar. If stake Lockup is active, the signing lockup authority
+    /// must follow if updating withdrawer.
     #[inline(always)]
     pub fn clock(&mut self, clock: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.clock = Some(clock);
@@ -398,8 +408,9 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
+    /// indicating whether the account is writable or not, and a `bool`
+    /// indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

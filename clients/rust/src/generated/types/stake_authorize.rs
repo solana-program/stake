@@ -3,11 +3,11 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
-//!
 
-use borsh::BorshDeserialize;
-use borsh::BorshSerialize;
-use num_derive::FromPrimitive;
+use {
+    borsh::{BorshDeserialize, BorshSerialize},
+    num_derive::FromPrimitive,
+};
 
 #[derive(
     BorshSerialize,

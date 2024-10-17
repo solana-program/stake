@@ -10,26 +10,25 @@ use {
         program_error::ProgramError,
         pubkey::Pubkey,
         rent::Rent,
-        stake::state::{Meta, StakeAuthorize, StakeStateV2},
         stake::{
             instruction::{
                 AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs, LockupArgs, LockupCheckedArgs,
                 StakeError, StakeInstruction,
             },
             stake_flags::StakeFlags,
-            state::{Authorized, Lockup},
+            state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
         sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
-        vote::program as solana_vote_program,
-        vote::state::VoteState,
+        vote::{program as solana_vote_program, state::VoteState},
     },
     std::collections::HashSet,
 };
 
-// TODO a nice change would be to pop an account off the queue and discard if its a gettable sysvar
-// ie, allow people to omit them from the accounts list without breaking compat
-// to be done after release, we keep the existing interface for all instructions for compat with firedancer
+// TODO a nice change would be to pop an account off the queue and discard if
+// its a gettable sysvar ie, allow people to omit them from the accounts list
+// without breaking compat to be done after release, we keep the existing
+// interface for all instructions for compat with firedancer
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
@@ -83,9 +82,10 @@ fn relocate_lamports(
     Ok(())
 }
 
-// various monorepo functions expect a HashSet of signer pubkeys. this constructs it
-// the unchecked mode doesnt add pubkeys of non-signers, relying on downstream errors if a required signer is missing
-// the checked mode expects every AccountInfo passed in should be a signer and errors if any is not
+// various monorepo functions expect a HashSet of signer pubkeys. this
+// constructs it the unchecked mode doesnt add pubkeys of non-signers, relying
+// on downstream errors if a required signer is missing the checked mode expects
+// every AccountInfo passed in should be a signer and errors if any is not
 fn collect_signers<'a>(
     accounts: &[&'a AccountInfo],
     optional_account: Option<&'a AccountInfo>,
@@ -243,8 +243,8 @@ fn move_stake_or_lamports_shared_checks(
     let clock = Clock::get()?;
     let stake_history = StakeHistorySysvar(clock.epoch);
 
-    // get_if_mergeable ensures accounts are not partly activated or in any form of deactivating
-    // we still need to exclude activating state ourselves
+    // get_if_mergeable ensures accounts are not partly activated or in any form of
+    // deactivating we still need to exclude activating state ourselves
     let source_merge_kind = MergeKind::get_if_mergeable(
         &get_stake_state(source_stake_account_info)?,
         source_stake_account_info.lamports(),
@@ -388,8 +388,8 @@ impl Processor {
         Ok(())
     }
 
-    // TODO after release we would like to substantially refactor this function, it can be much simpler
-    // for now however we follow the existing impl precisely
+    // TODO after release we would like to substantially refactor this function, it
+    // can be much simpler for now however we follow the existing impl precisely
     fn process_split(accounts: &[AccountInfo], split_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
         let source_stake_account_info = next_account_info(account_info_iter)?;
@@ -471,7 +471,8 @@ impl Processor {
                         (remaining_stake_delta, remaining_stake_delta)
                     } else {
                         // Otherwise, the new split stake should reflect the entire split
-                        // requested, less any lamports needed to cover the split_rent_exempt_reserve.
+                        // requested, less any lamports needed to cover the
+                        // split_rent_exempt_reserve.
                         if source_stake.delegation.stake.saturating_sub(split_lamports)
                             < minimum_delegation
                         {
@@ -568,8 +569,9 @@ impl Processor {
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        // this is somewhat subtle, but if the stake account is Uninitialized, you pass it twice and sign
-        // ie, Initialized or Stake, we use real withdraw authority. Uninitialized, stake account is its own authority
+        // this is somewhat subtle, but if the stake account is Uninitialized, you pass
+        // it twice and sign ie, Initialized or Stake, we use real withdraw
+        // authority. Uninitialized, stake account is its own authority
         let (signers, custodian) = collect_signers(
             &[withdraw_authority_info],
             option_lockup_authority_info,
@@ -612,8 +614,8 @@ impl Processor {
             _ => return Err(ProgramError::InvalidAccountData),
         };
 
-        // verify that lockup has expired or that the withdrawal is signed by the custodian
-        // both epoch and unix_timestamp must have passed
+        // verify that lockup has expired or that the withdrawal is signed by the
+        // custodian both epoch and unix_timestamp must have passed
         if lockup.is_in_force(clock, custodian) {
             return Err(StakeError::LockupInForce.into());
         }
@@ -924,8 +926,9 @@ impl Processor {
                 return Err(StakeError::VoteAddressMismatch.into());
             }
 
-            // Deactivate the stake account if its delegated vote account has never voted or has not
-            // voted in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
+            // Deactivate the stake account if its delegated vote account has never voted or
+            // has not voted in the last
+            // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
             if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
             {
                 stake.deactivate(clock.epoch)?;
@@ -957,8 +960,9 @@ impl Processor {
             stake_authority_info,
         )?;
 
-        // ensure source and destination are the right size for the current version of StakeState
-        // this a safeguard in case there is a new version of the struct that cannot fit into an old account
+        // ensure source and destination are the right size for the current version of
+        // StakeState this a safeguard in case there is a new version of the
+        // struct that cannot fit into an old account
         if source_stake_account_info.data_len() != StakeStateV2::size_of()
             || destination_stake_account_info.data_len() != StakeStateV2::size_of()
         {
@@ -973,12 +977,14 @@ impl Processor {
         let minimum_delegation = crate::get_minimum_delegation();
         let source_effective_stake = source_stake.delegation.stake;
 
-        // source cannot move more stake than it has, regardless of how many lamports it has
+        // source cannot move more stake than it has, regardless of how many lamports it
+        // has
         let source_final_stake = source_effective_stake
             .checked_sub(lamports)
             .ok_or(ProgramError::InvalidArgument)?;
 
-        // unless all stake is being moved, source must retain at least the minimum delegation
+        // unless all stake is being moved, source must retain at least the minimum
+        // delegation
         if source_final_stake != 0 && source_final_stake < minimum_delegation {
             return Err(ProgramError::InvalidArgument);
         }
@@ -1010,7 +1016,8 @@ impl Processor {
                 )?;
 
                 // StakeFlags::empty() is valid here because the only existing stake flag,
-                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to active stakes
+                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to
+                // active stakes
                 set_stake_state(
                     destination_stake_account_info,
                     &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
@@ -1028,7 +1035,8 @@ impl Processor {
                 destination_stake.delegation.stake = lamports;
 
                 // StakeFlags::empty() is valid here because the only existing stake flag,
-                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, is cleared when a stake is activated
+                // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, is cleared when a stake
+                // is activated
                 set_stake_state(
                     destination_stake_account_info,
                     &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
@@ -1048,7 +1056,8 @@ impl Processor {
             source_stake.delegation.stake = source_final_stake;
 
             // StakeFlags::empty() is valid here because the only existing stake flag,
-            // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to active stakes
+            // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, does not apply to
+            // active stakes
             set_stake_state(
                 source_stake_account_info,
                 &StakeStateV2::Stake(source_meta, source_stake, StakeFlags::empty()),
@@ -1061,7 +1070,8 @@ impl Processor {
             lamports,
         )?;
 
-        // this should be impossible, but because we do all our math with delegations, best to guard it
+        // this should be impossible, but because we do all our math with delegations,
+        // best to guard it
         if source_stake_account_info.lamports() < source_meta.rent_exempt_reserve
             || destination_stake_account_info.lamports() < destination_meta.rent_exempt_reserve
         {
@@ -1192,7 +1202,8 @@ impl Processor {
             }
             #[allow(deprecated)]
             StakeInstruction::Redelegate => Err(ProgramError::InvalidInstructionData),
-            // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is activated
+            // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is
+            // activated
             StakeInstruction::MoveStake(lamports) => {
                 msg!("Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)

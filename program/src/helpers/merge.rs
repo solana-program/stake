@@ -5,8 +5,7 @@ use {
         entrypoint::ProgramResult,
         msg,
         program_error::ProgramError,
-        stake::state::*,
-        stake::{instruction::StakeError, stake_flags::StakeFlags},
+        stake::{instruction::StakeError, stake_flags::StakeFlags, state::*},
         stake_history::StakeHistoryGetEntry,
     },
     std::convert::TryFrom,
@@ -184,9 +183,9 @@ pub(crate) fn merge_delegation_stake_and_credits_observed(
 /// observed of the merged stake is the weighted average of the two stakes'
 /// credits observed.
 ///
-/// This is because we can derive the effective credits_observed by reversing the staking
-/// rewards equation, _while keeping the rewards unchanged after merge (i.e. strong
-/// requirement)_, like below:
+/// This is because we can derive the effective credits_observed by reversing
+/// the staking rewards equation, _while keeping the rewards unchanged after
+/// merge (i.e. strong requirement)_, like below:
 ///
 /// a(N) => account, r => rewards, s => stake, c => credits:
 /// assume:
@@ -823,7 +822,8 @@ mod tests {
         );
         assert_eq!(new_stake.delegation.stake, delegation_a + delegation_b);
 
-        // active stake merge, unmatched credits observed, no need to ceiling the calculation
+        // active stake merge, unmatched credits observed, no need to ceiling the
+        // calculation
         let delegation = 1_000_000u64;
         let credits_a = 200_000_000u64;
         let credits_b = 100_000_000u64;

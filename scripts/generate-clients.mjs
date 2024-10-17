@@ -4,7 +4,7 @@ import * as c from 'codama';
 import { rootNodeFromAnchor } from '@codama/nodes-from-anchor';
 import { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
 import { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';
-import { getAllProgramIdls } from './utils.mjs';
+import { getAllProgramIdls, getToolchainArgument } from './utils.mjs';
 
 // Instanciate Codama.
 const [idl, ...additionalIdls] = getAllProgramIdls().map((idl) =>
@@ -80,5 +80,6 @@ codama.accept(
   renderRustVisitor(path.join(rustClient, 'src', 'generated'), {
     formatCode: true,
     crateFolder: rustClient,
+    toolchain: getToolchainArgument('format'),
   })
 );
