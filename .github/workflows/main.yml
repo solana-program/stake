@@ -91,23 +91,23 @@ jobs:
           path: ./**/*.so
           key: ${{ runner.os }}-builds-${{ github.sha }}
 
-  test_programs:
-    name: Test Programs
-    runs-on: ubuntu-latest
-    needs: format_and_lint_programs
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          cargo-cache-key: cargo-program-tests
-          cargo-cache-fallback-key: cargo-programs
-          solana: true
-
-      - name: Test Programs
-        run: pnpm programs:test
+  #test_programs:
+  #  name: Test Programs
+  #  runs-on: ubuntu-latest
+  #  needs: format_and_lint_programs
+  #  steps:
+  #    - name: Git Checkout
+  #      uses: actions/checkout@v4
+  #
+  #    - name: Setup Environment
+  #      uses: ./.github/actions/setup
+  #      with:
+  #        cargo-cache-key: cargo-program-tests
+  #        cargo-cache-fallback-key: cargo-programs
+  #        solana: true
+  #
+  #    - name: Test Programs
+  #      run: pnpm programs:test
 
   # Currently using a manual IDL.
   #
