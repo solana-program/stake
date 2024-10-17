@@ -8,5 +8,5 @@ solana = "2.1.0"
 # Specify Rust toolchains for rustfmt, clippy, and build.
 # Any unprovided toolchains default to stable.
 [workspace.metadata.toolchains]
-format = "1.81.0"
-lint = "1.81.0"
+format = "nightly-2023-10-05"
+lint = "nightly-2023-10-05"
