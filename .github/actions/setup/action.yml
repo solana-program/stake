@@ -58,7 +58,7 @@ runs:
       if: ${{ inputs.solana == 'true' }}
       uses: solana-program/actions/install-solana@v1
       with:
-        release: ${{ env.SOLANA_VERSION }}
+        version: ${{ env.SOLANA_VERSION }}
         cache: true
 
     - name: Cache Cargo Dependencies
