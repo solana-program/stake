@@ -4,25 +4,25 @@
 // warnings from uses of deprecated types during trait derivations.
 #![allow(deprecated)]
 
-use std::collections::HashSet;
-
 #[cfg(feature = "borsh")]
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
-use serde::{Deserialize, Serialize};
-use solana_clock::{Clock, Epoch, UnixTimestamp};
-use solana_instruction::error::InstructionError;
-use solana_program::stake_history::{StakeHistoryEntry, StakeHistoryGetEntry};
-use solana_pubkey::Pubkey;
-
-use crate::{
-    instruction::{LockupArgs, StakeError},
-    stake_flags::StakeFlags,
+use {
+    crate::{
+        instruction::{LockupArgs, StakeError},
+        stake_flags::StakeFlags,
+    },
+    serde::{Deserialize, Serialize},
+    solana_clock::{Clock, Epoch, UnixTimestamp},
+    solana_instruction::error::InstructionError,
+    solana_program::stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
+    solana_pubkey::Pubkey,
+    std::collections::HashSet,
 };
 
 pub type StakeActivationStatus = StakeHistoryEntry;
 
-// means that no more than RATE of current effective stake may be added or subtracted per
-// epoch
+// means that no more than RATE of current effective stake may be added or
+// subtracted per epoch
 pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
@@ -84,7 +84,10 @@ macro_rules! impl_borsh_stake_state {
 #[allow(clippy::large_enum_variant)]
 #[deprecated(
     since = "1.17.0",
-    note = "Please use `StakeStateV2` instead, and match the third `StakeFlags` field when matching `StakeStateV2::Stake` to resolve any breakage. For example, `if let StakeState::Stake(meta, stake)` becomes `if let StakeStateV2::Stake(meta, stake, _stake_flags)`."
+    note = "Please use `StakeStateV2` instead, and match the third `StakeFlags` field when \
+            matching `StakeStateV2::Stake` to resolve any breakage. For example, `if let \
+            StakeState::Stake(meta, stake)` becomes `if let StakeStateV2::Stake(meta, stake, \
+            _stake_flags)`."
 )]
 pub enum StakeState {
     #[default]
@@ -608,11 +611,13 @@ pub struct Delegation {
     pub voter_pubkey: Pubkey,
     /// activated stake amount, set at delegate() time
     pub stake: u64,
-    /// epoch at which this stake was activated, std::Epoch::MAX if is a bootstrap stake
+    /// epoch at which this stake was activated, std::Epoch::MAX if is a
+    /// bootstrap stake
     pub activation_epoch: Epoch,
     /// epoch the stake was deactivated, std::Epoch::MAX if not deactivated
     pub deactivation_epoch: Epoch,
-    /// how much stake we can activate per-epoch as a fraction of currently effective stake
+    /// how much stake we can activate per-epoch as a fraction of currently
+    /// effective stake
     #[deprecated(
         since = "1.16.7",
         note = "Please use `solana_sdk::stake::state::warmup_cooldown_rate()` instead"
@@ -756,8 +761,9 @@ impl Delegation {
             // fully effective immediately
             (delegated_stake, 0)
         } else if self.activation_epoch == self.deactivation_epoch {
-            // activated but instantly deactivated; no stake at all regardless of target_epoch
-            // this must be after the bootstrap check and before all-is-activating check
+            // activated but instantly deactivated; no stake at all regardless of
+            // target_epoch this must be after the bootstrap check and before
+            // all-is-activating check
             (0, 0)
         } else if target_epoch == self.activation_epoch {
             // all is activating
@@ -777,8 +783,9 @@ impl Delegation {
         {
             // target_epoch > self.activation_epoch
 
-            // loop from my activation epoch until the target epoch summing up my entitlement
-            // current effective stake is updated using its previous epoch's cluster stake
+            // loop from my activation epoch until the target epoch summing up my
+            // entitlement current effective stake is updated using its previous
+            // epoch's cluster stake
             let mut current_epoch;
             let mut current_effective_stake = 0;
             loop {
@@ -916,7 +923,8 @@ impl borsh0_10::ser::BorshSerialize for Delegation {
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
 pub struct Stake {
     pub delegation: Delegation,
-    /// credits observed is credits from vote account state when delegated or redeemed
+    /// credits observed is credits from vote account state when delegated or
+    /// redeemed
     pub credits_observed: u64,
 }
 
