@@ -34,3 +34,6 @@ solana-zk-token-sdk = { git = "https://github.com/2501babe/solana", branch = "ha
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[package.metadata.solana]
+program-id = "Stake11111111111111111111111111111111111111"
