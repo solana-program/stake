@@ -14,7 +14,8 @@ fn process_instruction(
     instruction_data: &[u8],
 ) -> ProgramResult {
     if let Err(error) = Processor::process(program_id, accounts, instruction_data) {
-        msg!("ERROR: {:?}", error);
+        // JC nit: can we print this with normal formatting instead of debug?
+        msg!("ERROR: {}", error);
         Err(error)
     } else {
         Ok(())

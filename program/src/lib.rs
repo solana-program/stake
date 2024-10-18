@@ -29,6 +29,8 @@ const FEATURE_STAKE_RAISE_MINIMUM_DELEGATION_TO_1_SOL: bool = false;
 // epoch has been fully (de)activated this means, as long as one epoch has
 // passed since activation where all prior stake had escaped cooldown...
 // ...we can pretend the rate has always beein 9% without issue. so we do that
+// JC nit: since the name makes it sound like the rate, and not the epoch, can
+// we rename this to `PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH`?
 const PERPETUAL_NEW_WARMUP: Option<u64> = Some(0);
 
 /// The minimum stake amount that can be delegated, in lamports.
