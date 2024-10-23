@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(clippy::arithmetic_side_effects)]
 
 use {
     solana_program_test::*,
@@ -28,11 +29,11 @@ use {
         sysvar::{clock::Clock, rent::Rent, stake_history::StakeHistory},
         transaction::{Transaction, TransactionError},
     },
+    solana_stake_program::{id, processor::Processor},
     solana_vote_program::{
         self, vote_instruction,
         vote_state::{self, VoteInit, VoteState, VoteStateVersions},
     },
-    stake_program::processor::Processor,
     test_case::{test_case, test_matrix},
 };
 
@@ -51,7 +52,7 @@ pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
         program_test.deactivate_feature(*feature_id);
     }
 
-    program_test.add_upgradeable_program_to_genesis("stake_program", &stake_program::id());
+    program_test.add_upgradeable_program_to_genesis("solana_stake_program", &id());
 
     program_test
 }
@@ -264,7 +265,7 @@ pub async fn create_independent_stake_account_with_lockup(
             &stake.pubkey(),
             lamports,
             std::mem::size_of::<stake::state::StakeStateV2>() as u64,
-            &stake_program::id(),
+            &id(),
         ),
         stake::instruction::initialize(&stake.pubkey(), authorized, lockup),
     ];
@@ -302,10 +303,10 @@ pub async fn create_blank_stake_account_from_keypair(
             &stake.pubkey(),
             lamports,
             StakeStateV2::size_of() as u64,
-            &stake_program::id(),
+            &id(),
         )],
         Some(&context.payer.pubkey()),
-        &[&context.payer, &stake],
+        &[&context.payer, stake],
         context.last_blockhash,
     );
 
@@ -531,7 +532,7 @@ async fn test_stake_initialize() {
     let account = SolanaAccount {
         lamports: rent_exempt_reserve / 2,
         data: vec![0; StakeStateV2::size_of()],
-        owner: stake_program::id(),
+        owner: id(),
         executable: false,
         rent_epoch: 1000,
     };
@@ -552,7 +553,7 @@ async fn test_stake_initialize() {
         &stake,
         rent_exempt_reserve * 2,
         StakeStateV2::size_of() as u64 + 1,
-        &stake_program::id(),
+        &id(),
     );
     process_instruction(&mut context, &instruction, &vec![&stake_keypair])
         .await
@@ -572,7 +573,7 @@ async fn test_stake_initialize() {
         &stake,
         rent_exempt_reserve,
         StakeStateV2::size_of() as u64 - 1,
-        &stake_program::id(),
+        &id(),
     );
     process_instruction(&mut context, &instruction, &vec![&stake_keypair])
         .await
@@ -855,7 +856,7 @@ async fn test_stake_delegate() {
         data: bincode::serialize(&StakeStateV2::RewardsPool)
             .unwrap()
             .to_vec(),
-        owner: stake_program::id(),
+        owner: id(),
         executable: false,
         rent_epoch: u64::MAX,
     };
@@ -1287,7 +1288,7 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         data: bincode::serialize(&StakeStateV2::RewardsPool)
             .unwrap()
             .to_vec(),
-        owner: stake_program::id(),
+        owner: id(),
         executable: false,
         rent_epoch: u64::MAX,
     };

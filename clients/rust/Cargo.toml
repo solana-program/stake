@@ -19,10 +19,16 @@ num-derive = "^0.3"
 num-traits = "^0.2"
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_with = { version = "^3.0", optional = true }
-solana-program = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
 thiserror = "^1.0"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-solana-program-test = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
-solana-sdk = { git = "https://github.com/2501babe/solana", branch = "hana-neostake-checkpoint" }
+solana-program-test = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+
+[patch.crates-io]
+solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+solana-zk-token-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+spl-associated-token-account = { git = "https://github.com/solana-labs/solana-program-library.git" }

@@ -1,6 +1,6 @@
 //! Program entrypoint
 
-#![cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
+#![cfg(not(feature = "no-entrypoint"))]
 
 use {
     crate::processor::Processor,
