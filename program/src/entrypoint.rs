@@ -14,7 +14,7 @@ fn process_instruction(
     instruction_data: &[u8],
 ) -> ProgramResult {
     if let Err(error) = Processor::process(program_id, accounts, instruction_data) {
-        msg!("ERROR: {:?}", error);
+        msg!("ERROR: {}", error);
         Err(error)
     } else {
         Ok(())
