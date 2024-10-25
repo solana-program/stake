@@ -38,7 +38,7 @@ fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, Pro
     }
 
     let mut vote_state = Box::new(MaybeUninit::uninit());
-    VoteState::deserialize_into_uninit(&vote_account_info.data.borrow(), vote_state.as_mut())
+    VoteState::deserialize_into_uninit(&vote_account_info.try_borrow_data()?, vote_state.as_mut())
         .map_err(|_| ProgramError::InvalidAccountData)?;
     let vote_state = unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteState) };
 
@@ -89,58 +89,45 @@ fn relocate_lamports(
     Ok(())
 }
 
-// various monorepo functions expect a HashSet of signer pubkeys. this
-// constructs it the unchecked mode doesnt add pubkeys of non-signers, relying
-// on downstream errors if a required signer is missing the checked mode expects
-// every AccountInfo passed in should be a signer and errors if any is not
-//
-// FIXME do something with this, but after easy changes, since i need to change
-// all callers i should have two functions, since this is used for:
-// * check all signers. easy
-// * check *some* both not *all* signers, for Initializ/Authorize/SetLockup
-//   whose checked variants check signer for accounts they dont actually need
-//   just as a safety feature
-// also rename optional_account to be more descriptive
-//
-// XXX ok so functions that create their own signers in stake_state.rs:
-// * auth seed, but its broken
-// * withdraw, only adds withdraw authority
-//   but then it gets the lockup authority and checks without hashset
-// * move stake/lamps, only add staker authority
-// everything else gets it from stake_instruction.rs
-// i need to go through every instruction and double check account len asserts
-// there are some that may "work" with fewer than expected accounts
-// abusing the fact that index lookups can get them out of order
-//
-// XXX but yes i need to contemplate my signer collection interface
-// sigh... every other instruction just hoovers up all the signers
-// so undisciplined. well the good news is at least i can be lazier with the code
-// just loop accounts twice. once get the signers once pop the accounts
-// i think we should break people who omit accounts relying on the buggy interface
-// need to record which if any instructions allow that tho
-fn collect_signers<'a>(
-    accounts: &[&'a AccountInfo],
-    optional_account: Option<&'a AccountInfo>,
-    checked: bool,
-) -> Result<(HashSet<Pubkey>, Option<&'a Pubkey>), ProgramError> {
+// almost all native stake program processors accumulate every account signer
+// they then defer all signer validation to functions on Meta or Authorized
+// this results in an instruction interface that is much looser than the one documented
+// to avoid breaking backwards compatibility, we do the same here
+// in the future, we may decide to tighten the interface and break badly formed transactions
+fn collect_signers(accounts: &[AccountInfo]) -> HashSet<Pubkey> {
     let mut signers = HashSet::new();
 
     for account in accounts {
         if account.is_signer {
             signers.insert(*account.key);
-        } else if checked {
+        }
+    }
+
+    signers
+}
+
+// MoveStake, MoveLamports, Withdraw, and AuthorizeWithSeed assemble signers explicitly
+// we also use this function for Checked variants and add extra signers manually
+fn collect_signers_checked<'a>(
+    authority_info: Option<&'a AccountInfo>,
+    custodian_info: Option<&'a AccountInfo>,
+) -> Result<(HashSet<Pubkey>, Option<&'a Pubkey>), ProgramError> {
+    let mut signers = HashSet::new();
+
+    if let Some(authority_info) = authority_info {
+        if authority_info.is_signer {
+            signers.insert(*authority_info.key);
+        } else {
             return Err(ProgramError::MissingRequiredSignature);
         }
     }
 
-    let custodian = if let Some(account) = optional_account {
-        if account.is_signer {
-            signers.insert(*account.key);
-            Some(account.key)
-        } else if checked {
-            return Err(ProgramError::MissingRequiredSignature);
+    let custodian = if let Some(custodian_info) = custodian_info {
+        if custodian_info.is_signer {
+            signers.insert(*custodian_info.key);
+            Some(custodian_info.key)
         } else {
-            None
+            return Err(ProgramError::MissingRequiredSignature);
         }
     } else {
         None
@@ -250,7 +237,7 @@ fn move_stake_or_lamports_shared_checks(
     stake_authority_info: &AccountInfo,
 ) -> Result<(MergeKind, MergeKind), ProgramError> {
     // authority must sign
-    let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
+    let (signers, _) = collect_signers_checked(Some(stake_authority_info), None)?;
 
     // confirm not the same account
     if *source_stake_account_info.key == *destination_stake_account_info.key {
@@ -314,6 +301,7 @@ impl Processor {
         lockup: Lockup,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let rent_info = next_account_info(account_info_iter)?;
         let rent = &Rent::from_account_info(rent_info)?;
@@ -329,18 +317,18 @@ impl Processor {
         new_authority: Pubkey,
         authority_type: StakeAuthorize,
     ) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
-        let stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        let _stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let (signers, custodian) = collect_signers(
-            &[stake_or_withdraw_authority_info],
-            option_lockup_authority_info,
-            false,
-        )?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let custodian = option_lockup_authority_info
+            .filter(|a| a.is_signer)
+            .map(|a| a.key);
 
         // `get_stake_state()` is called unconditionally, which checks owner
         do_authorize(
@@ -356,20 +344,18 @@ impl Processor {
     }
 
     fn process_delegate(accounts: &[AccountInfo]) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let vote_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let _stake_history_info = next_account_info(account_info_iter)?;
         let _stake_config_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
+        let _stake_authority_info = next_account_info(account_info_iter)?;
 
+        let clock = &Clock::from_account_info(clock_info)?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
-
-        // NOTE the existing program behaves as if this were false
-        // it should not break compat to check here, but may change errors
-        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         let vote_state = get_vote_state(vote_account_info)?;
 
@@ -422,17 +408,15 @@ impl Processor {
     // TODO after release we would like to substantially refactor this function, it
     // can be much simpler for now however we follow the existing impl precisely
     fn process_split(accounts: &[AccountInfo], split_lamports: u64) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
+
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
+        let _stake_authority_info = next_account_info(account_info_iter)?;
 
         let clock = Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
-
-        // NOTE the existing program behaves as if this were false
-        // it should not break compat to check here, but may change errors
-        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         let destination_data_len = destination_stake_account_info.data_len();
         if destination_data_len != StakeStateV2::size_of() {
@@ -568,7 +552,7 @@ impl Processor {
                 )?;
             }
             StakeStateV2::Uninitialized => {
-                if !signers.contains(source_stake_account_info.key) {
+                if !source_stake_account_info.is_signer {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
             }
@@ -591,30 +575,21 @@ impl Processor {
 
     fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let _stake_history_info = next_account_info(account_info_iter)?;
-        let stake_history = &StakeHistorySysvar(clock.epoch);
         let withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        // this is somewhat subtle, but if the stake account is Uninitialized, you pass
-        // it twice and sign ie, Initialized or Stake, we use real withdraw
-        // authority. Uninitialized, stake account is its own authority
-        // XXX also note i dont add it anymore here....... also note
-        // uhh ok i dont think we have to worry about... withdraw authority not being there
-        // yea withdraw asserts it received five accounts
-        //
-        // FIXME handle later, need to redo interface
-        // the old stae program passes in every account
-        // so users actually can omit the repeated account and it will work
-        let (signers, custodian) = collect_signers(
-            &[withdraw_authority_info],
-            option_lockup_authority_info,
-            true,
-        )?;
+        let clock = &Clock::from_account_info(clock_info)?;
+        let stake_history = &StakeHistorySysvar(clock.epoch);
+
+        // this is somewhat subtle. for Initialized and Stake, there is a real authority
+        // but for Uninitialized, the source account is passed twice, and signed for
+        let (signers, custodian) =
+            collect_signers_checked(Some(withdraw_authority_info), option_lockup_authority_info)?;
 
         let (lockup, reserve, is_staked) = match get_stake_state(source_stake_account_info)? {
             StakeStateV2::Stake(meta, stake, _stake_flag) => {
@@ -691,21 +666,14 @@ impl Processor {
     }
 
     fn process_deactivate(accounts: &[AccountInfo]) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
+        let _option_stake_authority_info = next_account_info(account_info_iter).ok();
 
-        // NOTE the existing program behaves as if this were false
-        // it should not break compat to check here, but may change errors
-        //
-        // XXX jon notes this can break "self-owned stake accounts"
-        // which seems like... a very strange thing to do, but i may need to check if
-        // stake_account_info is a signer but also i think that means i need to
-        // go back and read the stake program again if they just collect signer
-        // for every single account we might have to do the same
-        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
+        let clock = &Clock::from_account_info(clock_info)?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
@@ -727,12 +695,14 @@ impl Processor {
     }
 
     fn process_set_lockup(accounts: &[AccountInfo], lockup: LockupArgs) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
-        let clock = Clock::get()?;
 
-        let (signers, _) = collect_signers(&[old_withdraw_or_lockup_authority_info], None, false)?;
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let _option_old_withdraw_or_lockup_authority_info =
+            next_account_info(account_info_iter).ok();
+
+        let clock = Clock::get()?;
 
         // `get_stake_state()` is called unconditionally, which checks owner
         do_set_lockup(stake_account_info, &signers, &lockup, &clock)?;
@@ -741,22 +711,21 @@ impl Processor {
     }
 
     fn process_merge(accounts: &[AccountInfo]) -> ProgramResult {
+        let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
+
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let _stake_history_info = next_account_info(account_info_iter)?;
+        let _option_stake_authority_info = next_account_info(account_info_iter).ok();
+
+        let clock = &Clock::from_account_info(clock_info)?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
-        let stake_authority_info = next_account_info(account_info_iter)?;
 
         if source_stake_account_info.key == destination_stake_account_info.key {
             return Err(ProgramError::InvalidArgument);
         }
-
-        // NOTE the existing program behaves as if this were false
-        // it should not break compat to check here, but may change errors
-        let (signers, _) = collect_signers(&[stake_authority_info], None, true)?;
 
         msg!("Checking if destination stake is mergeable");
         let destination_merge_kind = MergeKind::get_if_mergeable(
@@ -804,16 +773,15 @@ impl Processor {
         authorize_args: AuthorizeWithSeedArgs,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        // XXX note when i re-review the existing stake program
-        // this is broken in the original for seed accounts with lockups but works in
-        // ours
-        let (mut signers, custodian) = collect_signers(&[], option_lockup_authority_info, false)?;
+        let clock = &Clock::from_account_info(clock_info)?;
+
+        let (mut signers, custodian) = collect_signers_checked(None, option_lockup_authority_info)?;
 
         if stake_or_withdraw_authority_base_info.is_signer {
             signers.insert(Pubkey::create_with_seed(
@@ -838,15 +806,14 @@ impl Processor {
 
     fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let rent_info = next_account_info(account_info_iter)?;
-        let rent = &Rent::from_account_info(rent_info)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
         let withdraw_authority_info = next_account_info(account_info_iter)?;
 
-        // XXX possibly another case of the stupid signer thing
-        // and worth noting jon didnt point this one out. so *i* might not have
-        // commented them all
+        let rent = &Rent::from_account_info(rent_info)?;
+
         if !withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
@@ -867,22 +834,23 @@ impl Processor {
         authority_type: StakeAuthorize,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        // XXX another of the stupid signer thing
-        let (signers, custodian) = collect_signers(
-            &[
-                old_stake_or_withdraw_authority_info,
-                new_stake_or_withdraw_authority_info,
-            ],
+        let clock = &Clock::from_account_info(clock_info)?;
+
+        let (mut signers, custodian) = collect_signers_checked(
+            Some(new_stake_or_withdraw_authority_info),
             option_lockup_authority_info,
-            true,
         )?;
+
+        if old_stake_or_withdraw_authority_info.is_signer {
+            signers.insert(*old_stake_or_withdraw_authority_info.key);
+        }
 
         // `get_stake_state()` is called unconditionally, which checks owner
         do_authorize(
@@ -902,17 +870,18 @@ impl Processor {
         authorize_args: AuthorizeCheckedWithSeedArgs,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let old_stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
         let clock_info = next_account_info(account_info_iter)?;
-        let clock = &Clock::from_account_info(clock_info)?;
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let (mut signers, custodian) = collect_signers(
-            &[new_stake_or_withdraw_authority_info],
+        let clock = &Clock::from_account_info(clock_info)?;
+
+        let (mut signers, custodian) = collect_signers_checked(
+            Some(new_stake_or_withdraw_authority_info),
             option_lockup_authority_info,
-            true,
         )?;
 
         if old_stake_or_withdraw_authority_base_info.is_signer {
@@ -941,17 +910,19 @@ impl Processor {
         lockup_checked: LockupCheckedArgs,
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter)?;
         let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
+
         let clock = Clock::get()?;
 
-        // XXX another signer thing
-        let (signers, custodian) = collect_signers(
-            &[old_withdraw_or_lockup_authority_info],
-            option_new_lockup_authority_info,
-            true,
-        )?;
+        let (mut signers, custodian) =
+            collect_signers_checked(None, option_new_lockup_authority_info)?;
+
+        if old_withdraw_or_lockup_authority_info.is_signer {
+            signers.insert(*old_withdraw_or_lockup_authority_info.key);
+        }
 
         let lockup = LockupArgs {
             unix_timestamp: lockup_checked.unix_timestamp,
@@ -967,9 +938,11 @@ impl Processor {
 
     fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let stake_account_info = next_account_info(account_info_iter)?;
         let delinquent_vote_account_info = next_account_info(account_info_iter)?;
         let reference_vote_account_info = next_account_info(account_info_iter)?;
+
         let clock = Clock::get()?;
 
         let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
@@ -1009,6 +982,7 @@ impl Processor {
 
     fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
@@ -1144,6 +1118,7 @@ impl Processor {
 
     fn process_move_lamports(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
+
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
