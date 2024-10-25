@@ -4,7 +4,6 @@ use {
         account_info::{next_account_info, AccountInfo},
         clock::Clock,
         entrypoint::ProgramResult,
-        instruction::InstructionError,
         msg,
         program::set_return_data,
         program_error::ProgramError,
@@ -195,7 +194,7 @@ fn do_authorize(
                     authority_type,
                     Some((&meta.lockup, clock, custodian)),
                 )
-                .map_err(InstructionError::turn_into)?;
+                .map_err(to_program_error)?;
 
             set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
         }
@@ -207,7 +206,7 @@ fn do_authorize(
                     authority_type,
                     Some((&meta.lockup, clock, custodian)),
                 )
-                .map_err(InstructionError::turn_into)?;
+                .map_err(to_program_error)?;
 
             set_stake_state(
                 stake_account_info,
@@ -227,13 +226,13 @@ fn do_set_lockup(
     match get_stake_state(stake_account_info)? {
         StakeStateV2::Initialized(mut meta) => {
             meta.set_lockup(lockup, signers, clock)
-                .map_err(InstructionError::turn_into)?;
+                .map_err(to_program_error)?;
 
             set_stake_state(stake_account_info, &StakeStateV2::Initialized(meta))
         }
         StakeStateV2::Stake(mut meta, stake, stake_flags) => {
             meta.set_lockup(lockup, signers, clock)
-                .map_err(InstructionError::turn_into)?;
+                .map_err(to_program_error)?;
 
             set_stake_state(
                 stake_account_info,
@@ -287,7 +286,7 @@ fn move_stake_or_lamports_shared_checks(
         .meta()
         .authorized
         .check(&signers, StakeAuthorize::Staker)
-        .map_err(InstructionError::turn_into)?;
+        .map_err(to_program_error)?;
 
     // same transient assurance as with source
     let destination_merge_kind = MergeKind::get_if_mergeable(
@@ -378,7 +377,7 @@ impl Processor {
             StakeStateV2::Initialized(meta) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
 
                 let ValidatedDelegatedInfo { stake_amount } =
                     validate_delegated_amount(stake_account_info, &meta)?;
@@ -398,7 +397,7 @@ impl Processor {
             StakeStateV2::Stake(meta, mut stake, flags) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
 
                 let ValidatedDelegatedInfo { stake_amount } =
                     validate_delegated_amount(stake_account_info, &meta)?;
@@ -458,7 +457,7 @@ impl Processor {
                 source_meta
                     .authorized
                     .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
 
                 let minimum_delegation = crate::get_minimum_delegation();
 
@@ -546,7 +545,7 @@ impl Processor {
                 source_meta
                     .authorized
                     .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
 
                 // NOTE this function also internally summons Rent via syscall
                 let validated_split_info = validate_split_amount(
@@ -621,7 +620,7 @@ impl Processor {
             StakeStateV2::Stake(meta, stake, _stake_flag) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Withdrawer)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
                 // if we have a deactivation epoch and we're in cooldown
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
                     stake.delegation.stake(
@@ -642,7 +641,7 @@ impl Processor {
             StakeStateV2::Initialized(meta) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Withdrawer)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
                 // stake accounts must have a balance >= rent_exempt_reserve
                 (meta.lockup, meta.rent_exempt_reserve, false)
             }
@@ -712,7 +711,7 @@ impl Processor {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
-                    .map_err(InstructionError::turn_into)?;
+                    .map_err(to_program_error)?;
 
                 stake.deactivate(clock.epoch)?;
 
