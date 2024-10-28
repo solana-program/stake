@@ -13,18 +13,6 @@ pub(crate) fn checked_add(a: u64, b: u64) -> Result<u64, ProgramError> {
     a.checked_add(b).ok_or(ProgramError::InsufficientFunds)
 }
 
-// FIXME this is kind of a hack... but better than mapping *all*
-// InstructionError into ProgramError::InvalidAccountData idk if theres a more
-// standard way
-pub(crate) trait TurnInto {
-    fn turn_into(self) -> ProgramError;
-}
-
-impl TurnInto for InstructionError {
-    fn turn_into(self) -> ProgramError {
-        match ProgramError::try_from(self) {
-            Ok(program_error) => program_error,
-            Err(_) => ProgramError::InvalidAccountData,
-        }
-    }
+pub(crate) fn to_program_error(e: InstructionError) -> ProgramError {
+    ProgramError::try_from(e).unwrap_or(ProgramError::InvalidAccountData)
 }
