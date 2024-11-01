@@ -3,6 +3,7 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
+//!
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -16,8 +17,7 @@ pub struct Withdraw {
     pub clock: solana_program::pubkey::Pubkey,
     /// Stake history sysvar
     pub stake_history: solana_program::pubkey::Pubkey,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup
-    /// authority must follow.
+    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
     pub withdraw_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -138,8 +138,7 @@ impl WithdrawBuilder {
         self.stake_history = Some(stake_history);
         self
     }
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup
-    /// authority must follow.
+    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
@@ -200,8 +199,7 @@ pub struct WithdrawCpiAccounts<'a, 'b> {
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup
-    /// authority must follow.
+    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -217,8 +215,7 @@ pub struct WithdrawCpi<'a, 'b> {
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup
-    /// authority must follow.
+    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: WithdrawInstructionArgs,
@@ -384,8 +381,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self.instruction.stake_history = Some(stake_history);
         self
     }
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup
-    /// authority must follow.
+    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
@@ -414,9 +410,8 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
-    /// indicating whether the account is writable or not, and a `bool`
-    /// indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

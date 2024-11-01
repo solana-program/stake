@@ -3,6 +3,7 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
+//!
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -10,9 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub struct SetLockupChecked {
     /// The stake account to set the lockup of
     pub stake: solana_program::pubkey::Pubkey,
-    /// stake's withdraw authority or lockup authority if lockup is active. If
-    /// setting a new lockup authority, the signing new lockup authority must
-    /// follow.
+    /// stake's withdraw authority or lockup authority if lockup is active. If setting a new lockup authority, the signing new lockup authority must follow.
     pub authority: solana_program::pubkey::Pubkey,
 }
 
@@ -101,9 +100,7 @@ impl SetLockupCheckedBuilder {
         self.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active. If
-    /// setting a new lockup authority, the signing new lockup authority must
-    /// follow.
+    /// stake's withdraw authority or lockup authority if lockup is active. If setting a new lockup authority, the signing new lockup authority must follow.
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
@@ -158,9 +155,7 @@ impl SetLockupCheckedBuilder {
 pub struct SetLockupCheckedCpiAccounts<'a, 'b> {
     /// The stake account to set the lockup of
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active. If
-    /// setting a new lockup authority, the signing new lockup authority must
-    /// follow.
+    /// stake's withdraw authority or lockup authority if lockup is active. If setting a new lockup authority, the signing new lockup authority must follow.
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -170,9 +165,7 @@ pub struct SetLockupCheckedCpi<'a, 'b> {
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The stake account to set the lockup of
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active. If
-    /// setting a new lockup authority, the signing new lockup authority must
-    /// follow.
+    /// stake's withdraw authority or lockup authority if lockup is active. If setting a new lockup authority, the signing new lockup authority must follow.
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: SetLockupCheckedInstructionArgs,
@@ -294,9 +287,7 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
         self.instruction.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active. If
-    /// setting a new lockup authority, the signing new lockup authority must
-    /// follow.
+    /// stake's withdraw authority or lockup authority if lockup is active. If setting a new lockup authority, the signing new lockup authority must follow.
     #[inline(always)]
     pub fn authority(
         &mut self,
@@ -332,9 +323,8 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
-    /// indicating whether the account is writable or not, and a `bool`
-    /// indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
