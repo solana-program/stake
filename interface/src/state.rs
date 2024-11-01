@@ -8,13 +8,14 @@
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
 use {
     crate::{
-        instruction::{LockupArgs, StakeError},
+        error::StakeError,
+        instruction::LockupArgs,
         stake_flags::StakeFlags,
+        stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     },
     serde::{Deserialize, Serialize},
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
-    solana_program::stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     solana_pubkey::Pubkey,
     std::collections::HashSet,
 };
@@ -1026,7 +1027,7 @@ impl borsh0_10::ser::BorshSerialize for Stake {
 #[cfg(test)]
 mod test {
     #[cfg(feature = "borsh")]
-    use crate::borsh1::try_from_slice_unchecked;
+    use solana_program::borsh1::try_from_slice_unchecked;
     use {super::*, assert_matches::assert_matches, bincode::serialize};
 
     #[cfg(feature = "borsh")]

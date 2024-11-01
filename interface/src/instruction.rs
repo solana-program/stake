@@ -6,173 +6,14 @@
 
 use {
     crate::{
-        program::id,
+        config,
+        program::{id, ID},
         state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
     },
-    num_derive::{FromPrimitive, ToPrimitive},
     solana_clock::{Epoch, UnixTimestamp},
-    solana_decode_error::DecodeError,
     solana_instruction::{AccountMeta, Instruction},
-    solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
 };
-
-/// Reasons the stake might have had an error
-#[derive(Debug, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-pub enum StakeError {
-    // 0
-    /// Not enough credits to redeem.
-    NoCreditsToRedeem,
-
-    /// Lockup has not yet expired.
-    LockupInForce,
-
-    /// Stake already deactivated.
-    AlreadyDeactivated,
-
-    /// One re-delegation permitted per epoch.
-    TooSoonToRedelegate,
-
-    /// Split amount is more than is staked.
-    InsufficientStake,
-
-    // 5
-    /// Stake account with transient stake cannot be merged.
-    MergeTransientStake,
-
-    /// Stake account merge failed due to different authority, lockups or state.
-    MergeMismatch,
-
-    /// Custodian address not present.
-    CustodianMissing,
-
-    /// Custodian signature not present.
-    CustodianSignatureMissing,
-
-    /// Insufficient voting activity in the reference vote account.
-    InsufficientReferenceVotes,
-
-    // 10
-    /// Stake account is not delegated to the provided vote account.
-    VoteAddressMismatch,
-
-    /// Stake account has not been delinquent for the minimum epochs required
-    /// for deactivation.
-    MinimumDelinquentEpochsForDeactivationNotMet,
-
-    /// Delegation amount is less than the minimum.
-    InsufficientDelegation,
-
-    /// Stake account with transient or inactive stake cannot be redelegated.
-    RedelegateTransientOrInactiveStake,
-
-    /// Stake redelegation to the same vote account is not permitted.
-    RedelegateToSameVoteAccount,
-
-    // 15
-    /// Redelegated stake must be fully activated before deactivation.
-    RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
-
-    /// Stake action is not permitted while the epoch rewards period is active.
-    EpochRewardsActive,
-}
-
-impl std::error::Error for StakeError {}
-
-impl core::fmt::Display for StakeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match self {
-            StakeError::NoCreditsToRedeem => {
-                write!(f, "not enough credits to redeem")
-            }
-            StakeError::LockupInForce => {
-                write!(f, "lockup has not yet expired")
-            }
-            StakeError::AlreadyDeactivated => {
-                write!(f, "stake already deactivated")
-            }
-            StakeError::TooSoonToRedelegate => {
-                write!(f, "one re-delegation permitted per epoch")
-            }
-            StakeError::InsufficientStake => {
-                write!(f, "split amount is more than is staked")
-            }
-            StakeError::MergeTransientStake => {
-                write!(f, "stake account with transient stake cannot be merged")
-            }
-            StakeError::MergeMismatch => {
-                write!(
-                    f,
-                    "stake account merge failed due to different authority, lockups or state"
-                )
-            }
-            StakeError::CustodianMissing => {
-                write!(f, "custodian address not present")
-            }
-            StakeError::CustodianSignatureMissing => {
-                write!(f, "custodian signature not present")
-            }
-            StakeError::InsufficientReferenceVotes => {
-                write!(
-                    f,
-                    "insufficient voting activity in the reference vote account"
-                )
-            }
-            StakeError::VoteAddressMismatch => {
-                write!(
-                    f,
-                    "stake account is not delegated to the provided vote account"
-                )
-            }
-            StakeError::MinimumDelinquentEpochsForDeactivationNotMet => {
-                write!(
-                    f,
-                    "stake account has not been delinquent for the minimum epochs required for \
-                     deactivation"
-                )
-            }
-            StakeError::InsufficientDelegation => {
-                write!(f, "delegation amount is less than the minimum")
-            }
-            StakeError::RedelegateTransientOrInactiveStake => {
-                write!(
-                    f,
-                    "stake account with transient or inactive stake cannot be redelegated"
-                )
-            }
-            StakeError::RedelegateToSameVoteAccount => {
-                write!(
-                    f,
-                    "stake redelegation to the same vote account is not permitted"
-                )
-            }
-            StakeError::RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted => {
-                write!(
-                    f,
-                    "redelegated stake must be fully activated before deactivation"
-                )
-            }
-            StakeError::EpochRewardsActive => {
-                write!(
-                    f,
-                    "stake action is not permitted while the epoch rewards period is active"
-                )
-            }
-        }
-    }
-}
-
-impl From<StakeError> for ProgramError {
-    fn from(e: StakeError) -> Self {
-        ProgramError::Custom(e as u32)
-    }
-}
-
-impl<E> DecodeError<E> for StakeError {
-    fn type_of() -> &'static str {
-        "StakeError"
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
@@ -511,7 +352,7 @@ pub fn create_account_with_seed(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
@@ -532,7 +373,7 @@ pub fn create_account(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
@@ -552,7 +393,7 @@ pub fn create_account_with_seed_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
@@ -572,7 +413,7 @@ pub fn create_account_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
@@ -595,7 +436,7 @@ fn _split(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::Split(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
 }
 
 pub fn split(
@@ -605,8 +446,8 @@ pub fn split(
     split_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(split_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(split_stake_pubkey, &id()),
+        solana_system_interface::allocate(split_stake_pubkey, StakeStateV2::size_of() as u64),
+        solana_system_interface::assign(split_stake_pubkey, &id()),
         _split(
             stake_pubkey,
             authorized_pubkey,
@@ -625,7 +466,7 @@ pub fn split_with_seed(
     seed: &str,                  // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::allocate_with_seed(
             split_stake_pubkey,
             base,
             seed,
@@ -831,10 +672,10 @@ pub fn delegate_stake(
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::stake_history::id(), false),
         // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::id(), false),
+        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::DelegateStake, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::DelegateStake, account_metas)
 }
 
 pub fn withdraw(
@@ -856,7 +697,7 @@ pub fn withdraw(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::Withdraw(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw(lamports), account_metas)
 }
 
 pub fn deactivate_stake(stake_pubkey: &Pubkey, authorized_pubkey: &Pubkey) -> Instruction {
@@ -865,7 +706,7 @@ pub fn deactivate_stake(stake_pubkey: &Pubkey, authorized_pubkey: &Pubkey) -> In
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::Deactivate, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Deactivate, account_metas)
 }
 
 pub fn set_lockup(
@@ -877,7 +718,7 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::SetLockup(*lockup), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup(*lockup), account_metas)
 }
 
 pub fn set_lockup_checked(
@@ -922,7 +763,7 @@ pub fn deactivate_delinquent_stake(
         AccountMeta::new_readonly(*delinquent_vote_account, false),
         AccountMeta::new_readonly(*reference_vote_account, false),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::DeactivateDelinquent, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::DeactivateDelinquent, account_metas)
 }
 
 fn _redelegate(
@@ -939,7 +780,7 @@ fn _redelegate(
         AccountMeta::new_readonly(config::id(), false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::Redelegate, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Redelegate, account_metas)
 }
 
 #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
@@ -950,8 +791,11 @@ pub fn redelegate(
     uninitialized_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(uninitialized_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(uninitialized_stake_pubkey, &id()),
+        solana_system_interface::allocate(
+            uninitialized_stake_pubkey,
+            StakeStateV2::size_of() as u64,
+        ),
+        solana_system_interface::assign(uninitialized_stake_pubkey, &id()),
         _redelegate(
             stake_pubkey,
             authorized_pubkey,
@@ -971,7 +815,7 @@ pub fn redelegate_with_seed(
     seed: &str,                          // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::allocate_with_seed(
             uninitialized_stake_pubkey,
             base,
             seed,
@@ -999,7 +843,7 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::MoveStake(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake(lamports), account_metas)
 }
 
 pub fn move_lamports(
@@ -1023,7 +867,10 @@ pub fn move_lamports(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, solana_decode_error::DecodeError, solana_instruction::error::InstructionError};
+    use {
+        crate::error::StakeError, solana_decode_error::DecodeError,
+        solana_instruction::error::InstructionError,
+    };
 
     #[test]
     fn test_custom_error_decode() {

@@ -11,6 +11,7 @@ extern crate solana_frozen_abi_macro;
 
 #[allow(deprecated)]
 pub mod config;
+pub mod error;
 pub mod instruction;
 pub mod stake_flags;
 pub mod stake_history;

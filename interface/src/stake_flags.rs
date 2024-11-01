@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Additional flags for stake state.
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
