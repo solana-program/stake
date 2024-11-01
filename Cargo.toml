@@ -13,9 +13,3 @@ solana = "edge"
 [workspace.metadata.toolchains]
 format = "nightly-2024-08-08"
 lint = "nightly-2024-08-08"
-
-[patch.crates-io]
-solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1" }
-solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1" }
-solana-zk-token-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1" }
-spl-associated-token-account = { git = "https://github.com/solana-labs/solana-program-library.git" }

@@ -17,10 +17,10 @@ num-derive = "^0.3"
 num-traits = "^0.2"
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_with = { version = "^3.0", optional = true }
-solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1", branch = "v2.1" }
+solana-program = ">= 1.16, < 3"
 thiserror = "^1.0"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-solana-program-test = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1", branch = "v2.1" }
-solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "^2.1", branch = "v2.1" }
+solana-program-test = "2.1"
+solana-sdk = "2.1"
