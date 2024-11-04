@@ -23,7 +23,7 @@ thiserror = "1.0.63"
 
 [dev-dependencies]
 solana-program-test = "2.1"
-solana-sdk = "=2.1"
+solana-sdk = "2.1"
 solana-vote-program = "2.1"
 test-case = "3.3.1"
 
