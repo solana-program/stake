@@ -659,25 +659,21 @@ impl Processor {
             return Err(StakeError::LockupInForce.into());
         }
 
-        let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
         let stake_account_lamports = source_stake_account_info.lamports();
-
-        // if the stake is active, we mustn't allow the account to go away
-        if is_staked && withdraw_lamports_and_reserve > stake_account_lamports {
-            return Err(ProgramError::InsufficientFunds);
-        }
-
-        // a partial withdrawal must not deplete the reserve
-        if withdraw_lamports != stake_account_lamports
-            && withdraw_lamports_and_reserve > stake_account_lamports
-        {
-            assert!(!is_staked);
-            return Err(ProgramError::InsufficientFunds);
-        }
-
-        // Deinitialize state upon zero balance
         if withdraw_lamports == stake_account_lamports {
+            // if the stake is active, we mustn't allow the account to go away
+            if is_staked {
+                return Err(ProgramError::InsufficientFunds);
+            }
+
+            // Deinitialize state upon zero balance
             set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+        } else {
+            // a partial withdrawal must not deplete the reserve
+            let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
+            if withdraw_lamports_and_reserve > stake_account_lamports {
+                return Err(ProgramError::InsufficientFunds);
+            }
         }
 
         relocate_lamports(
