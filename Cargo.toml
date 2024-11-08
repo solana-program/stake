@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    # XXX removed due to dependency issues "clients/rust",
+    "clients/rust",
     "program",
 ]
 
@@ -11,11 +11,5 @@ solana = "edge"
 # Specify Rust toolchains for rustfmt, clippy, and build.
 # Any unprovided toolchains default to stable.
 [workspace.metadata.toolchains]
-format = "nightly-2023-10-05"
-lint = "nightly-2023-10-05"
-
-[patch.crates-io]
-solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-solana-zk-token-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-spl-associated-token-account = { git = "https://github.com/solana-labs/solana-program-library.git" }
+format = "nightly-2024-08-08"
+lint = "nightly-2024-08-08"

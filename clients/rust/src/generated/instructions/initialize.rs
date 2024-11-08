@@ -3,6 +3,7 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
+//!
 
 use {
     borsh::{BorshDeserialize, BorshSerialize},
@@ -84,8 +85,7 @@ pub struct InitializeInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` rent (default to
-///      `SysvarRent111111111111111111111111111111111`)
+///   1. `[optional]` rent (default to `SysvarRent111111111111111111111111111111111`)
 #[derive(Clone, Debug, Default)]
 pub struct InitializeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
@@ -108,8 +108,8 @@ impl InitializeBuilder {
         self.stake = Some(stake);
         self
     }
-    /// `[optional account, default to
-    /// 'SysvarRent111111111111111111111111111111111']` Rent sysvar
+    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
+    /// Rent sysvar
     #[inline(always)]
     pub fn rent(&mut self, rent: solana_program::pubkey::Pubkey) -> &mut Self {
         self.rent = Some(rent);
@@ -366,9 +366,8 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
-    /// indicating whether the account is writable or not, and a `bool`
-    /// indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

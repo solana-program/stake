@@ -3,6 +3,7 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
+//!
 
 use {
     crate::generated::types::StakeAuthorize,
@@ -17,8 +18,7 @@ pub struct AuthorizeChecked {
     pub clock: solana_program::pubkey::Pubkey,
     /// stake's current stake or withdraw authority to change away from
     pub authority: solana_program::pubkey::Pubkey,
-    /// stake's new stake or withdraw authority to change to. If stake Lockup is
-    /// active, the signing lockup authority must follow if updating withdrawer.
+    /// stake's new stake or withdraw authority to change to. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
     pub new_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -128,8 +128,7 @@ impl AuthorizeCheckedBuilder {
         self.authority = Some(authority);
         self
     }
-    /// stake's new stake or withdraw authority to change to. If stake Lockup is
-    /// active, the signing lockup authority must follow if updating withdrawer.
+    /// stake's new stake or withdraw authority to change to. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
     #[inline(always)]
     pub fn new_authority(&mut self, new_authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.new_authority = Some(new_authority);
@@ -185,8 +184,7 @@ pub struct AuthorizeCheckedCpiAccounts<'a, 'b> {
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
     /// stake's current stake or withdraw authority to change away from
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's new stake or withdraw authority to change to. If stake Lockup is
-    /// active, the signing lockup authority must follow if updating withdrawer.
+    /// stake's new stake or withdraw authority to change to. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -200,8 +198,7 @@ pub struct AuthorizeCheckedCpi<'a, 'b> {
     pub clock: &'b solana_program::account_info::AccountInfo<'a>,
     /// stake's current stake or withdraw authority to change away from
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's new stake or withdraw authority to change to. If stake Lockup is
-    /// active, the signing lockup authority must follow if updating withdrawer.
+    /// stake's new stake or withdraw authority to change to. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: AuthorizeCheckedInstructionArgs,
@@ -353,8 +350,7 @@ impl<'a, 'b> AuthorizeCheckedCpiBuilder<'a, 'b> {
         self.instruction.authority = Some(authority);
         self
     }
-    /// stake's new stake or withdraw authority to change to. If stake Lockup is
-    /// active, the signing lockup authority must follow if updating withdrawer.
+    /// stake's new stake or withdraw authority to change to. If stake Lockup is active, the signing lockup authority must follow if updating withdrawer.
     #[inline(always)]
     pub fn new_authority(
         &mut self,
@@ -383,9 +379,8 @@ impl<'a, 'b> AuthorizeCheckedCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
-    /// indicating whether the account is writable or not, and a `bool`
-    /// indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

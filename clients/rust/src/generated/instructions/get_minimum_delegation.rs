@@ -3,6 +3,7 @@
 //! to add features, then rerun codama to update it.
 //!
 //! <https://github.com/codama-idl/codama>
+//!
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -54,6 +55,7 @@ impl Default for GetMinimumDelegationInstructionData {
 /// Instruction builder for `GetMinimumDelegation`.
 ///
 /// ### Accounts:
+///
 #[derive(Clone, Debug, Default)]
 pub struct GetMinimumDelegationBuilder {
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
@@ -166,6 +168,7 @@ impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
 /// Instruction builder for `GetMinimumDelegation` via CPI.
 ///
 /// ### Accounts:
+///
 #[derive(Clone, Debug)]
 pub struct GetMinimumDelegationCpiBuilder<'a, 'b> {
     instruction: Box<GetMinimumDelegationCpiBuilderInstruction<'a, 'b>>,
@@ -194,9 +197,8 @@ impl<'a, 'b> GetMinimumDelegationCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool`
-    /// indicating whether the account is writable or not, and a `bool`
-    /// indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,

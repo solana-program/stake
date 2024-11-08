@@ -8,27 +8,19 @@ readme = "README.md"
 license-file = "../../LICENSE"
 
 [features]
-anchor = ["dep:anchor-lang"]
 test-sbf = []
 serde = ["dep:serde", "dep:serde_with"]
 
 [dependencies]
-anchor-lang = { version = "0.30.0", optional = true }
 borsh = "^0.10"
 num-derive = "^0.3"
 num-traits = "^0.2"
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_with = { version = "^3.0", optional = true }
-solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
+solana-program = "2.1"
 thiserror = "^1.0"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-solana-program-test = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-
-[patch.crates-io]
-solana-program = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-solana-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-solana-zk-token-sdk = { git = "https://github.com/anza-xyz/agave.git", version = "=2.1.0" }
-spl-associated-token-account = { git = "https://github.com/solana-labs/solana-program-library.git" }
+solana-program-test = "2.1"
+solana-sdk = "2.1"
