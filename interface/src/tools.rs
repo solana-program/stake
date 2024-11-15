@@ -1,7 +1,9 @@
 //! Utility functions
 use {
-    crate::{program_error::ProgramError, stake::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION},
+    crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION,
     solana_clock::Epoch,
+    solana_cpi::{get_return_data, invoke_unchecked},
+    solana_program_error::ProgramError,
 };
 
 /// Helper function for programs to call [`GetMinimumDelegation`] and then fetch the return data
@@ -10,10 +12,10 @@ use {
 /// calls [`get_return_data()`] to fetch the return data.
 ///
 /// [`GetMinimumDelegation`]: super::instruction::StakeInstruction::GetMinimumDelegation
-/// [`get_return_data()`]: crate::program::get_return_data
+/// [`get_return_data()`]: solana_cpi::get_return_data
 pub fn get_minimum_delegation() -> Result<u64, ProgramError> {
     let instruction = super::instruction::get_minimum_delegation();
-    crate::program::invoke_unchecked(&instruction, &[])?;
+    invoke_unchecked(&instruction, &[])?;
     get_minimum_delegation_return_data()
 }
 
@@ -23,9 +25,9 @@ pub fn get_minimum_delegation() -> Result<u64, ProgramError> {
 /// program, and returns the correct type.
 ///
 /// [`GetMinimumDelegation`]: super::instruction::StakeInstruction::GetMinimumDelegation
-/// [`get_return_data()`]: crate::program::get_return_data
+/// [`get_return_data()`]: solana_cpi::get_return_data
 fn get_minimum_delegation_return_data() -> Result<u64, ProgramError> {
-    crate::program::get_return_data()
+    get_return_data()
         .ok_or(ProgramError::InvalidInstructionData)
         .and_then(|(program_id, return_data)| {
             (program_id == super::program::id())
@@ -40,8 +42,8 @@ fn get_minimum_delegation_return_data() -> Result<u64, ProgramError> {
         .map(u64::from_le_bytes)
 }
 
-// Check if the provided `epoch_credits` demonstrate active voting over the previous
-// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
+/// Check if the provided `epoch_credits` demonstrate active voting over the previous
+/// [`MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`].
 pub fn acceptable_reference_epoch_credits(
     epoch_credits: &[(Epoch, u64, u64)],
     current_epoch: Epoch,
@@ -63,8 +65,8 @@ pub fn acceptable_reference_epoch_credits(
     }
 }
 
-// Check if the provided `epoch_credits` demonstrate delinquency over the previous
-// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
+/// Check if the provided `epoch_credits` demonstrate delinquency over the previous
+/// [`MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`].
 pub fn eligible_for_deactivate_delinquent(
     epoch_credits: &[(Epoch, u64, u64)],
     current_epoch: Epoch,

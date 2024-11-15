@@ -8,22 +8,22 @@
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
 use {
     crate::{
-        instruction::InstructionError,
-        pubkey::Pubkey,
-        stake::{
-            instruction::{LockupArgs, StakeError},
-            stake_flags::StakeFlags,
-        },
+        error::StakeError,
+        instruction::LockupArgs,
+        stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     },
+    serde::{Deserialize, Serialize},
     solana_clock::{Clock, Epoch, UnixTimestamp},
+    solana_instruction::error::InstructionError,
+    solana_pubkey::Pubkey,
     std::collections::HashSet,
 };
 
 pub type StakeActivationStatus = StakeHistoryEntry;
 
-// means that no more than RATE of current effective stake may be added or subtracted per
-// epoch
+// Means that no more than RATE of current effective stake may be added or subtracted per
+// epoch.
 pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
@@ -80,7 +80,7 @@ macro_rules! impl_borsh_stake_state {
         }
     };
 }
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 #[deprecated(
@@ -139,7 +139,7 @@ impl StakeState {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum StakeStateV2 {
@@ -256,14 +256,14 @@ impl StakeStateV2 {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -352,7 +352,7 @@ impl borsh0_10::ser::BorshSerialize for Lockup {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -485,7 +485,7 @@ impl borsh0_10::ser::BorshSerialize for Authorized {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -597,7 +597,7 @@ impl borsh0_10::ser::BorshSerialize for Meta {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -609,9 +609,9 @@ pub struct Delegation {
     pub voter_pubkey: Pubkey,
     /// activated stake amount, set at delegate() time
     pub stake: u64,
-    /// epoch at which this stake was activated, std::Epoch::MAX if is a bootstrap stake
+    /// epoch at which this stake was activated, `std::u64::MAX` if is a bootstrap stake
     pub activation_epoch: Epoch,
-    /// epoch the stake was deactivated, std::Epoch::MAX if not deactivated
+    /// epoch the stake was deactivated, `std::u64::MAX` if not deactivated
     pub deactivation_epoch: Epoch,
     /// how much stake we can activate per-epoch as a fraction of currently effective stake
     #[deprecated(
@@ -908,7 +908,7 @@ impl borsh0_10::ser::BorshSerialize for Delegation {
     }
 }
 
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -1018,9 +1018,11 @@ impl borsh0_10::ser::BorshSerialize for Stake {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     #[cfg(feature = "borsh")]
-    use crate::borsh1::try_from_slice_unchecked;
-    use {super::*, assert_matches::assert_matches, bincode::serialize};
+    use solana_borsh::v1::try_from_slice_unchecked;
+    #[cfg(feature = "borsh")]
+    use {assert_matches::assert_matches, bincode::serialize};
 
     #[cfg(feature = "borsh")]
     fn check_borsh_deserialization(stake: StakeStateV2) {
@@ -1141,6 +1143,7 @@ mod test {
         );
     }
 
+    #[cfg(feature = "borsh")]
     #[test]
     fn stake_flag_member_offset() {
         const FLAG_OFFSET: usize = 196;

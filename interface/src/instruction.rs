@@ -5,96 +5,16 @@
 
 use {
     crate::{
-        instruction::{AccountMeta, Instruction},
-        program_error::ProgramError,
-        pubkey::Pubkey,
-        stake::{
-            config,
-            program::id,
-            state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
-        },
-        system_instruction, sysvar,
+        config,
+        state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
+        CLOCK_ID, RENT_ID, STAKE_HISTORY_ID,
     },
-    log::*,
-    num_derive::{FromPrimitive, ToPrimitive},
-    serde_derive::{Deserialize, Serialize},
+    serde::{Deserialize, Serialize},
     solana_clock::{Epoch, UnixTimestamp},
-    solana_decode_error::DecodeError,
-    thiserror::Error,
+    solana_instruction::{AccountMeta, Instruction},
+    solana_pubkey::Pubkey,
+    solana_system_interface::program::{id, ID},
 };
-
-/// Reasons the stake might have had an error
-#[derive(Error, Debug, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-pub enum StakeError {
-    // 0
-    #[error("not enough credits to redeem")]
-    NoCreditsToRedeem,
-
-    #[error("lockup has not yet expired")]
-    LockupInForce,
-
-    #[error("stake already deactivated")]
-    AlreadyDeactivated,
-
-    #[error("one re-delegation permitted per epoch")]
-    TooSoonToRedelegate,
-
-    #[error("split amount is more than is staked")]
-    InsufficientStake,
-
-    // 5
-    #[error("stake account with transient stake cannot be merged")]
-    MergeTransientStake,
-
-    #[error("stake account merge failed due to different authority, lockups or state")]
-    MergeMismatch,
-
-    #[error("custodian address not present")]
-    CustodianMissing,
-
-    #[error("custodian signature not present")]
-    CustodianSignatureMissing,
-
-    #[error("insufficient voting activity in the reference vote account")]
-    InsufficientReferenceVotes,
-
-    // 10
-    #[error("stake account is not delegated to the provided vote account")]
-    VoteAddressMismatch,
-
-    #[error(
-        "stake account has not been delinquent for the minimum epochs required for deactivation"
-    )]
-    MinimumDelinquentEpochsForDeactivationNotMet,
-
-    #[error("delegation amount is less than the minimum")]
-    InsufficientDelegation,
-
-    #[error("stake account with transient or inactive stake cannot be redelegated")]
-    RedelegateTransientOrInactiveStake,
-
-    #[error("stake redelegation to the same vote account is not permitted")]
-    RedelegateToSameVoteAccount,
-
-    // 15
-    #[error("redelegated stake must be fully activated before deactivation")]
-    RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
-
-    #[error("stake action is not permitted while the epoch rewards period is active")]
-    EpochRewardsActive,
-}
-
-impl From<StakeError> for ProgramError {
-    fn from(e: StakeError) -> Self {
-        ProgramError::Custom(e as u32)
-    }
-}
-
-impl<E> DecodeError<E> for StakeError {
-    fn type_of() -> &'static str {
-        "StakeError"
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
@@ -104,9 +24,9 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Uninitialized stake account
     ///   1. `[]` Rent sysvar
     ///
-    /// Authorized carries pubkeys that must sign staker transactions
-    ///   and withdrawer transactions.
-    /// Lockup carries information about withdrawal restrictions
+    /// [`Authorized`] carries pubkeys that must sign staker transactions
+    /// and withdrawer transactions; [`Lockup`] carries information about
+    /// withdrawal restrictions.
     Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
@@ -129,12 +49,11 @@ pub enum StakeInstruction {
     ///   4. `[]` Unused account, formerly the stake config
     ///   5. `[SIGNER]` Stake authority
     ///
-    /// The entire balance of the staking account is staked.  DelegateStake
-    ///   can be called multiple times, but re-delegation is delayed
-    ///   by one epoch
+    /// The entire balance of the staking account is staked. `DelegateStake`
+    /// can be called multiple times, but re-delegation is delayed by one epoch.
     DelegateStake,
 
-    /// Split u64 tokens and stake off a stake account into another stake account.
+    /// Split `u64` tokens and stake off a stake account into another stake account.
     ///
     /// # Account references
     ///   0. `[WRITE]` Stake account to be split; must be in the Initialized or Stake state
@@ -152,8 +71,8 @@ pub enum StakeInstruction {
     ///   4. `[SIGNER]` Withdraw authority
     ///   5. Optional: `[SIGNER]` Lockup authority, if before lockup expiration
     ///
-    /// The u64 is the portion of the stake account balance to be withdrawn,
-    ///    must be `<= StakeAccount.lamports - staked_lamports`.
+    /// The `u64` is the portion of the stake account balance to be withdrawn,
+    /// must be `<= StakeAccount.lamports - staked_lamports`.
     Withdraw(u64),
 
     /// Deactivates the stake in the account
@@ -206,8 +125,8 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be updated
     ///   1. `[SIGNER]` Base key of stake or withdraw authority
     ///   2. `[]` Clock sysvar
-    ///   3. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   3. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeWithSeed(AuthorizeWithSeedArgs),
 
     /// Initialize a stake with authorization information
@@ -233,8 +152,8 @@ pub enum StakeInstruction {
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` The stake or withdraw authority
     ///   3. `[SIGNER]` The new stake or withdraw authority
-    ///   4. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeChecked(StakeAuthorize),
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -247,8 +166,8 @@ pub enum StakeInstruction {
     ///   1. `[SIGNER]` Base key of stake or withdraw authority
     ///   2. `[]` Clock sysvar
     ///   3. `[SIGNER]` The new stake or withdraw authority
-    ///   4. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeCheckedWithSeed(AuthorizeCheckedWithSeedArgs),
 
     /// Set stake lockup
@@ -278,7 +197,7 @@ pub enum StakeInstruction {
     GetMinimumDelegation,
 
     /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
+    /// [`super::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
@@ -287,7 +206,7 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
-    ///      `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    ///      [`super::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -331,7 +250,7 @@ pub enum StakeInstruction {
     ///   1. `[WRITE]` Active or inactive destination stake account
     ///   2. `[SIGNER]` Stake authority
     ///
-    /// The u64 is the portion of the stake to move, which may be the entire delegation
+    /// The `u64` is the portion of the stake to move, which may be the entire delegation
     MoveStake(u64),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
@@ -346,7 +265,7 @@ pub enum StakeInstruction {
     ///   1. `[WRITE]` Mergeable destination stake account
     ///   2. `[SIGNER]` Stake authority
     ///
-    /// The u64 is the portion of available lamports to move
+    /// The `u64` is the portion of available lamports to move
     MoveLamports(u64),
 }
 
@@ -380,11 +299,11 @@ pub struct AuthorizeCheckedWithSeedArgs {
 
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::Initialize(*authorized, *lockup),
         vec![
             AccountMeta::new(*stake_pubkey, false),
-            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(RENT_ID, false),
         ],
     )
 }
@@ -395,7 +314,7 @@ pub fn initialize_checked(stake_pubkey: &Pubkey, authorized: &Authorized) -> Ins
         &StakeInstruction::InitializeChecked,
         vec![
             AccountMeta::new(*stake_pubkey, false),
-            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(RENT_ID, false),
             AccountMeta::new_readonly(authorized.staker, false),
             AccountMeta::new_readonly(authorized.withdrawer, true),
         ],
@@ -412,7 +331,7 @@ pub fn create_account_with_seed(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::instruction::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
@@ -433,7 +352,7 @@ pub fn create_account(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::instruction::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
@@ -453,7 +372,7 @@ pub fn create_account_with_seed_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::instruction::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
@@ -473,7 +392,7 @@ pub fn create_account_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::instruction::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
@@ -506,8 +425,11 @@ pub fn split(
     split_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(split_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(split_stake_pubkey, &id()),
+        solana_system_interface::instruction::allocate(
+            split_stake_pubkey,
+            StakeStateV2::size_of() as u64,
+        ),
+        solana_system_interface::instruction::assign(split_stake_pubkey, &id()),
         _split(
             stake_pubkey,
             authorized_pubkey,
@@ -526,7 +448,7 @@ pub fn split_with_seed(
     seed: &str,                  // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::instruction::allocate_with_seed(
             split_stake_pubkey,
             base,
             seed,
@@ -550,8 +472,8 @@ pub fn merge(
     let account_metas = vec![
         AccountMeta::new(*destination_stake_pubkey, false),
         AccountMeta::new(*source_stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
@@ -579,6 +501,7 @@ pub fn create_account_and_delegate_stake(
     instructions
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_account_with_seed_and_delegate_stake(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -615,7 +538,7 @@ pub fn authorize(
 ) -> Instruction {
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
@@ -639,7 +562,7 @@ pub fn authorize_checked(
 ) -> Instruction {
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
         AccountMeta::new_readonly(*new_authorized_pubkey, true),
     ];
@@ -667,7 +590,7 @@ pub fn authorize_with_seed(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*authority_base, true),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
     ];
 
     if let Some(custodian_pubkey) = custodian_pubkey {
@@ -700,7 +623,7 @@ pub fn authorize_checked_with_seed(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*authority_base, true),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*new_authorized_pubkey, true),
     ];
 
@@ -729,10 +652,10 @@ pub fn delegate_stake(
     let account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*vote_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::id(), false),
+        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
     Instruction::new_with_bincode(id(), &StakeInstruction::DelegateStake, account_metas)
@@ -748,8 +671,8 @@ pub fn withdraw(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new(*to_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         AccountMeta::new_readonly(*withdrawer_pubkey, true),
     ];
 
@@ -763,7 +686,7 @@ pub fn withdraw(
 pub fn deactivate_stake(stake_pubkey: &Pubkey, authorized_pubkey: &Pubkey) -> Instruction {
     let account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
     Instruction::new_with_bincode(id(), &StakeInstruction::Deactivate, account_metas)
@@ -851,8 +774,11 @@ pub fn redelegate(
     uninitialized_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(uninitialized_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(uninitialized_stake_pubkey, &id()),
+        solana_system_interface::instruction::allocate(
+            uninitialized_stake_pubkey,
+            StakeStateV2::size_of() as u64,
+        ),
+        solana_system_interface::instruction::assign(uninitialized_stake_pubkey, &id()),
         _redelegate(
             stake_pubkey,
             authorized_pubkey,
@@ -872,7 +798,7 @@ pub fn redelegate_with_seed(
     seed: &str,                          // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::instruction::allocate_with_seed(
             uninitialized_stake_pubkey,
             base,
             seed,
@@ -924,7 +850,10 @@ pub fn move_lamports(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::instruction::InstructionError};
+    use {
+        crate::error::StakeError, solana_decode_error::DecodeError,
+        solana_instruction::error::InstructionError,
+    };
 
     #[test]
     fn test_custom_error_decode() {

@@ -1,18 +1,17 @@
 //! A type to hold data for the [`StakeHistory` sysvar][sv].
 //!
 //! [sv]: https://docs.solanalabs.com/runtime/sysvars#stakehistory
-//!
-//! The sysvar ID is declared in [`sysvar::stake_history`].
-//!
-//! [`sysvar::stake_history`]: crate::sysvar::stake_history
 
 pub use solana_clock::Epoch;
-use std::ops::Deref;
+use {
+    serde::{Deserialize, Serialize},
+    std::ops::Deref,
+};
 
 pub const MAX_ENTRIES: usize = 512; // it should never take as many as 512 epochs to warm up or cool down
 
 #[repr(C)]
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone)]
 pub struct StakeHistoryEntry {
     pub effective: u64,    // effective stake at this epoch
@@ -57,7 +56,7 @@ impl std::ops::Add for StakeHistoryEntry {
 }
 
 #[repr(C)]
-#[cfg_attr(feature = "frozen-abi", derive(AbiExample))]
+#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone)]
 pub struct StakeHistory(Vec<(Epoch, StakeHistoryEntry)>);
 
