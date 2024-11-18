@@ -36,6 +36,16 @@ import {
 } from '@solana/web3.js';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  getEpochDecoder,
+  getEpochEncoder,
+  getUnixTimestampDecoder,
+  getUnixTimestampEncoder,
+  type Epoch,
+  type EpochArgs,
+  type UnixTimestamp,
+  type UnixTimestampArgs,
+} from '../types';
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
 
@@ -75,8 +85,8 @@ export type SetLockupCheckedInstructionData = {
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<number | bigint>;
-  epoch: OptionOrNullable<number | bigint>;
+  unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
+  epoch: OptionOrNullable<EpochArgs>;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {

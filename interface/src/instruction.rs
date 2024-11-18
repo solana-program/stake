@@ -6,6 +6,7 @@
 #[cfg(feature = "bincode")]
 use {
     crate::{config, state::StakeStateV2},
+    shank::ShankType,
     solana_instruction::{AccountMeta, Instruction},
     solana_system_interface::program::ID,
 };
@@ -35,7 +36,8 @@ const STAKE_HISTORY_ID: Pubkey =
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, ShankInstruction)]
+#[rustfmt::skip]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
     ///
@@ -46,6 +48,8 @@ pub enum StakeInstruction {
     /// [`Authorized`] carries pubkeys that must sign staker transactions
     /// and withdrawer transactions; [`Lockup`] carries information about
     /// withdrawal restrictions.
+    #[account(0, writable, name = "stake", desc = "Uninitialized stake account")]
+    #[account(1, name = "rent_sysvar", desc = "Rent sysvar")]
     Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
@@ -56,6 +60,16 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` The stake or withdraw authority
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
     ///      lockup expiration
+    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(1, name = "clock_sysvar", desc = "Rent sysvar")]
+    #[account(2, signer, name = "authority", desc = "Stake or withdraw authority")]
+    #[account(
+        3,
+        optional,
+        signer,
+        name = "lockup_authority",
+        desc = "Lockup authority"
+    )]
     Authorize(Pubkey, StakeAuthorize),
 
     /// Delegate a stake to a particular vote account
@@ -70,6 +84,21 @@ pub enum StakeInstruction {
     ///
     /// The entire balance of the staking account is staked. `DelegateStake`
     /// can be called multiple times, but re-delegation is delayed by one epoch.
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Initialized stake account to be delegated"
+    )]
+    #[account(
+        1,
+        name = "vote",
+        desc = "Vote account to which this stake will be delegated"
+    )]
+    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
+    #[account(4, name = "unused", desc = "Unused account, formerly the stake config")]
+    #[account(5, signer, name = "stake_authority", desc = "Stake authority")]
     DelegateStake,
 
     /// Split `u64` tokens and stake off a stake account into another stake account.
@@ -78,6 +107,14 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be split; must be in the Initialized or Stake state
     ///   1. `[WRITE]` Uninitialized stake account that will take the split-off amount
     ///   2. `[SIGNER]` Stake authority
+    #[account(0, writable, name = "stake", desc = "Stake account to be split")]
+    #[account(
+        1,
+        writable,
+        name = "split_stake",
+        desc = "Uninitialized stake account"
+    )]
+    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
     Split(u64),
 
     /// Withdraw unstaked lamports from the stake account
@@ -92,6 +129,23 @@ pub enum StakeInstruction {
     ///
     /// The `u64` is the portion of the stake account balance to be withdrawn,
     /// must be `<= StakeAccount.lamports - staked_lamports`.
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account from which to withdraw"
+    )]
+    #[account(1, writable, name = "recipient", desc = "Recipient account")]
+    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
+    #[account(4, signer, name = "Withdraw_authority", desc = "Withdraw authority")]
+    #[account(
+        5,
+        optional,
+        signer,
+        name = "lockup_authority",
+        desc = "Lockup authority"
+    )]
     Withdraw(u64),
 
     /// Deactivates the stake in the account
@@ -100,6 +154,9 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` Stake authority
+    #[account(0, writable, name = "stake", desc = "Delegated stake account")]
+    #[account(1, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
     Deactivate,
 
     /// Set stake lockup
@@ -110,6 +167,13 @@ pub enum StakeInstruction {
     /// # Account references
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
+    #[account(0, writable, name = "stake", desc = "Initialized stake account")]
+    #[account(
+        1,
+        signer,
+        name = "authority",
+        desc = "Lockup authority or withdraw authority"
+    )]
     SetLockup(LockupArgs),
 
     /// Merge two stake accounts.
@@ -136,6 +200,16 @@ pub enum StakeInstruction {
     ///   2. `[]` Clock sysvar
     ///   3. `[]` Stake history sysvar that carries stake warmup/cooldown history
     ///   4. `[SIGNER]` Stake authority
+    #[account(
+        0,
+        writable,
+        name = "destination_stake",
+        desc = "Destination stake account"
+    )]
+    #[account(1, writable, name = "source_stake", desc = "Source stake account")]
+    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
+    #[account(4, signer, name = "stake_authority", desc = "Stake authority")]
     Merge,
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -146,6 +220,21 @@ pub enum StakeInstruction {
     ///   2. `[]` Clock sysvar
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
+    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(
+        1,
+        signer,
+        name = "base",
+        desc = "Base key of stake or withdraw authority"
+    )]
+    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        3,
+        optional,
+        signer,
+        name = "lockup_authority",
+        desc = "Lockup authority"
+    )]
     AuthorizeWithSeed(AuthorizeWithSeedArgs),
 
     /// Initialize a stake with authorization information
@@ -158,6 +247,15 @@ pub enum StakeInstruction {
     ///   1. `[]` Rent sysvar
     ///   2. `[]` The stake authority
     ///   3. `[SIGNER]` The withdraw authority
+    #[account(0, writable, name = "stake", desc = "Uninitialized stake account")]
+    #[account(1, name = "rent_sysvar", desc = "Rent sysvar")]
+    #[account(2, name = "stake_authority", desc = "The stake authority")]
+    #[account(
+        3,
+        signer,
+        name = "withdraw_authority",
+        desc = "The withdraw authority"
+    )]
     InitializeChecked,
 
     /// Authorize a key to manage stake or withdrawal
@@ -172,6 +270,27 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
+    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(1, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        2,
+        signer,
+        name = "authority",
+        desc = "The stake or withdraw authority"
+    )]
+    #[account(
+        3,
+        signer,
+        name = "new_authority",
+        desc = "The new stake or withdraw authority"
+    )]
+    #[account(
+        4,
+        optional,
+        signer,
+        name = "lockup_authority",
+        desc = "Lockup authority"
+    )]
     AuthorizeChecked(StakeAuthorize),
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -186,6 +305,27 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
+    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(
+        1,
+        signer,
+        name = "base",
+        desc = "Base key of stake or withdraw authority"
+    )]
+    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        3,
+        signer,
+        name = "new_authority",
+        desc = "The new stake or withdraw authority"
+    )]
+    #[account(
+        4,
+        optional,
+        signer,
+        name = "lockup_authority",
+        desc = "Lockup authority"
+    )]
     AuthorizeCheckedWithSeed(AuthorizeCheckedWithSeedArgs),
 
     /// Set stake lockup
@@ -200,6 +340,20 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
     ///   2. Optional: `[SIGNER]` New lockup authority
+    #[account(0, writable, name = "stake", desc = "Initialized stake account")]
+    #[account(
+        1,
+        signer,
+        name = "authority",
+        desc = "Lockup authority or withdraw authority"
+    )]
+    #[account(
+        2,
+        optional,
+        signer,
+        name = "new_authority",
+        desc = "New lockup authority"
+    )]
     SetLockupChecked(LockupCheckedArgs),
 
     /// Get the minimum stake delegation, in lamports
@@ -225,6 +379,9 @@ pub enum StakeInstruction {
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
     ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
+    #[account(0, writable, name = "stake", desc = "Delegated stake account")]
+    #[account(1, name = "delinquent_vote", desc = "Delinquent vote account")]
+    #[account(2, name = "reference_vote", desc = "Reference vote account")]
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -269,6 +426,19 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` Stake authority
     ///
     /// The `u64` is the portion of the stake to move, which may be the entire delegation
+    #[account(
+        0,
+        writable,
+        name = "source_stake",
+        desc = "Active source stake account"
+    )]
+    #[account(
+        1,
+        writable,
+        name = "destination_stake",
+        desc = "Active or inactive destination stake account"
+    )]
+    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
     MoveStake(u64),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
@@ -284,6 +454,19 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` Stake authority
     ///
     /// The `u64` is the portion of available lamports to move
+    #[account(
+        0,
+        writable,
+        name = "source_stake",
+        desc = "Active or inactive source stake account"
+    )]
+    #[account(
+        1,
+        writable,
+        name = "destination_stake",
+        desc = "Mergeable destination stake account"
+    )]
+    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
     MoveLamports(u64),
 }
 
@@ -291,7 +474,7 @@ pub enum StakeInstruction {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy, ShankType)]
 pub struct LockupArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
@@ -302,7 +485,7 @@ pub struct LockupArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy, ShankType)]
 pub struct LockupCheckedArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
@@ -312,7 +495,7 @@ pub struct LockupCheckedArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, ShankType)]
 pub struct AuthorizeWithSeedArgs {
     pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
@@ -324,7 +507,7 @@ pub struct AuthorizeWithSeedArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, ShankType)]
 pub struct AuthorizeCheckedWithSeedArgs {
     pub stake_authorize: StakeAuthorize,
     pub authority_seed: String,

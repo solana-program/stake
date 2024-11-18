@@ -364,7 +364,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Clock sysvar
+    /// Rent sysvar
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,

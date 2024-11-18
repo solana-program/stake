@@ -73,8 +73,6 @@ export type SetLockupInstructionData = {
 };
 
 export type SetLockupInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<number | bigint>;
-  epoch: OptionOrNullable<number | bigint>;
   custodian: OptionOrNullable<Address>;
 };
 
@@ -117,8 +115,6 @@ export type SetLockupInput<
   stake: Address<TAccountStake>;
   /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  unixTimestamp: SetLockupInstructionDataArgs['unixTimestamp'];
-  epoch: SetLockupInstructionDataArgs['epoch'];
   custodian: SetLockupInstructionDataArgs['custodian'];
 };
 
