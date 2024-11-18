@@ -9,16 +9,18 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct Withdraw {
-    /// The stake account to withdraw from
-    pub from: solana_program::pubkey::Pubkey,
+    /// Stake account from which to withdraw
+    pub stake: solana_program::pubkey::Pubkey,
     /// Recipient account
-    pub to: solana_program::pubkey::Pubkey,
+    pub recipient: solana_program::pubkey::Pubkey,
     /// Clock sysvar
-    pub clock: solana_program::pubkey::Pubkey,
+    pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// Stake history sysvar
     pub stake_history: solana_program::pubkey::Pubkey,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
+    /// Withdraw authority
     pub withdraw_authority: solana_program::pubkey::Pubkey,
+    /// Lockup authority
+    pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl Withdraw {
@@ -34,15 +36,17 @@ impl Withdraw {
         args: WithdrawInstructionArgs,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.from, false,
+            self.stake, false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.to, false,
+            self.recipient,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.clock, false,
+            self.clock_sysvar,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.stake_history,
@@ -52,13 +56,24 @@ impl Withdraw {
             self.withdraw_authority,
             true,
         ));
+        if let Some(lockup_authority) = self.lockup_authority {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                lockup_authority,
+                true,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::STAKE_ID,
+                false,
+            ));
+        }
         accounts.extend_from_slice(remaining_accounts);
         let mut data = WithdrawInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -67,14 +82,12 @@ impl Withdraw {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct WithdrawInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl WithdrawInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [183, 18, 70, 156, 148, 109, 161, 34],
-        }
+        Self { discriminator: 4 }
     }
 }
 
@@ -87,26 +100,28 @@ impl Default for WithdrawInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WithdrawInstructionArgs {
-    pub lamports: u64,
+    pub args: u64,
 }
 
 /// Instruction builder for `Withdraw`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` from
-///   1. `[writable]` to
-///   2. `[]` clock
+///   0. `[writable]` stake
+///   1. `[writable]` recipient
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
 ///   3. `[]` stake_history
 ///   4. `[signer]` withdraw_authority
+///   5. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
 pub struct WithdrawBuilder {
-    from: Option<solana_program::pubkey::Pubkey>,
-    to: Option<solana_program::pubkey::Pubkey>,
-    clock: Option<solana_program::pubkey::Pubkey>,
+    stake: Option<solana_program::pubkey::Pubkey>,
+    recipient: Option<solana_program::pubkey::Pubkey>,
+    clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_history: Option<solana_program::pubkey::Pubkey>,
     withdraw_authority: Option<solana_program::pubkey::Pubkey>,
-    lamports: Option<u64>,
+    lockup_authority: Option<solana_program::pubkey::Pubkey>,
+    args: Option<u64>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -114,22 +129,23 @@ impl WithdrawBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The stake account to withdraw from
+    /// Stake account from which to withdraw
     #[inline(always)]
-    pub fn from(&mut self, from: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.from = Some(from);
+    pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.stake = Some(stake);
         self
     }
     /// Recipient account
     #[inline(always)]
-    pub fn to(&mut self, to: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.to = Some(to);
+    pub fn recipient(&mut self, recipient: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.recipient = Some(recipient);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.clock = Some(clock);
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -138,7 +154,7 @@ impl WithdrawBuilder {
         self.stake_history = Some(stake_history);
         self
     }
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
+    /// Withdraw authority
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
@@ -147,9 +163,19 @@ impl WithdrawBuilder {
         self.withdraw_authority = Some(withdraw_authority);
         self
     }
+    /// `[optional account]`
+    /// Lockup authority
     #[inline(always)]
-    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
-        self.lamports = Some(lamports);
+    pub fn lockup_authority(
+        &mut self,
+        lockup_authority: Option<solana_program::pubkey::Pubkey>,
+    ) -> &mut Self {
+        self.lockup_authority = lockup_authority;
+        self
+    }
+    #[inline(always)]
+    pub fn args(&mut self, args: u64) -> &mut Self {
+        self.args = Some(args);
         self
     }
     /// Add an additional account to the instruction.
@@ -173,16 +199,19 @@ impl WithdrawBuilder {
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Withdraw {
-            from: self.from.expect("from is not set"),
-            to: self.to.expect("to is not set"),
-            clock: self.clock.expect("clock is not set"),
+            stake: self.stake.expect("stake is not set"),
+            recipient: self.recipient.expect("recipient is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
             stake_history: self.stake_history.expect("stake_history is not set"),
             withdraw_authority: self
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),
+            lockup_authority: self.lockup_authority,
         };
         let args = WithdrawInstructionArgs {
-            lamports: self.lamports.clone().expect("lamports is not set"),
+            args: self.args.clone().expect("args is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -191,32 +220,36 @@ impl WithdrawBuilder {
 
 /// `withdraw` CPI accounts.
 pub struct WithdrawCpiAccounts<'a, 'b> {
-    /// The stake account to withdraw from
-    pub from: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake account from which to withdraw
+    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Recipient account
-    pub to: &'b solana_program::account_info::AccountInfo<'a>,
+    pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
+    /// Withdraw authority
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Lockup authority
+    pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
 /// `withdraw` CPI instruction.
 pub struct WithdrawCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to withdraw from
-    pub from: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake account from which to withdraw
+    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Recipient account
-    pub to: &'b solana_program::account_info::AccountInfo<'a>,
+    pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
+    /// Withdraw authority
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Lockup authority
+    pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: WithdrawInstructionArgs,
 }
@@ -229,11 +262,12 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
     ) -> Self {
         Self {
             __program: program,
-            from: accounts.from,
-            to: accounts.to,
-            clock: accounts.clock,
+            stake: accounts.stake,
+            recipient: accounts.recipient,
+            clock_sysvar: accounts.clock_sysvar,
             stake_history: accounts.stake_history,
             withdraw_authority: accounts.withdraw_authority,
+            lockup_authority: accounts.lockup_authority,
             __args: args,
         }
     }
@@ -270,17 +304,17 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.from.key,
+            *self.stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.to.key,
+            *self.recipient.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.clock.key,
+            *self.clock_sysvar.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -291,6 +325,17 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             *self.withdraw_authority.key,
             true,
         ));
+        if let Some(lockup_authority) = self.lockup_authority {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                *lockup_authority.key,
+                true,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::STAKE_ID,
+                false,
+            ));
+        }
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
@@ -303,17 +348,20 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(6 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(7 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.from.clone());
-        account_infos.push(self.to.clone());
-        account_infos.push(self.clock.clone());
+        account_infos.push(self.stake.clone());
+        account_infos.push(self.recipient.clone());
+        account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.stake_history.clone());
         account_infos.push(self.withdraw_authority.clone());
+        if let Some(lockup_authority) = self.lockup_authority {
+            account_infos.push(lockup_authority.clone());
+        }
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -330,11 +378,12 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` from
-///   1. `[writable]` to
-///   2. `[]` clock
+///   0. `[writable]` stake
+///   1. `[writable]` recipient
+///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history
 ///   4. `[signer]` withdraw_authority
+///   5. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug)]
 pub struct WithdrawCpiBuilder<'a, 'b> {
     instruction: Box<WithdrawCpiBuilderInstruction<'a, 'b>>,
@@ -344,32 +393,39 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(WithdrawCpiBuilderInstruction {
             __program: program,
-            from: None,
-            to: None,
-            clock: None,
+            stake: None,
+            recipient: None,
+            clock_sysvar: None,
             stake_history: None,
             withdraw_authority: None,
-            lamports: None,
+            lockup_authority: None,
+            args: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The stake account to withdraw from
+    /// Stake account from which to withdraw
     #[inline(always)]
-    pub fn from(&mut self, from: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.from = Some(from);
+    pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+        self.instruction.stake = Some(stake);
         self
     }
     /// Recipient account
     #[inline(always)]
-    pub fn to(&mut self, to: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.to = Some(to);
+    pub fn recipient(
+        &mut self,
+        recipient: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.recipient = Some(recipient);
         self
     }
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.clock = Some(clock);
+    pub fn clock_sysvar(
+        &mut self,
+        clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -381,7 +437,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self.instruction.stake_history = Some(stake_history);
         self
     }
-    /// from's withdraw authority. If stake Lockup is active, the signing lockup authority must follow.
+    /// Withdraw authority
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
@@ -390,9 +446,19 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self.instruction.withdraw_authority = Some(withdraw_authority);
         self
     }
+    /// `[optional account]`
+    /// Lockup authority
     #[inline(always)]
-    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
-        self.instruction.lamports = Some(lamports);
+    pub fn lockup_authority(
+        &mut self,
+        lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    ) -> &mut Self {
+        self.instruction.lockup_authority = lockup_authority;
+        self
+    }
+    #[inline(always)]
+    pub fn args(&mut self, args: u64) -> &mut Self {
+        self.instruction.args = Some(args);
         self
     }
     /// Add an additional account to the instruction.
@@ -437,20 +503,19 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = WithdrawInstructionArgs {
-            lamports: self
-                .instruction
-                .lamports
-                .clone()
-                .expect("lamports is not set"),
+            args: self.instruction.args.clone().expect("args is not set"),
         };
         let instruction = WithdrawCpi {
             __program: self.instruction.__program,
 
-            from: self.instruction.from.expect("from is not set"),
+            stake: self.instruction.stake.expect("stake is not set"),
 
-            to: self.instruction.to.expect("to is not set"),
+            recipient: self.instruction.recipient.expect("recipient is not set"),
 
-            clock: self.instruction.clock.expect("clock is not set"),
+            clock_sysvar: self
+                .instruction
+                .clock_sysvar
+                .expect("clock_sysvar is not set"),
 
             stake_history: self
                 .instruction
@@ -461,6 +526,8 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
                 .instruction
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),
+
+            lockup_authority: self.instruction.lockup_authority,
             __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -473,12 +540,13 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
 #[derive(Clone, Debug)]
 struct WithdrawCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    from: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    to: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    clock: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    recipient: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     withdraw_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    lamports: Option<u64>,
+    lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    args: Option<u64>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

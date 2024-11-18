@@ -8,12 +8,10 @@
 
 import {
   combineCodec,
-  fixDecoderSize,
-  fixEncoderSize,
-  getBytesDecoder,
-  getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -26,26 +24,25 @@ import {
   type IInstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
-  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/web3.js';
-import { STAKE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
-export const MERGE_DISCRIMINATOR = new Uint8Array([
-  148, 141, 236, 47, 174, 126, 69, 111,
-]);
+export const MERGE_DISCRIMINATOR = 7;
 
 export function getMergeDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(MERGE_DISCRIMINATOR);
+  return getU8Encoder().encode(MERGE_DISCRIMINATOR);
 }
 
 export type MergeInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
-  TAccountTo extends string | IAccountMeta<string> = string,
-  TAccountFrom extends string | IAccountMeta<string> = string,
-  TAccountClock extends string | IAccountMeta<string> = string,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
+  TAccountDestinationStake extends string | IAccountMeta<string> = string,
+  TAccountSourceStake extends string | IAccountMeta<string> = string,
+  TAccountClockSysvar extends
+    | string
+    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
   TAccountStakeHistory extends string | IAccountMeta<string> = string,
   TAccountStakeAuthority extends string | IAccountMeta<string> = string,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
@@ -53,13 +50,15 @@ export type MergeInstruction<
   IInstructionWithData<Uint8Array> &
   IInstructionWithAccounts<
     [
-      TAccountTo extends string ? WritableAccount<TAccountTo> : TAccountTo,
-      TAccountFrom extends string
-        ? WritableAccount<TAccountFrom>
-        : TAccountFrom,
-      TAccountClock extends string
-        ? ReadonlyAccount<TAccountClock>
-        : TAccountClock,
+      TAccountDestinationStake extends string
+        ? WritableAccount<TAccountDestinationStake>
+        : TAccountDestinationStake,
+      TAccountSourceStake extends string
+        ? WritableAccount<TAccountSourceStake>
+        : TAccountSourceStake,
+      TAccountClockSysvar extends string
+        ? ReadonlyAccount<TAccountClockSysvar>
+        : TAccountClockSysvar,
       TAccountStakeHistory extends string
         ? ReadonlyAccount<TAccountStakeHistory>
         : TAccountStakeHistory,
@@ -71,21 +70,19 @@ export type MergeInstruction<
     ]
   >;
 
-export type MergeInstructionData = { discriminator: ReadonlyUint8Array };
+export type MergeInstructionData = { discriminator: number };
 
 export type MergeInstructionDataArgs = {};
 
 export function getMergeInstructionDataEncoder(): Encoder<MergeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({ ...value, discriminator: MERGE_DISCRIMINATOR })
   );
 }
 
 export function getMergeInstructionDataDecoder(): Decoder<MergeInstructionData> {
-  return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-  ]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getMergeInstructionDataCodec(): Codec<
@@ -99,57 +96,59 @@ export function getMergeInstructionDataCodec(): Codec<
 }
 
 export type MergeInput<
-  TAccountTo extends string = string,
-  TAccountFrom extends string = string,
-  TAccountClock extends string = string,
+  TAccountDestinationStake extends string = string,
+  TAccountSourceStake extends string = string,
+  TAccountClockSysvar extends string = string,
   TAccountStakeHistory extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** The destination stake account to merge into */
-  to: Address<TAccountTo>;
-  /** The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained. */
-  from: Address<TAccountFrom>;
+  /** Destination stake account */
+  destinationStake: Address<TAccountDestinationStake>;
+  /** Source stake account */
+  sourceStake: Address<TAccountSourceStake>;
   /** Clock sysvar */
-  clock: Address<TAccountClock>;
+  clockSysvar?: Address<TAccountClockSysvar>;
   /** Stake history sysvar */
   stakeHistory: Address<TAccountStakeHistory>;
-  /** Both from and to's stake authority */
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
 export function getMergeInstruction<
-  TAccountTo extends string,
-  TAccountFrom extends string,
-  TAccountClock extends string,
+  TAccountDestinationStake extends string,
+  TAccountSourceStake extends string,
+  TAccountClockSysvar extends string,
   TAccountStakeHistory extends string,
   TAccountStakeAuthority extends string,
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: MergeInput<
-    TAccountTo,
-    TAccountFrom,
-    TAccountClock,
+    TAccountDestinationStake,
+    TAccountSourceStake,
+    TAccountClockSysvar,
     TAccountStakeHistory,
     TAccountStakeAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): MergeInstruction<
   TProgramAddress,
-  TAccountTo,
-  TAccountFrom,
-  TAccountClock,
+  TAccountDestinationStake,
+  TAccountSourceStake,
+  TAccountClockSysvar,
   TAccountStakeHistory,
   TAccountStakeAuthority
 > {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? STAKE_PROGRAM_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
-    to: { value: input.to ?? null, isWritable: true },
-    from: { value: input.from ?? null, isWritable: true },
-    clock: { value: input.clock ?? null, isWritable: false },
+    destinationStake: {
+      value: input.destinationStake ?? null,
+      isWritable: true,
+    },
+    sourceStake: { value: input.sourceStake ?? null, isWritable: true },
+    clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
     stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
@@ -158,12 +157,18 @@ export function getMergeInstruction<
     ResolvedAccount
   >;
 
+  // Resolve default values.
+  if (!accounts.clockSysvar.value) {
+    accounts.clockSysvar.value =
+      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
+  }
+
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   const instruction = {
     accounts: [
-      getAccountMeta(accounts.to),
-      getAccountMeta(accounts.from),
-      getAccountMeta(accounts.clock),
+      getAccountMeta(accounts.destinationStake),
+      getAccountMeta(accounts.sourceStake),
+      getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.stakeHistory),
       getAccountMeta(accounts.stakeAuthority),
     ],
@@ -171,9 +176,9 @@ export function getMergeInstruction<
     data: getMergeInstructionDataEncoder().encode({}),
   } as MergeInstruction<
     TProgramAddress,
-    TAccountTo,
-    TAccountFrom,
-    TAccountClock,
+    TAccountDestinationStake,
+    TAccountSourceStake,
+    TAccountClockSysvar,
     TAccountStakeHistory,
     TAccountStakeAuthority
   >;
@@ -182,20 +187,20 @@ export function getMergeInstruction<
 }
 
 export type ParsedMergeInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The destination stake account to merge into */
-    to: TAccountMetas[0];
-    /** The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained. */
-    from: TAccountMetas[1];
+    /** Destination stake account */
+    destinationStake: TAccountMetas[0];
+    /** Source stake account */
+    sourceStake: TAccountMetas[1];
     /** Clock sysvar */
-    clock: TAccountMetas[2];
+    clockSysvar: TAccountMetas[2];
     /** Stake history sysvar */
     stakeHistory: TAccountMetas[3];
-    /** Both from and to's stake authority */
+    /** Stake authority */
     stakeAuthority: TAccountMetas[4];
   };
   data: MergeInstructionData;
@@ -222,9 +227,9 @@ export function parseMergeInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      to: getNextAccount(),
-      from: getNextAccount(),
-      clock: getNextAccount(),
+      destinationStake: getNextAccount(),
+      sourceStake: getNextAccount(),
+      clockSysvar: getNextAccount(),
       stakeHistory: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },

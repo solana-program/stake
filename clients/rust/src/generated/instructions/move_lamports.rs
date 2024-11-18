@@ -5,43 +5,46 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use {
-    crate::generated::types::Lockup,
-    borsh::{BorshDeserialize, BorshSerialize},
-    solana_program::pubkey::Pubkey,
-};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
-pub struct Initialize {
-    /// Uninitialized stake account
-    pub stake: solana_program::pubkey::Pubkey,
-    /// Rent sysvar
-    pub rent_sysvar: solana_program::pubkey::Pubkey,
+pub struct MoveLamports {
+    /// Active or inactive source stake account
+    pub source_stake: solana_program::pubkey::Pubkey,
+    /// Mergeable destination stake account
+    pub destination_stake: solana_program::pubkey::Pubkey,
+    /// Stake authority
+    pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
-impl Initialize {
+impl MoveLamports {
     pub fn instruction(
         &self,
-        args: InitializeInstructionArgs,
+        args: MoveLamportsInstructionArgs,
     ) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        args: InitializeInstructionArgs,
+        args: MoveLamportsInstructionArgs,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.stake, false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.rent_sysvar,
+            self.source_stake,
             false,
         ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.destination_stake,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            self.stake_authority,
+            true,
+        ));
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = InitializeInstructionData::new().try_to_vec().unwrap();
+        let mut data = MoveLamportsInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -54,17 +57,17 @@ impl Initialize {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct InitializeInstructionData {
+pub struct MoveLamportsInstructionData {
     discriminator: u8,
 }
 
-impl InitializeInstructionData {
+impl MoveLamportsInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 0 }
+        Self { discriminator: 17 }
     }
 }
 
-impl Default for InitializeInstructionData {
+impl Default for MoveLamportsInstructionData {
     fn default() -> Self {
         Self::new()
     }
@@ -72,58 +75,57 @@ impl Default for InitializeInstructionData {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InitializeInstructionArgs {
-    pub staker: Pubkey,
-    pub withdrawer: Pubkey,
-    pub arg1: Lockup,
+pub struct MoveLamportsInstructionArgs {
+    pub args: u64,
 }
 
-/// Instruction builder for `Initialize`.
+/// Instruction builder for `MoveLamports`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` stake
-///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
+///   0. `[writable]` source_stake
+///   1. `[writable]` destination_stake
+///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
-pub struct InitializeBuilder {
-    stake: Option<solana_program::pubkey::Pubkey>,
-    rent_sysvar: Option<solana_program::pubkey::Pubkey>,
-    staker: Option<Pubkey>,
-    withdrawer: Option<Pubkey>,
-    arg1: Option<Lockup>,
+pub struct MoveLamportsBuilder {
+    source_stake: Option<solana_program::pubkey::Pubkey>,
+    destination_stake: Option<solana_program::pubkey::Pubkey>,
+    stake_authority: Option<solana_program::pubkey::Pubkey>,
+    args: Option<u64>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
-impl InitializeBuilder {
+impl MoveLamportsBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Uninitialized stake account
+    /// Active or inactive source stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.stake = Some(stake);
+    pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.source_stake = Some(source_stake);
         self
     }
-    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
-    /// Rent sysvar
+    /// Mergeable destination stake account
     #[inline(always)]
-    pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.rent_sysvar = Some(rent_sysvar);
+    pub fn destination_stake(
+        &mut self,
+        destination_stake: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.destination_stake = Some(destination_stake);
+        self
+    }
+    /// Stake authority
+    #[inline(always)]
+    pub fn stake_authority(
+        &mut self,
+        stake_authority: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.stake_authority = Some(stake_authority);
         self
     }
     #[inline(always)]
-    pub fn staker(&mut self, staker: Pubkey) -> &mut Self {
-        self.staker = Some(staker);
-        self
-    }
-    #[inline(always)]
-    pub fn withdrawer(&mut self, withdrawer: Pubkey) -> &mut Self {
-        self.withdrawer = Some(withdrawer);
-        self
-    }
-    #[inline(always)]
-    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
-        self.arg1 = Some(arg1);
+    pub fn args(&mut self, args: u64) -> &mut Self {
+        self.args = Some(args);
         self
     }
     /// Add an additional account to the instruction.
@@ -146,52 +148,56 @@ impl InitializeBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
-        let accounts = Initialize {
-            stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarRent111111111111111111111111111111111"
-            )),
+        let accounts = MoveLamports {
+            source_stake: self.source_stake.expect("source_stake is not set"),
+            destination_stake: self
+                .destination_stake
+                .expect("destination_stake is not set"),
+            stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
-        let args = InitializeInstructionArgs {
-            staker: self.staker.clone().expect("staker is not set"),
-            withdrawer: self.withdrawer.clone().expect("withdrawer is not set"),
-            arg1: self.arg1.clone().expect("arg1 is not set"),
+        let args = MoveLamportsInstructionArgs {
+            args: self.args.clone().expect("args is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
     }
 }
 
-/// `initialize` CPI accounts.
-pub struct InitializeCpiAccounts<'a, 'b> {
-    /// Uninitialized stake account
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+/// `move_lamports` CPI accounts.
+pub struct MoveLamportsCpiAccounts<'a, 'b> {
+    /// Active or inactive source stake account
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Mergeable destination stake account
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake authority
+    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
-/// `initialize` CPI instruction.
-pub struct InitializeCpi<'a, 'b> {
+/// `move_lamports` CPI instruction.
+pub struct MoveLamportsCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Active or inactive source stake account
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Mergeable destination stake account
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake authority
+    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
-    pub __args: InitializeInstructionArgs,
+    pub __args: MoveLamportsInstructionArgs,
 }
 
-impl<'a, 'b> InitializeCpi<'a, 'b> {
+impl<'a, 'b> MoveLamportsCpi<'a, 'b> {
     pub fn new(
         program: &'b solana_program::account_info::AccountInfo<'a>,
-        accounts: InitializeCpiAccounts<'a, 'b>,
-        args: InitializeInstructionArgs,
+        accounts: MoveLamportsCpiAccounts<'a, 'b>,
+        args: MoveLamportsInstructionArgs,
     ) -> Self {
         Self {
             __program: program,
-            stake: accounts.stake,
-            rent_sysvar: accounts.rent_sysvar,
+            source_stake: accounts.source_stake,
+            destination_stake: accounts.destination_stake,
+            stake_authority: accounts.stake_authority,
             __args: args,
         }
     }
@@ -228,14 +234,18 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.stake.key,
+            *self.source_stake.key,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.destination_stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.rent_sysvar.key,
-            false,
+            *self.stake_authority.key,
+            true,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(solana_program::instruction::AccountMeta {
@@ -244,7 +254,7 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = InitializeInstructionData::new().try_to_vec().unwrap();
+        let mut data = MoveLamportsInstructionData::new().try_to_vec().unwrap();
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -253,10 +263,11 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.stake.clone());
-        account_infos.push(self.rent_sysvar.clone());
+        account_infos.push(self.source_stake.clone());
+        account_infos.push(self.destination_stake.clone());
+        account_infos.push(self.stake_authority.clone());
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -269,58 +280,60 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
     }
 }
 
-/// Instruction builder for `Initialize` via CPI.
+/// Instruction builder for `MoveLamports` via CPI.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` stake
-///   1. `[]` rent_sysvar
+///   0. `[writable]` source_stake
+///   1. `[writable]` destination_stake
+///   2. `[signer]` stake_authority
 #[derive(Clone, Debug)]
-pub struct InitializeCpiBuilder<'a, 'b> {
-    instruction: Box<InitializeCpiBuilderInstruction<'a, 'b>>,
+pub struct MoveLamportsCpiBuilder<'a, 'b> {
+    instruction: Box<MoveLamportsCpiBuilderInstruction<'a, 'b>>,
 }
 
-impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
+impl<'a, 'b> MoveLamportsCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(InitializeCpiBuilderInstruction {
+        let instruction = Box::new(MoveLamportsCpiBuilderInstruction {
             __program: program,
-            stake: None,
-            rent_sysvar: None,
-            staker: None,
-            withdrawer: None,
-            arg1: None,
+            source_stake: None,
+            destination_stake: None,
+            stake_authority: None,
+            args: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// Uninitialized stake account
+    /// Active or inactive source stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.stake = Some(stake);
-        self
-    }
-    /// Rent sysvar
-    #[inline(always)]
-    pub fn rent_sysvar(
+    pub fn source_stake(
         &mut self,
-        rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+        source_stake: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.rent_sysvar = Some(rent_sysvar);
+        self.instruction.source_stake = Some(source_stake);
+        self
+    }
+    /// Mergeable destination stake account
+    #[inline(always)]
+    pub fn destination_stake(
+        &mut self,
+        destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.destination_stake = Some(destination_stake);
+        self
+    }
+    /// Stake authority
+    #[inline(always)]
+    pub fn stake_authority(
+        &mut self,
+        stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.stake_authority = Some(stake_authority);
         self
     }
     #[inline(always)]
-    pub fn staker(&mut self, staker: Pubkey) -> &mut Self {
-        self.instruction.staker = Some(staker);
-        self
-    }
-    #[inline(always)]
-    pub fn withdrawer(&mut self, withdrawer: Pubkey) -> &mut Self {
-        self.instruction.withdrawer = Some(withdrawer);
-        self
-    }
-    #[inline(always)]
-    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
-        self.instruction.arg1 = Some(arg1);
+    pub fn args(&mut self, args: u64) -> &mut Self {
+        self.instruction.args = Some(args);
         self
     }
     /// Add an additional account to the instruction.
@@ -364,24 +377,26 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         &self,
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
-        let args = InitializeInstructionArgs {
-            staker: self.instruction.staker.clone().expect("staker is not set"),
-            withdrawer: self
-                .instruction
-                .withdrawer
-                .clone()
-                .expect("withdrawer is not set"),
-            arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
+        let args = MoveLamportsInstructionArgs {
+            args: self.instruction.args.clone().expect("args is not set"),
         };
-        let instruction = InitializeCpi {
+        let instruction = MoveLamportsCpi {
             __program: self.instruction.__program,
 
-            stake: self.instruction.stake.expect("stake is not set"),
-
-            rent_sysvar: self
+            source_stake: self
                 .instruction
-                .rent_sysvar
-                .expect("rent_sysvar is not set"),
+                .source_stake
+                .expect("source_stake is not set"),
+
+            destination_stake: self
+                .instruction
+                .destination_stake
+                .expect("destination_stake is not set"),
+
+            stake_authority: self
+                .instruction
+                .stake_authority
+                .expect("stake_authority is not set"),
             __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -392,13 +407,12 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
 }
 
 #[derive(Clone, Debug)]
-struct InitializeCpiBuilderInstruction<'a, 'b> {
+struct MoveLamportsCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    rent_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    staker: Option<Pubkey>,
-    withdrawer: Option<Pubkey>,
-    arg1: Option<Lockup>,
+    source_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    destination_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    args: Option<u64>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

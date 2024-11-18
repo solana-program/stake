@@ -12,9 +12,9 @@ use {
 
 /// Accounts.
 pub struct SetLockup {
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
 }
 
@@ -45,7 +45,7 @@ impl SetLockup {
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -54,14 +54,12 @@ impl SetLockup {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct SetLockupInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl SetLockupInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [44, 170, 189, 40, 128, 123, 252, 201],
-        }
+        Self { discriminator: 6 }
     }
 }
 
@@ -74,8 +72,6 @@ impl Default for SetLockupInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupInstructionArgs {
-    pub unix_timestamp: Option<i64>,
-    pub epoch: Option<u64>,
     pub custodian: Option<Pubkey>,
 }
 
@@ -89,8 +85,6 @@ pub struct SetLockupInstructionArgs {
 pub struct SetLockupBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     authority: Option<solana_program::pubkey::Pubkey>,
-    unix_timestamp: Option<i64>,
-    epoch: Option<u64>,
     custodian: Option<Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
@@ -99,28 +93,16 @@ impl SetLockupBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
-        self
-    }
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
-        self.unix_timestamp = Some(unix_timestamp);
-        self
-    }
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
-        self.epoch = Some(epoch);
         self
     }
     /// `[optional argument]`
@@ -154,8 +136,6 @@ impl SetLockupBuilder {
             authority: self.authority.expect("authority is not set"),
         };
         let args = SetLockupInstructionArgs {
-            unix_timestamp: self.unix_timestamp.clone(),
-            epoch: self.epoch.clone(),
             custodian: self.custodian.clone(),
         };
 
@@ -165,9 +145,9 @@ impl SetLockupBuilder {
 
 /// `set_lockup` CPI accounts.
 pub struct SetLockupCpiAccounts<'a, 'b> {
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -175,9 +155,9 @@ pub struct SetLockupCpiAccounts<'a, 'b> {
 pub struct SetLockupCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: SetLockupInstructionArgs,
@@ -250,7 +230,7 @@ impl<'a, 'b> SetLockupCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };
@@ -287,38 +267,24 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             authority: None,
-            unix_timestamp: None,
-            epoch: None,
             custodian: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,
         authority: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.authority = Some(authority);
-        self
-    }
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
-        self.instruction.unix_timestamp = Some(unix_timestamp);
-        self
-    }
-    /// `[optional argument]`
-    #[inline(always)]
-    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
-        self.instruction.epoch = Some(epoch);
         self
     }
     /// `[optional argument]`
@@ -369,8 +335,6 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = SetLockupInstructionArgs {
-            unix_timestamp: self.instruction.unix_timestamp.clone(),
-            epoch: self.instruction.epoch.clone(),
             custodian: self.instruction.custodian.clone(),
         };
         let instruction = SetLockupCpi {
@@ -393,8 +357,6 @@ struct SetLockupCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    unix_timestamp: Option<i64>,
-    epoch: Option<u64>,
     custodian: Option<Pubkey>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(

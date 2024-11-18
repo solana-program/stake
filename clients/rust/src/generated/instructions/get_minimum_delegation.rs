@@ -26,7 +26,7 @@ impl GetMinimumDelegation {
             .unwrap();
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -35,14 +35,12 @@ impl GetMinimumDelegation {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct GetMinimumDelegationInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl GetMinimumDelegationInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [197, 65, 7, 73, 151, 105, 133, 105],
-        }
+        Self { discriminator: 13 }
     }
 }
 
@@ -147,7 +145,7 @@ impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
             .unwrap();
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };

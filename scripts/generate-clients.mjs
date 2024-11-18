@@ -4,67 +4,68 @@ import * as c from 'codama';
 import { rootNodeFromAnchor } from '@codama/nodes-from-anchor';
 import { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
 import { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';
-import { getAllProgramIdls, getToolchainArgument } from './utils.mjs';
+import { getToolchainArgument } from './utils.mjs';
 
-// Instanciate Codama.
-const [idl, ...additionalIdls] = getAllProgramIdls().map((idl) =>
-  rootNodeFromAnchor(require(idl))
-);
-const codama = c.createFromRoot(idl, additionalIdls);
+// Instanciate Codama from the IDL.
+const idl = require(path.join(__dirname, '..', 'interface', 'idl.json'));
+const codama = c.createFromRoot(rootNodeFromAnchor(idl));
 
-/*
-// Update programs.
+codama.accept(c.consoleLogVisitor(c.getDebugStringVisitor({ indent: true })));
+
+// Rename the program.
 codama.update(
   c.updateProgramsVisitor({
-    solanaStakeProgram: { name: 'stake' },
+    solanaStakeInterface: { name: 'stake' },
   })
 );
 
-// Update accounts.
-codama.update(
-  c.updateAccountsVisitor({
-    counter: {
-      seeds: [
-        c.constantPdaSeedNodeFromString('utf8', 'counter'),
-        c.variablePdaSeedNode(
-          'authority',
-          c.publicKeyTypeNode(),
-          'The authority of the counter account'
-        ),
-      ],
-    },
-  })
-);
 
-// Update instructions.
 codama.update(
   c.updateInstructionsVisitor({
-    create: {
-      byteDeltas: [c.instructionByteDeltaNode(c.accountLinkNode('counter'))],
-      accounts: {
-        counter: { defaultValue: c.pdaValueNode('counter') },
-        payer: { defaultValue: c.accountValueNode('authority') },
-      },
-    },
-    increment: {
-      accounts: {
-        counter: { defaultValue: c.pdaValueNode('counter') },
-      },
-      arguments: {
-        amount: { defaultValue: c.noneValueNode() },
-      },
-    },
+    // Deprecated instruction.
+    redelegate: { delete: true },
   })
 );
 
-// Set account discriminators.
-const key = (name) => ({ field: 'key', value: c.enumValueNode('Key', name) });
+// Add missing types from the IDL.
 codama.update(
-  c.setAccountDiscriminatorFromFieldVisitor({
-    counter: key('counter'),
-  })
+  c.bottomUpTransformerVisitor([
+    {
+      // Epoch -> u64
+      select: (node) => {
+        return (
+          c.isNode(node, "structFieldTypeNode") &&
+          c.isNode(node.type, "definedTypeLinkNode") &&
+          node.type.name === "epoch"
+        );
+      },
+      transform: (node) => {
+        c.assertIsNode(node, "structFieldTypeNode");
+        return {
+          ...node,
+          type: c.numberTypeNode("u64"),
+        };
+      },
+    },
+    {
+      // UnixTimestamp -> i64
+      select: (node) => {
+        return (
+          c.isNode(node, "structFieldTypeNode") &&
+          c.isNode(node.type, "definedTypeLinkNode") &&
+          node.type.name === "unixTimestamp"
+        );
+      },
+      transform: (node) => {
+        c.assertIsNode(node, "structFieldTypeNode");
+        return {
+          ...node,
+          type: c.numberTypeNode("i64"),
+        };
+      },
+    },
+  ])
 );
-*/
 
 // Render JavaScript.
 const jsClient = path.join(__dirname, '..', 'clients', 'js');

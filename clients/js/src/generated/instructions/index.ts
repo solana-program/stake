@@ -17,6 +17,8 @@ export * from './getMinimumDelegation';
 export * from './initialize';
 export * from './initializeChecked';
 export * from './merge';
+export * from './moveLamports';
+export * from './moveStake';
 export * from './setLockup';
 export * from './setLockupChecked';
 export * from './split';

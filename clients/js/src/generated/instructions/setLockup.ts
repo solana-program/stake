@@ -8,20 +8,14 @@
 
 import {
   combineCodec,
-  fixDecoderSize,
-  fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBytesDecoder,
-  getBytesEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -35,23 +29,20 @@ import {
   type Option,
   type OptionOrNullable,
   type ReadonlySignerAccount,
-  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/web3.js';
-import { STAKE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
-export const SET_LOCKUP_DISCRIMINATOR = new Uint8Array([
-  44, 170, 189, 40, 128, 123, 252, 201,
-]);
+export const SET_LOCKUP_DISCRIMINATOR = 6;
 
 export function getSetLockupDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(SET_LOCKUP_DISCRIMINATOR);
+  return getU8Encoder().encode(SET_LOCKUP_DISCRIMINATOR);
 }
 
 export type SetLockupInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | IAccountMeta<string> = string,
   TAccountAuthority extends string | IAccountMeta<string> = string,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
@@ -71,24 +62,18 @@ export type SetLockupInstruction<
   >;
 
 export type SetLockupInstructionData = {
-  discriminator: ReadonlyUint8Array;
-  unixTimestamp: Option<bigint>;
-  epoch: Option<bigint>;
+  discriminator: number;
   custodian: Option<Address>;
 };
 
 export type SetLockupInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<number | bigint>;
-  epoch: OptionOrNullable<number | bigint>;
   custodian: OptionOrNullable<Address>;
 };
 
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
-      ['unixTimestamp', getOptionEncoder(getI64Encoder())],
-      ['epoch', getOptionEncoder(getU64Encoder())],
+      ['discriminator', getU8Encoder()],
       ['custodian', getOptionEncoder(getAddressEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
@@ -97,9 +82,7 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-    ['unixTimestamp', getOptionDecoder(getI64Decoder())],
-    ['epoch', getOptionDecoder(getU64Decoder())],
+    ['discriminator', getU8Decoder()],
     ['custodian', getOptionDecoder(getAddressDecoder())],
   ]);
 }
@@ -118,26 +101,23 @@ export type SetLockupInput<
   TAccountStake extends string = string,
   TAccountAuthority extends string = string,
 > = {
-  /** The stake account to set the lockup of */
+  /** Initialized stake account */
   stake: Address<TAccountStake>;
-  /** stake's withdraw authority or lockup authority if lockup is active */
+  /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  unixTimestamp: SetLockupInstructionDataArgs['unixTimestamp'];
-  epoch: SetLockupInstructionDataArgs['epoch'];
   custodian: SetLockupInstructionDataArgs['custodian'];
 };
 
 export function getSetLockupInstruction<
   TAccountStake extends string,
   TAccountAuthority extends string,
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: SetLockupInput<TAccountStake, TAccountAuthority>,
   config?: { programAddress?: TProgramAddress }
 ): SetLockupInstruction<TProgramAddress, TAccountStake, TAccountAuthority> {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? STAKE_PROGRAM_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
@@ -168,14 +148,14 @@ export function getSetLockupInstruction<
 }
 
 export type ParsedSetLockupInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The stake account to set the lockup of */
+    /** Initialized stake account */
     stake: TAccountMetas[0];
-    /** stake's withdraw authority or lockup authority if lockup is active */
+    /** Lockup authority or withdraw authority */
     authority: TAccountMetas[1];
   };
   data: SetLockupInstructionData;

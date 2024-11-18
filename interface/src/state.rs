@@ -6,6 +6,7 @@
 
 #[cfg(feature = "borsh")]
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
+use shank::ShankType;
 use {
     crate::{
         error::StakeError,
@@ -377,7 +378,7 @@ impl borsh0_10::ser::BorshSerialize for Lockup {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy, ShankType)]
 pub struct Authorized {
     pub staker: Pubkey,
     pub withdrawer: Pubkey,

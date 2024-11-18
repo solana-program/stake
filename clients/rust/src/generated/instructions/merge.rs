@@ -9,15 +9,15 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct Merge {
-    /// The destination stake account to merge into
-    pub to: solana_program::pubkey::Pubkey,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
-    pub from: solana_program::pubkey::Pubkey,
+    /// Destination stake account
+    pub destination_stake: solana_program::pubkey::Pubkey,
+    /// Source stake account
+    pub source_stake: solana_program::pubkey::Pubkey,
     /// Clock sysvar
-    pub clock: solana_program::pubkey::Pubkey,
+    pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// Stake history sysvar
     pub stake_history: solana_program::pubkey::Pubkey,
-    /// Both from and to's stake authority
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -32,13 +32,16 @@ impl Merge {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.to, false,
+            self.destination_stake,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.from, false,
+            self.source_stake,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.clock, false,
+            self.clock_sysvar,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.stake_history,
@@ -52,7 +55,7 @@ impl Merge {
         let data = MergeInstructionData::new().try_to_vec().unwrap();
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -61,14 +64,12 @@ impl Merge {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct MergeInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl MergeInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [148, 141, 236, 47, 174, 126, 69, 111],
-        }
+        Self { discriminator: 7 }
     }
 }
 
@@ -82,16 +83,16 @@ impl Default for MergeInstructionData {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` to
-///   1. `[writable]` from
-///   2. `[]` clock
+///   0. `[writable]` destination_stake
+///   1. `[writable]` source_stake
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
 ///   3. `[]` stake_history
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MergeBuilder {
-    to: Option<solana_program::pubkey::Pubkey>,
-    from: Option<solana_program::pubkey::Pubkey>,
-    clock: Option<solana_program::pubkey::Pubkey>,
+    destination_stake: Option<solana_program::pubkey::Pubkey>,
+    source_stake: Option<solana_program::pubkey::Pubkey>,
+    clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_history: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
@@ -101,22 +102,26 @@ impl MergeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The destination stake account to merge into
+    /// Destination stake account
     #[inline(always)]
-    pub fn to(&mut self, to: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.to = Some(to);
+    pub fn destination_stake(
+        &mut self,
+        destination_stake: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.destination_stake = Some(destination_stake);
         self
     }
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// Source stake account
     #[inline(always)]
-    pub fn from(&mut self, from: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.from = Some(from);
+    pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.source_stake = Some(source_stake);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.clock = Some(clock);
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -125,7 +130,7 @@ impl MergeBuilder {
         self.stake_history = Some(stake_history);
         self
     }
-    /// Both from and to's stake authority
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -155,9 +160,13 @@ impl MergeBuilder {
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Merge {
-            to: self.to.expect("to is not set"),
-            from: self.from.expect("from is not set"),
-            clock: self.clock.expect("clock is not set"),
+            destination_stake: self
+                .destination_stake
+                .expect("destination_stake is not set"),
+            source_stake: self.source_stake.expect("source_stake is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
             stake_history: self.stake_history.expect("stake_history is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
@@ -168,15 +177,15 @@ impl MergeBuilder {
 
 /// `merge` CPI accounts.
 pub struct MergeCpiAccounts<'a, 'b> {
-    /// The destination stake account to merge into
-    pub to: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
-    pub from: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Destination stake account
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Source stake account
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Both from and to's stake authority
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -184,15 +193,15 @@ pub struct MergeCpiAccounts<'a, 'b> {
 pub struct MergeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The destination stake account to merge into
-    pub to: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
-    pub from: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Destination stake account
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Source stake account
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Both from and to's stake authority
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -203,9 +212,9 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
     ) -> Self {
         Self {
             __program: program,
-            to: accounts.to,
-            from: accounts.from,
-            clock: accounts.clock,
+            destination_stake: accounts.destination_stake,
+            source_stake: accounts.source_stake,
+            clock_sysvar: accounts.clock_sysvar,
             stake_history: accounts.stake_history,
             stake_authority: accounts.stake_authority,
         }
@@ -245,15 +254,15 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.to.key,
+            *self.destination_stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.from.key,
+            *self.source_stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.clock.key,
+            *self.clock_sysvar.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -274,15 +283,15 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
         let data = MergeInstructionData::new().try_to_vec().unwrap();
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };
         let mut account_infos = Vec::with_capacity(6 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.to.clone());
-        account_infos.push(self.from.clone());
-        account_infos.push(self.clock.clone());
+        account_infos.push(self.destination_stake.clone());
+        account_infos.push(self.source_stake.clone());
+        account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.stake_history.clone());
         account_infos.push(self.stake_authority.clone());
         remaining_accounts
@@ -301,9 +310,9 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` to
-///   1. `[writable]` from
-///   2. `[]` clock
+///   0. `[writable]` destination_stake
+///   1. `[writable]` source_stake
+///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug)]
@@ -315,31 +324,40 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(MergeCpiBuilderInstruction {
             __program: program,
-            to: None,
-            from: None,
-            clock: None,
+            destination_stake: None,
+            source_stake: None,
+            clock_sysvar: None,
             stake_history: None,
             stake_authority: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The destination stake account to merge into
+    /// Destination stake account
     #[inline(always)]
-    pub fn to(&mut self, to: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.to = Some(to);
+    pub fn destination_stake(
+        &mut self,
+        destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.destination_stake = Some(destination_stake);
         self
     }
-    /// The stake account to merge from. Must have exact same lockup and authority as to. This account will be drained.
+    /// Source stake account
     #[inline(always)]
-    pub fn from(&mut self, from: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.from = Some(from);
+    pub fn source_stake(
+        &mut self,
+        source_stake: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.source_stake = Some(source_stake);
         self
     }
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.clock = Some(clock);
+    pub fn clock_sysvar(
+        &mut self,
+        clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -351,7 +369,7 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
         self.instruction.stake_history = Some(stake_history);
         self
     }
-    /// Both from and to's stake authority
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -404,11 +422,20 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
         let instruction = MergeCpi {
             __program: self.instruction.__program,
 
-            to: self.instruction.to.expect("to is not set"),
+            destination_stake: self
+                .instruction
+                .destination_stake
+                .expect("destination_stake is not set"),
 
-            from: self.instruction.from.expect("from is not set"),
+            source_stake: self
+                .instruction
+                .source_stake
+                .expect("source_stake is not set"),
 
-            clock: self.instruction.clock.expect("clock is not set"),
+            clock_sysvar: self
+                .instruction
+                .clock_sysvar
+                .expect("clock_sysvar is not set"),
 
             stake_history: self
                 .instruction
@@ -430,9 +457,9 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
 #[derive(Clone, Debug)]
 struct MergeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    to: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    from: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    clock: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    destination_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    source_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.

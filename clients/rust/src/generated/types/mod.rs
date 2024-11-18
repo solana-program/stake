@@ -5,6 +5,6 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-pub(crate) mod r#stake_authorize;
+pub(crate) mod r#my_type;
 
-pub use self::r#stake_authorize::*;
+pub use self::r#my_type::*;

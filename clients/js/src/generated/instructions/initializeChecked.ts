@@ -8,12 +8,10 @@
 
 import {
   combineCodec,
-  fixDecoderSize,
-  fixEncoderSize,
-  getBytesDecoder,
-  getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -26,27 +24,22 @@ import {
   type IInstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
-  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/web3.js';
-import { STAKE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
-export const INITIALIZE_CHECKED_DISCRIMINATOR = new Uint8Array([
-  219, 90, 58, 161, 139, 88, 246, 28,
-]);
+export const INITIALIZE_CHECKED_DISCRIMINATOR = 9;
 
 export function getInitializeCheckedDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    INITIALIZE_CHECKED_DISCRIMINATOR
-  );
+  return getU8Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
 }
 
 export type InitializeCheckedInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountRent extends
+  TAccountRentSysvar extends
     | string
     | IAccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
   TAccountStakeAuthority extends string | IAccountMeta<string> = string,
@@ -59,9 +52,9 @@ export type InitializeCheckedInstruction<
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
-      TAccountRent extends string
-        ? ReadonlyAccount<TAccountRent>
-        : TAccountRent,
+      TAccountRentSysvar extends string
+        ? ReadonlyAccount<TAccountRentSysvar>
+        : TAccountRentSysvar,
       TAccountStakeAuthority extends string
         ? ReadonlyAccount<TAccountStakeAuthority>
         : TAccountStakeAuthority,
@@ -73,23 +66,19 @@ export type InitializeCheckedInstruction<
     ]
   >;
 
-export type InitializeCheckedInstructionData = {
-  discriminator: ReadonlyUint8Array;
-};
+export type InitializeCheckedInstructionData = { discriminator: number };
 
 export type InitializeCheckedInstructionDataArgs = {};
 
 export function getInitializeCheckedInstructionDataEncoder(): Encoder<InitializeCheckedInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({ ...value, discriminator: INITIALIZE_CHECKED_DISCRIMINATOR })
   );
 }
 
 export function getInitializeCheckedInstructionDataDecoder(): Decoder<InitializeCheckedInstructionData> {
-  return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-  ]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getInitializeCheckedInstructionDataCodec(): Codec<
@@ -104,30 +93,30 @@ export function getInitializeCheckedInstructionDataCodec(): Codec<
 
 export type InitializeCheckedInput<
   TAccountStake extends string = string,
-  TAccountRent extends string = string,
+  TAccountRentSysvar extends string = string,
   TAccountStakeAuthority extends string = string,
   TAccountWithdrawAuthority extends string = string,
 > = {
-  /** The stake account to initialize */
+  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
   /** Rent sysvar */
-  rent?: Address<TAccountRent>;
-  /** stake's new stake authority */
+  rentSysvar?: Address<TAccountRentSysvar>;
+  /** The stake authority */
   stakeAuthority: Address<TAccountStakeAuthority>;
-  /** stake's new withdraw authority */
+  /** The withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
 };
 
 export function getInitializeCheckedInstruction<
   TAccountStake extends string,
-  TAccountRent extends string,
+  TAccountRentSysvar extends string,
   TAccountStakeAuthority extends string,
   TAccountWithdrawAuthority extends string,
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: InitializeCheckedInput<
     TAccountStake,
-    TAccountRent,
+    TAccountRentSysvar,
     TAccountStakeAuthority,
     TAccountWithdrawAuthority
   >,
@@ -135,18 +124,17 @@ export function getInitializeCheckedInstruction<
 ): InitializeCheckedInstruction<
   TProgramAddress,
   TAccountStake,
-  TAccountRent,
+  TAccountRentSysvar,
   TAccountStakeAuthority,
   TAccountWithdrawAuthority
 > {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? STAKE_PROGRAM_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
-    rent: { value: input.rent ?? null, isWritable: false },
+    rentSysvar: { value: input.rentSysvar ?? null, isWritable: false },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     withdrawAuthority: {
       value: input.withdrawAuthority ?? null,
@@ -159,8 +147,8 @@ export function getInitializeCheckedInstruction<
   >;
 
   // Resolve default values.
-  if (!accounts.rent.value) {
-    accounts.rent.value =
+  if (!accounts.rentSysvar.value) {
+    accounts.rentSysvar.value =
       'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
   }
 
@@ -168,7 +156,7 @@ export function getInitializeCheckedInstruction<
   const instruction = {
     accounts: [
       getAccountMeta(accounts.stake),
-      getAccountMeta(accounts.rent),
+      getAccountMeta(accounts.rentSysvar),
       getAccountMeta(accounts.stakeAuthority),
       getAccountMeta(accounts.withdrawAuthority),
     ],
@@ -177,7 +165,7 @@ export function getInitializeCheckedInstruction<
   } as InitializeCheckedInstruction<
     TProgramAddress,
     TAccountStake,
-    TAccountRent,
+    TAccountRentSysvar,
     TAccountStakeAuthority,
     TAccountWithdrawAuthority
   >;
@@ -186,18 +174,18 @@ export function getInitializeCheckedInstruction<
 }
 
 export type ParsedInitializeCheckedInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The stake account to initialize */
+    /** Uninitialized stake account */
     stake: TAccountMetas[0];
     /** Rent sysvar */
-    rent: TAccountMetas[1];
-    /** stake's new stake authority */
+    rentSysvar: TAccountMetas[1];
+    /** The stake authority */
     stakeAuthority: TAccountMetas[2];
-    /** stake's new withdraw authority */
+    /** The withdraw authority */
     withdrawAuthority: TAccountMetas[3];
   };
   data: InitializeCheckedInstructionData;
@@ -225,7 +213,7 @@ export function parseInitializeCheckedInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       stake: getNextAccount(),
-      rent: getNextAccount(),
+      rentSysvar: getNextAccount(),
       stakeAuthority: getNextAccount(),
       withdrawAuthority: getNextAccount(),
     },

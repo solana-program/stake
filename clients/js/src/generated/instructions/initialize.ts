@@ -8,18 +8,12 @@
 
 import {
   combineCodec,
-  fixDecoderSize,
-  fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBytesDecoder,
-  getBytesEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -30,24 +24,27 @@ import {
   type IInstructionWithAccounts,
   type IInstructionWithData,
   type ReadonlyAccount,
-  type ReadonlyUint8Array,
   type WritableAccount,
 } from '@solana/web3.js';
-import { STAKE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  getLockupDecoder,
+  getLockupEncoder,
+  type Lockup,
+  type LockupArgs,
+} from '../types';
 
-export const INITIALIZE_DISCRIMINATOR = new Uint8Array([
-  175, 175, 109, 31, 13, 152, 155, 237,
-]);
+export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(INITIALIZE_DISCRIMINATOR);
+  return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 
 export type InitializeInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountRent extends
+  TAccountRentSysvar extends
     | string
     | IAccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
@@ -58,39 +55,33 @@ export type InitializeInstruction<
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
-      TAccountRent extends string
-        ? ReadonlyAccount<TAccountRent>
-        : TAccountRent,
+      TAccountRentSysvar extends string
+        ? ReadonlyAccount<TAccountRentSysvar>
+        : TAccountRentSysvar,
       ...TRemainingAccounts,
     ]
   >;
 
 export type InitializeInstructionData = {
-  discriminator: ReadonlyUint8Array;
+  discriminator: number;
   staker: Address;
   withdrawer: Address;
-  unixTimestamp: bigint;
-  epoch: bigint;
-  custodian: Address;
+  arg1: Lockup;
 };
 
 export type InitializeInstructionDataArgs = {
   staker: Address;
   withdrawer: Address;
-  unixTimestamp: number | bigint;
-  epoch: number | bigint;
-  custodian: Address;
+  arg1: LockupArgs;
 };
 
 export function getInitializeInstructionDataEncoder(): Encoder<InitializeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', fixEncoderSize(getBytesEncoder(), 8)],
+      ['discriminator', getU8Encoder()],
       ['staker', getAddressEncoder()],
       ['withdrawer', getAddressEncoder()],
-      ['unixTimestamp', getI64Encoder()],
-      ['epoch', getU64Encoder()],
-      ['custodian', getAddressEncoder()],
+      ['arg1', getLockupEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR })
   );
@@ -98,12 +89,10 @@ export function getInitializeInstructionDataEncoder(): Encoder<InitializeInstruc
 
 export function getInitializeInstructionDataDecoder(): Decoder<InitializeInstructionData> {
   return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
+    ['discriminator', getU8Decoder()],
     ['staker', getAddressDecoder()],
     ['withdrawer', getAddressDecoder()],
-    ['unixTimestamp', getI64Decoder()],
-    ['epoch', getU64Decoder()],
-    ['custodian', getAddressDecoder()],
+    ['arg1', getLockupDecoder()],
   ]);
 }
 
@@ -119,35 +108,32 @@ export function getInitializeInstructionDataCodec(): Codec<
 
 export type InitializeInput<
   TAccountStake extends string = string,
-  TAccountRent extends string = string,
+  TAccountRentSysvar extends string = string,
 > = {
-  /** The stake account to initialize */
+  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
   /** Rent sysvar */
-  rent?: Address<TAccountRent>;
+  rentSysvar?: Address<TAccountRentSysvar>;
   staker: InitializeInstructionDataArgs['staker'];
   withdrawer: InitializeInstructionDataArgs['withdrawer'];
-  unixTimestamp: InitializeInstructionDataArgs['unixTimestamp'];
-  epoch: InitializeInstructionDataArgs['epoch'];
-  custodian: InitializeInstructionDataArgs['custodian'];
+  arg1: InitializeInstructionDataArgs['arg1'];
 };
 
 export function getInitializeInstruction<
   TAccountStake extends string,
-  TAccountRent extends string,
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TAccountRentSysvar extends string,
+  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-  input: InitializeInput<TAccountStake, TAccountRent>,
+  input: InitializeInput<TAccountStake, TAccountRentSysvar>,
   config?: { programAddress?: TProgramAddress }
-): InitializeInstruction<TProgramAddress, TAccountStake, TAccountRent> {
+): InitializeInstruction<TProgramAddress, TAccountStake, TAccountRentSysvar> {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? STAKE_PROGRAM_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
-    rent: { value: input.rent ?? null, isWritable: false },
+    rentSysvar: { value: input.rentSysvar ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -158,33 +144,40 @@ export function getInitializeInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.rent.value) {
-    accounts.rent.value =
+  if (!accounts.rentSysvar.value) {
+    accounts.rentSysvar.value =
       'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
   }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   const instruction = {
-    accounts: [getAccountMeta(accounts.stake), getAccountMeta(accounts.rent)],
+    accounts: [
+      getAccountMeta(accounts.stake),
+      getAccountMeta(accounts.rentSysvar),
+    ],
     programAddress,
     data: getInitializeInstructionDataEncoder().encode(
       args as InitializeInstructionDataArgs
     ),
-  } as InitializeInstruction<TProgramAddress, TAccountStake, TAccountRent>;
+  } as InitializeInstruction<
+    TProgramAddress,
+    TAccountStake,
+    TAccountRentSysvar
+  >;
 
   return instruction;
 }
 
 export type ParsedInitializeInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The stake account to initialize */
+    /** Uninitialized stake account */
     stake: TAccountMetas[0];
     /** Rent sysvar */
-    rent: TAccountMetas[1];
+    rentSysvar: TAccountMetas[1];
   };
   data: InitializeInstructionData;
 };
@@ -211,7 +204,7 @@ export function parseInitializeInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       stake: getNextAccount(),
-      rent: getNextAccount(),
+      rentSysvar: getNextAccount(),
     },
     data: getInitializeInstructionDataDecoder().decode(instruction.data),
   };
