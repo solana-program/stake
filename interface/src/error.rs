@@ -199,31 +199,6 @@ impl<E> DecodeError<E> for StakeError {
     }
 }
 
-impl From<u64> for StakeError {
-    fn from(error: u64) -> Self {
-        match error {
-            0 => StakeError::NoCreditsToRedeem,
-            1 => StakeError::LockupInForce,
-            2 => StakeError::AlreadyDeactivated,
-            3 => StakeError::TooSoonToRedelegate,
-            4 => StakeError::InsufficientStake,
-            5 => StakeError::MergeTransientStake,
-            6 => StakeError::MergeMismatch,
-            7 => StakeError::CustodianMissing,
-            8 => StakeError::CustodianSignatureMissing,
-            9 => StakeError::InsufficientReferenceVotes,
-            10 => StakeError::VoteAddressMismatch,
-            11 => StakeError::MinimumDelinquentEpochsForDeactivationNotMet,
-            12 => StakeError::InsufficientDelegation,
-            13 => StakeError::RedelegateTransientOrInactiveStake,
-            14 => StakeError::RedelegateToSameVoteAccount,
-            15 => StakeError::RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
-            16 => StakeError::EpochRewardsActive,
-            _ => panic!("unsupported error code"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {super::StakeError, num_traits::FromPrimitive, strum::IntoEnumIterator};
@@ -238,5 +213,31 @@ mod tests {
             );
             assert_eq!(StakeError::from(variant_i64 as u64), variant);
         }
+    }
+
+    #[test]
+    fn test_custom_error_decode() {
+        use num_traits::FromPrimitive;
+        fn pretty_err<T>(err: InstructionError) -> String
+        where
+            T: 'static + std::error::Error + DecodeError<T> + FromPrimitive,
+        {
+            if let InstructionError::Custom(code) = err {
+                let specific_error: T = T::decode_custom_error_to_enum(code).unwrap();
+                format!(
+                    "{:?}: {}::{:?} - {}",
+                    err,
+                    T::type_of(),
+                    specific_error,
+                    specific_error,
+                )
+            } else {
+                "".to_string()
+            }
+        }
+        assert_eq!(
+            "Custom(0): StakeError::NoCreditsToRedeem - not enough credits to redeem",
+            pretty_err::<StakeError>(StakeError::NoCreditsToRedeem.into())
+        )
     }
 }

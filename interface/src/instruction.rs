@@ -193,11 +193,11 @@ pub enum StakeInstruction {
     /// Programs can use the [`get_minimum_delegation()`] helper function to invoke and
     /// retrieve the return value for this instruction.
     ///
-    /// [`get_minimum_delegation()`]: super::tools::get_minimum_delegation
+    /// [`get_minimum_delegation()`]: crate::tools::get_minimum_delegation
     GetMinimumDelegation,
 
     /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// [`super::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
+    /// [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
@@ -206,7 +206,7 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
-    ///      [`super::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
+    ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -846,38 +846,4 @@ pub fn move_lamports(
         &StakeInstruction::MoveLamports(lamports),
         account_metas,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use {
-        crate::error::StakeError, solana_decode_error::DecodeError,
-        solana_instruction::error::InstructionError,
-    };
-
-    #[test]
-    fn test_custom_error_decode() {
-        use num_traits::FromPrimitive;
-        fn pretty_err<T>(err: InstructionError) -> String
-        where
-            T: 'static + std::error::Error + DecodeError<T> + FromPrimitive,
-        {
-            if let InstructionError::Custom(code) = err {
-                let specific_error: T = T::decode_custom_error_to_enum(code).unwrap();
-                format!(
-                    "{:?}: {}::{:?} - {}",
-                    err,
-                    T::type_of(),
-                    specific_error,
-                    specific_error,
-                )
-            } else {
-                "".to_string()
-            }
-        }
-        assert_eq!(
-            "Custom(0): StakeError::NoCreditsToRedeem - not enough credits to redeem",
-            pretty_err::<StakeError>(StakeError::NoCreditsToRedeem.into())
-        )
-    }
 }

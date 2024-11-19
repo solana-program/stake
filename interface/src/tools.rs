@@ -11,10 +11,10 @@ use {
 /// This fn handles performing the CPI to call the [`GetMinimumDelegation`] function, and then
 /// calls [`get_return_data()`] to fetch the return data.
 ///
-/// [`GetMinimumDelegation`]: super::instruction::StakeInstruction::GetMinimumDelegation
+/// [`GetMinimumDelegation`]: crate::instruction::StakeInstruction::GetMinimumDelegation
 /// [`get_return_data()`]: solana_cpi::get_return_data
 pub fn get_minimum_delegation() -> Result<u64, ProgramError> {
-    let instruction = super::instruction::get_minimum_delegation();
+    let instruction = crate::instruction::get_minimum_delegation();
     invoke_unchecked(&instruction, &[])?;
     get_minimum_delegation_return_data()
 }
@@ -24,13 +24,13 @@ pub fn get_minimum_delegation() -> Result<u64, ProgramError> {
 /// This fn handles calling [`get_return_data()`], ensures the result is from the correct
 /// program, and returns the correct type.
 ///
-/// [`GetMinimumDelegation`]: super::instruction::StakeInstruction::GetMinimumDelegation
+/// [`GetMinimumDelegation`]: crate::instruction::StakeInstruction::GetMinimumDelegation
 /// [`get_return_data()`]: solana_cpi::get_return_data
 fn get_minimum_delegation_return_data() -> Result<u64, ProgramError> {
     get_return_data()
         .ok_or(ProgramError::InvalidInstructionData)
         .and_then(|(program_id, return_data)| {
-            (program_id == super::program::id())
+            (program_id == crate::program::id())
                 .then_some(return_data)
                 .ok_or(ProgramError::IncorrectProgramId)
         })
