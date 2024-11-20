@@ -13,7 +13,6 @@ use {
         stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     },
-    serde::{Deserialize, Serialize},
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
     solana_pubkey::Pubkey,
@@ -1168,7 +1167,6 @@ mod test {
         );
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn stake_flag_member_offset() {
         const FLAG_OFFSET: usize = 196;
