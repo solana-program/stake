@@ -5,6 +5,10 @@ use {
 
 /// Reasons the Stake might have had an error.
 #[cfg_attr(test, derive(strum_macros::FromRepr, strum_macros::EnumIter))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StakeError {
     // 0
@@ -201,7 +205,10 @@ impl<E> DecodeError<E> for StakeError {
 
 #[cfg(test)]
 mod tests {
-    use {super::StakeError, num_traits::FromPrimitive, strum::IntoEnumIterator};
+    use {
+        super::StakeError, num_traits::FromPrimitive, solana_decode_error::DecodeError,
+        solana_instruction::error::InstructionError, strum::IntoEnumIterator,
+    };
 
     #[test]
     fn test_stake_error_from_primitive_exhaustive() {
@@ -211,7 +218,6 @@ mod tests {
                 StakeError::from_repr(variant_i64 as usize),
                 StakeError::from_i64(variant_i64)
             );
-            assert_eq!(StakeError::from(variant_i64 as u64), variant);
         }
     }
 

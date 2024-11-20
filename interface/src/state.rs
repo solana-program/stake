@@ -13,7 +13,6 @@ use {
         stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     },
-    serde::{Deserialize, Serialize},
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
     solana_pubkey::Pubkey,
@@ -81,7 +80,11 @@ macro_rules! impl_borsh_stake_state {
     };
 }
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 #[deprecated(
     since = "1.17.0",
@@ -140,7 +143,11 @@ impl StakeState {
 }
 
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum StakeStateV2 {
     #[default]
@@ -257,7 +264,11 @@ impl StakeStateV2 {
 }
 
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,
@@ -269,7 +280,11 @@ pub enum StakeAuthorize {
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
     borsh(crate = "borsh")
 )]
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Lockup {
     /// UnixTimestamp at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
@@ -358,7 +373,11 @@ impl borsh0_10::ser::BorshSerialize for Lockup {
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
     borsh(crate = "borsh")
 )]
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Authorized {
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
@@ -491,7 +510,11 @@ impl borsh0_10::ser::BorshSerialize for Authorized {
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
     borsh(crate = "borsh")
 )]
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Meta {
     pub rent_exempt_reserve: u64,
     pub authorized: Authorized,
@@ -603,7 +626,11 @@ impl borsh0_10::ser::BorshSerialize for Meta {
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
     borsh(crate = "borsh")
 )]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Delegation {
     /// to whom the stake is delegated
     pub voter_pubkey: Pubkey,
@@ -914,7 +941,11 @@ impl borsh0_10::ser::BorshSerialize for Delegation {
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
     borsh(crate = "borsh")
 )]
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Stake {
     pub delegation: Delegation,
     /// credits observed is credits from vote account state when delegated or redeemed
@@ -1016,35 +1047,30 @@ impl borsh0_10::ser::BorshSerialize for Stake {
     }
 }
 
+#[cfg(all(feature = "borsh", feature = "bincode"))]
 #[cfg(test)]
 mod test {
     use super::*;
-    #[cfg(feature = "borsh")]
     use solana_borsh::v1::try_from_slice_unchecked;
-    #[cfg(feature = "borsh")]
     use {assert_matches::assert_matches, bincode::serialize};
 
-    #[cfg(feature = "borsh")]
     fn check_borsh_deserialization(stake: StakeStateV2) {
         let serialized = serialize(&stake).unwrap();
         let deserialized = StakeStateV2::try_from_slice(&serialized).unwrap();
         assert_eq!(stake, deserialized);
     }
 
-    #[cfg(feature = "borsh")]
     fn check_borsh_serialization(stake: StakeStateV2) {
         let bincode_serialized = serialize(&stake).unwrap();
         let borsh_serialized = borsh::to_vec(&stake).unwrap();
         assert_eq!(bincode_serialized, borsh_serialized);
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn test_size_of() {
         assert_eq!(StakeStateV2::size_of(), std::mem::size_of::<StakeStateV2>());
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn bincode_vs_borsh_deserialization() {
         check_borsh_deserialization(StakeStateV2::Uninitialized);
@@ -1080,7 +1106,6 @@ mod test {
         ));
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn bincode_vs_borsh_serialization() {
         check_borsh_serialization(StakeStateV2::Uninitialized);
@@ -1117,7 +1142,6 @@ mod test {
         ));
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn borsh_deserialization_live_data() {
         let data = [
@@ -1143,7 +1167,6 @@ mod test {
         );
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn stake_flag_member_offset() {
         const FLAG_OFFSET: usize = 196;
@@ -1186,14 +1209,13 @@ mod test {
 
     mod deprecated {
         use super::*;
-        #[cfg(feature = "borsh")]
+
         fn check_borsh_deserialization(stake: StakeState) {
             let serialized = serialize(&stake).unwrap();
             let deserialized = StakeState::try_from_slice(&serialized).unwrap();
             assert_eq!(stake, deserialized);
         }
 
-        #[cfg(feature = "borsh")]
         fn check_borsh_serialization(stake: StakeState) {
             let bincode_serialized = serialize(&stake).unwrap();
             let borsh_serialized = borsh::to_vec(&stake).unwrap();
@@ -1205,7 +1227,6 @@ mod test {
             assert_eq!(StakeState::size_of(), std::mem::size_of::<StakeState>());
         }
 
-        #[cfg(feature = "borsh")]
         #[test]
         fn bincode_vs_borsh_deserialization() {
             check_borsh_deserialization(StakeState::Uninitialized);
@@ -1240,7 +1261,6 @@ mod test {
             ));
         }
 
-        #[cfg(feature = "borsh")]
         #[test]
         fn bincode_vs_borsh_serialization() {
             check_borsh_serialization(StakeState::Uninitialized);
@@ -1275,7 +1295,6 @@ mod test {
             ));
         }
 
-        #[cfg(feature = "borsh")]
         #[test]
         fn borsh_deserialization_live_data() {
             let data = [

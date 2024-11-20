@@ -8,19 +8,19 @@ readme = "README.md"
 license-file = "../LICENSE"
 
 [dependencies]
-borsh = { version = "1.5.1", features = ["derive", "unstable__schema"], optional=true }
-borsh0-10 = { package = "borsh", version = "0.10.3", optional=true }
+borsh = { version = "1.5.1", features = ["derive", "unstable__schema"], optional = true }
+borsh0-10 = { package = "borsh", version = "0.10.3", optional = true }
 num-traits = "0.2"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_derive = "1.0.210"
+serde = { version = "1.0.210", features = ["derive"], optional = true }
+serde_derive = { version = "1.0.210", optional = true }
 solana-decode-error = "^2.1"
 solana-clock = "^2.1"
-solana-cpi = "^2.1"
+solana-cpi = { version = "^2.1", optional = true }
 solana-frozen-abi = { version = "^2.1", features = ["frozen-abi"], optional = true }
 solana-frozen-abi-macro = { version = "^2.1", features = ["frozen-abi"], optional = true }
-solana-instruction = { version = "^2.1", features = ["bincode", "std"] }
-solana-program-error = "^2.1"
-solana-pubkey = { version = "^2.1", default-features = false, features = ["serde"] }
+solana-instruction = "^2.1"
+solana-program-error = { version = "^2.1", optional = true }
+solana-pubkey = { version = "^2.1", default-features = false }
 solana-system-interface = { version = "0.0.1", git = "https://github.com/solana-program/system.git" }
 
 [dev-dependencies]
@@ -36,6 +36,13 @@ strum_macros = "0.24"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
+bincode = [
+    "dep:solana-cpi",
+    "dep:solana-program-error",
+    "solana-instruction/bincode",
+    "solana-instruction/serde",
+    "serde"
+]
 borsh = [
     "dep:borsh",
     "dep:borsh0-10",
@@ -49,3 +56,4 @@ frozen-abi = [
     "solana-instruction/frozen-abi",
     "solana-pubkey/frozen-abi"
 ]
+serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde"]
