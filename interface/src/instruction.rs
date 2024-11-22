@@ -48,8 +48,17 @@ pub enum StakeInstruction {
     /// [`Authorized`] carries pubkeys that must sign staker transactions
     /// and withdrawer transactions; [`Lockup`] carries information about
     /// withdrawal restrictions.
-    #[account(0, writable, name = "stake", desc = "Uninitialized stake account")]
-    #[account(1, name = "rent_sysvar", desc = "Rent sysvar")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Uninitialized stake account"
+    )]
+    #[account(
+        1,
+        name = "rent_sysvar",
+        desc = "Rent sysvar"
+    )]
     Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
@@ -60,9 +69,23 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` The stake or withdraw authority
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
     ///      lockup expiration
-    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
-    #[account(1, name = "clock_sysvar", desc = "Rent sysvar")]
-    #[account(2, signer, name = "authority", desc = "Stake or withdraw authority")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account to be updated"
+    )]
+    #[account(
+        1,
+        name = "clock_sysvar",
+        desc = "Rent sysvar"
+    )]
+    #[account(
+        2,
+        signer,
+        name = "authority",
+        desc = "Stake or withdraw authority"
+    )]
     #[account(
         3,
         optional,
@@ -95,10 +118,27 @@ pub enum StakeInstruction {
         name = "vote",
         desc = "Vote account to which this stake will be delegated"
     )]
-    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
-    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
-    #[account(4, name = "unused", desc = "Unused account, formerly the stake config")]
-    #[account(5, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        2,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
+    #[account(
+        3,
+        name = "stake_history",
+        desc = "Stake history sysvar"
+    )]
+    #[account(
+        4,
+        name = "unused",
+        desc = "Unused account, formerly the stake config"
+    )]
+    #[account(
+        5,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     DelegateStake,
 
     /// Split `u64` tokens and stake off a stake account into another stake account.
@@ -107,14 +147,24 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be split; must be in the Initialized or Stake state
     ///   1. `[WRITE]` Uninitialized stake account that will take the split-off amount
     ///   2. `[SIGNER]` Stake authority
-    #[account(0, writable, name = "stake", desc = "Stake account to be split")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account to be split"
+    )]
     #[account(
         1,
         writable,
         name = "split_stake",
         desc = "Uninitialized stake account"
     )]
-    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        2,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     Split(u64),
 
     /// Withdraw unstaked lamports from the stake account
@@ -135,10 +185,28 @@ pub enum StakeInstruction {
         name = "stake",
         desc = "Stake account from which to withdraw"
     )]
-    #[account(1, writable, name = "recipient", desc = "Recipient account")]
-    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
-    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
-    #[account(4, signer, name = "Withdraw_authority", desc = "Withdraw authority")]
+    #[account(
+        1,
+        writable,
+        name = "recipient",
+        desc = "Recipient account"
+    )]
+    #[account(
+        2,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
+    #[account(
+        3,
+        name = "stake_history",
+        desc = "Stake history sysvar"
+    )]
+    #[account(
+        4,
+        signer,
+        name = "Withdraw_authority",
+        desc = "Withdraw authority"
+    )]
     #[account(
         5,
         optional,
@@ -154,9 +222,23 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` Stake authority
-    #[account(0, writable, name = "stake", desc = "Delegated stake account")]
-    #[account(1, name = "clock_sysvar", desc = "Clock sysvar")]
-    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Delegated stake account"
+    )]
+    #[account(
+        1,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
+    #[account(
+        2,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     Deactivate,
 
     /// Set stake lockup
@@ -167,7 +249,12 @@ pub enum StakeInstruction {
     /// # Account references
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
-    #[account(0, writable, name = "stake", desc = "Initialized stake account")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Initialized stake account"
+    )]
     #[account(
         1,
         signer,
@@ -206,10 +293,28 @@ pub enum StakeInstruction {
         name = "destination_stake",
         desc = "Destination stake account"
     )]
-    #[account(1, writable, name = "source_stake", desc = "Source stake account")]
-    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
-    #[account(3, name = "stake_history", desc = "Stake history sysvar")]
-    #[account(4, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        1,
+        writable,
+        name = "source_stake",
+        desc = "Source stake account"
+    )]
+    #[account(
+        2,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
+    #[account(
+        3,
+        name = "stake_history",
+        desc = "Stake history sysvar"
+    )]
+    #[account(
+        4,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     Merge,
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -220,14 +325,23 @@ pub enum StakeInstruction {
     ///   2. `[]` Clock sysvar
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account to be updated"
+    )]
     #[account(
         1,
         signer,
         name = "base",
         desc = "Base key of stake or withdraw authority"
     )]
-    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        2,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
     #[account(
         3,
         optional,
@@ -247,9 +361,22 @@ pub enum StakeInstruction {
     ///   1. `[]` Rent sysvar
     ///   2. `[]` The stake authority
     ///   3. `[SIGNER]` The withdraw authority
-    #[account(0, writable, name = "stake", desc = "Uninitialized stake account")]
-    #[account(1, name = "rent_sysvar", desc = "Rent sysvar")]
-    #[account(2, name = "stake_authority", desc = "The stake authority")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Uninitialized stake account"
+    )]
+    #[account(
+        1,
+        name = "rent_sysvar",
+        desc = "Rent sysvar"
+    )]
+    #[account(
+        2,
+        name = "stake_authority",
+        desc = "The stake authority"
+    )]
     #[account(
         3,
         signer,
@@ -270,8 +397,17 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
-    #[account(1, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account to be updated"
+    )]
+    #[account(
+        1,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
     #[account(
         2,
         signer,
@@ -305,14 +441,23 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    #[account(0, writable, name = "stake", desc = "Stake account to be updated")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Stake account to be updated"
+    )]
     #[account(
         1,
         signer,
         name = "base",
         desc = "Base key of stake or withdraw authority"
     )]
-    #[account(2, name = "clock_sysvar", desc = "Clock sysvar")]
+    #[account(
+        2,
+        name = "clock_sysvar",
+        desc = "Clock sysvar"
+    )]
     #[account(
         3,
         signer,
@@ -340,7 +485,12 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
     ///   2. Optional: `[SIGNER]` New lockup authority
-    #[account(0, writable, name = "stake", desc = "Initialized stake account")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Initialized stake account"
+    )]
     #[account(
         1,
         signer,
@@ -379,9 +529,22 @@ pub enum StakeInstruction {
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
     ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
-    #[account(0, writable, name = "stake", desc = "Delegated stake account")]
-    #[account(1, name = "delinquent_vote", desc = "Delinquent vote account")]
-    #[account(2, name = "reference_vote", desc = "Reference vote account")]
+    #[account(
+        0,
+        writable,
+        name = "stake",
+        desc = "Delegated stake account"
+    )]
+    #[account(
+        1,
+        name = "delinquent_vote",
+        desc = "Delinquent vote account"
+    )]
+    #[account(
+        2,
+        name = "reference_vote",
+        desc = "Reference vote account"
+    )]
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -438,7 +601,12 @@ pub enum StakeInstruction {
         name = "destination_stake",
         desc = "Active or inactive destination stake account"
     )]
-    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        2,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     MoveStake(u64),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
@@ -466,7 +634,12 @@ pub enum StakeInstruction {
         name = "destination_stake",
         desc = "Mergeable destination stake account"
     )]
-    #[account(2, signer, name = "stake_authority", desc = "Stake authority")]
+    #[account(
+        2,
+        signer,
+        name = "stake_authority",
+        desc = "Stake authority"
+    )]
     MoveLamports(u64),
 }
 
