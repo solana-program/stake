@@ -3,100 +3,39 @@
 // Required to avoid warnings from uses of deprecated types during trait derivations.
 #![allow(deprecated)]
 
+#[cfg(feature = "bincode")]
 use {
-    crate::{
-        instruction::{AccountMeta, Instruction},
-        program_error::ProgramError,
-        pubkey::Pubkey,
-        stake::{
-            config,
-            program::id,
-            state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
-        },
-        system_instruction, sysvar,
-    },
-    log::*,
-    num_derive::{FromPrimitive, ToPrimitive},
-    serde_derive::{Deserialize, Serialize},
-    solana_clock::{Epoch, UnixTimestamp},
-    solana_decode_error::DecodeError,
-    thiserror::Error,
+    crate::{config, state::StakeStateV2},
+    solana_instruction::{AccountMeta, Instruction},
+    solana_system_interface::program::ID,
 };
 
-/// Reasons the stake might have had an error
-#[derive(Error, Debug, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-pub enum StakeError {
-    // 0
-    #[error("not enough credits to redeem")]
-    NoCreditsToRedeem,
+use {
+    crate::state::{Authorized, Lockup, StakeAuthorize},
+    solana_clock::{Epoch, UnixTimestamp},
+    solana_pubkey::Pubkey,
+};
 
-    #[error("lockup has not yet expired")]
-    LockupInForce,
+// Inline some constants to avoid dependencies.
+//
+// Note: replace these inline IDs with the corresponding value from
+// `solana_sdk_ids` once the version is updated to 2.2.0.
 
-    #[error("stake already deactivated")]
-    AlreadyDeactivated,
+#[cfg(feature = "bincode")]
+const CLOCK_ID: Pubkey = Pubkey::from_str_const("SysvarC1ock11111111111111111111111111111111");
 
-    #[error("one re-delegation permitted per epoch")]
-    TooSoonToRedelegate,
+#[cfg(feature = "bincode")]
+const RENT_ID: Pubkey = Pubkey::from_str_const("SysvarRent111111111111111111111111111111111");
 
-    #[error("split amount is more than is staked")]
-    InsufficientStake,
+#[cfg(feature = "bincode")]
+const STAKE_HISTORY_ID: Pubkey =
+    Pubkey::from_str_const("SysvarStakeHistory1111111111111111111111111");
 
-    // 5
-    #[error("stake account with transient stake cannot be merged")]
-    MergeTransientStake,
-
-    #[error("stake account merge failed due to different authority, lockups or state")]
-    MergeMismatch,
-
-    #[error("custodian address not present")]
-    CustodianMissing,
-
-    #[error("custodian signature not present")]
-    CustodianSignatureMissing,
-
-    #[error("insufficient voting activity in the reference vote account")]
-    InsufficientReferenceVotes,
-
-    // 10
-    #[error("stake account is not delegated to the provided vote account")]
-    VoteAddressMismatch,
-
-    #[error(
-        "stake account has not been delinquent for the minimum epochs required for deactivation"
-    )]
-    MinimumDelinquentEpochsForDeactivationNotMet,
-
-    #[error("delegation amount is less than the minimum")]
-    InsufficientDelegation,
-
-    #[error("stake account with transient or inactive stake cannot be redelegated")]
-    RedelegateTransientOrInactiveStake,
-
-    #[error("stake redelegation to the same vote account is not permitted")]
-    RedelegateToSameVoteAccount,
-
-    // 15
-    #[error("redelegated stake must be fully activated before deactivation")]
-    RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
-
-    #[error("stake action is not permitted while the epoch rewards period is active")]
-    EpochRewardsActive,
-}
-
-impl From<StakeError> for ProgramError {
-    fn from(e: StakeError) -> Self {
-        ProgramError::Custom(e as u32)
-    }
-}
-
-impl<E> DecodeError<E> for StakeError {
-    fn type_of() -> &'static str {
-        "StakeError"
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
     ///
@@ -104,9 +43,9 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Uninitialized stake account
     ///   1. `[]` Rent sysvar
     ///
-    /// Authorized carries pubkeys that must sign staker transactions
-    ///   and withdrawer transactions.
-    /// Lockup carries information about withdrawal restrictions
+    /// [`Authorized`] carries pubkeys that must sign staker transactions
+    /// and withdrawer transactions; [`Lockup`] carries information about
+    /// withdrawal restrictions.
     Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
@@ -129,12 +68,11 @@ pub enum StakeInstruction {
     ///   4. `[]` Unused account, formerly the stake config
     ///   5. `[SIGNER]` Stake authority
     ///
-    /// The entire balance of the staking account is staked.  DelegateStake
-    ///   can be called multiple times, but re-delegation is delayed
-    ///   by one epoch
+    /// The entire balance of the staking account is staked. `DelegateStake`
+    /// can be called multiple times, but re-delegation is delayed by one epoch.
     DelegateStake,
 
-    /// Split u64 tokens and stake off a stake account into another stake account.
+    /// Split `u64` tokens and stake off a stake account into another stake account.
     ///
     /// # Account references
     ///   0. `[WRITE]` Stake account to be split; must be in the Initialized or Stake state
@@ -152,8 +90,8 @@ pub enum StakeInstruction {
     ///   4. `[SIGNER]` Withdraw authority
     ///   5. Optional: `[SIGNER]` Lockup authority, if before lockup expiration
     ///
-    /// The u64 is the portion of the stake account balance to be withdrawn,
-    ///    must be `<= StakeAccount.lamports - staked_lamports`.
+    /// The `u64` is the portion of the stake account balance to be withdrawn,
+    /// must be `<= StakeAccount.lamports - staked_lamports`.
     Withdraw(u64),
 
     /// Deactivates the stake in the account
@@ -206,8 +144,8 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be updated
     ///   1. `[SIGNER]` Base key of stake or withdraw authority
     ///   2. `[]` Clock sysvar
-    ///   3. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   3. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeWithSeed(AuthorizeWithSeedArgs),
 
     /// Initialize a stake with authorization information
@@ -233,8 +171,8 @@ pub enum StakeInstruction {
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` The stake or withdraw authority
     ///   3. `[SIGNER]` The new stake or withdraw authority
-    ///   4. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeChecked(StakeAuthorize),
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -247,8 +185,8 @@ pub enum StakeInstruction {
     ///   1. `[SIGNER]` Base key of stake or withdraw authority
     ///   2. `[]` Clock sysvar
     ///   3. `[SIGNER]` The new stake or withdraw authority
-    ///   4. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
-    ///      lockup expiration
+    ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
+    ///      before lockup expiration
     AuthorizeCheckedWithSeed(AuthorizeCheckedWithSeedArgs),
 
     /// Set stake lockup
@@ -274,11 +212,11 @@ pub enum StakeInstruction {
     /// Programs can use the [`get_minimum_delegation()`] helper function to invoke and
     /// retrieve the return value for this instruction.
     ///
-    /// [`get_minimum_delegation()`]: super::tools::get_minimum_delegation
+    /// [`get_minimum_delegation()`]: crate::tools::get_minimum_delegation
     GetMinimumDelegation,
 
     /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
+    /// [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
@@ -287,7 +225,7 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
-    ///      `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -331,7 +269,7 @@ pub enum StakeInstruction {
     ///   1. `[WRITE]` Active or inactive destination stake account
     ///   2. `[SIGNER]` Stake authority
     ///
-    /// The u64 is the portion of the stake to move, which may be the entire delegation
+    /// The `u64` is the portion of the stake to move, which may be the entire delegation
     MoveStake(u64),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
@@ -346,24 +284,36 @@ pub enum StakeInstruction {
     ///   1. `[WRITE]` Mergeable destination stake account
     ///   2. `[SIGNER]` Stake authority
     ///
-    /// The u64 is the portion of available lamports to move
+    /// The `u64` is the portion of available lamports to move
     MoveLamports(u64),
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LockupArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
     pub custodian: Option<Pubkey>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LockupCheckedArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthorizeWithSeedArgs {
     pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
@@ -371,37 +321,44 @@ pub struct AuthorizeWithSeedArgs {
     pub authority_owner: Pubkey,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_derive::Deserialize, serde_derive::Serialize)
+)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthorizeCheckedWithSeedArgs {
     pub stake_authorize: StakeAuthorize,
     pub authority_seed: String,
     pub authority_owner: Pubkey,
 }
 
+#[cfg(feature = "bincode")]
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::Initialize(*authorized, *lockup),
         vec![
             AccountMeta::new(*stake_pubkey, false),
-            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(RENT_ID, false),
         ],
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn initialize_checked(stake_pubkey: &Pubkey, authorized: &Authorized) -> Instruction {
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::InitializeChecked,
         vec![
             AccountMeta::new(*stake_pubkey, false),
-            AccountMeta::new_readonly(sysvar::rent::id(), false),
+            AccountMeta::new_readonly(RENT_ID, false),
             AccountMeta::new_readonly(authorized.staker, false),
             AccountMeta::new_readonly(authorized.withdrawer, true),
         ],
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn create_account_with_seed(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -412,19 +369,20 @@ pub fn create_account_with_seed(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::instruction::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
             seed,
             lamports,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         initialize(stake_pubkey, authorized, lockup),
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn create_account(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -433,17 +391,18 @@ pub fn create_account(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::instruction::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         initialize(stake_pubkey, authorized, lockup),
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn create_account_with_seed_checked(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -453,19 +412,20 @@ pub fn create_account_with_seed_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account_with_seed(
+        solana_system_interface::instruction::create_account_with_seed(
             from_pubkey,
             stake_pubkey,
             base,
             seed,
             lamports,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         initialize_checked(stake_pubkey, authorized),
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn create_account_checked(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -473,17 +433,18 @@ pub fn create_account_checked(
     lamports: u64,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::create_account(
+        solana_system_interface::instruction::create_account(
             from_pubkey,
             stake_pubkey,
             lamports,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         initialize_checked(stake_pubkey, authorized),
     ]
 }
 
+#[cfg(feature = "bincode")]
 fn _split(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -496,9 +457,10 @@ fn _split(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::Split(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn split(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -506,8 +468,11 @@ pub fn split(
     split_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(split_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(split_stake_pubkey, &id()),
+        solana_system_interface::instruction::allocate(
+            split_stake_pubkey,
+            StakeStateV2::size_of() as u64,
+        ),
+        solana_system_interface::instruction::assign(split_stake_pubkey, &ID),
         _split(
             stake_pubkey,
             authorized_pubkey,
@@ -517,6 +482,7 @@ pub fn split(
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn split_with_seed(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -526,12 +492,12 @@ pub fn split_with_seed(
     seed: &str,                  // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::instruction::allocate_with_seed(
             split_stake_pubkey,
             base,
             seed,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         _split(
             stake_pubkey,
@@ -542,6 +508,7 @@ pub fn split_with_seed(
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn merge(
     destination_stake_pubkey: &Pubkey,
     source_stake_pubkey: &Pubkey,
@@ -550,18 +517,19 @@ pub fn merge(
     let account_metas = vec![
         AccountMeta::new(*destination_stake_pubkey, false),
         AccountMeta::new(*source_stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
     vec![Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::Merge,
         account_metas,
     )]
 }
 
+#[cfg(feature = "bincode")]
 pub fn create_account_and_delegate_stake(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -579,6 +547,8 @@ pub fn create_account_and_delegate_stake(
     instructions
 }
 
+#[cfg(feature = "bincode")]
+#[allow(clippy::too_many_arguments)]
 pub fn create_account_with_seed_and_delegate_stake(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -606,6 +576,7 @@ pub fn create_account_with_seed_and_delegate_stake(
     instructions
 }
 
+#[cfg(feature = "bincode")]
 pub fn authorize(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -615,7 +586,7 @@ pub fn authorize(
 ) -> Instruction {
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
@@ -624,12 +595,13 @@ pub fn authorize(
     }
 
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::Authorize(*new_authorized_pubkey, stake_authorize),
         account_metas,
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn authorize_checked(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -639,7 +611,7 @@ pub fn authorize_checked(
 ) -> Instruction {
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
         AccountMeta::new_readonly(*new_authorized_pubkey, true),
     ];
@@ -649,12 +621,13 @@ pub fn authorize_checked(
     }
 
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::AuthorizeChecked(stake_authorize),
         account_metas,
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn authorize_with_seed(
     stake_pubkey: &Pubkey,
     authority_base: &Pubkey,
@@ -667,7 +640,7 @@ pub fn authorize_with_seed(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*authority_base, true),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
     ];
 
     if let Some(custodian_pubkey) = custodian_pubkey {
@@ -682,12 +655,13 @@ pub fn authorize_with_seed(
     };
 
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::AuthorizeWithSeed(args),
         account_metas,
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn authorize_checked_with_seed(
     stake_pubkey: &Pubkey,
     authority_base: &Pubkey,
@@ -700,7 +674,7 @@ pub fn authorize_checked_with_seed(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*authority_base, true),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*new_authorized_pubkey, true),
     ];
 
@@ -715,12 +689,13 @@ pub fn authorize_checked_with_seed(
     };
 
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::AuthorizeCheckedWithSeed(args),
         account_metas,
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn delegate_stake(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -729,15 +704,16 @@ pub fn delegate_stake(
     let account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*vote_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::id(), false),
+        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::DelegateStake, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::DelegateStake, account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn withdraw(
     stake_pubkey: &Pubkey,
     withdrawer_pubkey: &Pubkey,
@@ -748,8 +724,8 @@ pub fn withdraw(
     let mut account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new(*to_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::stake_history::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
+        AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
         AccountMeta::new_readonly(*withdrawer_pubkey, true),
     ];
 
@@ -757,18 +733,20 @@ pub fn withdraw(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::Withdraw(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw(lamports), account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn deactivate_stake(stake_pubkey: &Pubkey, authorized_pubkey: &Pubkey) -> Instruction {
     let account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::Deactivate, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Deactivate, account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn set_lockup(
     stake_pubkey: &Pubkey,
     lockup: &LockupArgs,
@@ -778,9 +756,10 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::SetLockup(*lockup), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup(*lockup), account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn set_lockup_checked(
     stake_pubkey: &Pubkey,
     lockup: &LockupArgs,
@@ -799,20 +778,18 @@ pub fn set_lockup_checked(
         account_metas.push(AccountMeta::new_readonly(new_custodian, true));
     }
     Instruction::new_with_bincode(
-        id(),
+        ID,
         &StakeInstruction::SetLockupChecked(lockup_checked),
         account_metas,
     )
 }
 
+#[cfg(feature = "bincode")]
 pub fn get_minimum_delegation() -> Instruction {
-    Instruction::new_with_bincode(
-        id(),
-        &StakeInstruction::GetMinimumDelegation,
-        Vec::default(),
-    )
+    Instruction::new_with_bincode(ID, &StakeInstruction::GetMinimumDelegation, Vec::default())
 }
 
+#[cfg(feature = "bincode")]
 pub fn deactivate_delinquent_stake(
     stake_account: &Pubkey,
     delinquent_vote_account: &Pubkey,
@@ -823,9 +800,10 @@ pub fn deactivate_delinquent_stake(
         AccountMeta::new_readonly(*delinquent_vote_account, false),
         AccountMeta::new_readonly(*reference_vote_account, false),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::DeactivateDelinquent, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::DeactivateDelinquent, account_metas)
 }
 
+#[cfg(feature = "bincode")]
 fn _redelegate(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -837,12 +815,13 @@ fn _redelegate(
         AccountMeta::new(*uninitialized_stake_pubkey, false),
         AccountMeta::new_readonly(*vote_pubkey, false),
         // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::id(), false),
+        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(id(), &StakeInstruction::Redelegate, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Redelegate, account_metas)
 }
 
+#[cfg(feature = "bincode")]
 #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
 pub fn redelegate(
     stake_pubkey: &Pubkey,
@@ -851,8 +830,11 @@ pub fn redelegate(
     uninitialized_stake_pubkey: &Pubkey,
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate(uninitialized_stake_pubkey, StakeStateV2::size_of() as u64),
-        system_instruction::assign(uninitialized_stake_pubkey, &id()),
+        solana_system_interface::instruction::allocate(
+            uninitialized_stake_pubkey,
+            StakeStateV2::size_of() as u64,
+        ),
+        solana_system_interface::instruction::assign(uninitialized_stake_pubkey, &ID),
         _redelegate(
             stake_pubkey,
             authorized_pubkey,
@@ -862,6 +844,7 @@ pub fn redelegate(
     ]
 }
 
+#[cfg(feature = "bincode")]
 #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
 pub fn redelegate_with_seed(
     stake_pubkey: &Pubkey,
@@ -872,12 +855,12 @@ pub fn redelegate_with_seed(
     seed: &str,                          // seed
 ) -> Vec<Instruction> {
     vec![
-        system_instruction::allocate_with_seed(
+        solana_system_interface::instruction::allocate_with_seed(
             uninitialized_stake_pubkey,
             base,
             seed,
             StakeStateV2::size_of() as u64,
-            &id(),
+            &ID,
         ),
         _redelegate(
             stake_pubkey,
@@ -888,6 +871,7 @@ pub fn redelegate_with_seed(
     ]
 }
 
+#[cfg(feature = "bincode")]
 pub fn move_stake(
     source_stake_pubkey: &Pubkey,
     destination_stake_pubkey: &Pubkey,
@@ -900,9 +884,10 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(id(), &StakeInstruction::MoveStake(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake(lamports), account_metas)
 }
 
+#[cfg(feature = "bincode")]
 pub fn move_lamports(
     source_stake_pubkey: &Pubkey,
     destination_stake_pubkey: &Pubkey,
@@ -915,40 +900,24 @@ pub fn move_lamports(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(
-        id(),
-        &StakeInstruction::MoveLamports(lamports),
-        account_metas,
-    )
+    Instruction::new_with_bincode(ID, &StakeInstruction::MoveLamports(lamports), account_metas)
 }
 
+#[cfg(feature = "bincode")]
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::instruction::InstructionError};
+    use super::*;
 
+    #[allow(deprecated)]
     #[test]
-    fn test_custom_error_decode() {
-        use num_traits::FromPrimitive;
-        fn pretty_err<T>(err: InstructionError) -> String
-        where
-            T: 'static + std::error::Error + DecodeError<T> + FromPrimitive,
-        {
-            if let InstructionError::Custom(code) = err {
-                let specific_error: T = T::decode_custom_error_to_enum(code).unwrap();
-                format!(
-                    "{:?}: {}::{:?} - {}",
-                    err,
-                    T::type_of(),
-                    specific_error,
-                    specific_error,
-                )
-            } else {
-                "".to_string()
-            }
-        }
-        assert_eq!(
-            "Custom(0): StakeError::NoCreditsToRedeem - not enough credits to redeem",
-            pretty_err::<StakeError>(StakeError::NoCreditsToRedeem.into())
-        )
+    fn test_constants() {
+        // Ensure that the constants are in sync with the solana program.
+        assert_eq!(CLOCK_ID, solana_program::sysvar::clock::ID);
+
+        // Ensure that the constants are in sync with the solana program.
+        assert_eq!(STAKE_HISTORY_ID, solana_program::sysvar::stake_history::ID);
+
+        // Ensure that the constants are in sync with the solana rent.
+        assert_eq!(RENT_ID, solana_program::sysvar::rent::ID);
     }
 }
