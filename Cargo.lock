@@ -2349,8 +2349,6 @@ dependencies = [
 [[package]]
 name = "mollusk-svm"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0af5273982e065c575c75a5b234e2d4a90863cb1bbb915650631b346861e44e5"
 dependencies = [
  "bincode",
  "mollusk-svm-error",
@@ -2367,8 +2365,6 @@ dependencies = [
 [[package]]
 name = "mollusk-svm-error"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca5f3cb33936bc3946244edc3c7cc85f086d00322f2bead230bd652ac966507c"
 dependencies = [
  "solana-sdk",
  "thiserror 1.0.69",
@@ -2377,8 +2373,6 @@ dependencies = [
 [[package]]
 name = "mollusk-svm-keys"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47cbc83276b881193fe6be786394cb7be3bcccefabe5134503e121fde9bc127"
 dependencies = [
  "mollusk-svm-error",
  "solana-sdk",
@@ -5117,10 +5111,10 @@ dependencies = [
  "num-derive 0.4.2",
  "num-traits",
  "num_enum",
+ "solana-account",
  "solana-program",
  "solana-program-test",
  "solana-sdk",
- "solana-vote-program",
  "test-case",
  "thiserror 1.0.69",
 ]
