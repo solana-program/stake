@@ -10,7 +10,7 @@ use {
         entrypoint::ProgramResult,
         feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
         hash::Hash,
-        instruction::Instruction,
+        instruction::{AccountMeta, Instruction},
         native_token::LAMPORTS_PER_SOL,
         program_error::ProgramError,
         pubkey::Pubkey,
@@ -30,6 +30,7 @@ use {
         system_instruction, system_program,
         sysvar::{
             clock::Clock, epoch_schedule::EpochSchedule, rent::Rent, stake_history::StakeHistory,
+            SysvarId,
         },
         transaction::{Transaction, TransactionError},
         vote::{
@@ -93,56 +94,103 @@ fn assert_stake_rent_exemption() {
 }
 
 struct Env {
-    run: Mollusk,
+    mollusk: Mollusk,
     accounts: HashMap<Pubkey, AccountSharedData>,
 }
+impl Env {
+    fn init() -> Self {
+        // create a test environment at the execution epoch
+        let mut accounts = HashMap::new();
+        let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
+        mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
+        assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
-fn setup() -> Env {
-    // create a test environment at the execution epoch
-    let mut accounts = HashMap::new();
-    let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
-    mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
-    assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
+        // backfill stake history
+        for epoch in 0..EXECUTION_EPOCH {
+            mollusk.sysvars.stake_history.add(
+                epoch,
+                StakeHistoryEntry::with_effective(PERSISTANT_ACTIVE_STAKE),
+            );
+        }
 
-    // backfill stake history
-    for epoch in 0..EXECUTION_EPOCH {
-        mollusk.sysvars.stake_history.add(
-            epoch,
-            StakeHistoryEntry::with_effective(PERSISTANT_ACTIVE_STAKE),
+        // add a lamports source
+        let payer_data =
+            AccountSharedData::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
+        accounts.insert(PAYER, payer_data);
+
+        // create two vote accounts
+        let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
+        let vote_state = bincode::serialize(&VoteState::default()).unwrap();
+        let vote_data = AccountSharedData::create(
+            vote_rent_exemption,
+            vote_state,
+            vote_program::id(),
+            false,
+            u64::MAX,
         );
+        accounts.insert(VOTE_ACCOUNT_RED, vote_data.clone());
+        accounts.insert(VOTE_ACCOUNT_BLUE, vote_data);
+
+        // create two blank stake accounts
+        let stake_data = AccountSharedData::create(
+            STAKE_RENT_EXEMPTION,
+            vec![0; StakeStateV2::size_of()],
+            id(),
+            false,
+            u64::MAX,
+        );
+        accounts.insert(STAKE_ACCOUNT_BLACK, stake_data.clone());
+        accounts.insert(STAKE_ACCOUNT_WHITE, stake_data);
+
+        Self { mollusk, accounts }
     }
 
-    // add a lamports source
-    let payer_data =
-        AccountSharedData::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
-    accounts.insert(PAYER, payer_data);
+    fn resolve_accounts(&self, account_metas: &[AccountMeta]) -> Vec<(Pubkey, AccountSharedData)> {
+        let mut accounts = vec![];
+        for account_meta in account_metas {
+            let key = account_meta.pubkey;
+            let account_shared_data = if Rent::check_id(&key) {
+                self.mollusk.sysvars.keyed_account_for_rent_sysvar().1
+            } else {
+                self.accounts.get(&key).cloned().unwrap()
+            };
 
-    // create two vote accounts
-    let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
-    let vote_state = bincode::serialize(&VoteState::default()).unwrap();
-    let vote_data = AccountSharedData::create(
-        vote_rent_exemption,
-        vote_state,
-        vote_program::id(),
-        false,
-        u64::MAX,
-    );
-    accounts.insert(VOTE_ACCOUNT_RED, vote_data.clone());
-    accounts.insert(VOTE_ACCOUNT_BLUE, vote_data);
+            accounts.push((key, account_shared_data));
+        }
 
-    // create two blank stake accounts
-    let stake_data = AccountSharedData::create(
-        STAKE_RENT_EXEMPTION,
-        vec![0; StakeStateV2::size_of()],
-        id(),
-        false,
-        u64::MAX,
-    );
-    accounts.insert(STAKE_ACCOUNT_BLACK, stake_data.clone());
-    accounts.insert(STAKE_ACCOUNT_WHITE, stake_data);
-
-    Env {
-        run: mollusk,
-        accounts,
+        accounts
     }
+}
+
+fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
+    let mut data = vec![0; StakeStateV2::size_of()];
+    bincode::serialize_into(&mut data[..], stake).unwrap();
+    data
+}
+
+#[test]
+fn test_initialize() {
+    let env = Env::init();
+
+    let authorized = Authorized::default();
+    let lockup = Lockup::default();
+
+    let instruction = ixn::initialize(&STAKE_ACCOUNT_BLACK, &authorized, &lockup);
+    let accounts = env.resolve_accounts(&instruction.accounts);
+
+    let black_state = StakeStateV2::Initialized(Meta {
+        rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+        authorized,
+        lockup,
+    });
+    let black = stake_to_bytes(&black_state);
+
+    env.mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[
+            Check::success(),
+            Check::account(&STAKE_ACCOUNT_BLACK).data(&black).build(),
+        ],
+    );
 }
