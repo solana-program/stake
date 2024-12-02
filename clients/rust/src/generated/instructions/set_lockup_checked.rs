@@ -5,10 +5,7 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use {
-    crate::generated::types::{Epoch, UnixTimestamp},
-    borsh::{BorshDeserialize, BorshSerialize},
-};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct SetLockupChecked {
@@ -85,8 +82,8 @@ impl Default for SetLockupCheckedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionArgs {
-    pub unix_timestamp: Option<UnixTimestamp>,
-    pub epoch: Option<Epoch>,
+    pub unix_timestamp: Option<i64>,
+    pub epoch: Option<u64>,
 }
 
 /// Instruction builder for `SetLockupChecked`.
@@ -134,13 +131,13 @@ impl SetLockupCheckedBuilder {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: UnixTimestamp) -> &mut Self {
+    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
         self.unix_timestamp = Some(unix_timestamp);
         self
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn epoch(&mut self, epoch: Epoch) -> &mut Self {
+    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
         self.epoch = Some(epoch);
         self
     }
@@ -356,13 +353,13 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: UnixTimestamp) -> &mut Self {
+    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
         self.instruction.unix_timestamp = Some(unix_timestamp);
         self
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn epoch(&mut self, epoch: Epoch) -> &mut Self {
+    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
         self.instruction.epoch = Some(epoch);
         self
     }
