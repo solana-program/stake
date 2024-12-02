@@ -6,12 +6,15 @@
 //!
 
 use {
+    crate::generated::types::{Meta, Stake, StakeFlags},
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_program::pubkey::Pubkey,
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MyType {
-    pub custodian: Option<Pubkey>,
+pub enum StakeStateV2 {
+    Uninitialized,
+    Initialized(Meta),
+    Stake(Meta, Stake, StakeFlags),
+    RewardsPool,
 }

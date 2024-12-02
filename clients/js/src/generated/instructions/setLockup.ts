@@ -10,10 +10,14 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU64Decoder,
+  getU64Encoder,
   getU8Decoder,
   getU8Encoder,
   transformEncoder,
@@ -63,10 +67,14 @@ export type SetLockupInstruction<
 
 export type SetLockupInstructionData = {
   discriminator: number;
+  unixTimestamp: Option<bigint>;
+  epoch: Option<bigint>;
   custodian: Option<Address>;
 };
 
 export type SetLockupInstructionDataArgs = {
+  unixTimestamp: OptionOrNullable<number | bigint>;
+  epoch: OptionOrNullable<number | bigint>;
   custodian: OptionOrNullable<Address>;
 };
 
@@ -74,6 +82,8 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
+      ['unixTimestamp', getOptionEncoder(getI64Encoder())],
+      ['epoch', getOptionEncoder(getU64Encoder())],
       ['custodian', getOptionEncoder(getAddressEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
@@ -83,6 +93,8 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
+    ['unixTimestamp', getOptionDecoder(getI64Decoder())],
+    ['epoch', getOptionDecoder(getU64Decoder())],
     ['custodian', getOptionDecoder(getAddressDecoder())],
   ]);
 }
@@ -105,6 +117,8 @@ export type SetLockupInput<
   stake: Address<TAccountStake>;
   /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
+  unixTimestamp: SetLockupInstructionDataArgs['unixTimestamp'];
+  epoch: SetLockupInstructionDataArgs['epoch'];
   custodian: SetLockupInstructionDataArgs['custodian'];
 };
 

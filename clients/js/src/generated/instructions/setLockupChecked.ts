@@ -8,10 +8,14 @@
 
 import {
   combineCodec,
+  getI64Decoder,
+  getI64Encoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU64Decoder,
+  getU64Encoder,
   getU8Decoder,
   getU8Encoder,
   transformEncoder,
@@ -32,16 +36,6 @@ import {
 } from '@solana/web3.js';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
-import {
-  getEpochDecoder,
-  getEpochEncoder,
-  getUnixTimestampDecoder,
-  getUnixTimestampEncoder,
-  type Epoch,
-  type EpochArgs,
-  type UnixTimestamp,
-  type UnixTimestampArgs,
-} from '../types';
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
 
@@ -76,21 +70,21 @@ export type SetLockupCheckedInstruction<
 
 export type SetLockupCheckedInstructionData = {
   discriminator: number;
-  unixTimestamp: Option<UnixTimestamp>;
-  epoch: Option<Epoch>;
+  unixTimestamp: Option<bigint>;
+  epoch: Option<bigint>;
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
-  epoch: OptionOrNullable<EpochArgs>;
+  unixTimestamp: OptionOrNullable<number | bigint>;
+  epoch: OptionOrNullable<number | bigint>;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
-      ['unixTimestamp', getOptionEncoder(getUnixTimestampEncoder())],
-      ['epoch', getOptionEncoder(getEpochEncoder())],
+      ['unixTimestamp', getOptionEncoder(getI64Encoder())],
+      ['epoch', getOptionEncoder(getU64Encoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_CHECKED_DISCRIMINATOR })
   );
@@ -99,8 +93,8 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
-    ['unixTimestamp', getOptionDecoder(getUnixTimestampDecoder())],
-    ['epoch', getOptionDecoder(getEpochDecoder())],
+    ['unixTimestamp', getOptionDecoder(getI64Decoder())],
+    ['epoch', getOptionDecoder(getU64Decoder())],
   ]);
 }
 

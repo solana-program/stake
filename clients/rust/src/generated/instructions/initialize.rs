@@ -6,9 +6,8 @@
 //!
 
 use {
-    crate::generated::types::Lockup,
+    crate::generated::types::{Authorized, Lockup},
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_program::pubkey::Pubkey,
 };
 
 /// Accounts.
@@ -73,8 +72,7 @@ impl Default for InitializeInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeInstructionArgs {
-    pub staker: Pubkey,
-    pub withdrawer: Pubkey,
+    pub arg0: Authorized,
     pub arg1: Lockup,
 }
 
@@ -88,8 +86,7 @@ pub struct InitializeInstructionArgs {
 pub struct InitializeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     rent_sysvar: Option<solana_program::pubkey::Pubkey>,
-    staker: Option<Pubkey>,
-    withdrawer: Option<Pubkey>,
+    arg0: Option<Authorized>,
     arg1: Option<Lockup>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
@@ -112,13 +109,8 @@ impl InitializeBuilder {
         self
     }
     #[inline(always)]
-    pub fn staker(&mut self, staker: Pubkey) -> &mut Self {
-        self.staker = Some(staker);
-        self
-    }
-    #[inline(always)]
-    pub fn withdrawer(&mut self, withdrawer: Pubkey) -> &mut Self {
-        self.withdrawer = Some(withdrawer);
+    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
+        self.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
@@ -153,8 +145,7 @@ impl InitializeBuilder {
             )),
         };
         let args = InitializeInstructionArgs {
-            staker: self.staker.clone().expect("staker is not set"),
-            withdrawer: self.withdrawer.clone().expect("withdrawer is not set"),
+            arg0: self.arg0.clone().expect("arg0 is not set"),
             arg1: self.arg1.clone().expect("arg1 is not set"),
         };
 
@@ -286,8 +277,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             rent_sysvar: None,
-            staker: None,
-            withdrawer: None,
+            arg0: None,
             arg1: None,
             __remaining_accounts: Vec::new(),
         });
@@ -309,13 +299,8 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn staker(&mut self, staker: Pubkey) -> &mut Self {
-        self.instruction.staker = Some(staker);
-        self
-    }
-    #[inline(always)]
-    pub fn withdrawer(&mut self, withdrawer: Pubkey) -> &mut Self {
-        self.instruction.withdrawer = Some(withdrawer);
+    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
+        self.instruction.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
@@ -365,12 +350,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = InitializeInstructionArgs {
-            staker: self.instruction.staker.clone().expect("staker is not set"),
-            withdrawer: self
-                .instruction
-                .withdrawer
-                .clone()
-                .expect("withdrawer is not set"),
+            arg0: self.instruction.arg0.clone().expect("arg0 is not set"),
             arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
         };
         let instruction = InitializeCpi {
@@ -396,8 +376,7 @@ struct InitializeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     rent_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    staker: Option<Pubkey>,
-    withdrawer: Option<Pubkey>,
+    arg0: Option<Authorized>,
     arg1: Option<Lockup>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(

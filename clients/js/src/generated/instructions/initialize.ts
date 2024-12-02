@@ -8,8 +8,6 @@
 
 import {
   combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
   getU8Decoder,
@@ -29,8 +27,12 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
+  getAuthorizedDecoder,
+  getAuthorizedEncoder,
   getLockupDecoder,
   getLockupEncoder,
+  type Authorized,
+  type AuthorizedArgs,
   type Lockup,
   type LockupArgs,
 } from '../types';
@@ -64,14 +66,12 @@ export type InitializeInstruction<
 
 export type InitializeInstructionData = {
   discriminator: number;
-  staker: Address;
-  withdrawer: Address;
+  arg0: Authorized;
   arg1: Lockup;
 };
 
 export type InitializeInstructionDataArgs = {
-  staker: Address;
-  withdrawer: Address;
+  arg0: AuthorizedArgs;
   arg1: LockupArgs;
 };
 
@@ -79,8 +79,7 @@ export function getInitializeInstructionDataEncoder(): Encoder<InitializeInstruc
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
-      ['staker', getAddressEncoder()],
-      ['withdrawer', getAddressEncoder()],
+      ['arg0', getAuthorizedEncoder()],
       ['arg1', getLockupEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR })
@@ -90,8 +89,7 @@ export function getInitializeInstructionDataEncoder(): Encoder<InitializeInstruc
 export function getInitializeInstructionDataDecoder(): Decoder<InitializeInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
-    ['staker', getAddressDecoder()],
-    ['withdrawer', getAddressDecoder()],
+    ['arg0', getAuthorizedDecoder()],
     ['arg1', getLockupDecoder()],
   ]);
 }
@@ -114,8 +112,7 @@ export type InitializeInput<
   stake: Address<TAccountStake>;
   /** Rent sysvar */
   rentSysvar?: Address<TAccountRentSysvar>;
-  staker: InitializeInstructionDataArgs['staker'];
-  withdrawer: InitializeInstructionDataArgs['withdrawer'];
+  arg0: InitializeInstructionDataArgs['arg0'];
   arg1: InitializeInstructionDataArgs['arg1'];
 };
 

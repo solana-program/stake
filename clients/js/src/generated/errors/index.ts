@@ -6,12 +6,4 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './authorized';
-export * from './delegation';
-export * from './lockup';
-export * from './meta';
 export * from './stake';
-export * from './stakeAuthorize';
-export * from './stakeFlags';
-export * from './stakeState';
-export * from './stakeStateV2';
