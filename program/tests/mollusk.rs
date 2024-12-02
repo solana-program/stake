@@ -4,7 +4,7 @@
 
 use {
     mollusk_svm::{result::Check, Mollusk},
-    solana_account::{AccountSharedData, WritableAccount},
+    solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
@@ -21,6 +21,7 @@ use {
             instruction::{
                 self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
             },
+            stake_flags::StakeFlags,
             state::{
                 warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
                 StakeActivationStatus, StakeAuthorize, StakeStateV2,
@@ -53,25 +54,42 @@ use {
 // ideally we automatically check missing signer failures
 // need to create a vote account... ugh we need to get credits right for DeactivateDelinquent
 // for delegate we just need owner, vote account pubkey, and credits (can be 0)
+//
+// XXX OK i wrote a simple init test
+// what to do on monday... i guess go through the stake ixn tests and see what to impl
+// main thing we lack is full coverage for lockup and i think a bunch of split edge cases
 
 // arbitrary, but gives us room to set up activations/deactivations serveral epochs in the past
 const EXECUTION_EPOCH: u64 = 8;
 
 // mollusk doesnt charge transaction fees, this is just a convenient source of lamports
-const PAYER: Pubkey = Pubkey::from_str_const("PAYER7y5empWisbHsxHGE7vgBWKZCemGo1gKw7NpQSK");
+const PAYER: Pubkey = Pubkey::from_str_const("PAYER11111111111111111111111111111111111111");
 const PAYER_BALANCE: u64 = 1_000_000 * LAMPORTS_PER_SOL;
 
 // two vote accounts with no credits, fine for all stake tests except DeactivateDelinquent
 const VOTE_ACCOUNT_RED: Pubkey =
-    Pubkey::from_str_const("REDjn6cyjcZkXAvRHWFtAd4chwHd6MmtqT2u965cDqg");
+    Pubkey::from_str_const("RED1111111111111111111111111111111111111111");
 const VOTE_ACCOUNT_BLUE: Pubkey =
-    Pubkey::from_str_const("BLUE7fsMB69ti5fDRZEbZVoWdXbCoA8bwk963vXsZs7");
+    Pubkey::from_str_const("BLUE111111111111111111111111111111111111111");
 
 // two blank stake accounts that can be serialized into for tests
 const STAKE_ACCOUNT_BLACK: Pubkey =
-    Pubkey::from_str_const("BLACK8oXP6Ar933gupyVZqunKYmmb8rEnrbPSqpxbFt");
+    Pubkey::from_str_const("BLACK11111111111111111111111111111111111111");
 const STAKE_ACCOUNT_WHITE: Pubkey =
-    Pubkey::from_str_const("WH1TE3e9czGF33AtbkTBbQ4BQ3EY7BaL8utApeYfSnL");
+    Pubkey::from_str_const("WH1TE11111111111111111111111111111111111111");
+
+// authorities for tests which use separate ones
+const STAKER_BLACK: Pubkey = Pubkey::from_str_const("STAKERBLACK11111111111111111111111111111111");
+const WITHDRAWER_BLACK: Pubkey =
+    Pubkey::from_str_const("W1THDRAWERBLACK1111111111111111111111111111");
+const STAKER_WHITE: Pubkey = Pubkey::from_str_const("STAKERWH1TE11111111111111111111111111111111");
+const WITHDRAWER_WHITE: Pubkey =
+    Pubkey::from_str_const("W1THDRAWERWH1TE1111111111111111111111111111");
+
+// authorities for tests which use shared ones
+const STAKER_GRAY: Pubkey = Pubkey::from_str_const("STAKERGRAY111111111111111111111111111111111");
+const WITHDRAWER_GRAY: Pubkey =
+    Pubkey::from_str_const("W1THDRAWERGRAY11111111111111111111111111111");
 
 // stake delegated to some imaginary vote account in all epochs
 // with a warmup/cooldown rate of 9%, routine tests moving under 9sol can ignore stake history
@@ -98,6 +116,7 @@ struct Env {
     accounts: HashMap<Pubkey, AccountSharedData>,
 }
 impl Env {
+    // set up a test environment with valid stake history, two vote accounts, and two blank stake accounts
     fn init() -> Self {
         // create a test environment at the execution epoch
         let mut accounts = HashMap::new();
@@ -145,6 +164,8 @@ impl Env {
         Self { mollusk, accounts }
     }
 
+    // get the accounts from our account store that this transaction expects to see
+    // we dont need implicit sysvars, mollusk resolves them internally via syscall stub
     fn resolve_accounts(&self, account_metas: &[AccountMeta]) -> Vec<(Pubkey, AccountSharedData)> {
         let mut accounts = vec![];
         for account_meta in account_metas {
@@ -160,6 +181,68 @@ impl Env {
 
         accounts
     }
+
+    // set up one of the preconfigured blank stake accounts at some starting state
+    // to mutate the accounts after initial setup, do it directly or execute instructions
+    // note these accounts are already rent exempt, so lamports specified are stake or extra
+    fn init_stake(
+        &mut self,
+        pubkey: &Pubkey,
+        stake_state: &StakeStateV2,
+        additional_lamports: u64,
+    ) {
+        assert!(*pubkey == STAKE_ACCOUNT_BLACK || *pubkey == STAKE_ACCOUNT_WHITE);
+        let stake_account = self.accounts.get_mut(pubkey).unwrap();
+        let current_lamports = stake_account.lamports();
+        stake_account.set_lamports(current_lamports + additional_lamports);
+        bincode::serialize_into(stake_account.data_as_mut_slice(), stake_state).unwrap();
+    }
+
+    // process an instruction, assert checks, and update internal accounts
+    fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
+        let initial_accounts = self.resolve_accounts(&instruction.accounts);
+
+        let result =
+            self.mollusk
+                .process_and_validate_instruction(instruction, &initial_accounts, checks);
+
+        for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
+            let account_meta = &instruction.accounts[i];
+            assert_eq!(account_meta.pubkey, resulting_account.0);
+            if account_meta.is_writable {
+                if resulting_account.1.lamports() == 0 {
+                    self.accounts.remove(&resulting_account.0);
+                } else {
+                    self.accounts
+                        .insert(resulting_account.0, resulting_account.1);
+                }
+            }
+        }
+    }
+
+    // shorthand for process with only a success check
+    fn process_success(&mut self, instruction: &Instruction) {
+        self.process(instruction, &[Check::success()]);
+    }
+
+    // shorthand for process with an expected error
+    fn process_fail(&mut self, instruction: &Instruction, error: ProgramError) {
+        self.process(instruction, &[Check::err(error)]);
+    }
+}
+
+fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
+    StakeStateV2::Stake(
+        meta,
+        Stake {
+            delegation: Delegation {
+                stake,
+                ..Delegation::default()
+            },
+            ..Stake::default()
+        },
+        StakeFlags::empty(),
+    )
 }
 
 fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
@@ -170,13 +253,12 @@ fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
 
 #[test]
 fn test_initialize() {
-    let env = Env::init();
+    let mut env = Env::init();
 
     let authorized = Authorized::default();
     let lockup = Lockup::default();
 
     let instruction = ixn::initialize(&STAKE_ACCOUNT_BLACK, &authorized, &lockup);
-    let accounts = env.resolve_accounts(&instruction.accounts);
 
     let black_state = StakeStateV2::Initialized(Meta {
         rent_exempt_reserve: STAKE_RENT_EXEMPTION,
@@ -185,9 +267,8 @@ fn test_initialize() {
     });
     let black = stake_to_bytes(&black_state);
 
-    env.mollusk.process_and_validate_instruction(
+    env.process(
         &instruction,
-        &accounts,
         &[
             Check::success(),
             Check::account(&STAKE_ACCOUNT_BLACK).data(&black).build(),
