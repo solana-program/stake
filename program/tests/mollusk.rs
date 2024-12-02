@@ -37,7 +37,7 @@ use {
             state::{VoteInit, VoteState, VoteStateVersions},
         },
     },
-    solana_stake_program::{id, processor::Processor},
+    solana_stake_program::{get_minimum_delegation, id, processor::Processor},
     std::collections::HashMap,
     test_case::{test_case, test_matrix},
 };
@@ -162,6 +162,145 @@ impl Env {
         Self { mollusk, accounts }
     }
 
+    // creates a test environment and instruction for a given stake operation
+    // enum contents are sometimes, but not necessarily, ignored
+    // the success is trivial, this is mostly to allow exhaustive failure tests
+    // or to do some post-setup for more meaningful success tests
+    // XXX this is horrible. getting full coverage is fucking insane. this shit is too complicated
+    // probably need my own enum... or at least add lockup as an arg for everything
+    fn init_for_instruction(stake_instruction: &StakeInstruction) -> (Self, Instruction) {
+        let mut env = Self::init();
+        let minimum_delegation = get_minimum_delegation();
+
+        let instruction = match stake_instruction {
+            StakeInstruction::Initialize(_, _) => instruction::initialize(
+                &STAKE_ACCOUNT_BLACK,
+                &Authorized {
+                    staker: STAKER_BLACK,
+                    withdrawer: WITHDRAWER_BLACK,
+                },
+                &Lockup::default(),
+            ),
+            // TODO lockup
+            StakeInstruction::Authorize(_, authorize) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                let (old_authority, new_authority) = match authorize {
+                    StakeAuthorize::Staker => (STAKER_BLACK, STAKER_GRAY),
+                    StakeAuthorize::Withdrawer => (WITHDRAWER_BLACK, WITHDRAWER_GRAY),
+                };
+
+                instruction::authorize(
+                    &STAKE_ACCOUNT_BLACK,
+                    &old_authority,
+                    &new_authority,
+                    *authorize,
+                    None,
+                )
+            }
+            // TODO withdrawer
+            StakeInstruction::DelegateStake => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
+            }
+            // TODO amount, also maybe should use gray
+            StakeInstruction::Split(_) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &active_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation * 2,
+                    ),
+                    minimum_delegation * 2,
+                );
+
+                instruction::split(
+                    &STAKE_ACCOUNT_BLACK,
+                    &STAKER_BLACK,
+                    minimum_delegation,
+                    &STAKE_ACCOUNT_WHITE,
+                )[2]
+                .clone()
+            }
+            // TODO partial, lockup
+            StakeInstruction::Withdraw(_) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                instruction::withdraw(
+                    &STAKE_ACCOUNT_BLACK,
+                    &WITHDRAWER_BLACK,
+                    &PAYER,
+                    minimum_delegation + STAKE_RENT_EXEMPTION,
+                    None,
+                )
+            }
+            // TODO withdrawer
+            StakeInstruction::Deactivate => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
+            }
+            // TODO existing lockup, remove lockup, also hardcoded custodians maybe?
+            StakeInstruction::SetLockup(_) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                instruction::set_lockup(
+                    &STAKE_ACCOUNT_BLACK,
+                    &LockupArgs {
+                        epoch: Some(EXECUTION_EPOCH * 2),
+                        custodian: Some(Pubkey::new_unique()),
+                        unix_timestamp: None,
+                    },
+                    &WITHDRAWER_BLACK,
+                )
+            }
+            // TODO withdrawer
+            StakeInstruction::Merge => {
+                // XXX TODO FIXME these need to use gray
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                env.update_stake(
+                    &STAKE_ACCOUNT_WHITE,
+                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_WHITE, minimum_delegation),
+                    minimum_delegation,
+                );
+
+                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)[0]
+                    .clone()
+            }
+            // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
+            _ => todo!(),
+        };
+
+        (env, instruction)
+    }
+
     // get the accounts from our account store that this transaction expects to see
     // we dont need implicit sysvars, mollusk resolves them internally via syscall stub
     fn resolve_accounts(&self, account_metas: &[AccountMeta]) -> Vec<(Pubkey, AccountSharedData)> {
@@ -202,7 +341,7 @@ impl Env {
     // set up one of the preconfigured blank stake accounts at some starting state
     // to mutate the accounts after initial setup, do it directly or execute instructions
     // note these accounts are already rent exempt, so lamports specified are stake or extra
-    fn init_stake(
+    fn update_stake(
         &mut self,
         pubkey: &Pubkey,
         stake_state: &StakeStateV2,
@@ -248,12 +387,63 @@ impl Env {
     }
 }
 
-fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
+fn just_stake(stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
+    let authorized = match stake_pubkey {
+        STAKE_ACCOUNT_BLACK => Authorized {
+            staker: STAKER_BLACK,
+            withdrawer: WITHDRAWER_BLACK,
+        },
+        STAKE_ACCOUNT_WHITE => Authorized {
+            staker: STAKER_WHITE,
+            withdrawer: WITHDRAWER_WHITE,
+        },
+        _ => Authorized::default(),
+    };
+
     StakeStateV2::Stake(
-        meta,
+        Meta {
+            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+            authorized,
+            lockup: Lockup::default(),
+        },
         Stake {
             delegation: Delegation {
                 stake,
+                ..Delegation::default()
+            },
+            ..Stake::default()
+        },
+        StakeFlags::empty(),
+    )
+}
+
+fn active_stake(voter_pubkey: Pubkey, stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
+    assert!(stake_pubkey != VOTE_ACCOUNT_RED);
+    assert!(stake_pubkey != VOTE_ACCOUNT_BLUE);
+
+    let authorized = match stake_pubkey {
+        STAKE_ACCOUNT_BLACK => Authorized {
+            staker: STAKER_BLACK,
+            withdrawer: WITHDRAWER_BLACK,
+        },
+        STAKE_ACCOUNT_WHITE => Authorized {
+            staker: STAKER_WHITE,
+            withdrawer: WITHDRAWER_WHITE,
+        },
+        _ => Authorized::default(),
+    };
+
+    StakeStateV2::Stake(
+        Meta {
+            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+            authorized,
+            lockup: Lockup::default(),
+        },
+        Stake {
+            delegation: Delegation {
+                stake,
+                voter_pubkey,
+                activation_epoch: EXECUTION_EPOCH - 1,
                 ..Delegation::default()
             },
             ..Stake::default()
