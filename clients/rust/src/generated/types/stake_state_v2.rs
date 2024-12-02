@@ -10,8 +10,7 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub enum StakeStateV2 {
     Uninitialized,
     Initialized(Meta),

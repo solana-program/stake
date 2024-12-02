@@ -171,5 +171,13 @@ codama.accept(
     crateFolder: rustClient,
     anchorTraits: false,
     toolchain: getToolchainArgument('format'),
+    traitOptions: {
+      overrides: {
+        delegation: ['borsh::BorshSerialize', 'borsh::BorshDeserialize', 'Clone', 'Debug'],
+        stake: ['borsh::BorshSerialize', 'borsh::BorshDeserialize', 'Clone', 'Debug'],
+        stakeState: ['borsh::BorshSerialize', 'borsh::BorshDeserialize', 'Clone', 'Debug'],
+        stakeStateV2: ['borsh::BorshSerialize', 'borsh::BorshDeserialize', 'Clone', 'Debug'],
+      },
+    },
   })
 );
