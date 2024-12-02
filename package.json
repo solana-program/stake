@@ -24,7 +24,7 @@
     "clients:rust:test": "zx ./scripts/client/test-rust.mjs"
   },
   "devDependencies": {
-    "@codama/nodes-from-anchor": "^1.0.0",
+    "@codama/nodes-from-anchor": "^1.0.1",
     "@codama/renderers-js": "^1.1.0",
     "@codama/renderers-rust": "^1.0.4",
     "@iarna/toml": "^2.2.5",
