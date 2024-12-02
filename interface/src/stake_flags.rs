@@ -1,5 +1,6 @@
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
+use shank::ShankType;
 
 /// Additional flags for stake state.
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -12,7 +13,7 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Debug, ShankType)]
 pub struct StakeFlags {
     bits: u8,
 }
