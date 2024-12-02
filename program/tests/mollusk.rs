@@ -212,7 +212,7 @@ impl Env {
 
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
-            // TODO amount, also maybe should use gray
+            // TODO amount
             StakeInstruction::Split(_) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
@@ -220,13 +220,14 @@ impl Env {
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation * 2,
+                        true,
                     ),
                     minimum_delegation * 2,
                 );
 
                 instruction::split(
                     &STAKE_ACCOUNT_BLACK,
-                    &STAKER_BLACK,
+                    &STAKER_GRAY,
                     minimum_delegation,
                     &STAKE_ACCOUNT_WHITE,
                 )[2]
@@ -236,7 +237,12 @@ impl Env {
             StakeInstruction::Withdraw(_) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    &active_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                    ),
                     minimum_delegation,
                 );
 
@@ -252,7 +258,12 @@ impl Env {
             StakeInstruction::Deactivate => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    &active_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                    ),
                     minimum_delegation,
                 );
 
@@ -278,16 +289,25 @@ impl Env {
             }
             // TODO withdrawer
             StakeInstruction::Merge => {
-                // XXX TODO FIXME these need to use gray
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    &active_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        true,
+                    ),
                     minimum_delegation,
                 );
 
                 env.update_stake(
                     &STAKE_ACCOUNT_WHITE,
-                    &active_stake(VOTE_ACCOUNT_RED, STAKE_ACCOUNT_WHITE, minimum_delegation),
+                    &active_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_WHITE,
+                        minimum_delegation,
+                        true,
+                    ),
                     minimum_delegation,
                 );
 
@@ -417,20 +437,29 @@ fn just_stake(stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
     )
 }
 
-fn active_stake(voter_pubkey: Pubkey, stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
+fn active_stake(
+    voter_pubkey: Pubkey,
+    stake_pubkey: Pubkey,
+    stake: u64,
+    use_gray: bool,
+) -> StakeStateV2 {
     assert!(stake_pubkey != VOTE_ACCOUNT_RED);
     assert!(stake_pubkey != VOTE_ACCOUNT_BLUE);
 
-    let authorized = match stake_pubkey {
-        STAKE_ACCOUNT_BLACK => Authorized {
+    let authorized = match (use_gray, stake_pubkey) {
+        (true, _) => Authorized {
+            staker: STAKER_GRAY,
+            withdrawer: WITHDRAWER_GRAY,
+        },
+        (false, STAKE_ACCOUNT_BLACK) => Authorized {
             staker: STAKER_BLACK,
             withdrawer: WITHDRAWER_BLACK,
         },
-        STAKE_ACCOUNT_WHITE => Authorized {
+        (false, STAKE_ACCOUNT_WHITE) => Authorized {
             staker: STAKER_WHITE,
             withdrawer: WITHDRAWER_WHITE,
         },
-        _ => Authorized::default(),
+        (false, _) => Authorized::default(),
     };
 
     StakeStateV2::Stake(
