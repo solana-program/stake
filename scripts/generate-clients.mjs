@@ -10,15 +10,12 @@ import { getToolchainArgument } from './utils.mjs';
 const idl = require(path.join(__dirname, '..', 'interface', 'idl.json'));
 const codama = c.createFromRoot(rootNodeFromAnchor(idl));
 
-codama.accept(c.consoleLogVisitor(c.getDebugStringVisitor({ indent: true })));
-
 // Rename the program.
 codama.update(
   c.updateProgramsVisitor({
     solanaStakeInterface: { name: 'stake' },
   })
 );
-
 
 codama.update(
   c.updateInstructionsVisitor({
@@ -31,37 +28,128 @@ codama.update(
 codama.update(
   c.bottomUpTransformerVisitor([
     {
-      // Epoch -> u64
-      select: (node) => {
-        return (
-          c.isNode(node, "structFieldTypeNode") &&
-          c.isNode(node.type, "definedTypeLinkNode") &&
-          node.type.name === "epoch"
-        );
-      },
+      select: '[programNode]stake',
       transform: (node) => {
-        c.assertIsNode(node, "structFieldTypeNode");
+        c.assertIsNode(node, 'programNode');
         return {
           ...node,
-          type: c.numberTypeNode("u64"),
+          errors: [
+            {
+              code: 0,
+              name: 'NoCreditsToRedeem',
+              message: 'Not enough credits to redeem',
+            },
+            {
+              code: 1,
+              name: 'LockupInForce',
+              message: 'Lockup has not yet expired',
+            },
+            {
+              code: 2,
+              name: 'AlreadyDeactivated',
+              message: 'Stake already deactivated',
+            },
+            {
+              code: 3,
+              name: 'TooSoonToRedelegate',
+              message: 'One re-delegation permitted per epoch',
+            },
+            {
+              code: 4,
+              name: 'InsufficientStake',
+              message: 'Split amount is more than is staked',
+            },
+            {
+              code: 5,
+              name: 'MergeTransientStake',
+              message: 'Stake account with transient stake cannot be merged',
+            },
+            {
+              code: 6,
+              name: 'MergeMismatch',
+              message:
+                'Stake account merge failed due to different authority, lockups or state',
+            },
+            {
+              code: 7,
+              name: 'CustodianMissing',
+              message: 'Custodian address not present',
+            },
+            {
+              code: 8,
+              name: 'CustodianSignatureMissing',
+              message: 'Custodian signature not present',
+            },
+            {
+              code: 9,
+              name: 'InsufficientReferenceVotes',
+              message:
+                'Insufficient voting activity in the reference vote account',
+            },
+            {
+              code: 10,
+              name: 'VoteAddressMismatch',
+              message:
+                'Stake account is not delegated to the provided vote account',
+            },
+            {
+              code: 11,
+              name: 'MinimumDelinquentEpochsForDeactivationNotMet',
+              message:
+                'Stake account has not been delinquent for the minimum epochs required for deactivation',
+            },
+            {
+              code: 12,
+              name: 'InsufficientDelegation',
+              message: 'Delegation amount is less than the minimum',
+            },
+            {
+              code: 13,
+              name: 'RedelegateTransientOrInactiveStake',
+              message:
+                'Stake account with transient or inactive stake cannot be redelegated',
+            },
+            {
+              code: 14,
+              name: 'RedelegateToSameVoteAccount',
+              message:
+                'Stake redelegation to the same vote account is not permitted',
+            },
+            {
+              code: 15,
+              name: 'RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted',
+              message:
+                'Redelegated stake must be fully activated before deactivation',
+            },
+            {
+              code: 16,
+              name: 'EpochRewardsActive',
+              message:
+                'Stake action is not permitted while the epoch rewards period is active',
+            },
+          ],
         };
       },
     },
     {
-      // UnixTimestamp -> i64
-      select: (node) => {
-        return (
-          c.isNode(node, "structFieldTypeNode") &&
-          c.isNode(node.type, "definedTypeLinkNode") &&
-          node.type.name === "unixTimestamp"
-        );
+      // Epoch -> u64
+      select: '[definedTypeLinkNode]epoch',
+      transform: () => {
+        return c.numberTypeNode('u64');
       },
-      transform: (node) => {
-        c.assertIsNode(node, "structFieldTypeNode");
-        return {
-          ...node,
-          type: c.numberTypeNode("i64"),
-        };
+    },
+    {
+      // UnixTimestamp -> i64
+      select: '[definedTypeLinkNode]unixTimestamp',
+      transform: () => {
+        return c.numberTypeNode('i64');
+      },
+    },
+    {
+      // f64 -> f64
+      select: '[definedTypeLinkNode]f64',
+      transform: () => {
+        return c.numberTypeNode('f64');
       },
     },
   ])
