@@ -18,9 +18,7 @@ use {
         signers::Signers,
         stake::{
             self,
-            instruction::{
-                self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
-            },
+            instruction::{self, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
             stake_flags::StakeFlags,
             state::{
                 warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
@@ -30,8 +28,8 @@ use {
         stake_history::StakeHistoryEntry,
         system_instruction, system_program,
         sysvar::{
-            clock::Clock, epoch_schedule::EpochSchedule, rent::Rent, stake_history::StakeHistory,
-            SysvarId,
+            clock::Clock, epoch_rewards::EpochRewards, epoch_schedule::EpochSchedule, rent::Rent,
+            stake_history::StakeHistory, SysvarId,
         },
         transaction::{Transaction, TransactionError},
         vote::{
@@ -172,8 +170,27 @@ impl Env {
             let key = account_meta.pubkey;
             let account_shared_data = if Rent::check_id(&key) {
                 self.mollusk.sysvars.keyed_account_for_rent_sysvar().1
+            } else if Clock::check_id(&key) {
+                self.mollusk.sysvars.keyed_account_for_clock_sysvar().1
+            } else if EpochSchedule::check_id(&key) {
+                self.mollusk
+                    .sysvars
+                    .keyed_account_for_epoch_schedule_sysvar()
+                    .1
+            } else if EpochRewards::check_id(&key) {
+                self.mollusk
+                    .sysvars
+                    .keyed_account_for_epoch_rewards_sysvar()
+                    .1
+            } else if StakeHistory::check_id(&key) {
+                self.mollusk
+                    .sysvars
+                    .keyed_account_for_stake_history_sysvar()
+                    .1
+            } else if let Some(account) = self.accounts.get(&key).cloned() {
+                account
             } else {
-                self.accounts.get(&key).cloned().unwrap()
+                AccountSharedData::default()
             };
 
             accounts.push((key, account_shared_data));
@@ -258,7 +275,7 @@ fn test_initialize() {
     let authorized = Authorized::default();
     let lockup = Lockup::default();
 
-    let instruction = ixn::initialize(&STAKE_ACCOUNT_BLACK, &authorized, &lockup);
+    let instruction = instruction::initialize(&STAKE_ACCOUNT_BLACK, &authorized, &lockup);
 
     let black_state = StakeStateV2::Initialized(Meta {
         rent_exempt_reserve: STAKE_RENT_EXEMPTION,
