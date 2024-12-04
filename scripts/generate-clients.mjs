@@ -37,7 +37,7 @@ codama.update(
             ...node.accounts,
             // stake account
             c.accountNode({
-              name: 'stakeState',
+              name: 'stakeStateAccount',
               data: c.structTypeNode([
                 c.structFieldTypeNode({
                   name: 'state',
@@ -190,7 +190,7 @@ codama.accept(
 // provides its own implementation.
 codama.update(
   c.updateAccountsVisitor({
-    stakeState: { delete: true },
+    stakeStateAccount: { delete: true },
   })
 );
 

@@ -36,7 +36,7 @@ export const STAKE_PROGRAM_ADDRESS =
   'Stake11111111111111111111111111111111111111' as Address<'Stake11111111111111111111111111111111111111'>;
 
 export enum StakeAccount {
-  StakeState,
+  StakeStateAccount,
 }
 
 export enum StakeInstruction {
