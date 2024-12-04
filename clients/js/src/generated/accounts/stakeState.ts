@@ -33,71 +33,71 @@ import {
   type StakeStateV2Args,
 } from '../types';
 
-export type StakeAccount = { state: StakeStateV2 };
+export type StakeState = { state: StakeStateV2 };
 
-export type StakeAccountArgs = { state: StakeStateV2Args };
+export type StakeStateArgs = { state: StakeStateV2Args };
 
-export function getStakeAccountEncoder(): Encoder<StakeAccountArgs> {
+export function getStakeStateEncoder(): Encoder<StakeStateArgs> {
   return getStructEncoder([['state', getStakeStateV2Encoder()]]);
 }
 
-export function getStakeAccountDecoder(): Decoder<StakeAccount> {
+export function getStakeStateDecoder(): Decoder<StakeState> {
   return getStructDecoder([['state', getStakeStateV2Decoder()]]);
 }
 
-export function getStakeAccountCodec(): Codec<StakeAccountArgs, StakeAccount> {
-  return combineCodec(getStakeAccountEncoder(), getStakeAccountDecoder());
+export function getStakeStateCodec(): Codec<StakeStateArgs, StakeState> {
+  return combineCodec(getStakeStateEncoder(), getStakeStateDecoder());
 }
 
-export function decodeStakeAccount<TAddress extends string = string>(
+export function decodeStakeState<TAddress extends string = string>(
   encodedAccount: EncodedAccount<TAddress>
-): Account<StakeAccount, TAddress>;
-export function decodeStakeAccount<TAddress extends string = string>(
+): Account<StakeState, TAddress>;
+export function decodeStakeState<TAddress extends string = string>(
   encodedAccount: MaybeEncodedAccount<TAddress>
-): MaybeAccount<StakeAccount, TAddress>;
-export function decodeStakeAccount<TAddress extends string = string>(
+): MaybeAccount<StakeState, TAddress>;
+export function decodeStakeState<TAddress extends string = string>(
   encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
-): Account<StakeAccount, TAddress> | MaybeAccount<StakeAccount, TAddress> {
+): Account<StakeState, TAddress> | MaybeAccount<StakeState, TAddress> {
   return decodeAccount(
     encodedAccount as MaybeEncodedAccount<TAddress>,
-    getStakeAccountDecoder()
+    getStakeStateDecoder()
   );
 }
 
-export async function fetchStakeAccount<TAddress extends string = string>(
+export async function fetchStakeState<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
   config?: FetchAccountConfig
-): Promise<Account<StakeAccount, TAddress>> {
-  const maybeAccount = await fetchMaybeStakeAccount(rpc, address, config);
+): Promise<Account<StakeState, TAddress>> {
+  const maybeAccount = await fetchMaybeStakeState(rpc, address, config);
   assertAccountExists(maybeAccount);
   return maybeAccount;
 }
 
-export async function fetchMaybeStakeAccount<TAddress extends string = string>(
+export async function fetchMaybeStakeState<TAddress extends string = string>(
   rpc: Parameters<typeof fetchEncodedAccount>[0],
   address: Address<TAddress>,
   config?: FetchAccountConfig
-): Promise<MaybeAccount<StakeAccount, TAddress>> {
+): Promise<MaybeAccount<StakeState, TAddress>> {
   const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeStakeAccount(maybeAccount);
+  return decodeStakeState(maybeAccount);
 }
 
-export async function fetchAllStakeAccount(
+export async function fetchAllStakeState(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
   config?: FetchAccountsConfig
-): Promise<Account<StakeAccount>[]> {
-  const maybeAccounts = await fetchAllMaybeStakeAccount(rpc, addresses, config);
+): Promise<Account<StakeState>[]> {
+  const maybeAccounts = await fetchAllMaybeStakeState(rpc, addresses, config);
   assertAccountsExist(maybeAccounts);
   return maybeAccounts;
 }
 
-export async function fetchAllMaybeStakeAccount(
+export async function fetchAllMaybeStakeState(
   rpc: Parameters<typeof fetchEncodedAccounts>[0],
   addresses: Array<Address>,
   config?: FetchAccountsConfig
-): Promise<MaybeAccount<StakeAccount>[]> {
+): Promise<MaybeAccount<StakeState>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeStakeAccount(maybeAccount));
+  return maybeAccounts.map((maybeAccount) => decodeStakeState(maybeAccount));
 }

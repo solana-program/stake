@@ -1,2 +1,2 @@
-pub mod stake_account;
-pub use stake_account::*;
+pub mod stake_state;
+pub use stake_state::*;
