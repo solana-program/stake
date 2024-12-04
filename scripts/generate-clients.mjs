@@ -190,7 +190,7 @@ codama.accept(
 // provides its own implementation.
 codama.update(
   c.updateAccountsVisitor({
-    stake: { delete: true },
+    stakeAccount: { delete: true },
   })
 );
 
