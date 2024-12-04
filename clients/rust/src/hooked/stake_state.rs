@@ -7,11 +7,11 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub struct StakeAccount {
+pub struct StakeState {
     state: StakeStateV2,
 }
 
-impl StakeAccount {
+impl StakeState {
     #[inline(always)]
     pub fn from_bytes(data: &[u8]) -> Result<Self, std::io::Error> {
         let mut data = data;
@@ -105,7 +105,7 @@ impl StakeAccount {
     }
 }
 
-impl<'a> TryFrom<&solana_program::account_info::AccountInfo<'a>> for StakeAccount {
+impl<'a> TryFrom<&solana_program::account_info::AccountInfo<'a>> for StakeState {
     type Error = std::io::Error;
 
     fn try_from(
@@ -116,7 +116,7 @@ impl<'a> TryFrom<&solana_program::account_info::AccountInfo<'a>> for StakeAccoun
     }
 }
 
-impl BorshDeserialize for StakeAccount {
+impl BorshDeserialize for StakeState {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let enum_value: u32 = BorshDeserialize::deserialize_reader(reader)?;
         let state = match enum_value {
@@ -135,11 +135,11 @@ impl BorshDeserialize for StakeAccount {
             _ => return Err(Error::new(ErrorKind::InvalidData, "Invalid enum value")),
         };
 
-        Ok(StakeAccount { state })
+        Ok(StakeState { state })
     }
 }
 
-impl BorshSerialize for StakeAccount {
+impl BorshSerialize for StakeState {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self.state {
             StakeStateV2::Uninitialized => writer.write_all(&0u32.to_le_bytes()),
