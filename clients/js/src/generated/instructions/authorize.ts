@@ -123,7 +123,7 @@ export type AuthorizeInput<
 > = {
   /** Stake account to be updated */
   stake: Address<TAccountStake>;
-  /** Rent sysvar */
+  /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
   /** Stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
@@ -212,7 +212,7 @@ export type ParsedAuthorizeInstruction<
   accounts: {
     /** Stake account to be updated */
     stake: TAccountMetas[0];
-    /** Rent sysvar */
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
     /** Stake or withdraw authority */
     authority: TAccountMetas[2];

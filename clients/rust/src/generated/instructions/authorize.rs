@@ -15,7 +15,7 @@ use {
 pub struct Authorize {
     /// Stake account to be updated
     pub stake: solana_program::pubkey::Pubkey,
-    /// Rent sysvar
+    /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// Stake or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
@@ -126,7 +126,7 @@ impl AuthorizeBuilder {
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
-    /// Rent sysvar
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
@@ -199,7 +199,7 @@ impl AuthorizeBuilder {
 pub struct AuthorizeCpiAccounts<'a, 'b> {
     /// Stake account to be updated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -213,7 +213,7 @@ pub struct AuthorizeCpi<'a, 'b> {
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake account to be updated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -364,7 +364,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Rent sysvar
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,

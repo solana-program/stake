@@ -78,7 +78,7 @@ pub enum StakeInstruction {
     #[account(
         1,
         name = "clock_sysvar",
-        desc = "Rent sysvar"
+        desc = "Clock sysvar"
     )]
     #[account(
         2,

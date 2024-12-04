@@ -57,7 +57,7 @@
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "Rent sysvar"
+            "Clock sysvar"
           ]
         },
         {
