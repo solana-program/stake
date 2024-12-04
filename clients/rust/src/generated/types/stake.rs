@@ -10,7 +10,7 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Stake {
     pub delegation: Delegation,
     pub credits_observed: u64,

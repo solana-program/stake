@@ -10,7 +10,7 @@ use {
     solana_program::pubkey::Pubkey,
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Delegation {
     #[cfg_attr(
         feature = "serde",

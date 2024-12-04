@@ -10,7 +10,7 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
 pub enum StakeState {
     Uninitialized,
     Initialized(Meta),

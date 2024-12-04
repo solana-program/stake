@@ -35,6 +35,10 @@ import {
 export const STAKE_PROGRAM_ADDRESS =
   'Stake11111111111111111111111111111111111111' as Address<'Stake11111111111111111111111111111111111111'>;
 
+export enum StakeAccount {
+  StakeAccount,
+}
+
 export enum StakeInstruction {
   Initialize,
   Authorize,
