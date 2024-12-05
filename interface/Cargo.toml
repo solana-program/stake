@@ -25,7 +25,6 @@ solana-instruction = "^2.1"
 solana-program-error = { version = "^2.1", optional = true }
 solana-pubkey = { version = "^2.1", default-features = false }
 solana-system-interface = "^1.0"
-shank = "0.4.2"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
