@@ -9,17 +9,17 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct DelegateStake {
-    /// The stake account to be delegated
+    /// Initialized stake account to be delegated
     pub stake: solana_program::pubkey::Pubkey,
-    /// Vote account to which stake will be delegated
+    /// Vote account to which this stake will be delegated
     pub vote: solana_program::pubkey::Pubkey,
     /// Clock sysvar
-    pub clock: solana_program::pubkey::Pubkey,
+    pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// Stake history sysvar
     pub stake_history: solana_program::pubkey::Pubkey,
-    /// Stake config native program
-    pub stake_config: solana_program::pubkey::Pubkey,
-    /// stake's stake authority
+    /// Unused account, formerly the stake config
+    pub unused: solana_program::pubkey::Pubkey,
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -40,14 +40,15 @@ impl DelegateStake {
             self.vote, false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.clock, false,
+            self.clock_sysvar,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.stake_history,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.stake_config,
+            self.unused,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -58,7 +59,7 @@ impl DelegateStake {
         let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -67,14 +68,12 @@ impl DelegateStake {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct DelegateStakeInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl DelegateStakeInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [50, 110, 95, 179, 194, 75, 140, 246],
-        }
+        Self { discriminator: 2 }
     }
 }
 
@@ -90,17 +89,17 @@ impl Default for DelegateStakeInstructionData {
 ///
 ///   0. `[writable]` stake
 ///   1. `[]` vote
-///   2. `[]` clock
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
 ///   3. `[]` stake_history
-///   4. `[]` stake_config
+///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DelegateStakeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     vote: Option<solana_program::pubkey::Pubkey>,
-    clock: Option<solana_program::pubkey::Pubkey>,
+    clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_history: Option<solana_program::pubkey::Pubkey>,
-    stake_config: Option<solana_program::pubkey::Pubkey>,
+    unused: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
@@ -109,22 +108,23 @@ impl DelegateStakeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The stake account to be delegated
+    /// Initialized stake account to be delegated
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// Vote account to which stake will be delegated
+    /// Vote account to which this stake will be delegated
     #[inline(always)]
     pub fn vote(&mut self, vote: solana_program::pubkey::Pubkey) -> &mut Self {
         self.vote = Some(vote);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.clock = Some(clock);
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -133,13 +133,13 @@ impl DelegateStakeBuilder {
         self.stake_history = Some(stake_history);
         self
     }
-    /// Stake config native program
+    /// Unused account, formerly the stake config
     #[inline(always)]
-    pub fn stake_config(&mut self, stake_config: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.stake_config = Some(stake_config);
+    pub fn unused(&mut self, unused: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.unused = Some(unused);
         self
     }
-    /// stake's stake authority
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -171,9 +171,11 @@ impl DelegateStakeBuilder {
         let accounts = DelegateStake {
             stake: self.stake.expect("stake is not set"),
             vote: self.vote.expect("vote is not set"),
-            clock: self.clock.expect("clock is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
             stake_history: self.stake_history.expect("stake_history is not set"),
-            stake_config: self.stake_config.expect("stake_config is not set"),
+            unused: self.unused.expect("unused is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
 
@@ -183,17 +185,17 @@ impl DelegateStakeBuilder {
 
 /// `delegate_stake` CPI accounts.
 pub struct DelegateStakeCpiAccounts<'a, 'b> {
-    /// The stake account to be delegated
+    /// Initialized stake account to be delegated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Vote account to which stake will be delegated
+    /// Vote account to which this stake will be delegated
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake config native program
-    pub stake_config: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's stake authority
+    /// Unused account, formerly the stake config
+    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -201,17 +203,17 @@ pub struct DelegateStakeCpiAccounts<'a, 'b> {
 pub struct DelegateStakeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to be delegated
+    /// Initialized stake account to be delegated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Vote account to which stake will be delegated
+    /// Vote account to which this stake will be delegated
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake config native program
-    pub stake_config: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's stake authority
+    /// Unused account, formerly the stake config
+    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -224,9 +226,9 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             __program: program,
             stake: accounts.stake,
             vote: accounts.vote,
-            clock: accounts.clock,
+            clock_sysvar: accounts.clock_sysvar,
             stake_history: accounts.stake_history,
-            stake_config: accounts.stake_config,
+            unused: accounts.unused,
             stake_authority: accounts.stake_authority,
         }
     }
@@ -273,7 +275,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.clock.key,
+            *self.clock_sysvar.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -281,7 +283,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.stake_config.key,
+            *self.unused.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -298,7 +300,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
         let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };
@@ -306,9 +308,9 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
         account_infos.push(self.__program.clone());
         account_infos.push(self.stake.clone());
         account_infos.push(self.vote.clone());
-        account_infos.push(self.clock.clone());
+        account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.stake_history.clone());
-        account_infos.push(self.stake_config.clone());
+        account_infos.push(self.unused.clone());
         account_infos.push(self.stake_authority.clone());
         remaining_accounts
             .iter()
@@ -328,9 +330,9 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
 ///
 ///   0. `[writable]` stake
 ///   1. `[]` vote
-///   2. `[]` clock
+///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history
-///   4. `[]` stake_config
+///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug)]
 pub struct DelegateStakeCpiBuilder<'a, 'b> {
@@ -343,21 +345,21 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             vote: None,
-            clock: None,
+            clock_sysvar: None,
             stake_history: None,
-            stake_config: None,
+            unused: None,
             stake_authority: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The stake account to be delegated
+    /// Initialized stake account to be delegated
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Vote account to which stake will be delegated
+    /// Vote account to which this stake will be delegated
     #[inline(always)]
     pub fn vote(&mut self, vote: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.vote = Some(vote);
@@ -365,8 +367,11 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     }
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock(&mut self, clock: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.clock = Some(clock);
+    pub fn clock_sysvar(
+        &mut self,
+        clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake history sysvar
@@ -378,16 +383,16 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self.instruction.stake_history = Some(stake_history);
         self
     }
-    /// Stake config native program
+    /// Unused account, formerly the stake config
     #[inline(always)]
-    pub fn stake_config(
+    pub fn unused(
         &mut self,
-        stake_config: &'b solana_program::account_info::AccountInfo<'a>,
+        unused: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.stake_config = Some(stake_config);
+        self.instruction.unused = Some(unused);
         self
     }
-    /// stake's stake authority
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -444,17 +449,17 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
 
             vote: self.instruction.vote.expect("vote is not set"),
 
-            clock: self.instruction.clock.expect("clock is not set"),
+            clock_sysvar: self
+                .instruction
+                .clock_sysvar
+                .expect("clock_sysvar is not set"),
 
             stake_history: self
                 .instruction
                 .stake_history
                 .expect("stake_history is not set"),
 
-            stake_config: self
-                .instruction
-                .stake_config
-                .expect("stake_config is not set"),
+            unused: self.instruction.unused.expect("unused is not set"),
 
             stake_authority: self
                 .instruction
@@ -473,9 +478,9 @@ struct DelegateStakeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     vote: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    clock: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_config: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    unused: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(

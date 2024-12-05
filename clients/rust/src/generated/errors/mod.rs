@@ -4,3 +4,7 @@
 //!
 //! <https://github.com/codama-idl/codama>
 //!
+
+pub(crate) mod stake;
+
+pub use self::stake::StakeError;

@@ -158,7 +158,6 @@ pub enum StakeInstruction {
     ///   1. `[]` Rent sysvar
     ///   2. `[]` The stake authority
     ///   3. `[SIGNER]` The withdraw authority
-    ///
     InitializeChecked,
 
     /// Authorize a key to manage stake or withdrawal

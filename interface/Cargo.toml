@@ -7,6 +7,9 @@ edition = "2021"
 readme = "README.md"
 license-file = "../LICENSE"
 
+[package.metadata.solana]
+program-id = "Stake11111111111111111111111111111111111111"
+
 [dependencies]
 borsh = { version = "1.5.1", features = ["derive", "unstable__schema"], optional = true }
 borsh0-10 = { package = "borsh", version = "0.10.3", optional = true }

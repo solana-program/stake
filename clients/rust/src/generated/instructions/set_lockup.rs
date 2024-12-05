@@ -12,9 +12,9 @@ use {
 
 /// Accounts.
 pub struct SetLockup {
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
 }
 
@@ -45,7 +45,7 @@ impl SetLockup {
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         }
@@ -54,14 +54,12 @@ impl SetLockup {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct SetLockupInstructionData {
-    discriminator: [u8; 8],
+    discriminator: u8,
 }
 
 impl SetLockupInstructionData {
     pub fn new() -> Self {
-        Self {
-            discriminator: [44, 170, 189, 40, 128, 123, 252, 201],
-        }
+        Self { discriminator: 6 }
     }
 }
 
@@ -99,13 +97,13 @@ impl SetLockupBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
@@ -165,9 +163,9 @@ impl SetLockupBuilder {
 
 /// `set_lockup` CPI accounts.
 pub struct SetLockupCpiAccounts<'a, 'b> {
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -175,9 +173,9 @@ pub struct SetLockupCpiAccounts<'a, 'b> {
 pub struct SetLockupCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: SetLockupInstructionArgs,
@@ -250,7 +248,7 @@ impl<'a, 'b> SetLockupCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_PROGRAM_ID,
+            program_id: crate::STAKE_ID,
             accounts,
             data,
         };
@@ -294,13 +292,13 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
-    /// The stake account to set the lockup of
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// stake's withdraw authority or lockup authority if lockup is active
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,

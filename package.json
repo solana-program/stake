@@ -6,10 +6,9 @@
     "programs:clean": "zx ./scripts/program/clean.mjs",
     "programs:format": "zx ./scripts/program/format.mjs",
     "programs:lint": "zx ./scripts/program/lint.mjs",
-    "generate:idls": "zx ./scripts/generate-idls.mjs",
     "solana:check": "zx ./scripts/check-solana-version.mjs",
     "solana:link": "zx ./scripts/link-solana-version.mjs",
-    "generate": "pnpm generate:idls && pnpm generate:clients",
+    "generate": "pnpm generate:clients",
     "generate:clients": "zx ./scripts/generate-clients.mjs",
     "validator:start": "zx ./scripts/start-validator.mjs",
     "validator:restart": "pnpm validator:start --restart",
@@ -24,12 +23,12 @@
     "clients:rust:test": "zx ./scripts/client/test-rust.mjs"
   },
   "devDependencies": {
-    "@codama/nodes-from-anchor": "^1.0.0",
-    "@codama/renderers-js": "^1.0.1",
-    "@codama/renderers-rust": "^1.0.3",
+    "@codama/nodes-from-anchor": "^1.0.1",
+    "@codama/renderers-js": "^1.1.0",
+    "@codama/renderers-rust": "^1.0.4",
     "@iarna/toml": "^2.2.5",
     "@metaplex-foundation/shank-js": "^0.1.7",
-    "codama": "^1.0.0",
+    "codama": "^1.1.0",
     "typescript": "^5.5.2",
     "zx": "^7.2.3"
   },

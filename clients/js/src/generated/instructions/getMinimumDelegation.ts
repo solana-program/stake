@@ -8,12 +8,10 @@
 
 import {
   combineCodec,
-  fixDecoderSize,
-  fixEncoderSize,
-  getBytesDecoder,
-  getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -23,36 +21,29 @@ import {
   type IInstruction,
   type IInstructionWithAccounts,
   type IInstructionWithData,
-  type ReadonlyUint8Array,
 } from '@solana/web3.js';
-import { STAKE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
-export const GET_MINIMUM_DELEGATION_DISCRIMINATOR = new Uint8Array([
-  197, 65, 7, 73, 151, 105, 133, 105,
-]);
+export const GET_MINIMUM_DELEGATION_DISCRIMINATOR = 13;
 
 export function getGetMinimumDelegationDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    GET_MINIMUM_DELEGATION_DISCRIMINATOR
-  );
+  return getU8Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
 }
 
 export type GetMinimumDelegationInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
   IInstructionWithAccounts<TRemainingAccounts>;
 
-export type GetMinimumDelegationInstructionData = {
-  discriminator: ReadonlyUint8Array;
-};
+export type GetMinimumDelegationInstructionData = { discriminator: number };
 
 export type GetMinimumDelegationInstructionDataArgs = {};
 
 export function getGetMinimumDelegationInstructionDataEncoder(): Encoder<GetMinimumDelegationInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({
       ...value,
       discriminator: GET_MINIMUM_DELEGATION_DISCRIMINATOR,
@@ -61,9 +52,7 @@ export function getGetMinimumDelegationInstructionDataEncoder(): Encoder<GetMini
 }
 
 export function getGetMinimumDelegationInstructionDataDecoder(): Decoder<GetMinimumDelegationInstructionData> {
-  return getStructDecoder([
-    ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
-  ]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getGetMinimumDelegationInstructionDataCodec(): Codec<
@@ -79,13 +68,12 @@ export function getGetMinimumDelegationInstructionDataCodec(): Codec<
 export type GetMinimumDelegationInput = {};
 
 export function getGetMinimumDelegationInstruction<
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(config?: {
   programAddress?: TProgramAddress;
 }): GetMinimumDelegationInstruction<TProgramAddress> {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? STAKE_PROGRAM_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
   const instruction = {
     programAddress,
@@ -96,7 +84,7 @@ export function getGetMinimumDelegationInstruction<
 }
 
 export type ParsedGetMinimumDelegationInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_PROGRAM_ADDRESS,
+  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
 > = {
   programAddress: Address<TProgram>;
   data: GetMinimumDelegationInstructionData;
