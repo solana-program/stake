@@ -36,7 +36,6 @@ const STAKE_HISTORY_ID: Pubkey =
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[rustfmt::skip]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
     ///
