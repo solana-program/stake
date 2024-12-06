@@ -977,8 +977,6 @@ impl StakeLifecycle {
     }
 }
 
-// TODO test whole-balance split (there are a lot more split tests i didnt port
-// yet tho)
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
@@ -1129,7 +1127,6 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// TODO lockup... unenforced and enforced? also maybe for split
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
