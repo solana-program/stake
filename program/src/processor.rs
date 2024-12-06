@@ -24,14 +24,6 @@ use {
     std::{collections::HashSet, mem::MaybeUninit},
 };
 
-// TODO a nice change would be to pop an account off the queue and discard if
-// its a gettable sysvar ie, allow people to omit them from the accounts list
-// without breaking compat to be done after release, we keep the existing
-// interface for all instructions for compat with firedancer
-
-// TODO undecided if we do it in initial release or in a future release...
-// but we could use StakeError much more extensively and impl PrintProgramError
-
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
         return Err(ProgramError::IncorrectProgramId);
@@ -1224,7 +1216,7 @@ impl Processor {
             .unwrap_or(false);
 
         let instruction =
-            bincode::deserialize(data).map_err(|_| ProgramError::InvalidAccountData)?;
+            bincode::deserialize(data).map_err(|_| ProgramError::InvalidInstructionData)?;
 
         if epoch_rewards_active && !matches!(instruction, StakeInstruction::GetMinimumDelegation) {
             return Err(StakeError::EpochRewardsActive.into());
