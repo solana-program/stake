@@ -27,7 +27,11 @@ use {
         signers::Signers,
         stake::{
             self, config as stake_config,
-            instruction::{self, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
+            instruction::{
+                self, authorize_checked, authorize_checked_with_seed, initialize_checked,
+                set_lockup_checked, AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs,
+                LockupArgs, StakeError, StakeInstruction,
+            },
             stake_flags::StakeFlags,
             state::{
                 warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
@@ -47,12 +51,12 @@ use {
             SysvarId,
         },
         transaction::{Transaction, TransactionError},
-        vote::{
-            program as solana_vote_program,
-            state::{VoteInit, VoteState, VoteStateVersions},
-        },
     },
     solana_stake_program::{get_minimum_delegation, id, processor::Processor},
+    solana_vote_program::{
+        self,
+        vote_state::{self, VoteState, VoteStateVersions},
+    },
     std::{
         collections::{HashMap, HashSet},
         fs,
@@ -118,10 +122,19 @@ fn spoofed_stake_program_id() -> Pubkey {
 fn process_instruction(
     mollusk: &Mollusk,
     instruction_data: &[u8],
-    transaction_accounts: Vec<(Pubkey, AccountSharedData)>,
+    mut transaction_accounts: Vec<(Pubkey, AccountSharedData)>,
     instruction_accounts: Vec<AccountMeta>,
     expected_result: Result<(), ProgramError>,
 ) -> Vec<AccountSharedData> {
+    for ixn_key in instruction_accounts.iter().map(|meta| meta.pubkey) {
+        if !transaction_accounts
+            .iter()
+            .any(|(txn_key, _)| *txn_key == ixn_key)
+        {
+            transaction_accounts.push((ixn_key, AccountSharedData::default()));
+        }
+    }
+
     let instruction = Instruction {
         program_id: id(),
         accounts: instruction_accounts,
@@ -184,6 +197,21 @@ fn get_default_transaction_accounts(instruction: &Instruction) -> Vec<(Pubkey, A
         .collect()
 }
 
+fn process_instruction_as_one_arg(
+    mollusk: &Mollusk,
+    instruction: &Instruction,
+    expected_result: Result<(), ProgramError>,
+) -> Vec<AccountSharedData> {
+    let transaction_accounts = get_default_transaction_accounts(instruction);
+    process_instruction(
+        &mollusk,
+        &instruction.data,
+        transaction_accounts,
+        instruction.accounts.clone(),
+        expected_result,
+    )
+}
+
 fn new_stake(
     stake: u64,
     voter_pubkey: &Pubkey,
@@ -202,6 +230,22 @@ fn from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stak
 
 fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stake> {
     from(account).and_then(|state: StakeStateV2| state.stake())
+}
+
+pub fn delegation_from(account: &AccountSharedData) -> Option<Delegation> {
+    from(account).and_then(|state: StakeStateV2| state.delegation())
+}
+
+pub fn authorized_from(account: &AccountSharedData) -> Option<Authorized> {
+    from(account).and_then(|state: StakeStateV2| state.authorized())
+}
+
+pub fn lockup_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Lockup> {
+    from(account).and_then(|state: StakeStateV2| state.lockup())
+}
+
+pub fn meta_from(account: &AccountSharedData) -> Option<Meta> {
+    from(account).and_then(|state: StakeStateV2| state.meta())
 }
 
 fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
@@ -255,6 +299,1346 @@ mod config {
         lamports
     }
 }
+
+// XXX SKIP BEOFRE THIS
+// the tests are kind of dumb but i mihgt grab them anyway
+// just annoying bc they test errors that changed
+// and are kind of useless, we should actually test the interface systematically
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_checked_instructions(mollusk: Mollusk) {
+    let stake_address = Pubkey::new_unique();
+    let staker = Pubkey::new_unique();
+    let staker_account = create_default_account();
+    let withdrawer = Pubkey::new_unique();
+    let withdrawer_account = create_default_account();
+    let authorized_address = Pubkey::new_unique();
+    let authorized_account = create_default_account();
+    let new_authorized_account = create_default_account();
+    let clock_address = clock::id();
+    let clock_account = create_account_shared_data_for_test(&Clock::default());
+    let custodian = Pubkey::new_unique();
+    let custodian_account = create_default_account();
+    let rent = Rent::default();
+    let rent_address = rent::id();
+    let rent_account = create_account_shared_data_for_test(&rent);
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let minimum_delegation = crate::get_minimum_delegation();
+
+    // Test InitializeChecked with non-signing withdrawer
+    let mut instruction = initialize_checked(&stake_address, &Authorized { staker, withdrawer });
+    instruction.accounts[3] = AccountMeta::new_readonly(withdrawer, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Test InitializeChecked with withdrawer signer
+    let stake_account = AccountSharedData::new(
+        rent_exempt_reserve + minimum_delegation,
+        StakeStateV2::size_of(),
+        &id(),
+    );
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::InitializeChecked).unwrap(),
+        vec![
+            (stake_address, stake_account),
+            (rent_address, rent_account),
+            (staker, staker_account),
+            (withdrawer, withdrawer_account.clone()),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: rent_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: staker,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: withdrawer,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    // Test AuthorizeChecked with non-signing authority
+    let mut instruction = authorize_checked(
+        &stake_address,
+        &authorized_address,
+        &staker,
+        StakeAuthorize::Staker,
+        None,
+    );
+    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    let mut instruction = authorize_checked(
+        &stake_address,
+        &authorized_address,
+        &withdrawer,
+        StakeAuthorize::Withdrawer,
+        None,
+    );
+    instruction.accounts[3] = AccountMeta::new_readonly(withdrawer, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Test AuthorizeChecked with authority signer
+    let stake_account = AccountSharedData::new_data_with_space(
+        42,
+        &StakeStateV2::Initialized(Meta::auto(&authorized_address)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::AuthorizeChecked(StakeAuthorize::Staker)).unwrap(),
+        vec![
+            (stake_address, stake_account.clone()),
+            (clock_address, clock_account.clone()),
+            (authorized_address, authorized_account.clone()),
+            (staker, new_authorized_account.clone()),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: authorized_address,
+                is_signer: true,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: staker,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::AuthorizeChecked(
+            StakeAuthorize::Withdrawer,
+        ))
+        .unwrap(),
+        vec![
+            (stake_address, stake_account),
+            (clock_address, clock_account.clone()),
+            (authorized_address, authorized_account.clone()),
+            (withdrawer, new_authorized_account.clone()),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: authorized_address,
+                is_signer: true,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: withdrawer,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    // Test AuthorizeCheckedWithSeed with non-signing authority
+    let authorized_owner = Pubkey::new_unique();
+    let seed = "test seed";
+    let address_with_seed =
+        Pubkey::create_with_seed(&authorized_owner, seed, &authorized_owner).unwrap();
+    let mut instruction = authorize_checked_with_seed(
+        &stake_address,
+        &authorized_owner,
+        seed.to_string(),
+        &authorized_owner,
+        &staker,
+        StakeAuthorize::Staker,
+        None,
+    );
+    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    let mut instruction = authorize_checked_with_seed(
+        &stake_address,
+        &authorized_owner,
+        seed.to_string(),
+        &authorized_owner,
+        &staker,
+        StakeAuthorize::Withdrawer,
+        None,
+    );
+    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Test AuthorizeCheckedWithSeed with authority signer
+    let stake_account = AccountSharedData::new_data_with_space(
+        42,
+        &StakeStateV2::Initialized(Meta::auto(&address_with_seed)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::AuthorizeCheckedWithSeed(
+            AuthorizeCheckedWithSeedArgs {
+                stake_authorize: StakeAuthorize::Staker,
+                authority_seed: seed.to_string(),
+                authority_owner: authorized_owner,
+            },
+        ))
+        .unwrap(),
+        vec![
+            (address_with_seed, stake_account.clone()),
+            (authorized_owner, authorized_account.clone()),
+            (clock_address, clock_account.clone()),
+            (staker, new_authorized_account.clone()),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: address_with_seed,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: authorized_owner,
+                is_signer: true,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: clock_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: staker,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::AuthorizeCheckedWithSeed(
+            AuthorizeCheckedWithSeedArgs {
+                stake_authorize: StakeAuthorize::Withdrawer,
+                authority_seed: seed.to_string(),
+                authority_owner: authorized_owner,
+            },
+        ))
+        .unwrap(),
+        vec![
+            (address_with_seed, stake_account),
+            (authorized_owner, authorized_account),
+            (clock_address, clock_account.clone()),
+            (withdrawer, new_authorized_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: address_with_seed,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: authorized_owner,
+                is_signer: true,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: clock_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: withdrawer,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    // Test SetLockupChecked with non-signing lockup custodian
+    let mut instruction = set_lockup_checked(
+        &stake_address,
+        &LockupArgs {
+            unix_timestamp: None,
+            epoch: Some(1),
+            custodian: Some(custodian),
+        },
+        &withdrawer,
+    );
+    instruction.accounts[2] = AccountMeta::new_readonly(custodian, false);
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Test SetLockupChecked with lockup custodian signer
+    let stake_account = AccountSharedData::new_data_with_space(
+        42,
+        &StakeStateV2::Initialized(Meta::auto(&withdrawer)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+
+    process_instruction(
+        &mollusk,
+        &instruction.data,
+        vec![
+            (clock_address, clock_account),
+            (stake_address, stake_account),
+            (withdrawer, withdrawer_account),
+            (custodian, custodian_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: withdrawer,
+                is_signer: true,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: custodian,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_initialize(mollusk: Mollusk) {
+    let rent = Rent::default();
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let stake_lamports = rent_exempt_reserve;
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let stake_account = AccountSharedData::new(stake_lamports, StakeStateV2::size_of(), &id());
+    let custodian_address = solana_sdk::pubkey::new_rand();
+    let lockup = Lockup {
+        epoch: 1,
+        unix_timestamp: 0,
+        custodian: custodian_address,
+    };
+    let instruction_data = serialize(&StakeInstruction::Initialize(
+        Authorized::auto(&stake_address),
+        lockup,
+    ))
+    .unwrap();
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account.clone()),
+        (rent::id(), create_account_shared_data_for_test(&rent)),
+    ];
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: rent::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // should pass
+    let accounts = process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    // check that we see what we expect
+    assert_eq!(
+        from(&accounts[0]).unwrap(),
+        StakeStateV2::Initialized(Meta {
+            authorized: Authorized::auto(&stake_address),
+            rent_exempt_reserve,
+            lockup,
+        }),
+    );
+
+    // 2nd time fails, can't move it from anything other than uninit->init
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InvalidAccountData),
+    );
+    transaction_accounts[0] = (stake_address, stake_account);
+
+    // not enough balance for rent
+    transaction_accounts[1] = (
+        rent::id(),
+        create_account_shared_data_for_test(&Rent {
+            lamports_per_byte_year: rent.lamports_per_byte_year + 1,
+            ..rent
+        }),
+    );
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InsufficientFunds),
+    );
+
+    // incorrect account sizes
+    let stake_account = AccountSharedData::new(stake_lamports, StakeStateV2::size_of() + 1, &id());
+    transaction_accounts[0] = (stake_address, stake_account);
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InvalidAccountData),
+    );
+
+    let stake_account = AccountSharedData::new(stake_lamports, StakeStateV2::size_of() - 1, &id());
+    transaction_accounts[0] = (stake_address, stake_account);
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::InvalidAccountData),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_authorize(mollusk: Mollusk) {
+    let authority_address = solana_sdk::pubkey::new_rand();
+    let authority_address_2 = solana_sdk::pubkey::new_rand();
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let stake_lamports = 42;
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::default(),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let to_address = solana_sdk::pubkey::new_rand();
+    let to_account = AccountSharedData::new(1, 0, &system_program::id());
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account),
+        (to_address, to_account),
+        (authority_address, AccountSharedData::default()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+        (
+            epoch_schedule::id(),
+            create_account_shared_data_for_test(&EpochSchedule::default()),
+        ),
+    ];
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authority_address,
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // should fail, uninit
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InvalidAccountData),
+    );
+
+    // should pass
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Initialized(Meta::auto(&stake_address)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    transaction_accounts[0] = (stake_address, stake_account);
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Withdrawer,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    if let StakeStateV2::Initialized(Meta { authorized, .. }) = from(&accounts[0]).unwrap() {
+        assert_eq!(authorized.staker, authority_address);
+        assert_eq!(authorized.withdrawer, authority_address);
+    } else {
+        panic!();
+    }
+
+    // A second authorization signed by the stake account should fail
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address_2,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Test a second authorization by the new authority_address
+    instruction_accounts[0].is_signer = false;
+    instruction_accounts[2].is_signer = true;
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address_2,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    if let StakeStateV2::Initialized(Meta { authorized, .. }) = from(&accounts[0]).unwrap() {
+        assert_eq!(authorized.staker, authority_address_2);
+    } else {
+        panic!();
+    }
+
+    // Test a successful action by the currently authorized withdrawer
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: to_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authority_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(stake_lamports)).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+
+    // Test that withdrawal to account fails without authorized withdrawer
+    instruction_accounts[4].is_signer = false;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(stake_lamports)).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_authorize_override(mollusk: Mollusk) {
+    let authority_address = solana_sdk::pubkey::new_rand();
+    let mallory_address = solana_sdk::pubkey::new_rand();
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let stake_lamports = 42;
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Initialized(Meta::auto(&stake_address)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account),
+        (authority_address, AccountSharedData::default()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+    ];
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authority_address,
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // Authorize a staker pubkey and move the withdrawer key into cold storage.
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // Attack! The stake key (a hot key) is stolen and used to authorize a new staker.
+    instruction_accounts[0].is_signer = false;
+    instruction_accounts[2].is_signer = true;
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            mallory_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // Verify the original staker no longer has access.
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Verify the withdrawer (pulled from cold storage) can save the day.
+    instruction_accounts[0].is_signer = true;
+    instruction_accounts[2].is_signer = false;
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Withdrawer,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // Attack! Verify the staker cannot be used to authorize a withdraw.
+    instruction_accounts[0].is_signer = false;
+    instruction_accounts[2] = AccountMeta {
+        pubkey: mallory_address,
+        is_signer: true,
+        is_writable: false,
+    };
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Withdrawer,
+        ))
+        .unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_authorize_with_seed(mollusk: Mollusk) {
+    let authority_base_address = solana_sdk::pubkey::new_rand();
+    let authority_address = solana_sdk::pubkey::new_rand();
+    let seed = "42";
+    let stake_address = Pubkey::create_with_seed(&authority_base_address, seed, &id()).unwrap();
+    let stake_lamports = 42;
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Initialized(Meta::auto(&stake_address)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account),
+        (authority_base_address, AccountSharedData::default()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+    ];
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: authority_base_address,
+            is_signer: true,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // Wrong seed
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::AuthorizeWithSeed(
+            AuthorizeWithSeedArgs {
+                new_authorized_pubkey: authority_address,
+                stake_authorize: StakeAuthorize::Staker,
+                authority_seed: "".to_string(),
+                authority_owner: id(),
+            },
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Wrong base
+    instruction_accounts[1].pubkey = authority_address;
+    let instruction_data = serialize(&StakeInstruction::AuthorizeWithSeed(
+        AuthorizeWithSeedArgs {
+            new_authorized_pubkey: authority_address,
+            stake_authorize: StakeAuthorize::Staker,
+            authority_seed: seed.to_string(),
+            authority_owner: id(),
+        },
+    ))
+    .unwrap();
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+    instruction_accounts[1].pubkey = authority_base_address;
+
+    // Set stake authority
+    let accounts = process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // Set withdraw authority
+    let instruction_data = serialize(&StakeInstruction::AuthorizeWithSeed(
+        AuthorizeWithSeedArgs {
+            new_authorized_pubkey: authority_address,
+            stake_authorize: StakeAuthorize::Withdrawer,
+            authority_seed: seed.to_string(),
+            authority_owner: id(),
+        },
+    ))
+    .unwrap();
+    let accounts = process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // No longer withdraw authority
+    process_instruction(
+        &mollusk,
+        &instruction_data,
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::MissingRequiredSignature),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_authorize_delegated_stake(mollusk: Mollusk) {
+    let authority_address = solana_sdk::pubkey::new_rand();
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let minimum_delegation = crate::get_minimum_delegation();
+    let stake_lamports = minimum_delegation;
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Initialized(Meta::auto(&stake_address)),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let vote_address = solana_sdk::pubkey::new_rand();
+    let vote_account =
+        vote_state::create_account(&vote_address, &solana_sdk::pubkey::new_rand(), 0, 100);
+    let vote_address_2 = solana_sdk::pubkey::new_rand();
+    let mut vote_account_2 =
+        vote_state::create_account(&vote_address_2, &solana_sdk::pubkey::new_rand(), 0, 100);
+    vote_account_2
+        .set_state(&VoteStateVersions::new_current(VoteState::default()))
+        .unwrap();
+    #[allow(deprecated)]
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account),
+        (vote_address, vote_account),
+        (vote_address_2, vote_account_2),
+        (
+            authority_address,
+            AccountSharedData::new(42, 0, &system_program::id()),
+        ),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+        (
+            stake_config::id(),
+            config::create_account(0, &stake_config::Config::default()),
+        ),
+        (
+            epoch_schedule::id(),
+            create_account_shared_data_for_test(&EpochSchedule::default()),
+        ),
+    ];
+    #[allow(deprecated)]
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_config::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // delegate stake
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // deactivate, so we can re-delegate
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        transaction_accounts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+
+    // authorize
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Authorize(
+            authority_address,
+            StakeAuthorize::Staker,
+        ))
+        .unwrap(),
+        transaction_accounts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: authority_address,
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    assert_eq!(
+        authorized_from(&accounts[0]).unwrap().staker,
+        authority_address
+    );
+
+    // Random other account should fail
+    instruction_accounts[0].is_signer = false;
+    instruction_accounts[1].pubkey = vote_address_2;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+
+    // Authorized staker should succeed
+    instruction_accounts.push(AccountMeta {
+        pubkey: authority_address,
+        is_signer: true,
+        is_writable: false,
+    });
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts,
+        Ok(()),
+    );
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    assert_eq!(
+        stake_from(&accounts[0]).unwrap().delegation.voter_pubkey,
+        vote_address_2,
+    );
+
+    // Test another staking action
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        transaction_accounts,
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: authority_address,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_delegate(mollusk: Mollusk) {
+    let mut vote_state = VoteState::default();
+    for i in 0..1000 {
+        vote_state::process_slot_vote_unchecked(&mut vote_state, i);
+    }
+    let vote_state_credits = vote_state.credits();
+    let vote_address = solana_sdk::pubkey::new_rand();
+    let vote_address_2 = solana_sdk::pubkey::new_rand();
+    let mut vote_account =
+        vote_state::create_account(&vote_address, &solana_sdk::pubkey::new_rand(), 0, 100);
+    let mut vote_account_2 =
+        vote_state::create_account(&vote_address_2, &solana_sdk::pubkey::new_rand(), 0, 100);
+    vote_account
+        .set_state(&VoteStateVersions::new_current(vote_state.clone()))
+        .unwrap();
+    vote_account_2
+        .set_state(&VoteStateVersions::new_current(vote_state))
+        .unwrap();
+    let minimum_delegation = crate::get_minimum_delegation();
+    let stake_lamports = minimum_delegation;
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let mut stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Initialized(Meta {
+            authorized: Authorized {
+                staker: stake_address,
+                withdrawer: stake_address,
+            },
+            ..Meta::default()
+        }),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let mut clock = Clock {
+        epoch: 1,
+        ..Clock::default()
+    };
+    #[allow(deprecated)]
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account.clone()),
+        (vote_address, vote_account),
+        (vote_address_2, vote_account_2.clone()),
+        (clock::id(), create_account_shared_data_for_test(&clock)),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+        (
+            stake_config::id(),
+            config::create_account(0, &stake_config::Config::default()),
+        ),
+        (
+            epoch_schedule::id(),
+            create_account_shared_data_for_test(&EpochSchedule::default()),
+        ),
+    ];
+    #[allow(deprecated)]
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_config::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    // should fail, unsigned stake account
+    instruction_accounts[0].is_signer = false;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::MissingRequiredSignature),
+    );
+    instruction_accounts[0].is_signer = true;
+
+    // should pass
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    // verify that delegate() looks right, compare against hand-rolled
+    assert_eq!(
+        stake_from(&accounts[0]).unwrap(),
+        Stake {
+            delegation: Delegation {
+                voter_pubkey: vote_address,
+                stake: stake_lamports,
+                activation_epoch: clock.epoch,
+                deactivation_epoch: u64::MAX,
+                ..Delegation::default()
+            },
+            credits_observed: vote_state_credits,
+        }
+    );
+
+    // verify that delegate fails as stake is active and not deactivating
+    clock.epoch += 1;
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(StakeError::TooSoonToRedelegate.into()),
+    );
+
+    // deactivate
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        transaction_accounts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+
+    // verify that delegate to a different vote account fails
+    // during deactivation
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    instruction_accounts[1].pubkey = vote_address_2;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(StakeError::TooSoonToRedelegate.into()),
+    );
+    instruction_accounts[1].pubkey = vote_address;
+
+    // verify that delegate succeeds to same vote account
+    // when stake is deactivating
+    let accounts_2 = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    // verify that deactivation has been cleared
+    let stake = stake_from(&accounts_2[0]).unwrap();
+    assert_eq!(stake.delegation.deactivation_epoch, u64::MAX);
+
+    // verify that delegate to a different vote account fails
+    // if stake is still active
+    transaction_accounts[0] = (stake_address, accounts_2[0].clone());
+    instruction_accounts[1].pubkey = vote_address_2;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(StakeError::TooSoonToRedelegate.into()),
+    );
+
+    // without stake history, cool down is instantaneous
+    clock.epoch += 1;
+    transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
+
+    // verify that delegate can be called to new vote account, 2nd is redelegate
+    transaction_accounts[0] = (stake_address, accounts[0].clone());
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    instruction_accounts[1].pubkey = vote_address;
+    // verify that delegate() looks right, compare against hand-rolled
+    assert_eq!(
+        stake_from(&accounts[0]).unwrap(),
+        Stake {
+            delegation: Delegation {
+                voter_pubkey: vote_address_2,
+                stake: stake_lamports,
+                activation_epoch: clock.epoch,
+                deactivation_epoch: u64::MAX,
+                ..Delegation::default()
+            },
+            credits_observed: vote_state_credits,
+        }
+    );
+
+    // signed but faked vote account
+    transaction_accounts[1] = (vote_address_2, vote_account_2);
+    transaction_accounts[1]
+        .1
+        .set_owner(solana_sdk::pubkey::new_rand());
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::IncorrectProgramId),
+    );
+
+    // verify that non-stakes fail delegate()
+    let stake_state = StakeStateV2::RewardsPool;
+    stake_account.set_state(&stake_state).unwrap();
+    transaction_accounts[0] = (stake_address, stake_account);
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::IncorrectProgramId),
+    );
+}
+
+// XXX NOTE DIVIDE HERE
+// below, i have everything up to the end of the file
+// but working backwards is fucking annoying
 
 #[test_case(mollusk_native(); "native_stake")]
 #[test_case(mollusk_bpf(); "bpf_stake")]

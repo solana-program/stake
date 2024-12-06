@@ -5119,6 +5119,7 @@ dependencies = [
  "solana-program-runtime",
  "solana-program-test",
  "solana-sdk",
+ "solana-vote-program",
  "test-case",
  "thiserror 1.0.69",
 ]
