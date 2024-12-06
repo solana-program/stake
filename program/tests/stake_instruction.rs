@@ -6,6 +6,7 @@ use {
     bincode::serialize,
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
+    solana_program_runtime::loaded_programs::ProgramCacheEntryOwner,
     solana_sdk::{
         account::{create_account_shared_data_for_test, Account as SolanaAccount},
         account_utils::StateMut,
@@ -18,6 +19,7 @@ use {
         },
         hash::Hash,
         instruction::{AccountMeta, Instruction},
+        native_loader,
         native_token::LAMPORTS_PER_SOL,
         program_error::ProgramError,
         pubkey::Pubkey,
@@ -74,6 +76,19 @@ fn mollusk_bpf() -> Mollusk {
         .feature_set
         .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
     mollusk
+}
+
+trait IsBpf {
+    fn is_bpf(&self) -> bool;
+}
+impl IsBpf for Mollusk {
+    fn is_bpf(&self) -> bool {
+        self.program_cache
+            .load_program(&id())
+            .unwrap()
+            .account_owner
+            != ProgramCacheEntryOwner::NativeLoader
+    }
 }
 
 fn create_default_account() -> AccountSharedData {
@@ -189,6 +204,20 @@ fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Optio
     from(account).and_then(|state: StakeStateV2| state.stake())
 }
 
+fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
+    StakeStateV2::Stake(
+        meta,
+        Stake {
+            delegation: Delegation {
+                stake,
+                ..Delegation::default()
+            },
+            ..Stake::default()
+        },
+        StakeFlags::empty(),
+    )
+}
+
 mod config {
     #[allow(deprecated)]
     use solana_sdk::stake::config::{self, *};
@@ -226,6 +255,747 @@ mod config {
         lamports
     }
 }
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let merge_from_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let meta = Meta::auto(&authorized_address);
+    let stake_lamports = 42;
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: merge_from_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    for state in &[
+        StakeStateV2::Initialized(meta),
+        just_stake(meta, stake_lamports),
+    ] {
+        let stake_account = AccountSharedData::new_data_with_space(
+            stake_lamports,
+            state,
+            StakeStateV2::size_of(),
+            &id(),
+        )
+        .unwrap();
+        for merge_from_state in &[
+            StakeStateV2::Initialized(meta),
+            just_stake(meta, stake_lamports),
+        ] {
+            let merge_from_account = AccountSharedData::new_data_with_space(
+                stake_lamports,
+                merge_from_state,
+                StakeStateV2::size_of(),
+                &id(),
+            )
+            .unwrap();
+            let transaction_accounts = vec![
+                (stake_address, stake_account.clone()),
+                (merge_from_address, merge_from_account),
+                (authorized_address, AccountSharedData::default()),
+                (
+                    clock::id(),
+                    create_account_shared_data_for_test(&Clock::default()),
+                ),
+                (
+                    stake_history::id(),
+                    create_account_shared_data_for_test(&StakeHistory::default()),
+                ),
+                (
+                    epoch_schedule::id(),
+                    create_account_shared_data_for_test(&EpochSchedule::default()),
+                ),
+            ];
+
+            // Authorized staker signature required...
+            instruction_accounts[4].is_signer = false;
+            process_instruction(
+                &mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts.clone(),
+                instruction_accounts.clone(),
+                Err(ProgramError::MissingRequiredSignature),
+            );
+            instruction_accounts[4].is_signer = true;
+
+            let accounts = process_instruction(
+                &mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts,
+                instruction_accounts.clone(),
+                Ok(()),
+            );
+
+            // check lamports
+            assert_eq!(accounts[0].lamports(), stake_lamports * 2);
+            assert_eq!(accounts[1].lamports(), 0);
+
+            // check state
+            match state {
+                StakeStateV2::Initialized(meta) => {
+                    assert_eq!(accounts[0].state(), Ok(StakeStateV2::Initialized(*meta)),);
+                }
+                StakeStateV2::Stake(meta, stake, stake_flags) => {
+                    let expected_stake = stake.delegation.stake
+                        + merge_from_state
+                            .stake()
+                            .map(|stake| stake.delegation.stake)
+                            .unwrap_or_else(|| {
+                                stake_lamports
+                                    - merge_from_state.meta().unwrap().rent_exempt_reserve
+                            });
+                    assert_eq!(
+                        accounts[0].state(),
+                        Ok(StakeStateV2::Stake(
+                            *meta,
+                            Stake {
+                                delegation: Delegation {
+                                    stake: expected_stake,
+                                    ..stake.delegation
+                                },
+                                ..*stake
+                            },
+                            *stake_flags,
+                        )),
+                    );
+                }
+                _ => unreachable!(),
+            }
+            assert_eq!(accounts[1].state(), Ok(StakeStateV2::Uninitialized));
+        }
+    }
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge_self_fails(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let rent = Rent::default();
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let stake_amount = 4242424242;
+    let stake_lamports = rent_exempt_reserve + stake_amount;
+    let meta = Meta {
+        rent_exempt_reserve,
+        ..Meta::auto(&authorized_address)
+    };
+    let stake = Stake {
+        delegation: Delegation {
+            stake: stake_amount,
+            activation_epoch: 0,
+            ..Delegation::default()
+        },
+        ..Stake::default()
+    };
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Stake(meta, stake, StakeFlags::empty()),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let transaction_accounts = vec![
+        (stake_address, stake_account),
+        (authorized_address, AccountSharedData::default()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+    ];
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Merge).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::InvalidArgument),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge_incorrect_authorized_staker(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let merge_from_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let wrong_authorized_address = solana_sdk::pubkey::new_rand();
+    let stake_lamports = 42;
+    let mut instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: merge_from_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    for state in &[
+        StakeStateV2::Initialized(Meta::auto(&authorized_address)),
+        just_stake(Meta::auto(&authorized_address), stake_lamports),
+    ] {
+        let stake_account = AccountSharedData::new_data_with_space(
+            stake_lamports,
+            state,
+            StakeStateV2::size_of(),
+            &id(),
+        )
+        .unwrap();
+        for merge_from_state in &[
+            StakeStateV2::Initialized(Meta::auto(&wrong_authorized_address)),
+            just_stake(Meta::auto(&wrong_authorized_address), stake_lamports),
+        ] {
+            let merge_from_account = AccountSharedData::new_data_with_space(
+                stake_lamports,
+                merge_from_state,
+                StakeStateV2::size_of(),
+                &id(),
+            )
+            .unwrap();
+            let transaction_accounts = vec![
+                (stake_address, stake_account.clone()),
+                (merge_from_address, merge_from_account),
+                (authorized_address, AccountSharedData::default()),
+                (wrong_authorized_address, AccountSharedData::default()),
+                (
+                    clock::id(),
+                    create_account_shared_data_for_test(&Clock::default()),
+                ),
+                (
+                    stake_history::id(),
+                    create_account_shared_data_for_test(&StakeHistory::default()),
+                ),
+                (
+                    epoch_schedule::id(),
+                    create_account_shared_data_for_test(&EpochSchedule::default()),
+                ),
+            ];
+
+            instruction_accounts[4].pubkey = wrong_authorized_address;
+            process_instruction(
+                &mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts.clone(),
+                instruction_accounts.clone(),
+                Err(ProgramError::MissingRequiredSignature),
+            );
+            instruction_accounts[4].pubkey = authorized_address;
+
+            process_instruction(
+                &mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts,
+                instruction_accounts.clone(),
+                Err(StakeError::MergeMismatch.into()),
+            );
+        }
+    }
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge_invalid_account_data(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let merge_from_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let stake_lamports = 42;
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: merge_from_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    for state in &[
+        StakeStateV2::Uninitialized,
+        StakeStateV2::RewardsPool,
+        StakeStateV2::Initialized(Meta::auto(&authorized_address)),
+        just_stake(Meta::auto(&authorized_address), stake_lamports),
+    ] {
+        let stake_account = AccountSharedData::new_data_with_space(
+            stake_lamports,
+            state,
+            StakeStateV2::size_of(),
+            &id(),
+        )
+        .unwrap();
+        for merge_from_state in &[StakeStateV2::Uninitialized, StakeStateV2::RewardsPool] {
+            let merge_from_account = AccountSharedData::new_data_with_space(
+                stake_lamports,
+                merge_from_state,
+                StakeStateV2::size_of(),
+                &id(),
+            )
+            .unwrap();
+            let transaction_accounts = vec![
+                (stake_address, stake_account.clone()),
+                (merge_from_address, merge_from_account),
+                (authorized_address, AccountSharedData::default()),
+                (
+                    clock::id(),
+                    create_account_shared_data_for_test(&Clock::default()),
+                ),
+                (
+                    stake_history::id(),
+                    create_account_shared_data_for_test(&StakeHistory::default()),
+                ),
+                (
+                    epoch_schedule::id(),
+                    create_account_shared_data_for_test(&EpochSchedule::default()),
+                ),
+            ];
+
+            process_instruction(
+                &mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts,
+                instruction_accounts.clone(),
+                Err(ProgramError::InvalidAccountData),
+            );
+        }
+    }
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge_fake_stake_source(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let merge_from_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let stake_lamports = 42;
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &just_stake(Meta::auto(&authorized_address), stake_lamports),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let merge_from_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &just_stake(Meta::auto(&authorized_address), stake_lamports),
+        StakeStateV2::size_of(),
+        &solana_sdk::pubkey::new_rand(),
+    )
+    .unwrap();
+    let transaction_accounts = vec![
+        (stake_address, stake_account),
+        (merge_from_address, merge_from_account),
+        (authorized_address, AccountSharedData::default()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+    ];
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: merge_from_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Merge).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(if mollusk.is_bpf() {
+            ProgramError::InvalidAccountOwner
+        } else {
+            ProgramError::IncorrectProgramId
+        }),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_merge_active_stake(mollusk: Mollusk) {
+    let stake_address = solana_sdk::pubkey::new_rand();
+    let merge_from_address = solana_sdk::pubkey::new_rand();
+    let authorized_address = solana_sdk::pubkey::new_rand();
+    let base_lamports = 4242424242;
+    let rent = Rent::default();
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let stake_amount = base_lamports;
+    let stake_lamports = rent_exempt_reserve + stake_amount;
+    let merge_from_amount = base_lamports;
+    let merge_from_lamports = rent_exempt_reserve + merge_from_amount;
+    let meta = Meta {
+        rent_exempt_reserve,
+        ..Meta::auto(&authorized_address)
+    };
+    let mut stake = Stake {
+        delegation: Delegation {
+            stake: stake_amount,
+            activation_epoch: 0,
+            ..Delegation::default()
+        },
+        ..Stake::default()
+    };
+    let stake_account = AccountSharedData::new_data_with_space(
+        stake_lamports,
+        &StakeStateV2::Stake(meta, stake, StakeFlags::empty()),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let merge_from_activation_epoch = 2;
+    let mut merge_from_stake = Stake {
+        delegation: Delegation {
+            stake: merge_from_amount,
+            activation_epoch: merge_from_activation_epoch,
+            ..stake.delegation
+        },
+        ..stake
+    };
+    let merge_from_account = AccountSharedData::new_data_with_space(
+        merge_from_lamports,
+        &StakeStateV2::Stake(meta, merge_from_stake, StakeFlags::empty()),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+    let mut clock = Clock::default();
+    let mut stake_history = StakeHistory::default();
+    let mut effective = base_lamports;
+    let mut activating = stake_amount;
+    let mut deactivating = 0;
+    stake_history.add(
+        clock.epoch,
+        StakeHistoryEntry {
+            effective,
+            activating,
+            deactivating,
+        },
+    );
+    let mut transaction_accounts = vec![
+        (stake_address, stake_account),
+        (merge_from_address, merge_from_account),
+        (authorized_address, AccountSharedData::default()),
+        (clock::id(), create_account_shared_data_for_test(&clock)),
+        (
+            stake_history::id(),
+            create_account_shared_data_for_test(&stake_history),
+        ),
+        (
+            epoch_schedule::id(),
+            create_account_shared_data_for_test(&EpochSchedule::default()),
+        ),
+    ];
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: merge_from_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_history::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: authorized_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+
+    fn try_merge(
+        mollusk: &Mollusk,
+        transaction_accounts: Vec<(Pubkey, AccountSharedData)>,
+        mut instruction_accounts: Vec<AccountMeta>,
+        expected_result: Result<(), ProgramError>,
+    ) {
+        for iteration in 0..2 {
+            if iteration == 1 {
+                instruction_accounts.swap(0, 1);
+            }
+            let accounts = process_instruction(
+                mollusk,
+                &serialize(&StakeInstruction::Merge).unwrap(),
+                transaction_accounts.clone(),
+                instruction_accounts.clone(),
+                expected_result.clone(),
+            );
+            if expected_result.is_ok() {
+                assert_eq!(
+                    accounts[1 - iteration].state(),
+                    Ok(StakeStateV2::Uninitialized)
+                );
+            }
+        }
+    }
+
+    // stake activation epoch, source initialized succeeds
+    try_merge(
+        &mollusk,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+
+    let new_warmup_cooldown_rate_epoch = Some(0);
+
+    // both activating fails
+    loop {
+        clock.epoch += 1;
+        if clock.epoch == merge_from_activation_epoch {
+            activating += merge_from_amount;
+        }
+        let delta = activating.min(
+            (effective as f64 * warmup_cooldown_rate(clock.epoch, new_warmup_cooldown_rate_epoch))
+                as u64,
+        );
+        effective += delta;
+        activating -= delta;
+        stake_history.add(
+            clock.epoch - 1,
+            StakeHistoryEntry {
+                effective,
+                activating,
+                deactivating,
+            },
+        );
+        transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
+        transaction_accounts[4] = (
+            stake_history::id(),
+            create_account_shared_data_for_test(&stake_history),
+        );
+        if stake_amount == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+            && merge_from_amount
+                == merge_from_stake.stake(
+                    clock.epoch,
+                    &stake_history,
+                    new_warmup_cooldown_rate_epoch,
+                )
+        {
+            break;
+        }
+        try_merge(
+            &mollusk,
+            transaction_accounts.clone(),
+            instruction_accounts.clone(),
+            Err(ProgramError::from(StakeError::MergeTransientStake)),
+        );
+    }
+
+    // Both fully activated works
+    try_merge(
+        &mollusk,
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+
+    // deactivate setup for deactivation
+    let merge_from_deactivation_epoch = clock.epoch + 1;
+    let stake_deactivation_epoch = clock.epoch + 2;
+
+    // active/deactivating and deactivating/inactive mismatches fail
+    loop {
+        clock.epoch += 1;
+        let delta = deactivating.min(
+            (effective as f64 * warmup_cooldown_rate(clock.epoch, new_warmup_cooldown_rate_epoch))
+                as u64,
+        );
+        effective -= delta;
+        deactivating -= delta;
+        if clock.epoch == stake_deactivation_epoch {
+            deactivating += stake_amount;
+            stake = Stake {
+                delegation: Delegation {
+                    deactivation_epoch: stake_deactivation_epoch,
+                    ..stake.delegation
+                },
+                ..stake
+            };
+            transaction_accounts[0]
+                .1
+                .set_state(&StakeStateV2::Stake(meta, stake, StakeFlags::empty()))
+                .unwrap();
+        }
+        if clock.epoch == merge_from_deactivation_epoch {
+            deactivating += merge_from_amount;
+            merge_from_stake = Stake {
+                delegation: Delegation {
+                    deactivation_epoch: merge_from_deactivation_epoch,
+                    ..merge_from_stake.delegation
+                },
+                ..merge_from_stake
+            };
+            transaction_accounts[1]
+                .1
+                .set_state(&StakeStateV2::Stake(
+                    meta,
+                    merge_from_stake,
+                    StakeFlags::empty(),
+                ))
+                .unwrap();
+        }
+        stake_history.add(
+            clock.epoch - 1,
+            StakeHistoryEntry {
+                effective,
+                activating,
+                deactivating,
+            },
+        );
+        transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
+        transaction_accounts[4] = (
+            stake_history::id(),
+            create_account_shared_data_for_test(&stake_history),
+        );
+        if 0 == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+            && 0 == merge_from_stake.stake(
+                clock.epoch,
+                &stake_history,
+                new_warmup_cooldown_rate_epoch,
+            )
+        {
+            break;
+        }
+        try_merge(
+            &mollusk,
+            transaction_accounts.clone(),
+            instruction_accounts.clone(),
+            Err(ProgramError::from(StakeError::MergeTransientStake)),
+        );
+    }
+
+    // Both fully deactivated works
+    try_merge(&mollusk, transaction_accounts, instruction_accounts, Ok(()));
+}
+
+// XXX SKIP test_stake_get_minimum_delegation
 
 // Ensure that the correct errors are returned when processing instructions
 //
