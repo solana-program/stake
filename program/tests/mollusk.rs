@@ -172,8 +172,6 @@ impl Env {
     // enum contents are sometimes, but not necessarily, ignored
     // the success is trivial, this is mostly to allow exhaustive failure tests
     // or to do some post-setup for more meaningful success tests
-    // XXX this is horrible. getting full coverage is fucking insane. this shit is too complicated
-    // probably need my own enum... or at least add lockup as an arg for everything
     fn init_for_instruction(stake_instruction: &StakeInstruction) -> (Self, Instruction) {
         let mut env = Self::init();
         let minimum_delegation = get_minimum_delegation();
