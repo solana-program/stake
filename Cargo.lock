@@ -5113,6 +5113,7 @@ dependencies = [
  "num-traits",
  "num_enum",
  "solana-account",
+ "solana-config-program",
  "solana-feature-set",
  "solana-program",
  "solana-program-test",
