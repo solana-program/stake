@@ -18,12 +18,12 @@ use {
         system_instruction, system_program,
         sysvar::{clock::Clock, stake_history::StakeHistory},
         transaction::{Transaction, TransactionError},
+        vote::{
+            instruction as vote_instruction,
+            state::{VoteInit, VoteState, VoteStateVersions},
+        },
     },
     solana_stake_program::id,
-    solana_vote_program::{
-        self, vote_instruction,
-        vote_state::{VoteInit, VoteState, VoteStateVersions},
-    },
     test_case::{test_case, test_matrix},
 };
 

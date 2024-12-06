@@ -3,12 +3,18 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
-    mollusk_svm::{result::Check, Mollusk},
+    mollusk_svm::{fuzz::firedancer::load_firedancer_fixture, result::Check, Mollusk},
+    mollusk_svm_fuzz_fixture_firedancer::Fixture,
     solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
     solana_sdk::{
         account::Account as SolanaAccount,
+        address_lookup_table, bpf_loader_upgradeable,
         entrypoint::ProgramResult,
-        feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
+        feature_set::{
+            enable_partitioned_epoch_reward, get_sysvar_syscall_enabled,
+            move_stake_and_move_lamports_ixs, partitioned_epoch_rewards_superfeature,
+            stake_raise_minimum_delegation_to_1_sol,
+        },
         hash::Hash,
         instruction::{AccountMeta, Instruction},
         native_token::LAMPORTS_PER_SOL,
@@ -38,7 +44,7 @@ use {
         },
     },
     solana_stake_program::{get_minimum_delegation, id, processor::Processor},
-    std::collections::HashMap,
+    std::{collections::HashMap, fs},
     test_case::{test_case, test_matrix},
 };
 
@@ -511,3 +517,195 @@ fn test_initialize() {
         ],
     );
 }
+
+/* TODO someday, fd fixtures are very touchy
+   after a week or two of work, we have found zero "true" failures
+#[test]
+fn hana() {
+    // failure counts by ixn:
+    // 7 HANA ixn: 3 (split)
+    //   bad fixtures, useless accounts
+    // 6 HANA ixn: 2 (delegate)
+    //   bad fixtures, vote v023
+    // 5 HANA ixn: 13 (minimum delegation)
+    //   bad fixtures, cu nonsense or useless accounts
+    // 4 HANA ixn: 4 (withdraw)
+    //   bad fixtures, malformed stake history
+    // 2 HANA ixn: 6 (set lockup)
+    //   bad fixtures, useless accounts
+    // 1 HANA ixn: 8 (auth with seed)
+    //   expected to fail with missing signature, probably the bug we fixed
+    #[rustfmt::skip]
+    let failure_paths = vec!["/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/8e377aa2af14a8261c8687e689ea5a2c05937f5b_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/f2597f5e62e88676.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/0d19e6c0dcc5293fd85fa6cbd243b683df1d27f5_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/ac86895e3b04af19.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/bae28d42fc69dfea.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/52c531d4dde001a2.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/103caec03366be1a9bd9132fa8be1428b193528c_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/a9bc98e87eec2acd.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/5aece52dbeb1ceec8c6d5707e45372a2fbbb3e61_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/336973321e077c57.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/0acdc3b3818e466a.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/c97fa85d47757592.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/11cf70f361a4cc77.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/6f632e1ad6075480.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/35b98356227ed1e087868ea9f5062f599f97e96a_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/instr-1111111111111111111111111111111111111111111111111111111111111111-1416.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/9973b46e31edd1780e96ae00a5a6226fba3eb4d7_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/instr-1111111111111111111111111111111111111111111111111111111111111111-0124.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/51ddcae74379237f.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/55b22d9dcb936676fd574fbafe4bb906628e525e_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/133723dc1d779f033aa6a11ac9d61c5c2ad286fe_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/c73f6e8eb34ab99b145b2875a915b3262f592f22_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/adf5434529d66e18db0a10ad5596cb30997c4c8a_3246959.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/1ede3ae646d1b82f.bin.fix", "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/2ab4c8c82a552c80.bin.fix"];
+
+    const DIR: &str = "/home/hana/work/firedancer/test-vectors/instr/fixtures/stake/";
+
+    let mut fixture_paths = vec![];
+    if let Ok(entries) = fs::read_dir(DIR) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "fix") {
+                if let Some(path_str) = path.to_str() {
+                    fixture_paths.push(path_str.to_string());
+                }
+            }
+        }
+    }
+
+    let stake_dummy = AccountSharedData::create(0, vec![], bpf_loader_upgradeable::id(), true, 0);
+
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut ok = 0;
+    let mut err = 0;
+    let mut bad_sysvar = 0;
+    let mut bad_cu = 0;
+    let mut enabled_min = 0;
+    let mut use_alt = 0;
+    let mut disabled_rewards = 0;
+    let mut disabled_move = 0;
+    for path in &failure_paths /* XXX fixture_paths */ {
+        // expects to spend no CUs on minimum delegation
+        if path.contains("c03a06bd0c9c52b0000dc54d4de4fd8d8b350297_3246959.fix") {
+            bad_cu += 1;
+            continue;
+        }
+
+        // set up firedancer fixture test environment
+        let mut fixture = Fixture::load_from_blob_file(&path);
+
+        // activate these features because the program doesnt function without them
+        // we may have spurious failures for tests that want to fail with the features off
+        fixture
+            .input
+            .epoch_context
+            .feature_set
+            .activate(&enable_partitioned_epoch_reward::id(), 0);
+        fixture
+            .input
+            .epoch_context
+            .feature_set
+            .activate(&get_sysvar_syscall_enabled::id(), 0);
+
+        let ref feature_set = fixture.input.epoch_context.feature_set;
+
+        // bpf stake requires the EpochRewards sysvar
+        if !feature_set.is_active(&partitioned_epoch_rewards_superfeature::id())
+            && !feature_set.is_active(&enable_partitioned_epoch_reward::id())
+        {
+            disabled_rewards += 1;
+            continue;
+        }
+
+        // bpf stake cannot enable minimum delegation
+        if feature_set.is_active(&stake_raise_minimum_delegation_to_1_sol::id()) {
+            enabled_min += 1;
+            continue;
+        }
+
+        // some fixtures have mangled sysvar data, but we cannot test these
+        // mollusk attempts to parse them and unwraps. this is not something we really need to test tho
+        // since both styles of sysvar object constructor validate the pubkey
+        let Ok((mut mollusk, instruction, accounts, mut expected)) =
+            std::panic::catch_unwind(|| load_firedancer_fixture(&fixture))
+        else {
+            bad_sysvar += 1;
+            continue;
+        };
+
+        // XXX
+        if instruction.data[0] != 4 {
+            continue;
+        }
+
+        // alt cannot be resolved by mollusk, which operates on an invoke context
+        if instruction
+            .accounts
+            .iter()
+            .any(|meta| meta.pubkey == address_lookup_table::program::id())
+        {
+            use_alt += 1;
+            continue;
+        }
+
+        // bpf stake cannot disable the move instructions
+        // so if theyre used with the feature disabled, we skip the fixture
+        if instruction.data.len() > 1 {
+            if (instruction.data[0] == 16 || instruction.data[0] == 17)
+                && !feature_set.is_active(&move_stake_and_move_lamports_ixs::id())
+            {
+                disabled_move += 1;
+                continue;
+            }
+        }
+
+        // TODO a way to have `load_firedancer_fixture` use a preloaded program
+        //mollusk.add_program(&id(), "solana_stake_program", &bpf_loader_upgradeable::id());
+
+        // process instruction against bpf stake program
+        let mut actual = mollusk.process_instruction(&instruction, &accounts);
+        println!("HANA ixn: {:#?}\nHANa accts: {:#?}\nHANA exp: {:#?}", instruction, accounts, expected);
+        println!("HANA actual: {:#?}", actual);
+
+        // fixtures and bpf stake often disagree on whether these should be in the account results
+        // they never change tho so can be filtered out unconditionally
+        #[allow(deprecated)]
+        {
+            expected.resulting_accounts.retain(|(key, _)| {
+                !solana_sdk::sysvar::is_sysvar_id(key) && key != &stake::config::id()
+            });
+            actual.resulting_accounts.retain(|(key, _)| {
+                !solana_sdk::sysvar::is_sysvar_id(key) && key != &stake::config::id()
+            });
+        }
+
+        // stake program in the account results is different because fd fixtures use native
+        expected
+            .resulting_accounts
+            .iter_mut()
+            .find(|(key, _)| key == &id())
+            .map(|(_, account)| *account = stake_dummy.clone());
+
+        // this is a custom function that emulates what we would like solana-conformance consensus mode to be:
+        // * program_result matches if both are Ok or both are Err, without errors being compared
+        // * raw_result is ignored (i dont actually know what this is, maybe comparing them is fine)
+        // * resulting_accounts are only compared for successful transactions
+        let compare_result = std::panic::catch_unwind(|| expected.compare_consensus(&actual));
+
+        if compare_result.is_ok() {
+            if expected.program_result.is_err() {
+                err += 1;
+            } else {
+                ok += 1;
+            }
+
+            passed += 1;
+        } else {
+            failed += 1;
+        }
+    }
+
+    println!(
+        "passed: {} ({} ok, {} err)
+failed: {}
+skipped: {}
+* malformed sysvar: {}
+* onerous CU limit: {}
+* requires 1sol minimum: {}
+* requires ALT: {}
+* EpochRewards disabled: {}
+* MoveStake/MoveLamports disabled but used: {}",
+        passed,
+        ok,
+        err,
+        failed,
+        bad_sysvar + bad_cu + enabled_min + use_alt + disabled_rewards + disabled_move,
+        bad_sysvar,
+        bad_cu,
+        enabled_min,
+        use_alt,
+        disabled_rewards,
+        disabled_move,
+    );
+}
+*/
