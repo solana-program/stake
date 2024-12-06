@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
@@ -9,25 +7,14 @@ use {
     solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
     solana_program_runtime::loaded_programs::ProgramCacheEntryOwner,
     solana_sdk::{
-        account::{create_account_shared_data_for_test, Account as SolanaAccount},
+        account::create_account_shared_data_for_test,
         account_utils::StateMut,
-        address_lookup_table, bpf_loader_upgradeable,
-        entrypoint::ProgramResult,
-        feature_set::{
-            enable_partitioned_epoch_reward, get_sysvar_syscall_enabled,
-            move_stake_and_move_lamports_ixs, partitioned_epoch_rewards_superfeature,
-            stake_raise_minimum_delegation_to_1_sol,
-        },
-        hash::Hash,
+        feature_set::stake_raise_minimum_delegation_to_1_sol,
         instruction::{AccountMeta, Instruction},
-        native_loader,
-        native_token::LAMPORTS_PER_SOL,
         program_error::ProgramError,
         pubkey::Pubkey,
-        signature::{Keypair, Signer},
-        signers::Signers,
         stake::{
-            self, config as stake_config,
+            config as stake_config,
             instruction::{
                 self, authorize_checked, authorize_checked_with_seed, initialize_checked,
                 set_lockup_checked, AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs,
@@ -35,13 +22,13 @@ use {
             },
             stake_flags::StakeFlags,
             state::{
-                warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
-                StakeActivationStatus, StakeAuthorize, StakeStateV2,
+                warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
+                StakeStateV2,
             },
             MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION,
         },
         stake_history::{Epoch, StakeHistoryEntry},
-        system_instruction, system_program,
+        system_program,
         sysvar::{
             clock::{self, Clock},
             epoch_rewards::{self, EpochRewards},
@@ -49,23 +36,16 @@ use {
             rent::{self, Rent},
             rewards,
             stake_history::{self, StakeHistory},
-            SysvarId,
         },
-        transaction::{Transaction, TransactionError},
         transaction_context::TransactionReturnData,
     },
-    solana_stake_program::{get_minimum_delegation, id, processor::Processor},
+    solana_stake_program::{get_minimum_delegation, id},
     solana_vote_program::{
         self,
         vote_state::{self, VoteState, VoteStateVersions},
     },
-    std::{
-        collections::{HashMap, HashSet},
-        fs,
-        str::FromStr,
-        sync::Arc,
-    },
-    test_case::{test_case, test_matrix},
+    std::{collections::HashSet, str::FromStr},
+    test_case::test_case,
 };
 
 fn mollusk_native() -> Mollusk {
@@ -234,20 +214,8 @@ fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Optio
     from(account).and_then(|state: StakeStateV2| state.stake())
 }
 
-fn delegation_from(account: &AccountSharedData) -> Option<Delegation> {
-    from(account).and_then(|state: StakeStateV2| state.delegation())
-}
-
 fn authorized_from(account: &AccountSharedData) -> Option<Authorized> {
     from(account).and_then(|state: StakeStateV2| state.authorized())
-}
-
-fn lockup_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Lockup> {
-    from(account).and_then(|state: StakeStateV2| state.lockup())
-}
-
-fn meta_from(account: &AccountSharedData) -> Option<Meta> {
-    from(account).and_then(|state: StakeStateV2| state.meta())
 }
 
 fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
@@ -330,39 +298,14 @@ fn create_stake_history_from_delegations(
 
 mod config {
     #[allow(deprecated)]
-    use solana_sdk::stake::config::{self, *};
     use {
-        bincode::deserialize,
-        solana_config_program::{create_config_account, get_config_data},
-        solana_sdk::{
-            account::{AccountSharedData, ReadableAccount, WritableAccount},
-            genesis_config::GenesisConfig,
-            transaction_context::BorrowedAccount,
-        },
+        solana_config_program::create_config_account,
+        solana_sdk::{account::AccountSharedData, stake::config::Config},
     };
-
-    #[allow(deprecated)]
-    pub fn from(account: &BorrowedAccount) -> Option<Config> {
-        get_config_data(account.get_data())
-            .ok()
-            .and_then(|data| deserialize(data).ok())
-    }
 
     #[allow(deprecated)]
     pub fn create_account(lamports: u64, config: &Config) -> AccountSharedData {
         create_config_account(vec![], config, lamports)
-    }
-
-    #[allow(deprecated)]
-    pub fn add_genesis_account(genesis_config: &mut GenesisConfig) -> u64 {
-        let mut account = create_config_account(vec![], &Config::default(), 0);
-        let lamports = genesis_config.rent.minimum_balance(account.data().len());
-
-        account.set_lamports(lamports.max(1));
-
-        genesis_config.add_account(config::id(), account);
-
-        lamports
     }
 }
 
