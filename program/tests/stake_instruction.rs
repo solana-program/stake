@@ -51,6 +51,7 @@ use {
             SysvarId,
         },
         transaction::{Transaction, TransactionError},
+        transaction_context::TransactionReturnData,
     },
     solana_stake_program::{get_minimum_delegation, id, processor::Processor},
     solana_vote_program::{
@@ -3848,7 +3849,38 @@ fn test_merge_active_stake(mollusk: Mollusk) {
     try_merge(&mollusk, transaction_accounts, instruction_accounts, Ok(()));
 }
 
-// XXX SKIP test_stake_get_minimum_delegation
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
+    let stake_address = Pubkey::new_unique();
+    let stake_account = create_default_stake_account();
+    let minimum_delegation = crate::get_minimum_delegation();
+    let instruction_data = serialize(&StakeInstruction::GetMinimumDelegation).unwrap();
+    let transaction_accounts = vec![(stake_address, stake_account)];
+    let instruction_accounts = vec![AccountMeta {
+        pubkey: stake_address,
+        is_signer: false,
+        is_writable: true,
+    }];
+
+    let instruction = Instruction {
+        program_id: id(),
+        accounts: instruction_accounts,
+        data: instruction_data,
+    };
+
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &transaction_accounts,
+        &[
+            Check::success(),
+            Check::return_data(TransactionReturnData {
+                program_id: id(),
+                data: minimum_delegation.to_le_bytes().to_vec(),
+            }),
+        ],
+    );
+}
 
 // Ensure that the correct errors are returned when processing instructions
 //
