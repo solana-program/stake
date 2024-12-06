@@ -4,8 +4,7 @@
 
 use {
     bincode::serialize,
-    mollusk_svm::{fuzz::firedancer::load_firedancer_fixture, result::Check, Mollusk},
-    mollusk_svm_fuzz_fixture_firedancer::Fixture,
+    mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
     solana_sdk::{
         account::{create_account_shared_data_for_test, Account as SolanaAccount},
