@@ -2372,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "bincode",
  "mollusk-svm-error",
@@ -2384,13 +2384,14 @@ dependencies = [
  "solana-logger",
  "solana-program-runtime",
  "solana-sdk",
+ "solana-stake-program 2.1.0",
  "solana-system-program",
  "solana-timings",
 ]
 
 [[package]]
 name = "mollusk-svm-error"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "solana-sdk",
  "thiserror 1.0.69",
@@ -2398,7 +2399,7 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-fuzz-fixture-firedancer"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "mollusk-svm-fuzz-fs",
  "prost",
@@ -2411,7 +2412,7 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-fuzz-fs"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "bs58",
  "prost",
@@ -2422,7 +2423,7 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-keys"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "mollusk-svm-error",
  "solana-sdk",
