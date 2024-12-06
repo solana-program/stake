@@ -366,10 +366,415 @@ mod config {
     }
 }
 
-// XXX SKIP BEOFRE THIS
-// the tests are kind of dumb but i mihgt grab them anyway
-// just annoying bc they test errors that changed
-// and are kind of useless, we should actually test the interface systematically
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_process_instruction(mollusk: Mollusk) {
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::initialize(
+            &Pubkey::new_unique(),
+            &Authorized::default(),
+            &Lockup::default(),
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::authorize(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            StakeAuthorize::Staker,
+            None,
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::split(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+            &invalid_stake_state_pubkey(),
+        )[2],
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::merge(
+            &Pubkey::new_unique(),
+            &invalid_stake_state_pubkey(),
+            &Pubkey::new_unique(),
+        )[0],
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::split_with_seed(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+            &invalid_stake_state_pubkey(),
+            &Pubkey::new_unique(),
+            "seed",
+        )[1],
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::delegate_stake(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::withdraw(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+            None,
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_stake(&Pubkey::new_unique(), &Pubkey::new_unique()),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::set_lockup(
+            &Pubkey::new_unique(),
+            &LockupArgs::default(),
+            &Pubkey::new_unique(),
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_delinquent_stake(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+        ),
+        Err(ProgramError::IncorrectProgramId),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_delinquent_stake(
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+            &Pubkey::new_unique(),
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_delinquent_stake(
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+            &invalid_vote_state_pubkey(),
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::move_stake(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::move_lamports(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+        ),
+        Err(ProgramError::InvalidAccountData),
+    );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_process_instruction_decode_bail(mollusk: Mollusk) {
+    // these will not call stake_state, have bogus contents
+    let stake_address = Pubkey::new_unique();
+    let stake_account = create_default_stake_account();
+    let rent_address = rent::id();
+    let rent = Rent::default();
+    let rent_account = create_account_shared_data_for_test(&rent);
+    let rewards_address = rewards::id();
+    let rewards_account = create_account_shared_data_for_test(&rewards::Rewards::new(0.0));
+    let stake_history_address = stake_history::id();
+    let stake_history_account = create_account_shared_data_for_test(&StakeHistory::default());
+    let vote_address = Pubkey::new_unique();
+    let vote_account = AccountSharedData::new(0, 0, &solana_vote_program::id());
+    let clock_address = clock::id();
+    let clock_account = create_account_shared_data_for_test(&clock::Clock::default());
+    #[allow(deprecated)]
+    let config_address = stake_config::id();
+    #[allow(deprecated)]
+    let config_account = config::create_account(0, &stake_config::Config::default());
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let minimum_delegation = crate::get_minimum_delegation();
+    let withdrawal_amount = rent_exempt_reserve + minimum_delegation;
+
+    // gets the "is_empty()" check
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Initialize(
+            Authorized::default(),
+            Lockup::default(),
+        ))
+        .unwrap(),
+        Vec::new(),
+        Vec::new(),
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // no account for rent
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Initialize(
+            Authorized::default(),
+            Lockup::default(),
+        ))
+        .unwrap(),
+        vec![(stake_address, stake_account.clone())],
+        vec![AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        }],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // fails to deserialize stake state
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Initialize(
+            Authorized::default(),
+            Lockup::default(),
+        ))
+        .unwrap(),
+        vec![
+            (stake_address, stake_account.clone()),
+            (rent_address, rent_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: rent_address,
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Err(ProgramError::InvalidAccountData),
+    );
+
+    // gets the first check in delegate, wrong number of accounts
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        vec![(stake_address, stake_account.clone())],
+        vec![AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        }],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // gets the sub-check for number of args
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        vec![(stake_address, stake_account.clone())],
+        vec![AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        }],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // gets the check non-deserialize-able account in delegate_stake
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        vec![
+            (stake_address, stake_account.clone()),
+            (vote_address, vote_account.clone()),
+            (clock_address, clock_account),
+            (stake_history_address, stake_history_account.clone()),
+            (config_address, config_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: vote_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: clock_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: stake_history_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: config_address,
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Err(ProgramError::InvalidAccountData),
+    );
+
+    // Tests 3rd keyed account is of correct type (Clock instead of rewards) in withdraw
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(withdrawal_amount)).unwrap(),
+        vec![
+            (stake_address, stake_account.clone()),
+            (vote_address, vote_account.clone()),
+            (rewards_address, rewards_account.clone()),
+            (stake_history_address, stake_history_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: vote_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: rewards_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: stake_history_address,
+                is_signer: false,
+                is_writable: false,
+            },
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: false,
+            },
+        ],
+        Err(ProgramError::InvalidArgument),
+    );
+
+    // Tests correct number of accounts are provided in withdraw
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(withdrawal_amount)).unwrap(),
+        vec![(stake_address, stake_account.clone())],
+        vec![AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        }],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // Tests 2nd keyed account is of correct type (Clock instead of rewards) in deactivate
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        vec![
+            (stake_address, stake_account.clone()),
+            (rewards_address, rewards_account),
+        ],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: rewards_address,
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Err(ProgramError::InvalidArgument),
+    );
+
+    // Tests correct number of accounts are provided in deactivate
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        Vec::new(),
+        Vec::new(),
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+
+    // Tests correct number of accounts are provided in deactivate_delinquent
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        Vec::new(),
+        Vec::new(),
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        vec![(stake_address, stake_account.clone())],
+        vec![AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        }],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        vec![(stake_address, stake_account), (vote_address, vote_account)],
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: false,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: vote_address,
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Err(ProgramError::NotEnoughAccountKeys),
+    );
+}
 
 #[test_case(mollusk_native(); "native_stake")]
 #[test_case(mollusk_bpf(); "bpf_stake")]
