@@ -24,7 +24,7 @@ use {
         signature::{Keypair, Signer},
         signers::Signers,
         stake::{
-            self,
+            self, config as stake_config,
             instruction::{self, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
             stake_flags::StakeFlags,
             state::{
@@ -37,9 +37,10 @@ use {
         system_instruction, system_program,
         sysvar::{
             clock::{self, Clock},
-            epoch_rewards::EpochRewards,
-            epoch_schedule::EpochSchedule,
-            rent::Rent,
+            epoch_rewards::{self, EpochRewards},
+            epoch_schedule::{self, EpochSchedule},
+            rent::{self, Rent},
+            rewards,
             stake_history::{self, StakeHistory},
             SysvarId,
         },
@@ -50,7 +51,12 @@ use {
         },
     },
     solana_stake_program::{get_minimum_delegation, id, processor::Processor},
-    std::{collections::HashMap, fs, sync::Arc},
+    std::{
+        collections::{HashMap, HashSet},
+        fs,
+        str::FromStr,
+        sync::Arc,
+    },
     test_case::{test_case, test_matrix},
 };
 
@@ -68,6 +74,30 @@ fn mollusk_bpf() -> Mollusk {
         .feature_set
         .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
     mollusk
+}
+
+fn create_default_account() -> AccountSharedData {
+    AccountSharedData::new(0, 0, &Pubkey::new_unique())
+}
+
+fn create_default_stake_account() -> AccountSharedData {
+    AccountSharedData::new(0, 0, &id())
+}
+
+fn invalid_stake_state_pubkey() -> Pubkey {
+    Pubkey::from_str("BadStake11111111111111111111111111111111111").unwrap()
+}
+
+fn invalid_vote_state_pubkey() -> Pubkey {
+    Pubkey::from_str("BadVote111111111111111111111111111111111111").unwrap()
+}
+
+fn spoofed_stake_state_pubkey() -> Pubkey {
+    Pubkey::from_str("SpoofedStake1111111111111111111111111111111").unwrap()
+}
+
+fn spoofed_stake_program_id() -> Pubkey {
+    Pubkey::from_str("Spoofed111111111111111111111111111111111111").unwrap()
 }
 
 fn process_instruction(
@@ -98,6 +128,47 @@ fn process_instruction(
         .collect()
 }
 
+fn get_default_transaction_accounts(instruction: &Instruction) -> Vec<(Pubkey, AccountSharedData)> {
+    let mut pubkeys: HashSet<Pubkey> = instruction
+        .accounts
+        .iter()
+        .map(|meta| meta.pubkey)
+        .collect();
+    pubkeys.insert(clock::id());
+    pubkeys.insert(epoch_schedule::id());
+    pubkeys.insert(stake_history::id());
+    #[allow(deprecated)]
+    pubkeys
+        .iter()
+        .map(|pubkey| {
+            (
+                *pubkey,
+                if clock::check_id(pubkey) {
+                    create_account_shared_data_for_test(&clock::Clock::default())
+                } else if rewards::check_id(pubkey) {
+                    create_account_shared_data_for_test(&rewards::Rewards::new(0.0))
+                } else if stake_history::check_id(pubkey) {
+                    create_account_shared_data_for_test(&StakeHistory::default())
+                } else if stake_config::check_id(pubkey) {
+                    config::create_account(0, &stake_config::Config::default())
+                } else if epoch_schedule::check_id(pubkey) {
+                    create_account_shared_data_for_test(&EpochSchedule::default())
+                } else if rent::check_id(pubkey) {
+                    create_account_shared_data_for_test(&Rent::default())
+                } else if *pubkey == invalid_stake_state_pubkey() {
+                    AccountSharedData::new(0, 0, &id())
+                } else if *pubkey == invalid_vote_state_pubkey() {
+                    AccountSharedData::new(0, 0, &solana_vote_program::id())
+                } else if *pubkey == spoofed_stake_state_pubkey() {
+                    AccountSharedData::new(0, 0, &spoofed_stake_program_id())
+                } else {
+                    AccountSharedData::new(0, 0, &id())
+                },
+            )
+        })
+        .collect()
+}
+
 fn new_stake(
     stake: u64,
     voter_pubkey: &Pubkey,
@@ -116,6 +187,119 @@ fn from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stak
 
 fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stake> {
     from(account).and_then(|state: StakeStateV2| state.stake())
+}
+
+mod config {
+    #[allow(deprecated)]
+    use solana_sdk::stake::config::{self, *};
+    use {
+        bincode::deserialize,
+        solana_config_program::{create_config_account, get_config_data},
+        solana_sdk::{
+            account::{AccountSharedData, ReadableAccount, WritableAccount},
+            genesis_config::GenesisConfig,
+            transaction_context::BorrowedAccount,
+        },
+    };
+
+    #[allow(deprecated)]
+    pub fn from(account: &BorrowedAccount) -> Option<Config> {
+        get_config_data(account.get_data())
+            .ok()
+            .and_then(|data| deserialize(data).ok())
+    }
+
+    #[allow(deprecated)]
+    pub fn create_account(lamports: u64, config: &Config) -> AccountSharedData {
+        create_config_account(vec![], config, lamports)
+    }
+
+    #[allow(deprecated)]
+    pub fn add_genesis_account(genesis_config: &mut GenesisConfig) -> u64 {
+        let mut account = create_config_account(vec![], &Config::default(), 0);
+        let lamports = genesis_config.rent.minimum_balance(account.data().len());
+
+        account.set_lamports(lamports.max(1));
+
+        genesis_config.add_account(config::id(), account);
+
+        lamports
+    }
+}
+
+// Ensure that the correct errors are returned when processing instructions
+//
+// The GetMinimumDelegation instruction does not take any accounts; so when it was added,
+// `process_instruction()` needed to be updated to *not* need a stake account passed in, which
+// changes the error *ordering* conditions.
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_process_instruction_error_ordering(mollusk: Mollusk) {
+    let rent = Rent::default();
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let rent_address = rent::id();
+    let rent_account = create_account_shared_data_for_test(&rent);
+
+    let good_stake_address = Pubkey::new_unique();
+    let good_stake_account =
+        AccountSharedData::new(rent_exempt_reserve, StakeStateV2::size_of(), &id());
+    let good_instruction = instruction::initialize(
+        &good_stake_address,
+        &Authorized::auto(&good_stake_address),
+        &Lockup::default(),
+    );
+    let good_transaction_accounts = vec![
+        (good_stake_address, good_stake_account),
+        (rent_address, rent_account),
+    ];
+    let good_instruction_accounts = vec![
+        AccountMeta {
+            pubkey: good_stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: rent_address,
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+    let good_accounts = (good_transaction_accounts, good_instruction_accounts);
+
+    // The instruction data needs to deserialize to a bogus StakeInstruction.  We likely never
+    // will have `usize::MAX`-number of instructions, so this should be a safe constant to
+    // always map to an invalid stake instruction.
+    let bad_instruction = Instruction::new_with_bincode(id(), &usize::MAX, Vec::default());
+    let bad_transaction_accounts = Vec::default();
+    let bad_instruction_accounts = Vec::default();
+    let bad_accounts = (bad_transaction_accounts, bad_instruction_accounts);
+
+    for (instruction, (transaction_accounts, instruction_accounts), expected_result) in [
+        (&good_instruction, &good_accounts, Ok(())),
+        (
+            &bad_instruction,
+            &good_accounts,
+            Err(ProgramError::InvalidInstructionData),
+        ),
+        (
+            &good_instruction,
+            &bad_accounts,
+            Err(ProgramError::NotEnoughAccountKeys),
+        ),
+        (
+            &bad_instruction,
+            &bad_accounts,
+            Err(ProgramError::InvalidInstructionData),
+        ),
+    ] {
+        process_instruction(
+            &mollusk,
+            &instruction.data,
+            transaction_accounts.clone(),
+            instruction_accounts.clone(),
+            expected_result,
+        );
+    }
 }
 
 #[test_case(mollusk_native(); "native_stake")]
@@ -385,4 +569,191 @@ fn test_deactivate_delinquent(mollusk: Mollusk) {
         &reference_vote_account,
         Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into()),
     );
+}
+
+#[test_case(mollusk_native(); "native_stake")]
+#[test_case(mollusk_bpf(); "bpf_stake")]
+fn test_stake_process_instruction_with_epoch_rewards_active(mollusk: Mollusk) {
+    let process_instruction_as_one_arg = |mollusk: &Mollusk,
+                                          instruction: &Instruction,
+                                          expected_result: Result<(), ProgramError>|
+     -> Vec<AccountSharedData> {
+        let mut transaction_accounts = get_default_transaction_accounts(instruction);
+
+        // Initialize EpochRewards sysvar account
+        let epoch_rewards_sysvar = EpochRewards {
+            active: true,
+            ..EpochRewards::default()
+        };
+        transaction_accounts.push((
+            epoch_rewards::id(),
+            create_account_shared_data_for_test(&epoch_rewards_sysvar),
+        ));
+
+        process_instruction(
+            &mollusk,
+            &instruction.data,
+            transaction_accounts,
+            instruction.accounts.clone(),
+            expected_result,
+        )
+    };
+
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::initialize(
+            &Pubkey::new_unique(),
+            &Authorized::default(),
+            &Lockup::default(),
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::authorize(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            StakeAuthorize::Staker,
+            None,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::delegate_stake(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::split(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+            &invalid_stake_state_pubkey(),
+        )[2],
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::withdraw(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+            None,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_stake(&Pubkey::new_unique(), &Pubkey::new_unique()),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::set_lockup(
+            &Pubkey::new_unique(),
+            &LockupArgs::default(),
+            &Pubkey::new_unique(),
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::merge(
+            &Pubkey::new_unique(),
+            &invalid_stake_state_pubkey(),
+            &Pubkey::new_unique(),
+        )[0],
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::authorize_with_seed(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            "seed".to_string(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            StakeAuthorize::Staker,
+            None,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::initialize_checked(&Pubkey::new_unique(), &Authorized::default()),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::authorize_checked(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            StakeAuthorize::Staker,
+            None,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::authorize_checked_with_seed(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            "seed".to_string(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            StakeAuthorize::Staker,
+            None,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::set_lockup_checked(
+            &Pubkey::new_unique(),
+            &LockupArgs::default(),
+            &Pubkey::new_unique(),
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::deactivate_delinquent_stake(
+            &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
+            &Pubkey::new_unique(),
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::move_stake(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+    process_instruction_as_one_arg(
+        &mollusk,
+        &instruction::move_lamports(
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            &Pubkey::new_unique(),
+            100,
+        ),
+        Err(StakeError::EpochRewardsActive.into()),
+    );
+
+    // Only GetMinimumDelegation should not return StakeError::EpochRewardsActive
+    process_instruction_as_one_arg(&mollusk, &instruction::get_minimum_delegation(), Ok(()));
 }
