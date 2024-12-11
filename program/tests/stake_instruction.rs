@@ -250,6 +250,10 @@ fn get_active_stake_for_tests(
     active_stake
 }
 
+fn create_empty_stake_history_for_test() -> AccountSharedData {
+    AccountSharedData::create(1, vec![0; 8], solana_program::sysvar::id(), false, u64::MAX)
+}
+
 fn new_stake_history_entry<'a, I>(
     epoch: Epoch,
     stakes: I,
@@ -293,6 +297,18 @@ fn create_stake_history_from_delegations(
     }
 
     stake_history
+}
+
+fn create_stake_history_at_epoch(current_epoch: Epoch) -> StakeHistory {
+    unsafe {
+        std::mem::transmute::<Vec<_>, StakeHistory>(
+            (0..current_epoch)
+                .rev()
+                .take(512)
+                .map(|past_epoch| (past_epoch, StakeHistoryEntry::with_effective(u64::MAX)))
+                .collect(),
+        )
+    }
 }
 
 mod config {
@@ -1848,10 +1864,7 @@ fn test_stake_delegate(mollusk: Mollusk) {
         (vote_address, vote_account),
         (vote_address_2, vote_account_2.clone()),
         (clock::id(), create_account_shared_data_for_test(&clock)),
-        (
-            stake_history::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
-        ),
+        (stake_history::id(), create_empty_stake_history_for_test()),
         (
             stake_config::id(),
             config::create_account(0, &stake_config::Config::default()),
@@ -3909,7 +3922,6 @@ fn test_staked_split_destination_minimum_balance(
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let stake_history = StakeHistory::default();
     let current_epoch = 100;
     let clock = Clock {
         epoch: current_epoch,
@@ -4033,7 +4045,7 @@ fn test_staked_split_destination_minimum_balance(
         let expected_active_stake = get_active_stake_for_tests(
             &[source_account.clone(), destination_account.clone()],
             &clock,
-            &stake_history,
+            &StakeHistory::default(),
         );
         let accounts = process_instruction(
             &mollusk,
@@ -4042,10 +4054,7 @@ fn test_staked_split_destination_minimum_balance(
                 (source_address, source_account.clone()),
                 (destination_address, destination_account),
                 (rent::id(), create_account_shared_data_for_test(&rent)),
-                (
-                    stake_history::id(),
-                    create_account_shared_data_for_test(&stake_history),
-                ),
+                (stake_history::id(), create_empty_stake_history_for_test()),
                 (clock::id(), create_account_shared_data_for_test(&clock)),
                 (
                     epoch_schedule::id(),
@@ -4057,7 +4066,7 @@ fn test_staked_split_destination_minimum_balance(
         );
         assert_eq!(
             expected_active_stake,
-            get_active_stake_for_tests(&accounts[0..2], &clock, &stake_history)
+            get_active_stake_for_tests(&accounts[0..2], &clock, &StakeHistory::default())
         );
         // For the expected OK cases, when the source's StakeStateV2 is Stake, then the
         // destination's StakeStateV2 *must* also end up as Stake as well.  Additionally,
@@ -4222,10 +4231,7 @@ fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegat
             AccountSharedData::new(rent_exempt_reserve, 0, &system_program::id()),
         ),
         (clock::id(), create_account_shared_data_for_test(&clock)),
-        (
-            stake_history::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
-        ),
+        (stake_history::id(), create_empty_stake_history_for_test()),
         (
             stake_config::id(),
             config::create_account(0, &stake_config::Config::default()),
@@ -4907,12 +4913,14 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
     let rent = Rent::default();
     let source_larger_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
     let split_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let stake_history = StakeHistory::default();
     let current_epoch = 100;
     let clock = Clock {
         epoch: current_epoch,
         ..Clock::default()
     };
+    // XXX
+    //let stake_history = create_stake_history_at_epoch(current_epoch);
+    let stake_history = StakeHistory::default();
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (source_larger_rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_sdk::pubkey::new_rand();
