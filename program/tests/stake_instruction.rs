@@ -37,7 +37,6 @@ use {
             rewards,
             stake_history::{self, StakeHistory},
         },
-        transaction_context::TransactionReturnData,
     },
     solana_stake_program::{get_minimum_delegation, id},
     solana_vote_program::{
@@ -6536,10 +6535,7 @@ fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
         &transaction_accounts,
         &[
             Check::success(),
-            Check::return_data(TransactionReturnData {
-                program_id: id(),
-                data: minimum_delegation.to_le_bytes().to_vec(),
-            }),
+            Check::return_data(minimum_delegation.to_le_bytes().to_vec()),
         ],
     );
 }
