@@ -299,18 +299,6 @@ fn create_stake_history_from_delegations(
     stake_history
 }
 
-fn create_stake_history_at_epoch(current_epoch: Epoch) -> StakeHistory {
-    unsafe {
-        std::mem::transmute::<Vec<_>, StakeHistory>(
-            (0..current_epoch)
-                .rev()
-                .take(512)
-                .map(|past_epoch| (past_epoch, StakeHistoryEntry::with_effective(u64::MAX)))
-                .collect(),
-        )
-    }
-}
-
 mod config {
     #[allow(deprecated)]
     use {
@@ -2096,10 +2084,7 @@ fn test_redelegate_consider_balance_changes(mollusk: Mollusk) {
         ),
         (authority_address, AccountSharedData::default()),
         (clock::id(), create_account_shared_data_for_test(&clock)),
-        (
-            stake_history::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
-        ),
+        (stake_history::id(), create_empty_stake_history_for_test()),
         (
             stake_config::id(),
             config::create_account(0, &stake_config::Config::default()),
@@ -4735,7 +4720,6 @@ fn test_split_with_rent(mollusk: Mollusk) {
 fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let stake_history = StakeHistory::default();
     let current_epoch = 100;
     let clock = Clock {
         epoch: current_epoch,
@@ -4783,10 +4767,7 @@ fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
             (stake_address, stake_account.clone()),
             (split_to_address, split_to_account),
             (rent::id(), create_account_shared_data_for_test(&rent)),
-            (
-                stake_history::id(),
-                create_account_shared_data_for_test(&stake_history),
-            ),
+            (stake_history::id(), create_empty_stake_history_for_test()),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
                 epoch_schedule::id(),
@@ -4834,7 +4815,7 @@ fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
                 transaction_accounts[1].1.clone(),
             ],
             &clock,
-            &stake_history,
+            &StakeHistory::default(),
         );
 
         // split more than available fails
@@ -4862,7 +4843,7 @@ fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
         // no deactivated stake
         assert_eq!(
             expected_active_stake,
-            get_active_stake_for_tests(&accounts[0..2], &clock, &stake_history)
+            get_active_stake_for_tests(&accounts[0..2], &clock, &StakeHistory::default())
         );
 
         if let StakeStateV2::Stake(meta, stake, stake_flags) = state {
@@ -4918,9 +4899,6 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    // XXX
-    //let stake_history = create_stake_history_at_epoch(current_epoch);
-    let stake_history = StakeHistory::default();
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (source_larger_rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -4963,10 +4941,7 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
             (stake_address, stake_account.clone()),
             (split_to_address, split_to_account),
             (rent::id(), create_account_shared_data_for_test(&rent)),
-            (
-                stake_history::id(),
-                create_account_shared_data_for_test(&stake_history),
-            ),
+            (stake_history::id(), create_empty_stake_history_for_test()),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
                 epoch_schedule::id(),
@@ -5003,7 +4978,7 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
                 transaction_accounts[1].1.clone(),
             ],
             &clock,
-            &stake_history,
+            &StakeHistory::default(),
         );
 
         // split more than available fails
@@ -5031,7 +5006,7 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
         // no deactivated stake
         assert_eq!(
             expected_active_stake,
-            get_active_stake_for_tests(&accounts[0..2], &clock, &stake_history)
+            get_active_stake_for_tests(&accounts[0..2], &clock, &StakeHistory::default())
         );
 
         if let StakeStateV2::Stake(meta, stake, stake_flags) = state {
@@ -5589,7 +5564,6 @@ fn test_split_rent_exemptness(mollusk: Mollusk) {
 fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let stake_history = StakeHistory::default();
     let current_epoch = 100;
     let clock = Clock {
         epoch: current_epoch,
@@ -5647,10 +5621,7 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
                     (source_address, source_account.clone()),
                     (destination_address, destination_account),
                     (rent::id(), create_account_shared_data_for_test(&rent)),
-                    (
-                        stake_history::id(),
-                        create_account_shared_data_for_test(&stake_history),
-                    ),
+                    (stake_history::id(), create_empty_stake_history_for_test()),
                     (clock::id(), create_account_shared_data_for_test(&clock)),
                     (
                         epoch_schedule::id(),
@@ -5666,7 +5637,7 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
                 let expected_active_stake = get_active_stake_for_tests(
                     &[source_account.clone(), transaction_accounts[1].1.clone()],
                     &clock,
-                    &stake_history,
+                    &StakeHistory::default(),
                 );
                 let result_accounts = process_instruction(
                     &mollusk,
@@ -5679,8 +5650,11 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
                         expected_result.clone()
                     },
                 );
-                let result_active_stake =
-                    get_active_stake_for_tests(&result_accounts[0..2], &clock, &stake_history);
+                let result_active_stake = get_active_stake_for_tests(
+                    &result_accounts[0..2],
+                    &clock,
+                    &StakeHistory::default(),
+                );
                 if expected_active_stake > 0 // starting stake was delegated
                     // partial split
                     && result_accounts[0].lamports() > 0
@@ -5701,7 +5675,7 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
                 let expected_active_stake = get_active_stake_for_tests(
                     &[source_account.clone(), transaction_accounts[1].1.clone()],
                     &clock,
-                    &stake_history,
+                    &StakeHistory::default(),
                 );
                 let accounts = process_instruction(
                     &mollusk,
@@ -5720,7 +5694,7 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
                 // no deactivated stake
                 assert_eq!(
                     expected_active_stake,
-                    get_active_stake_for_tests(&accounts[0..2], &clock, &stake_history)
+                    get_active_stake_for_tests(&accounts[0..2], &clock, &StakeHistory::default())
                 );
 
                 if let StakeStateV2::Stake(meta, stake, stake_flags) = state {
