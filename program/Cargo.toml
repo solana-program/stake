@@ -23,14 +23,17 @@ thiserror = "1.0.63"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
+arbitrary = { version = "1.4.1", features = ["derive"] }
 mollusk-svm = { version = "=0.0.15", features = ["all-builtins"] }
-solana-account = { version = "2.1", features = ["bincode"] }
+solana-account = { version = "2.1.10", features = ["bincode"] }
+solana-logger = "2.1.10"
 solana-program-test = "2.1.10"
 solana-program-runtime = "2.1.10"
 solana-config-program = "2.1.10"
 solana-vote-program = "2.1.10"
 solana-sdk = "2.1.10"
 solana-feature-set = "2.1.10"
+rand = "0.8.5"
 test-case = "3.3.1"
 
 [lib]
