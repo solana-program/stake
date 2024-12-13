@@ -48,25 +48,10 @@ use {
     test_case::{test_case, test_matrix},
 };
 
-// XXX ok so wow i am going to have to write a lot of shit
-// we need a mechanism to create basically arbitrary stake accounts
-// this means all states (uninit, init, activating, active, deactivating, deactive)
-// we need to be able to make a stake history that gives us partial activation/deactivation
-// actually we need to set up stake history ourselves correctly in all cases
-// we need to be able to set lockup and authority arbitrarily
-// we need helpers to set up with seed pubkeys
-// ideally we automatically check missing signer failures
-// need to create a vote account... ugh we need to get credits right for DeactivateDelinquent
-// for delegate we just need owner, vote account pubkey, and credits (can be 0)
-//
-// XXX OK i wrote a simple init test
-// what to do on monday... i guess go through the stake ixn tests and see what to impl
-// main thing we lack is full coverage for lockup and i think a bunch of split edge cases
-
-// arbitrary, but gives us room to set up activations/deactivations serveral epochs in the past
+// arbitrary, gives us room to set up activations/deactivations
 const EXECUTION_EPOCH: u64 = 8;
 
-// mollusk doesnt charge transaction fees, this is just a convenient source of lamports
+// mollusk doesnt charge transaction fees, this is just a convenient source/sink for lamports
 const PAYER: Pubkey = Pubkey::from_str_const("PAYER11111111111111111111111111111111111111");
 const PAYER_BALANCE: u64 = 1_000_000 * LAMPORTS_PER_SOL;
 
@@ -82,7 +67,7 @@ const STAKE_ACCOUNT_BLACK: Pubkey =
 const STAKE_ACCOUNT_WHITE: Pubkey =
     Pubkey::from_str_const("WH1TE11111111111111111111111111111111111111");
 
-// authorities for tests which use separate ones
+// separate authorities for two stake accounts
 const STAKER_BLACK: Pubkey = Pubkey::from_str_const("STAKERBLACK11111111111111111111111111111111");
 const WITHDRAWER_BLACK: Pubkey =
     Pubkey::from_str_const("W1THDRAWERBLACK1111111111111111111111111111");
@@ -90,7 +75,7 @@ const STAKER_WHITE: Pubkey = Pubkey::from_str_const("STAKERWH1TE1111111111111111
 const WITHDRAWER_WHITE: Pubkey =
     Pubkey::from_str_const("W1THDRAWERWH1TE1111111111111111111111111111");
 
-// authorities for tests which use shared ones
+// shared authorities for two stake accounts, clearly distinguished from the above
 const STAKER_GRAY: Pubkey = Pubkey::from_str_const("STAKERGRAY111111111111111111111111111111111");
 const WITHDRAWER_GRAY: Pubkey =
     Pubkey::from_str_const("W1THDRAWERGRAY11111111111111111111111111111");
@@ -182,164 +167,21 @@ impl Env {
         }
     }
 
-    // creates a test environment and instruction for a given stake operation
-    // enum contents are sometimes, but not necessarily, ignored
-    // the success is trivial, this is mostly to allow exhaustive failure tests
-    // or to do some post-setup for more meaningful success tests
-    /*
-    fn init_for_instruction(stake_instruction: &StakeInstruction) -> (Self, Instruction) {
-        let mut env = Self::init();
-        let minimum_delegation = get_minimum_delegation();
-
-        let instruction = match stake_instruction {
-            StakeInstruction::Initialize(_, _) => instruction::initialize(
-                &STAKE_ACCOUNT_BLACK,
-                &Authorized {
-                    staker: STAKER_BLACK,
-                    withdrawer: WITHDRAWER_BLACK,
-                },
-                &Lockup::default(),
-            ),
-            // TODO lockup
-            StakeInstruction::Authorize(_, authorize) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
-                    minimum_delegation,
-                );
-
-                let (old_authority, new_authority) = match authorize {
-                    StakeAuthorize::Staker => (STAKER_BLACK, STAKER_GRAY),
-                    StakeAuthorize::Withdrawer => (WITHDRAWER_BLACK, WITHDRAWER_GRAY),
-                };
-
-                instruction::authorize(
-                    &STAKE_ACCOUNT_BLACK,
-                    &old_authority,
-                    &new_authority,
-                    *authorize,
-                    None,
-                )
-            }
-            // TODO withdrawer
-            StakeInstruction::DelegateStake => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
-                    minimum_delegation,
-                );
-
-                instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
-            }
-            // TODO amount
-            StakeInstruction::Split(_) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation * 2,
-                        true,
-                    ),
-                    minimum_delegation * 2,
-                );
-
-                instruction::split(
-                    &STAKE_ACCOUNT_BLACK,
-                    &STAKER_GRAY,
-                    minimum_delegation,
-                    &STAKE_ACCOUNT_WHITE,
-                )[2]
-                .clone()
-            }
-            // TODO partial, lockup
-            StakeInstruction::Withdraw(_) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        false,
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::withdraw(
-                    &STAKE_ACCOUNT_BLACK,
-                    &WITHDRAWER_BLACK,
-                    &PAYER,
-                    minimum_delegation + STAKE_RENT_EXEMPTION,
-                    None,
-                )
-            }
-            // TODO withdrawer
-            StakeInstruction::Deactivate => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        false,
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
-            }
-            // TODO existing lockup, remove lockup, also hardcoded custodians maybe?
-            StakeInstruction::SetLockup(_) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
-                    minimum_delegation,
-                );
-
-                instruction::set_lockup(
-                    &STAKE_ACCOUNT_BLACK,
-                    &LockupArgs {
-                        epoch: Some(EXECUTION_EPOCH * 2),
-                        custodian: Some(Pubkey::new_unique()),
-                        unix_timestamp: None,
-                    },
-                    &WITHDRAWER_BLACK,
-                )
-            }
-            // TODO withdrawer
-            StakeInstruction::Merge => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        true,
-                    ),
-                    minimum_delegation,
-                );
-
-                env.update_stake(
-                    &STAKE_ACCOUNT_WHITE,
-                    &active_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_WHITE,
-                        minimum_delegation,
-                        true,
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)[0]
-                    .clone()
-            }
-            // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
-            _ => todo!(),
-        };
-
-        (env, instruction)
+    // set up one of the preconfigured blank stake accounts at some starting state
+    // to mutate the accounts after initial setup, do it directly or execute instructions
+    // note these accounts are already rent exempt, so lamports specified are stake or extra
+    fn update_stake(
+        &mut self,
+        pubkey: &Pubkey,
+        stake_state: &StakeStateV2,
+        additional_lamports: u64,
+    ) {
+        assert!(*pubkey == STAKE_ACCOUNT_BLACK || *pubkey == STAKE_ACCOUNT_WHITE);
+        let stake_account = self.override_accounts.get_mut(pubkey).unwrap();
+        let current_lamports = stake_account.lamports();
+        stake_account.set_lamports(current_lamports + additional_lamports);
+        bincode::serialize_into(stake_account.data_as_mut_slice(), stake_state).unwrap();
     }
-        */
 
     // get the accounts from our account store that this transaction expects to see
     // we dont need implicit sysvars, mollusk resolves them internally via syscall stub
@@ -380,63 +222,44 @@ impl Env {
         accounts
     }
 
-    // set up one of the preconfigured blank stake accounts at some starting state
-    // to mutate the accounts after initial setup, do it directly or execute instructions
-    // note these accounts are already rent exempt, so lamports specified are stake or extra
-    fn update_stake(
-        &mut self,
-        pubkey: &Pubkey,
-        stake_state: &StakeStateV2,
-        additional_lamports: u64,
-    ) {
-        assert!(*pubkey == STAKE_ACCOUNT_BLACK || *pubkey == STAKE_ACCOUNT_WHITE);
-        let stake_account = self.override_accounts.get_mut(pubkey).unwrap();
-        let current_lamports = stake_account.lamports();
-        stake_account.set_lamports(current_lamports + additional_lamports);
-        bincode::serialize_into(stake_account.data_as_mut_slice(), stake_state).unwrap();
-    }
+    // process an instruction, assert checks, and update override accounts
+    fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
+        let initial_accounts = self.resolve_accounts(&instruction.accounts);
 
-    fn reset(&mut self) {
-        self.override_accounts.clear()
-    }
+        let result =
+            self.mollusk
+                .process_and_validate_instruction(instruction, &initial_accounts, checks);
 
-    /* XXX
-        // process an instruction, assert checks, and update internal accounts
-        // XXX dont think i need to mutate accounts, im doing all one-off
-        fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
-            let initial_accounts = self.resolve_accounts(&instruction.accounts);
-
-            let result =
-                self.mollusk
-                    .process_and_validate_instruction(instruction, &initial_accounts, checks);
-
-            for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
-                let account_meta = &instruction.accounts[i];
-                assert_eq!(account_meta.pubkey, resulting_account.0);
-                if account_meta.is_writable {
-                    if resulting_account.1.lamports() == 0 {
-                        self.accounts.remove(&resulting_account.0);
-                    } else {
-                        self.accounts
-                            .insert(resulting_account.0, resulting_account.1);
-                    }
+        for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
+            let account_meta = &instruction.accounts[i];
+            assert_eq!(account_meta.pubkey, resulting_account.0);
+            if account_meta.is_writable {
+                if resulting_account.1.lamports() == 0 {
+                    self.override_accounts.remove(&resulting_account.0);
+                } else {
+                    self.override_accounts
+                        .insert(resulting_account.0, resulting_account.1);
                 }
             }
         }
-    */
+    }
 
-    // shorthand for process with only a success check
+    // immutable process with only a success check
     fn process_success(&self, instruction: &Instruction) {
         let accounts = self.resolve_accounts(&instruction.accounts);
         self.mollusk
             .process_and_validate_instruction(instruction, &accounts, &[Check::success()]);
     }
 
-    // shorthand for process with an expected error
+    // immutable process with an expected error
     fn process_fail(&self, instruction: &Instruction, error: ProgramError) {
         let accounts = self.resolve_accounts(&instruction.accounts);
         self.mollusk
             .process_and_validate_instruction(instruction, &accounts, &[Check::err(error)]);
+    }
+
+    fn reset(&mut self) {
+        self.override_accounts.clear()
     }
 }
 
@@ -755,6 +578,7 @@ fn test_all_success() {
         let instruction = StakeInterface::arbitrary(&mut unstructured)
             .unwrap()
             .to_instruction(&mut env);
+
         env.process_success(&instruction);
         env.reset();
     }
