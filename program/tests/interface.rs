@@ -250,42 +250,18 @@ impl Env {
         accounts
     }
 
-    /* XXX
-        // process an instruction, assert checks, and update override accounts
-        fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
-            let initial_accounts = self.resolve_accounts(&instruction.accounts);
-
-            let result =
-                self.mollusk
-                    .process_and_validate_instruction(instruction, &initial_accounts, checks);
-
-            for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
-                let account_meta = &instruction.accounts[i];
-                assert_eq!(account_meta.pubkey, resulting_account.0);
-                if account_meta.is_writable {
-                    if resulting_account.1.lamports() == 0 {
-                        self.override_accounts.remove(&resulting_account.0);
-                    } else {
-                        self.override_accounts
-                            .insert(resulting_account.0, resulting_account.1);
-                    }
-                }
-            }
-        }
-    */
-
-    // immutable process with only a success check
+    // immutable process that should succeed
     fn process_success(&self, instruction: &Instruction) {
         let accounts = self.resolve_accounts(&instruction.accounts);
         self.mollusk
             .process_and_validate_instruction(instruction, &accounts, &[Check::success()]);
     }
 
-    // immutable process with an expected error
-    fn process_fail(&self, instruction: &Instruction, error: ProgramError) {
+    // immutable process that should fail
+    fn process_fail(&self, instruction: &Instruction) {
         let accounts = self.resolve_accounts(&instruction.accounts);
-        self.mollusk
-            .process_and_validate_instruction(instruction, &accounts, &[Check::err(error)]);
+        let result = self.mollusk.process_instruction(instruction, &accounts);
+        assert!(result.program_result.is_err());
     }
 
     fn reset(&mut self) {
@@ -629,8 +605,6 @@ fn not_just_stake(
     )
 }
 
-// XXX FIXME for inactive lockup we should NOT sign
-
 // any point in the stake lifecycle with settable vote account, authority, and lockup
 fn i_cant_believe_its_not_stake(
     voter_pubkey: Pubkey,
@@ -723,5 +697,24 @@ fn test_all_success() {
         let instruction = declaration.to_instruction(&mut env);
         env.process_success(&instruction);
         env.reset();
+    }
+}
+
+#[test]
+fn test_no_signer_bypass() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
+        for i in 0..instruction.accounts.len() {
+            if !instruction.accounts[i].is_signer {
+                continue;
+            }
+
+            let mut instruction = instruction.clone();
+            instruction.accounts[i].is_signer = false;
+            env.process_fail(&instruction);
+            env.reset();
+        }
     }
 }
