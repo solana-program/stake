@@ -111,7 +111,7 @@ fn assert_stake_rent_exemption() {
 }
 
 // exhaustive set of all test instruction declarations
-// this is probabalistic but should exceed ten nines
+// this is probabilistic but should exceed ten nines
 // implementing it by hand would be extremely annoying
 static INSTRUCTION_DECLARATIONS: LazyLock<HashSet<StakeInterface>> = LazyLock::new(|| {
     let mut declarations = HashSet::new();
@@ -139,7 +139,6 @@ impl Env {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
         let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
-        solana_logger::setup_with("");
         mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
@@ -278,7 +277,6 @@ impl Env {
     // immutable process with only a success check
     fn process_success(&self, instruction: &Instruction) {
         let accounts = self.resolve_accounts(&instruction.accounts);
-        //println!("HANA ixn: {:#?}\n     accts: {:#?}\n    hm1: {:#?}\n    hm2: {:#?}", instruction, accounts, self.base_accounts, self.override_accounts);
         self.mollusk
             .process_and_validate_instruction(instruction, &accounts, &[Check::success()]);
     }
@@ -295,18 +293,16 @@ impl Env {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
     Initialize(LockupState),
     Authorize(AuthorityType, LockupState),
     DelegateStake(LockupState),
-    /*
-    Split(AmountFraction),
-    Withdraw(LockupState, AmountFraction),
-    Deactivate(AuthorityType),
+    Split(LockupState, AmountFraction),
+    Withdraw(SimpleStakeStatus, LockupState, AmountFraction),
+    Deactivate(LockupState),
     SetLockup(LockupState, LockupState),
-    Merge(AuthorityType),
-    */
+    Merge(LockupState),
     // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
 }
 
@@ -370,117 +366,172 @@ impl StakeInterface {
 
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
-            /*
-            // TODO amount
-            Self::Split(_) => {
+            Self::Split(lockup_state, amount_fraction) => {
+                let delegated_stake = minimum_delegation * 2;
+                let split_amount = match amount_fraction {
+                    AmountFraction::Partial => delegated_stake / 2,
+                    AmountFraction::Full => delegated_stake + STAKE_RENT_EXEMPTION,
+                };
+
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
+                    &i_cant_believe_its_not_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
-                        minimum_delegation * 2,
+                        delegated_stake,
+                        StakeStatus::Active,
                         true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
-                    minimum_delegation * 2,
+                    delegated_stake,
                 );
 
                 instruction::split(
                     &STAKE_ACCOUNT_BLACK,
                     &STAKER_GRAY,
-                    minimum_delegation,
+                    split_amount,
                     &STAKE_ACCOUNT_WHITE,
-                )[2]
-                .clone()
+                )
+                .remove(2)
             }
-            // TODO partial, lockup
-            Self::Withdraw(_) => {
+            Self::Withdraw(simple_status, lockup_state, amount_fraction) => {
+                let status = simple_status.into();
+                let free_lamports = LAMPORTS_PER_SOL;
+
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
+                    &i_cant_believe_its_not_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
+                        status,
                         false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
-                    minimum_delegation,
+                    minimum_delegation + free_lamports,
                 );
+
+                let withdraw_amount = match amount_fraction {
+                    AmountFraction::Full if status != StakeStatus::Active => {
+                        free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
+                    }
+                    _ => free_lamports,
+                };
+
+                let authority = if status == StakeStatus::Uninitialized {
+                    STAKE_ACCOUNT_BLACK
+                } else {
+                    WITHDRAWER_BLACK
+                };
 
                 instruction::withdraw(
                     &STAKE_ACCOUNT_BLACK,
-                    &WITHDRAWER_BLACK,
+                    &authority,
                     &PAYER,
-                    minimum_delegation + STAKE_RENT_EXEMPTION,
-                    None,
+                    withdraw_amount,
+                    lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            // TODO withdrawer
-            Self::Deactivate => {
+            Self::Deactivate(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
+                    &i_cant_believe_its_not_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
+                        StakeStatus::Active,
                         false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
                     minimum_delegation,
                 );
 
                 instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
             }
-            // TODO existing lockup, remove lockup, also hardcoded custodians maybe?
-            Self::SetLockup(_) => {
+            Self::SetLockup(existing_lockup_state, new_lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    &not_just_stake(
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                        existing_lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
                     minimum_delegation,
                 );
 
                 instruction::set_lockup(
                     &STAKE_ACCOUNT_BLACK,
-                    &LockupArgs {
-                        epoch: Some(EXECUTION_EPOCH * 2),
-                        custodian: Some(Pubkey::new_unique()),
-                        unix_timestamp: None,
-                    },
-                    &WITHDRAWER_BLACK,
+                    &new_lockup_state.to_args(CUSTODIAN_RIGHT),
+                    existing_lockup_state
+                        .to_custodian(&CUSTODIAN_LEFT)
+                        .unwrap_or(&WITHDRAWER_BLACK),
                 )
             }
-            // TODO withdrawer
-            Self::Merge => {
+            Self::Merge(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &active_stake(
+                    &i_cant_believe_its_not_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
+                        StakeStatus::Active,
                         true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
                     minimum_delegation,
                 );
 
                 env.update_stake(
                     &STAKE_ACCOUNT_WHITE,
-                    &active_stake(
+                    &i_cant_believe_its_not_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_WHITE,
                         minimum_delegation,
+                        StakeStatus::Active,
                         true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
                     minimum_delegation,
                 );
 
-                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)[0]
-                    .clone()
+                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
+                    .remove(0)
             }
-            */
             // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
             _ => todo!(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
+enum StakeStatus {
+    Uninitialized,
+    Initialized,
+    Activating,
+    Active,
+    Deactivating,
+    Deactive,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
+enum SimpleStakeStatus {
+    Uninitialized,
+    Initialized,
+    Active,
+}
+
+impl From<&SimpleStakeStatus> for StakeStatus {
+    fn from(simple_status: &SimpleStakeStatus) -> Self {
+        match simple_status {
+            SimpleStakeStatus::Uninitialized => Self::Uninitialized,
+            SimpleStakeStatus::Initialized => Self::Initialized,
+            SimpleStakeStatus::Active => Self::Active,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum AuthorityType {
     Staker,
     Withdrawer,
@@ -507,7 +558,7 @@ impl From<&AuthorityType> for StakeAuthorize {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum LockupState {
     Active,
     Inactive,
@@ -533,22 +584,35 @@ impl LockupState {
 
     fn to_custodian<'a>(&self, custodian: &'a Pubkey) -> Option<&'a Pubkey> {
         match self {
-            Self::None => None,
-            _ => Some(custodian),
+            Self::Active => Some(custodian),
+            _ => None,
+        }
+    }
+
+    fn to_args(&self, custodian: Pubkey) -> LockupArgs {
+        match self {
+            Self::None => LockupArgs::default(),
+            _ => LockupArgs {
+                custodian: self.to_custodian(&custodian).cloned(),
+                epoch: Some(self.to_lockup(custodian).epoch),
+                unix_timestamp: None,
+            },
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Arbitrary)]
 enum AmountFraction {
     Partial,
     Full,
 }
 
+// initialized with appropriate authority, no lockup
 fn just_stake(stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
     not_just_stake(stake_pubkey, stake, false, Lockup::default())
 }
 
+// initialized with settable authority and lockup
 fn not_just_stake(
     stake_pubkey: Pubkey,
     stake: u64,
@@ -559,19 +623,22 @@ fn not_just_stake(
         Pubkey::default(),
         stake_pubkey,
         stake,
+        StakeStatus::Initialized,
         common_authority,
         lockup,
-        false,
     )
 }
 
+// XXX FIXME for inactive lockup we should NOT sign
+
+// any point in the stake lifecycle with settable vote account, authority, and lockup
 fn i_cant_believe_its_not_stake(
     voter_pubkey: Pubkey,
     stake_pubkey: Pubkey,
     stake: u64,
+    stake_status: StakeStatus,
     common_authority: bool,
     lockup: Lockup,
-    is_active: bool,
 ) -> StakeStateV2 {
     assert!(stake_pubkey != VOTE_ACCOUNT_RED);
     assert!(stake_pubkey != VOTE_ACCOUNT_BLUE);
@@ -592,25 +659,54 @@ fn i_cant_believe_its_not_stake(
         _ => panic!("expected a hardcoded stake pubkey, got {}", stake_pubkey),
     };
 
-    let activation_epoch = if is_active { EXECUTION_EPOCH - 1 } else { 0 };
+    let meta = Meta {
+        rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+        authorized,
+        lockup,
+    };
 
-    StakeStateV2::Stake(
-        Meta {
-            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
-            authorized,
-            lockup,
+    let delegation = match stake_status {
+        StakeStatus::Uninitialized | StakeStatus::Initialized => Delegation::default(),
+        StakeStatus::Activating => Delegation {
+            stake,
+            voter_pubkey,
+            activation_epoch: EXECUTION_EPOCH,
+            ..Delegation::default()
         },
-        Stake {
-            delegation: Delegation {
-                stake,
-                voter_pubkey,
-                activation_epoch,
-                ..Delegation::default()
+        StakeStatus::Active => Delegation {
+            stake,
+            voter_pubkey,
+            activation_epoch: EXECUTION_EPOCH - 1,
+            ..Delegation::default()
+        },
+        StakeStatus::Deactivating => Delegation {
+            stake,
+            voter_pubkey,
+            activation_epoch: EXECUTION_EPOCH - 1,
+            deactivation_epoch: EXECUTION_EPOCH,
+            ..Delegation::default()
+        },
+        StakeStatus::Deactive => Delegation {
+            stake,
+            voter_pubkey,
+            activation_epoch: EXECUTION_EPOCH - 2,
+            deactivation_epoch: EXECUTION_EPOCH - 1,
+            ..Delegation::default()
+        },
+    };
+
+    match stake_status {
+        StakeStatus::Uninitialized => StakeStateV2::Uninitialized,
+        StakeStatus::Initialized => StakeStateV2::Initialized(meta),
+        _ => StakeStateV2::Stake(
+            meta,
+            Stake {
+                delegation,
+                ..Stake::default()
             },
-            ..Stake::default()
-        },
-        StakeFlags::empty(),
-    )
+            StakeFlags::empty(),
+        ),
+    }
 }
 
 fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
