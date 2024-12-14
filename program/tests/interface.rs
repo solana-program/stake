@@ -44,7 +44,11 @@ use {
         },
     },
     solana_stake_program::{get_minimum_delegation, id, processor::Processor},
-    std::{collections::HashMap, fs},
+    std::{
+        collections::{HashMap, HashSet},
+        fs,
+        sync::LazyLock,
+    },
     test_case::{test_case, test_matrix},
 };
 
@@ -106,6 +110,22 @@ fn assert_stake_rent_exemption() {
     );
 }
 
+// exhaustive set of all test instruction declarations
+// this is probabalistic but should exceed ten nines
+// implementing it by hand would be extremely annoying
+static INSTRUCTION_DECLARATIONS: LazyLock<HashSet<StakeInterface>> = LazyLock::new(|| {
+    let mut declarations = HashSet::new();
+    for _ in 0..10_000 {
+        let raw_data: Vec<u8> = (0..StakeInterface::max_size())
+            .map(|_| rand::random::<u8>())
+            .collect();
+        let mut unstructured = Unstructured::new(&raw_data);
+        declarations.insert(StakeInterface::arbitrary(&mut unstructured).unwrap());
+    }
+
+    declarations
+});
+
 // we use two hashmaps because cloning mollusk is impossible and creating it is expensive
 // doing this we let base_accounts be immutable and can set and clear override_accounts
 struct Env {
@@ -119,7 +139,7 @@ impl Env {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
         let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
-        // XXX solana_logger::setup_with("");
+        solana_logger::setup_with("");
         mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
@@ -275,11 +295,11 @@ impl Env {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
     Initialize(LockupState),
     Authorize(AuthorityType, LockupState),
-    DelegateStake(AuthorityType),
+    DelegateStake(LockupState),
     /*
     Split(AmountFraction),
     Withdraw(LockupState, AmountFraction),
@@ -336,15 +356,17 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            // XXX FIXME withdrawer doesnt work, working as intended? also maybe add lockup
-            Self::DelegateStake(_authority_type) => {
+            Self::DelegateStake(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
+                    &not_just_stake(
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
                     minimum_delegation,
                 );
-
-                // XXX let authority = authority_type.pubkey(STAKE_ACCOUNT_BLACK);
 
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
@@ -458,7 +480,7 @@ impl StakeInterface {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum AuthorityType {
     Staker,
     Withdrawer,
@@ -485,7 +507,7 @@ impl From<&AuthorityType> for StakeAuthorize {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum LockupState {
     Active,
     Inactive,
@@ -517,7 +539,7 @@ impl LockupState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum AmountFraction {
     Partial,
     Full,
@@ -601,16 +623,8 @@ fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
 fn test_all_success() {
     let mut env = Env::init();
 
-    for _ in 0..10 {
-        let raw_data: Vec<u8> = (0..StakeInterface::max_size())
-            .map(|_| rand::random::<u8>())
-            .collect();
-        let mut unstructured = Unstructured::new(&raw_data);
-
-        let instruction = StakeInterface::arbitrary(&mut unstructured)
-            .unwrap()
-            .to_instruction(&mut env);
-
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
         env.process_success(&instruction);
         env.reset();
     }
