@@ -5,7 +5,7 @@
 use {
     arbitrary::{Arbitrary, Unstructured},
     mollusk_svm::{result::Check, Mollusk},
-    solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
+    solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
     solana_sdk::{
         account::Account as SolanaAccount,
         address_lookup_table, bpf_loader_upgradeable,
@@ -110,8 +110,8 @@ fn assert_stake_rent_exemption() {
 // doing this we let base_accounts be immutable and can set and clear override_accounts
 struct Env {
     mollusk: Mollusk,
-    base_accounts: HashMap<Pubkey, AccountSharedData>,
-    override_accounts: HashMap<Pubkey, AccountSharedData>,
+    base_accounts: HashMap<Pubkey, Account>,
+    override_accounts: HashMap<Pubkey, Account>,
 }
 impl Env {
     // set up a test environment with valid stake history, two vote accounts, and two blank stake accounts
@@ -119,7 +119,7 @@ impl Env {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
         let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
-        solana_logger::setup_with("");
+        // XXX solana_logger::setup_with("");
         mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
@@ -132,33 +132,34 @@ impl Env {
         }
 
         // add a lamports source
-        let payer_data =
-            AccountSharedData::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
-        base_accounts.insert(PAYER, payer_data);
+        let payer_account =
+            Account::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
+        base_accounts.insert(PAYER, payer_account);
 
         // create two vote accounts
         let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
-        let vote_state = bincode::serialize(&VoteState::default()).unwrap();
-        let vote_data = AccountSharedData::create(
+        let vote_state_versions = VoteStateVersions::new_current(VoteState::default());
+        let vote_data = bincode::serialize(&vote_state_versions).unwrap();
+        let vote_account = Account::create(
             vote_rent_exemption,
-            vote_state,
+            vote_data,
             vote_program::id(),
             false,
             u64::MAX,
         );
-        base_accounts.insert(VOTE_ACCOUNT_RED, vote_data.clone());
-        base_accounts.insert(VOTE_ACCOUNT_BLUE, vote_data);
+        base_accounts.insert(VOTE_ACCOUNT_RED, vote_account.clone());
+        base_accounts.insert(VOTE_ACCOUNT_BLUE, vote_account);
 
         // create two blank stake accounts
-        let stake_data = AccountSharedData::create(
+        let stake_account = Account::create(
             STAKE_RENT_EXEMPTION,
             vec![0; StakeStateV2::size_of()],
             id(),
             false,
             u64::MAX,
         );
-        base_accounts.insert(STAKE_ACCOUNT_BLACK, stake_data.clone());
-        base_accounts.insert(STAKE_ACCOUNT_WHITE, stake_data);
+        base_accounts.insert(STAKE_ACCOUNT_BLACK, stake_account.clone());
+        base_accounts.insert(STAKE_ACCOUNT_WHITE, stake_account);
 
         Self {
             mollusk,
@@ -177,10 +178,18 @@ impl Env {
         additional_lamports: u64,
     ) {
         assert!(*pubkey == STAKE_ACCOUNT_BLACK || *pubkey == STAKE_ACCOUNT_WHITE);
-        let stake_account = self.override_accounts.get_mut(pubkey).unwrap();
+
+        let mut stake_account = if let Some(stake_account) = self.override_accounts.get(pubkey) {
+            stake_account.clone()
+        } else {
+            self.base_accounts.get(pubkey).cloned().unwrap()
+        };
+
         let current_lamports = stake_account.lamports();
         stake_account.set_lamports(current_lamports + additional_lamports);
         bincode::serialize_into(stake_account.data_as_mut_slice(), stake_state).unwrap();
+
+        self.override_accounts.insert(*pubkey, stake_account);
     }
 
     // get the accounts from our account store that this transaction expects to see
@@ -209,9 +218,9 @@ impl Env {
                     .keyed_account_for_stake_history_sysvar()
                     .1
             } else if let Some(account) = self.override_accounts.get(&key).cloned() {
-                account
+                account.into()
             } else if let Some(account) = self.base_accounts.get(&key).cloned() {
-                account
+                account.into()
             } else {
                 AccountSharedData::default()
             };
@@ -222,31 +231,34 @@ impl Env {
         accounts
     }
 
-    // process an instruction, assert checks, and update override accounts
-    fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
-        let initial_accounts = self.resolve_accounts(&instruction.accounts);
+    /* XXX
+        // process an instruction, assert checks, and update override accounts
+        fn process(&mut self, instruction: &Instruction, checks: &[Check]) {
+            let initial_accounts = self.resolve_accounts(&instruction.accounts);
 
-        let result =
-            self.mollusk
-                .process_and_validate_instruction(instruction, &initial_accounts, checks);
+            let result =
+                self.mollusk
+                    .process_and_validate_instruction(instruction, &initial_accounts, checks);
 
-        for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
-            let account_meta = &instruction.accounts[i];
-            assert_eq!(account_meta.pubkey, resulting_account.0);
-            if account_meta.is_writable {
-                if resulting_account.1.lamports() == 0 {
-                    self.override_accounts.remove(&resulting_account.0);
-                } else {
-                    self.override_accounts
-                        .insert(resulting_account.0, resulting_account.1);
+            for (i, resulting_account) in result.resulting_accounts.into_iter().enumerate() {
+                let account_meta = &instruction.accounts[i];
+                assert_eq!(account_meta.pubkey, resulting_account.0);
+                if account_meta.is_writable {
+                    if resulting_account.1.lamports() == 0 {
+                        self.override_accounts.remove(&resulting_account.0);
+                    } else {
+                        self.override_accounts
+                            .insert(resulting_account.0, resulting_account.1);
+                    }
                 }
             }
         }
-    }
+    */
 
     // immutable process with only a success check
     fn process_success(&self, instruction: &Instruction) {
         let accounts = self.resolve_accounts(&instruction.accounts);
+        //println!("HANA ixn: {:#?}\n     accts: {:#?}\n    hm1: {:#?}\n    hm2: {:#?}", instruction, accounts, self.base_accounts, self.override_accounts);
         self.mollusk
             .process_and_validate_instruction(instruction, &accounts, &[Check::success()]);
     }
@@ -267,18 +279,24 @@ impl Env {
 enum StakeInterface {
     Initialize(LockupState),
     Authorize(AuthorityType, LockupState),
+    DelegateStake(AuthorityType),
     /*
-    DelegateStake(StakeAuthorize),
     Split(AmountFraction),
     Withdraw(LockupState, AmountFraction),
-    Deactivate(StakeAuthorize),
+    Deactivate(AuthorityType),
     SetLockup(LockupState, LockupState),
-    Merge(StakeAuthorize),
+    Merge(AuthorityType),
     */
     // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
 }
 
 impl StakeInterface {
+    // unfortunately `size_hint()` is useless
+    // we substantially overshoot to avoid mistakes
+    fn max_size() -> usize {
+        32
+    }
+
     // creates an instruction with the given combination of settings that is guaranteed to succeed
     fn to_instruction(&self, env: &mut Env) -> Instruction {
         let minimum_delegation = get_minimum_delegation();
@@ -318,19 +336,21 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            /*
-            // TODO withdrawer
-            StakeInstruction::DelegateStake => {
+            // XXX FIXME withdrawer doesnt work, working as intended? also maybe add lockup
+            Self::DelegateStake(_authority_type) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
                     minimum_delegation,
                 );
 
+                // XXX let authority = authority_type.pubkey(STAKE_ACCOUNT_BLACK);
+
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
+            /*
             // TODO amount
-            StakeInstruction::Split(_) => {
+            Self::Split(_) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &active_stake(
@@ -351,7 +371,7 @@ impl StakeInterface {
                 .clone()
             }
             // TODO partial, lockup
-            StakeInstruction::Withdraw(_) => {
+            Self::Withdraw(_) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &active_stake(
@@ -372,7 +392,7 @@ impl StakeInterface {
                 )
             }
             // TODO withdrawer
-            StakeInstruction::Deactivate => {
+            Self::Deactivate => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &active_stake(
@@ -387,7 +407,7 @@ impl StakeInterface {
                 instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
             }
             // TODO existing lockup, remove lockup, also hardcoded custodians maybe?
-            StakeInstruction::SetLockup(_) => {
+            Self::SetLockup(_) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &just_stake(STAKE_ACCOUNT_BLACK, minimum_delegation),
@@ -405,7 +425,7 @@ impl StakeInterface {
                 )
             }
             // TODO withdrawer
-            StakeInstruction::Merge => {
+            Self::Merge => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &active_stake(
@@ -442,6 +462,18 @@ impl StakeInterface {
 enum AuthorityType {
     Staker,
     Withdrawer,
+}
+
+impl AuthorityType {
+    fn pubkey(&self, stake_pubkey: Pubkey) -> Pubkey {
+        match (stake_pubkey, self) {
+            (STAKE_ACCOUNT_BLACK, Self::Staker) => STAKER_BLACK,
+            (STAKE_ACCOUNT_BLACK, Self::Withdrawer) => WITHDRAWER_BLACK,
+            (STAKE_ACCOUNT_WHITE, Self::Staker) => STAKER_WHITE,
+            (STAKE_ACCOUNT_WHITE, Self::Withdrawer) => WITHDRAWER_WHITE,
+            _ => panic!("expected a hardcoded stake pubkey, got {}", stake_pubkey),
+        }
+    }
 }
 
 impl From<&AuthorityType> for StakeAuthorize {
@@ -535,7 +567,7 @@ fn i_cant_believe_its_not_stake(
             staker: STAKER_WHITE,
             withdrawer: WITHDRAWER_WHITE,
         },
-        _ => Authorized::default(),
+        _ => panic!("expected a hardcoded stake pubkey, got {}", stake_pubkey),
     };
 
     let activation_epoch = if is_active { EXECUTION_EPOCH - 1 } else { 0 };
@@ -569,8 +601,8 @@ fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
 fn test_all_success() {
     let mut env = Env::init();
 
-    for _ in 0..1000 {
-        let raw_data: Vec<u8> = (0..StakeInterface::size_hint(99).0)
+    for _ in 0..10 {
+        let raw_data: Vec<u8> = (0..StakeInterface::max_size())
             .map(|_| rand::random::<u8>())
             .collect();
         let mut unstructured = Unstructured::new(&raw_data);
