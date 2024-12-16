@@ -274,8 +274,8 @@ enum StakeInterface {
     Initialize(LockupState),
     Authorize(AuthorityType, LockupState),
     DelegateStake(LockupState),
-    Split(LockupState, AmountFraction),
-    Withdraw(Option<bool>, LockupState, AmountFraction),
+    Split(LockupState, bool),
+    Withdraw(Option<bool>, LockupState, bool),
     Deactivate(LockupState),
     SetLockup(LockupState, LockupState),
     Merge(LockupState),
@@ -342,11 +342,12 @@ impl StakeInterface {
 
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
-            Self::Split(lockup_state, amount_fraction) => {
+            Self::Split(lockup_state, full_split) => {
                 let delegated_stake = minimum_delegation * 2;
-                let split_amount = match amount_fraction {
-                    AmountFraction::Partial => delegated_stake / 2,
-                    AmountFraction::Full => delegated_stake + STAKE_RENT_EXEMPTION,
+                let split_amount = if full_split {
+                    delegated_stake + STAKE_RENT_EXEMPTION
+                } else {
+                    delegated_stake / 2
                 };
 
                 env.update_stake(
@@ -370,7 +371,7 @@ impl StakeInterface {
                 )
                 .remove(2)
             }
-            Self::Withdraw(source_has_delegation, lockup_state, amount_fraction) => {
+            Self::Withdraw(source_has_delegation, lockup_state, full_withdraw) => {
                 let free_lamports = LAMPORTS_PER_SOL;
                 let status = match source_has_delegation {
                     None => StakeStatus::Uninitialized,
@@ -391,11 +392,10 @@ impl StakeInterface {
                     minimum_delegation + free_lamports,
                 );
 
-                let withdraw_amount = match amount_fraction {
-                    AmountFraction::Full if status != StakeStatus::Active => {
-                        free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
-                    }
-                    _ => free_lamports,
+                let withdraw_amount = if full_withdraw && status != StakeStatus::Active {
+                    free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
+                } else {
+                    free_lamports
                 };
 
                 let authority = if status == StakeStatus::Uninitialized {
@@ -562,12 +562,6 @@ impl LockupState {
             },
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Arbitrary)]
-enum AmountFraction {
-    Partial,
-    Full,
 }
 
 // initialized with appropriate authority, no lockup
