@@ -275,7 +275,7 @@ enum StakeInterface {
     Authorize(AuthorityType, LockupState),
     DelegateStake(LockupState),
     Split(LockupState, AmountFraction),
-    Withdraw(SimpleStakeStatus, LockupState, AmountFraction),
+    Withdraw(Option<bool>, LockupState, AmountFraction),
     Deactivate(LockupState),
     SetLockup(LockupState, LockupState),
     Merge(LockupState),
@@ -290,7 +290,7 @@ impl StakeInterface {
     }
 
     // creates an instruction with the given combination of settings that is guaranteed to succeed
-    fn to_instruction(&self, env: &mut Env) -> Instruction {
+    fn to_instruction(self, env: &mut Env) -> Instruction {
         let minimum_delegation = get_minimum_delegation();
 
         match self {
@@ -370,9 +370,13 @@ impl StakeInterface {
                 )
                 .remove(2)
             }
-            Self::Withdraw(simple_status, lockup_state, amount_fraction) => {
-                let status = simple_status.into();
+            Self::Withdraw(source_has_delegation, lockup_state, amount_fraction) => {
                 let free_lamports = LAMPORTS_PER_SOL;
+                let status = match source_has_delegation {
+                    None => StakeStatus::Uninitialized,
+                    Some(false) => StakeStatus::Initialized,
+                    Some(true) => StakeStatus::Active,
+                };
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
@@ -491,23 +495,6 @@ enum StakeStatus {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
-enum SimpleStakeStatus {
-    Uninitialized,
-    Initialized,
-    Active,
-}
-
-impl From<&SimpleStakeStatus> for StakeStatus {
-    fn from(simple_status: &SimpleStakeStatus) -> Self {
-        match simple_status {
-            SimpleStakeStatus::Uninitialized => Self::Uninitialized,
-            SimpleStakeStatus::Initialized => Self::Initialized,
-            SimpleStakeStatus::Active => Self::Active,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum AuthorityType {
     Staker,
     Withdrawer,
@@ -525,8 +512,8 @@ impl AuthorityType {
     }
 }
 
-impl From<&AuthorityType> for StakeAuthorize {
-    fn from(authority_type: &AuthorityType) -> Self {
+impl From<AuthorityType> for StakeAuthorize {
+    fn from(authority_type: AuthorityType) -> Self {
         match authority_type {
             AuthorityType::Staker => Self::Staker,
             AuthorityType::Withdrawer => Self::Withdrawer,
@@ -542,7 +529,7 @@ enum LockupState {
 }
 
 impl LockupState {
-    fn to_lockup(&self, custodian: Pubkey) -> Lockup {
+    fn to_lockup(self, custodian: Pubkey) -> Lockup {
         match self {
             Self::Active => Lockup {
                 custodian,
@@ -558,14 +545,14 @@ impl LockupState {
         }
     }
 
-    fn to_custodian<'a>(&self, custodian: &'a Pubkey) -> Option<&'a Pubkey> {
+    fn to_custodian(self, custodian: &Pubkey) -> Option<&Pubkey> {
         match self {
             Self::Active => Some(custodian),
             _ => None,
         }
     }
 
-    fn to_args(&self, custodian: Pubkey) -> LockupArgs {
+    fn to_args(self, custodian: Pubkey) -> LockupArgs {
         match self {
             Self::None => LockupArgs::default(),
             _ => LockupArgs {
