@@ -52,6 +52,11 @@ use {
     test_case::{test_case, test_matrix},
 };
 
+// NOTE ideas for future tests:
+// * fail with different vote accounts on operations that require them to match
+// * fail with different authorities on operations that require them to match
+// * adding/changing lockups to ensure we always fail when violating lockup
+
 // arbitrary, gives us room to set up activations/deactivations
 const EXECUTION_EPOCH: u64 = 8;
 
@@ -279,7 +284,9 @@ enum StakeInterface {
     Deactivate(LockupState),
     SetLockup(LockupState, LockupState),
     Merge(LockupState),
-    // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
+    //MoveStake(LockupState, bool, bool),
+    //MoveLamports(LockupState, bool, Option<bool>),
+    // TODO checked, seed, deactivate delinquent, minimum, redelegate
 }
 
 impl StakeInterface {
@@ -373,7 +380,7 @@ impl StakeInterface {
             }
             Self::Withdraw(source_has_delegation, lockup_state, full_withdraw) => {
                 let free_lamports = LAMPORTS_PER_SOL;
-                let status = match source_has_delegation {
+                let source_status = match source_has_delegation {
                     None => StakeStatus::Uninitialized,
                     Some(false) => StakeStatus::Initialized,
                     Some(true) => StakeStatus::Active,
@@ -385,20 +392,20 @@ impl StakeInterface {
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
-                        status,
+                        source_status,
                         false,
                         lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
                     minimum_delegation + free_lamports,
                 );
 
-                let withdraw_amount = if full_withdraw && status != StakeStatus::Active {
+                let withdraw_amount = if full_withdraw && source_status != StakeStatus::Active {
                     free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
                 } else {
                     free_lamports
                 };
 
-                let authority = if status == StakeStatus::Uninitialized {
+                let authority = if source_status == StakeStatus::Uninitialized {
                     STAKE_ACCOUNT_BLACK
                 } else {
                     WITHDRAWER_BLACK
@@ -477,9 +484,95 @@ impl StakeInterface {
 
                 instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
                     .remove(0)
-            }
-            // TODO move, checked, seed, deactivate delinquent, minimum, redelegate
-            _ => todo!(),
+            } // XXX these have VERY unexpected behavior
+              // when we try to get MergeKind, it doesnt show the stake history we expect, but an empty one
+              // however mollusk does have the stake history we want in its sysvar cache it creates
+              // i need to depend on a local monorepo to debug this which means i need to redo my whole account-decoder shit
+              // do this after all the other instructions so that i know theyre good
+              /*
+              Self::MoveStake(lockup_state, active_destination, full_move) => {
+                  let source_delegation = minimum_delegation * 2;
+                  let move_amount = if full_move {
+                      source_delegation
+                  } else {
+                      source_delegation / 2
+                  };
+
+                  env.update_stake(
+                      &STAKE_ACCOUNT_BLACK,
+                      &i_cant_believe_its_not_stake(
+                          VOTE_ACCOUNT_RED,
+                          STAKE_ACCOUNT_BLACK,
+                          source_delegation,
+                          StakeStatus::Active,
+                          true,
+                          lockup_state.to_lockup(CUSTODIAN_LEFT),
+                      ),
+                      source_delegation,
+                  );
+
+                  env.update_stake(
+                      &STAKE_ACCOUNT_WHITE,
+                      &i_cant_believe_its_not_stake(
+                          VOTE_ACCOUNT_RED,
+                          STAKE_ACCOUNT_WHITE,
+                          minimum_delegation,
+                          if active_destination {
+                              StakeStatus::Active
+                          } else {
+                              StakeStatus::Initialized
+                          },
+                          true,
+                          lockup_state.to_lockup(CUSTODIAN_LEFT),
+                      ),
+                      minimum_delegation,
+                  );
+
+                  instruction::move_stake(&STAKE_ACCOUNT_BLACK, &STAKE_ACCOUNT_WHITE, &STAKER_GRAY, move_amount)
+
+              }
+              Self::MoveLamports(lockup_state, active_source, fully_activated_destination) => {
+                  let free_lamports = LAMPORTS_PER_SOL;
+                  let destination_status = match fully_activated_destination {
+                      None => StakeStatus::Initialized,
+                      Some(false) => StakeStatus::Activating,
+                      Some(true) => StakeStatus::Active,
+                  };
+
+                  env.update_stake(
+                      &STAKE_ACCOUNT_BLACK,
+                      &i_cant_believe_its_not_stake(
+                          VOTE_ACCOUNT_RED,
+                          STAKE_ACCOUNT_BLACK,
+                          minimum_delegation,
+                          if active_source {
+                              StakeStatus::Active
+                          } else {
+                              StakeStatus::Initialized
+                          },
+                          true,
+                          lockup_state.to_lockup(CUSTODIAN_LEFT),
+                      ),
+                      minimum_delegation + free_lamports,
+                  );
+
+                  env.update_stake(
+                      &STAKE_ACCOUNT_WHITE,
+                      &i_cant_believe_its_not_stake(
+                          VOTE_ACCOUNT_RED,
+                          STAKE_ACCOUNT_WHITE,
+                          minimum_delegation,
+                          destination_status,
+                          true,
+                          lockup_state.to_lockup(CUSTODIAN_LEFT),
+                      ),
+                      minimum_delegation,
+                  );
+
+                  instruction::move_lamports(&STAKE_ACCOUNT_BLACK, &STAKE_ACCOUNT_WHITE, &STAKER_GRAY, free_lamports)
+              }
+              */
+              // TODO checked, seed, deactivate delinquent, minimum, redelegate
         }
     }
 }
