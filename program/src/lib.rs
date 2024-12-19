@@ -3,7 +3,7 @@ use solana_program::native_token::LAMPORTS_PER_SOL;
 pub mod helpers;
 pub mod processor;
 
-#[cfg(not(feature = "no-entrypoint"))]
+#[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint;
 
 pub use solana_program;
