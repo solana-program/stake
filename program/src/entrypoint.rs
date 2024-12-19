@@ -1,7 +1,5 @@
 //! Program entrypoint
 
-#![cfg(not(feature = "no-entrypoint"))]
-
 use {
     crate::processor::Processor,
     solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey},
