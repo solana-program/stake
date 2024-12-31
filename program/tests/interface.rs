@@ -305,7 +305,7 @@ impl StakeInterface {
     // unfortunately `size_hint()` is useless
     // we substantially overshoot to avoid mistakes
     fn max_size() -> usize {
-        32
+        128
     }
 
     // creates an instruction with the given combination of settings that is guaranteed to succeed
