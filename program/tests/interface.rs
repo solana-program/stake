@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
@@ -7,49 +5,33 @@ use {
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
     solana_sdk::{
-        account::Account as SolanaAccount,
-        address_lookup_table, bpf_loader_upgradeable,
-        entrypoint::ProgramResult,
-        feature_set::{
-            enable_partitioned_epoch_reward, get_sysvar_syscall_enabled,
-            move_stake_and_move_lamports_ixs, partitioned_epoch_rewards_superfeature,
-            stake_raise_minimum_delegation_to_1_sol,
-        },
-        hash::Hash,
         instruction::{AccountMeta, Instruction},
         native_token::LAMPORTS_PER_SOL,
-        program_error::ProgramError,
         pubkey::Pubkey,
-        signature::{Keypair, Signer},
-        signers::Signers,
         stake::{
-            self,
-            instruction::{self, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction},
+            instruction::{self, LockupArgs},
             stake_flags::StakeFlags,
             state::{
-                warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
-                StakeActivationStatus, StakeAuthorize, StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
+                warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
+                StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
             },
         },
         stake_history::StakeHistoryEntry,
-        system_instruction, system_program,
+        system_program,
         sysvar::{
             clock::Clock, epoch_rewards::EpochRewards, epoch_schedule::EpochSchedule, rent::Rent,
             stake_history::StakeHistory, SysvarId,
         },
-        transaction::{Transaction, TransactionError},
         vote::{
             program as vote_program,
-            state::{VoteInit, VoteState, VoteStateVersions},
+            state::{VoteState, VoteStateVersions},
         },
     },
-    solana_stake_program::{get_minimum_delegation, id, processor::Processor},
+    solana_stake_program::{get_minimum_delegation, id},
     std::{
         collections::{HashMap, HashSet},
-        fs,
         sync::LazyLock,
     },
-    test_case::{test_case, test_matrix},
 };
 
 // NOTE ideas for future tests:
@@ -364,7 +346,7 @@ impl StakeInterface {
                 let seed_base = Pubkey::new_unique();
                 let seed = "seed";
                 let seed_authority =
-                    Pubkey::create_with_seed(&seed_base, &seed, &system_program::id()).unwrap();
+                    Pubkey::create_with_seed(&seed_base, seed, &system_program::id()).unwrap();
 
                 let mut black_state = not_just_stake(
                     STAKE_ACCOUNT_BLACK,
@@ -672,18 +654,6 @@ enum AuthorityType {
     Withdrawer,
 }
 
-impl AuthorityType {
-    fn pubkey(&self, stake_pubkey: Pubkey) -> Pubkey {
-        match (stake_pubkey, self) {
-            (STAKE_ACCOUNT_BLACK, Self::Staker) => STAKER_BLACK,
-            (STAKE_ACCOUNT_BLACK, Self::Withdrawer) => WITHDRAWER_BLACK,
-            (STAKE_ACCOUNT_WHITE, Self::Staker) => STAKER_WHITE,
-            (STAKE_ACCOUNT_WHITE, Self::Withdrawer) => WITHDRAWER_WHITE,
-            _ => panic!("expected a hardcoded stake pubkey, got {}", stake_pubkey),
-        }
-    }
-}
-
 impl From<AuthorityType> for StakeAuthorize {
     fn from(authority_type: AuthorityType) -> Self {
         match authority_type {
@@ -734,11 +704,6 @@ impl LockupState {
             },
         }
     }
-}
-
-// initialized with appropriate authority, no lockup
-fn just_stake(stake_pubkey: Pubkey, stake: u64) -> StakeStateV2 {
-    not_just_stake(stake_pubkey, stake, false, Lockup::default())
 }
 
 // initialized with settable authority and lockup
@@ -834,12 +799,6 @@ fn i_cant_believe_its_not_stake(
             StakeFlags::empty(),
         ),
     }
-}
-
-fn stake_to_bytes(stake: &StakeStateV2) -> Vec<u8> {
-    let mut data = vec![0; StakeStateV2::size_of()];
-    bincode::serialize_into(&mut data[..], stake).unwrap();
-    data
 }
 
 #[test]
