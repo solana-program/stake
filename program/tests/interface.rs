@@ -274,19 +274,25 @@ impl Env {
     }
 }
 
+// NOTE we skip:
+// * redelegate: will never be enabled
+// * minimum delegation: cannot fail in any nontrivial way
+// * deactivate deliqnquent: requires no signers, and our only failure test is missing signers
+// the first two need never be added but the third should be when we have more tests
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
     Initialize(LockupState),
-    Authorize(AuthorityType, LockupState),
+    InitializeChecked,
+    Authorize(bool, AuthorityType, LockupState),
+    AuthorizeWithSeed(bool, AuthorityType, LockupState),
+    SetLockup(bool, LockupState, LockupState),
     DelegateStake(LockupState),
     Split(LockupState, bool),
+    Merge(LockupState),
     Withdraw(Option<bool>, LockupState, bool),
     Deactivate(LockupState),
-    SetLockup(LockupState, LockupState),
-    Merge(LockupState),
     //MoveStake(LockupState, bool, bool),
     //MoveLamports(LockupState, bool, Option<bool>),
-    // TODO checked, seed, deactivate delinquent, minimum, redelegate
 }
 
 impl StakeInterface {
@@ -309,7 +315,14 @@ impl StakeInterface {
                 },
                 &lockup_state.to_lockup(CUSTODIAN_LEFT),
             ),
-            Self::Authorize(authority_type, lockup_state) => {
+            Self::InitializeChecked => instruction::initialize_checked(
+                &STAKE_ACCOUNT_BLACK,
+                &Authorized {
+                    staker: STAKER_BLACK,
+                    withdrawer: WITHDRAWER_BLACK,
+                },
+            ),
+            Self::Authorize(checked, authority_type, lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &not_just_stake(
@@ -327,7 +340,13 @@ impl StakeInterface {
                     StakeAuthorize::Withdrawer => (WITHDRAWER_BLACK, WITHDRAWER_GRAY),
                 };
 
-                instruction::authorize(
+                let make_instruction = if checked {
+                    instruction::authorize_checked
+                } else {
+                    instruction::authorize
+                };
+
+                make_instruction(
                     &STAKE_ACCOUNT_BLACK,
                     &old_authority,
                     &new_authority,
@@ -435,7 +454,7 @@ impl StakeInterface {
 
                 instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
             }
-            Self::SetLockup(existing_lockup_state, new_lockup_state) => {
+            Self::SetLockup(checked, existing_lockup_state, new_lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &not_just_stake(
@@ -447,7 +466,13 @@ impl StakeInterface {
                     minimum_delegation,
                 );
 
-                instruction::set_lockup(
+                let make_instruction = if checked {
+                    instruction::set_lockup_checked
+                } else {
+                    instruction::set_lockup
+                };
+
+                make_instruction(
                     &STAKE_ACCOUNT_BLACK,
                     &new_lockup_state.to_args(CUSTODIAN_RIGHT),
                     existing_lockup_state
@@ -484,6 +509,52 @@ impl StakeInterface {
 
                 instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
                     .remove(0)
+            }
+            Self::AuthorizeWithSeed(checked, authority_type, lockup_state) => {
+                let seed_base = Pubkey::new_unique();
+                let seed = "seed";
+                let seed_authority =
+                    Pubkey::create_with_seed(&seed_base, &seed, &system_program::id()).unwrap();
+
+                let mut black_state = not_just_stake(
+                    STAKE_ACCOUNT_BLACK,
+                    minimum_delegation,
+                    false,
+                    lockup_state.to_lockup(CUSTODIAN_LEFT),
+                );
+
+                let authorize = authority_type.into();
+                let new_authority = match black_state {
+                    StakeStateV2::Initialized(ref mut meta) => match authorize {
+                        StakeAuthorize::Staker => {
+                            meta.authorized.staker = seed_authority;
+                            STAKER_GRAY
+                        }
+                        StakeAuthorize::Withdrawer => {
+                            meta.authorized.withdrawer = seed_authority;
+                            WITHDRAWER_GRAY
+                        }
+                    },
+                    _ => unreachable!(),
+                };
+
+                env.update_stake(&STAKE_ACCOUNT_BLACK, &black_state, minimum_delegation);
+
+                let make_instruction = if checked {
+                    instruction::authorize_checked_with_seed
+                } else {
+                    instruction::authorize_with_seed
+                };
+
+                make_instruction(
+                    &STAKE_ACCOUNT_BLACK,
+                    &seed_base,
+                    seed.to_string(),
+                    &system_program::id(),
+                    &new_authority,
+                    authorize,
+                    lockup_state.to_custodian(&CUSTODIAN_LEFT),
+                )
             } // XXX these have VERY unexpected behavior
               // when we try to get MergeKind, it doesnt show the stake history we expect, but an empty one
               // however mollusk does have the stake history we want in its sysvar cache it creates
