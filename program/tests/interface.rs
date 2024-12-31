@@ -28,7 +28,7 @@ use {
             stake_flags::StakeFlags,
             state::{
                 warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake,
-                StakeActivationStatus, StakeAuthorize, StakeStateV2,
+                StakeActivationStatus, StakeAuthorize, StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
             },
         },
         stake_history::StakeHistoryEntry,
@@ -102,7 +102,7 @@ const CUSTODIAN_RIGHT: Pubkey =
 const PERSISTANT_ACTIVE_STAKE: u64 = 100 * LAMPORTS_PER_SOL;
 #[test]
 fn assert_warmup_cooldown_rate() {
-    assert_eq!(warmup_cooldown_rate(0, Some(0)), 0.09);
+    assert_eq!(warmup_cooldown_rate(0, Some(0)), NEW_WARMUP_COOLDOWN_RATE);
 }
 
 // hardcoded for convenience
@@ -148,10 +148,16 @@ impl Env {
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
         // backfill stake history
+        let stake_delta_amount =
+            (PERSISTANT_ACTIVE_STAKE as f64 * NEW_WARMUP_COOLDOWN_RATE).floor() as u64;
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
-                StakeHistoryEntry::with_effective_and_activating(PERSISTANT_ACTIVE_STAKE, 1),
+                StakeHistoryEntry {
+                    effective: PERSISTANT_ACTIVE_STAKE,
+                    activating: stake_delta_amount,
+                    deactivating: stake_delta_amount,
+                },
             );
         }
 
