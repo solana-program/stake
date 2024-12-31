@@ -151,7 +151,7 @@ impl Env {
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
-                StakeHistoryEntry::with_effective(PERSISTANT_ACTIVE_STAKE),
+                StakeHistoryEntry::with_effective_and_activating(PERSISTANT_ACTIVE_STAKE, 1),
             );
         }
 
@@ -277,7 +277,7 @@ impl Env {
 // NOTE we skip:
 // * redelegate: will never be enabled
 // * minimum delegation: cannot fail in any nontrivial way
-// * deactivate deliqnquent: requires no signers, and our only failure test is missing signers
+// * deactivate delinquent: requires no signers, and our only failure test is missing signers
 // the first two need never be added but the third should be when we have more tests
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
@@ -289,10 +289,10 @@ enum StakeInterface {
     DelegateStake(LockupState),
     Split(LockupState, bool),
     Merge(LockupState),
+    MoveStake(LockupState, bool, bool),
+    MoveLamports(LockupState, bool, Option<bool>),
     Withdraw(Option<bool>, LockupState, bool),
     Deactivate(LockupState),
-    //MoveStake(LockupState, bool, bool),
-    //MoveLamports(LockupState, bool, Option<bool>),
 }
 
 impl StakeInterface {
@@ -555,95 +555,97 @@ impl StakeInterface {
                     authorize,
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
-            } // XXX these have VERY unexpected behavior
-              // when we try to get MergeKind, it doesnt show the stake history we expect, but an empty one
-              // however mollusk does have the stake history we want in its sysvar cache it creates
-              // i need to depend on a local monorepo to debug this which means i need to redo my whole account-decoder shit
-              // do this after all the other instructions so that i know theyre good
-              /*
-              Self::MoveStake(lockup_state, active_destination, full_move) => {
-                  let source_delegation = minimum_delegation * 2;
-                  let move_amount = if full_move {
-                      source_delegation
-                  } else {
-                      source_delegation / 2
-                  };
+            }
+            Self::MoveStake(lockup_state, active_destination, full_move) => {
+                let source_delegation = minimum_delegation * 2;
+                let move_amount = if full_move {
+                    source_delegation
+                } else {
+                    source_delegation / 2
+                };
 
-                  env.update_stake(
-                      &STAKE_ACCOUNT_BLACK,
-                      &i_cant_believe_its_not_stake(
-                          VOTE_ACCOUNT_RED,
-                          STAKE_ACCOUNT_BLACK,
-                          source_delegation,
-                          StakeStatus::Active,
-                          true,
-                          lockup_state.to_lockup(CUSTODIAN_LEFT),
-                      ),
-                      source_delegation,
-                  );
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        source_delegation,
+                        StakeStatus::Active,
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    source_delegation,
+                );
 
-                  env.update_stake(
-                      &STAKE_ACCOUNT_WHITE,
-                      &i_cant_believe_its_not_stake(
-                          VOTE_ACCOUNT_RED,
-                          STAKE_ACCOUNT_WHITE,
-                          minimum_delegation,
-                          if active_destination {
-                              StakeStatus::Active
-                          } else {
-                              StakeStatus::Initialized
-                          },
-                          true,
-                          lockup_state.to_lockup(CUSTODIAN_LEFT),
-                      ),
-                      minimum_delegation,
-                  );
+                env.update_stake(
+                    &STAKE_ACCOUNT_WHITE,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_WHITE,
+                        minimum_delegation,
+                        if active_destination {
+                            StakeStatus::Active
+                        } else {
+                            StakeStatus::Initialized
+                        },
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
 
-                  instruction::move_stake(&STAKE_ACCOUNT_BLACK, &STAKE_ACCOUNT_WHITE, &STAKER_GRAY, move_amount)
+                instruction::move_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &STAKE_ACCOUNT_WHITE,
+                    &STAKER_GRAY,
+                    move_amount,
+                )
+            }
+            Self::MoveLamports(lockup_state, active_source, fully_activated_destination) => {
+                let free_lamports = LAMPORTS_PER_SOL;
+                let destination_status = match fully_activated_destination {
+                    None => StakeStatus::Initialized,
+                    Some(false) => StakeStatus::Activating,
+                    Some(true) => StakeStatus::Active,
+                };
 
-              }
-              Self::MoveLamports(lockup_state, active_source, fully_activated_destination) => {
-                  let free_lamports = LAMPORTS_PER_SOL;
-                  let destination_status = match fully_activated_destination {
-                      None => StakeStatus::Initialized,
-                      Some(false) => StakeStatus::Activating,
-                      Some(true) => StakeStatus::Active,
-                  };
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        if active_source {
+                            StakeStatus::Active
+                        } else {
+                            StakeStatus::Initialized
+                        },
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation + free_lamports,
+                );
 
-                  env.update_stake(
-                      &STAKE_ACCOUNT_BLACK,
-                      &i_cant_believe_its_not_stake(
-                          VOTE_ACCOUNT_RED,
-                          STAKE_ACCOUNT_BLACK,
-                          minimum_delegation,
-                          if active_source {
-                              StakeStatus::Active
-                          } else {
-                              StakeStatus::Initialized
-                          },
-                          true,
-                          lockup_state.to_lockup(CUSTODIAN_LEFT),
-                      ),
-                      minimum_delegation + free_lamports,
-                  );
+                env.update_stake(
+                    &STAKE_ACCOUNT_WHITE,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_WHITE,
+                        minimum_delegation,
+                        destination_status,
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
 
-                  env.update_stake(
-                      &STAKE_ACCOUNT_WHITE,
-                      &i_cant_believe_its_not_stake(
-                          VOTE_ACCOUNT_RED,
-                          STAKE_ACCOUNT_WHITE,
-                          minimum_delegation,
-                          destination_status,
-                          true,
-                          lockup_state.to_lockup(CUSTODIAN_LEFT),
-                      ),
-                      minimum_delegation,
-                  );
-
-                  instruction::move_lamports(&STAKE_ACCOUNT_BLACK, &STAKE_ACCOUNT_WHITE, &STAKER_GRAY, free_lamports)
-              }
-              */
-              // TODO checked, seed, deactivate delinquent, minimum, redelegate
+                instruction::move_lamports(
+                    &STAKE_ACCOUNT_BLACK,
+                    &STAKE_ACCOUNT_WHITE,
+                    &STAKER_GRAY,
+                    free_lamports,
+                )
+            }
         }
     }
 }
