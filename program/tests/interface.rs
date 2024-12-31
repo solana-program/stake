@@ -360,162 +360,6 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            Self::DelegateStake(lockup_state) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &not_just_stake(
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        false,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
-            }
-            Self::Split(lockup_state, full_split) => {
-                let delegated_stake = minimum_delegation * 2;
-                let split_amount = if full_split {
-                    delegated_stake + STAKE_RENT_EXEMPTION
-                } else {
-                    delegated_stake / 2
-                };
-
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        delegated_stake,
-                        StakeStatus::Active,
-                        true,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    delegated_stake,
-                );
-
-                instruction::split(
-                    &STAKE_ACCOUNT_BLACK,
-                    &STAKER_GRAY,
-                    split_amount,
-                    &STAKE_ACCOUNT_WHITE,
-                )
-                .remove(2)
-            }
-            Self::Withdraw(source_has_delegation, lockup_state, full_withdraw) => {
-                let free_lamports = LAMPORTS_PER_SOL;
-                let source_status = match source_has_delegation {
-                    None => StakeStatus::Uninitialized,
-                    Some(false) => StakeStatus::Initialized,
-                    Some(true) => StakeStatus::Active,
-                };
-
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        source_status,
-                        false,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation + free_lamports,
-                );
-
-                let withdraw_amount = if full_withdraw && source_status != StakeStatus::Active {
-                    free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
-                } else {
-                    free_lamports
-                };
-
-                let authority = if source_status == StakeStatus::Uninitialized {
-                    STAKE_ACCOUNT_BLACK
-                } else {
-                    WITHDRAWER_BLACK
-                };
-
-                instruction::withdraw(
-                    &STAKE_ACCOUNT_BLACK,
-                    &authority,
-                    &PAYER,
-                    withdraw_amount,
-                    lockup_state.to_custodian(&CUSTODIAN_LEFT),
-                )
-            }
-            Self::Deactivate(lockup_state) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        StakeStatus::Active,
-                        false,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
-            }
-            Self::SetLockup(checked, existing_lockup_state, new_lockup_state) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &not_just_stake(
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        false,
-                        existing_lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation,
-                );
-
-                let make_instruction = if checked {
-                    instruction::set_lockup_checked
-                } else {
-                    instruction::set_lockup
-                };
-
-                make_instruction(
-                    &STAKE_ACCOUNT_BLACK,
-                    &new_lockup_state.to_args(CUSTODIAN_RIGHT),
-                    existing_lockup_state
-                        .to_custodian(&CUSTODIAN_LEFT)
-                        .unwrap_or(&WITHDRAWER_BLACK),
-                )
-            }
-            Self::Merge(lockup_state) => {
-                env.update_stake(
-                    &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_BLACK,
-                        minimum_delegation,
-                        StakeStatus::Active,
-                        true,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation,
-                );
-
-                env.update_stake(
-                    &STAKE_ACCOUNT_WHITE,
-                    &i_cant_believe_its_not_stake(
-                        VOTE_ACCOUNT_RED,
-                        STAKE_ACCOUNT_WHITE,
-                        minimum_delegation,
-                        StakeStatus::Active,
-                        true,
-                        lockup_state.to_lockup(CUSTODIAN_LEFT),
-                    ),
-                    minimum_delegation,
-                );
-
-                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
-                    .remove(0)
-            }
             Self::AuthorizeWithSeed(checked, authority_type, lockup_state) => {
                 let seed_base = Pubkey::new_unique();
                 let seed = "seed";
@@ -561,6 +405,105 @@ impl StakeInterface {
                     authorize,
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
+            }
+            Self::SetLockup(checked, existing_lockup_state, new_lockup_state) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &not_just_stake(
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                        existing_lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                let make_instruction = if checked {
+                    instruction::set_lockup_checked
+                } else {
+                    instruction::set_lockup
+                };
+
+                make_instruction(
+                    &STAKE_ACCOUNT_BLACK,
+                    &new_lockup_state.to_args(CUSTODIAN_RIGHT),
+                    existing_lockup_state
+                        .to_custodian(&CUSTODIAN_LEFT)
+                        .unwrap_or(&WITHDRAWER_BLACK),
+                )
+            }
+            Self::DelegateStake(lockup_state) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &not_just_stake(
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
+            }
+            Self::Split(lockup_state, full_split) => {
+                let delegated_stake = minimum_delegation * 2;
+                let split_amount = if full_split {
+                    delegated_stake + STAKE_RENT_EXEMPTION
+                } else {
+                    delegated_stake / 2
+                };
+
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        delegated_stake,
+                        StakeStatus::Active,
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    delegated_stake,
+                );
+
+                instruction::split(
+                    &STAKE_ACCOUNT_BLACK,
+                    &STAKER_GRAY,
+                    split_amount,
+                    &STAKE_ACCOUNT_WHITE,
+                )
+                .remove(2)
+            }
+            Self::Merge(lockup_state) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        StakeStatus::Active,
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                env.update_stake(
+                    &STAKE_ACCOUNT_WHITE,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_WHITE,
+                        minimum_delegation,
+                        StakeStatus::Active,
+                        true,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
+                    .remove(0)
             }
             Self::MoveStake(lockup_state, active_destination, full_move) => {
                 let source_delegation = minimum_delegation * 2;
@@ -651,6 +594,63 @@ impl StakeInterface {
                     &STAKER_GRAY,
                     free_lamports,
                 )
+            }
+            Self::Withdraw(source_has_delegation, lockup_state, full_withdraw) => {
+                let free_lamports = LAMPORTS_PER_SOL;
+                let source_status = match source_has_delegation {
+                    None => StakeStatus::Uninitialized,
+                    Some(false) => StakeStatus::Initialized,
+                    Some(true) => StakeStatus::Active,
+                };
+
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        source_status,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation + free_lamports,
+                );
+
+                let withdraw_amount = if full_withdraw && source_status != StakeStatus::Active {
+                    free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
+                } else {
+                    free_lamports
+                };
+
+                let authority = if source_status == StakeStatus::Uninitialized {
+                    STAKE_ACCOUNT_BLACK
+                } else {
+                    WITHDRAWER_BLACK
+                };
+
+                instruction::withdraw(
+                    &STAKE_ACCOUNT_BLACK,
+                    &authority,
+                    &PAYER,
+                    withdraw_amount,
+                    lockup_state.to_custodian(&CUSTODIAN_LEFT),
+                )
+            }
+            Self::Deactivate(lockup_state) => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &i_cant_believe_its_not_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        StakeStatus::Active,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
             }
         }
     }
