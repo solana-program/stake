@@ -11,7 +11,7 @@ import './dump.mjs';
 
 // Configure additional arguments here, e.g.:
 // ['--arg1', '--arg2', ...cliArguments()]
-const testArgs = cliArguments();
+const testArgs = ['--features', 'bpf-entrypoint', ...cliArguments()];
 
 const hasSolfmt = await which('solfmt', { nothrow: true });
 
