@@ -6,6 +6,13 @@ members = [
     "program",
 ]
 
+[workspace.package]
+authors = ["Anza Maintainers <maintainers@anza.xyz>"]
+repository = "https://github.com/solana-program/stake"
+homepage = "https://anza.xyz/"
+license = "Apache-2.0"
+edition = "2021"
+
 [workspace.metadata.cli]
 solana = "2.1.0"
 
