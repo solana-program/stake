@@ -11,7 +11,7 @@ import './dump.mjs';
 
 // Configure additional arguments here, e.g.:
 // ['--arg1', '--arg2', ...cliArguments()]
-const buildArgs = cliArguments();
+const buildArgs = ['--features', 'bpf-entrypoint', ...cliArguments()];
 
 // Build the programs.
 await Promise.all(
