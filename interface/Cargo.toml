@@ -51,6 +51,7 @@ bincode = [
     "dep:solana-program-error",
     "solana-instruction/bincode",
     "solana-instruction/serde",
+    "solana-system-interface/bincode",
     "serde"
 ]
 borsh = [
