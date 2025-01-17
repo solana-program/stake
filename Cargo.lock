@@ -5128,7 +5128,7 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-interface"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "assert_matches",
  "bincode",
