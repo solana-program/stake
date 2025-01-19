@@ -1,6 +1,7 @@
 use {
     num_traits::{FromPrimitive, ToPrimitive},
     solana_decode_error::DecodeError,
+    solana_program_error::ProgramError,
 };
 
 /// Reasons the Stake might have had an error.
@@ -66,6 +67,12 @@ pub enum StakeError {
 
     /// Stake action is not permitted while the epoch rewards period is active.
     EpochRewardsActive,
+}
+
+impl From<StakeError> for ProgramError {
+    fn from(e: StakeError) -> Self {
+        ProgramError::Custom(e as u32)
+    }
 }
 
 impl FromPrimitive for StakeError {
