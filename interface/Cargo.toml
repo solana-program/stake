@@ -27,7 +27,7 @@ solana-cpi = { version = "^2.1", optional = true }
 solana-frozen-abi = { version = "^2.1", features = ["frozen-abi"], optional = true }
 solana-frozen-abi-macro = { version = "^2.1", features = ["frozen-abi"], optional = true }
 solana-instruction = "^2.1"
-solana-program-error = { version = "^2.1", optional = true }
+solana-program-error = { version = "^2.1" }
 solana-pubkey = { version = "^2.1", default-features = false }
 solana-system-interface = "^1.0"
 solana-sysvar-id = "2.1"
@@ -49,7 +49,6 @@ rustdoc-args = ["--cfg=docsrs"]
 [features]
 bincode = [
     "dep:solana-cpi",
-    "dep:solana-program-error",
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
