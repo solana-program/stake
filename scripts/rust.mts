@@ -116,6 +116,7 @@ async function publish() {
 
   // Expose the new version to CI if needed.
   if (process.env.CI) {
+    await $`echo "crate_name=${crateName}" >> $GITHUB_OUTPUT`;
     await $`echo "new_version=${newVersion}" >> $GITHUB_OUTPUT`;
   }
 
