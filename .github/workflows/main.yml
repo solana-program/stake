@@ -4,28 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
-  format_and_lint_programs:
-    name: Format & Lint Programs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          clippy: true
-          rustfmt: true
-
-      - name: Format Programs
-        run: pnpm programs:format
-
-      - name: Lint Programs
-        run: pnpm programs:lint
-
   format_and_lint_client_js:
     name: Format & Lint Client JS
     runs-on: ubuntu-latest
@@ -37,10 +17,10 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Format Client JS
-        run: pnpm clients:js:format
+        run: pnpm js:format
 
       - name: Lint Client JS
-        run: pnpm clients:js:lint
+        run: pnpm js:lint
 
   format_and_lint_client_rust:
     name: Format & Lint Client Rust
@@ -52,19 +32,23 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          clippy: true
-          rustfmt: true
+          toolchain: format, lint
 
-      - name: Format Client Rust
-        run: pnpm clients:rust:format
+      - name: Format
+        run: pnpm rust:format
 
-      - name: Lint Client Rust
-        run: pnpm clients:rust:lint
+      - name: Lint / Clippy
+        run: pnpm rust:lint:clippy
 
-  build_programs:
-    name: Build programs
+      - name: Lint / Docs
+        run: pnpm rust:lint:docs
+
+      - name: Lint / Features
+        run: pnpm rust:lint:features
+
+  format_and_lint_interface:
+    name: Format & Lint Interface
     runs-on: ubuntu-latest
-    needs: format_and_lint_programs
     steps:
       - name: Git Checkout
         uses: actions/checkout@v4
@@ -72,29 +56,41 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          cargo-cache-key: cargo-programs
+          toolchain: format, lint
+
+      - name: Format
+        run: pnpm interface:format
+
+      - name: Lint / Clippy
+        run: pnpm interface:lint:clippy
+
+      - name: Lint / Docs
+        run: pnpm interface:lint:docs
+
+      - name: Lint / Features
+        run: pnpm interface:lint:features
+
+  test_interface:
+    name: Test Interface
+    runs-on: ubuntu-latest
+    needs: format_and_lint_interface
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          toolchain: test
+          cargo-cache-key: cargo-interface
           solana: true
 
-      - name: Build Programs
-        run: pnpm programs:build
+      - name: Test Interface
+        run: pnpm interface:test
 
-      - name: Upload Program Builds
-        uses: actions/upload-artifact@v4
-        with:
-          name: program-builds
-          path: ./target/deploy/*.so
-          if-no-files-found: error
-
-      - name: Save Program Builds For Client Jobs
-        uses: actions/cache/save@v4
-        with:
-          path: ./**/*.so
-          key: ${{ runner.os }}-builds-${{ github.sha }}
-
-  #test_programs:
-  #  name: Test Programs
+  #generate_clients:
+  #  name: Check Client Generation
   #  runs-on: ubuntu-latest
-  #  needs: format_and_lint_programs
   #  steps:
   #    - name: Git Checkout
   #      uses: actions/checkout@v4
@@ -102,62 +98,20 @@ jobs:
   #    - name: Setup Environment
   #      uses: ./.github/actions/setup
   #      with:
-  #        cargo-cache-key: cargo-program-tests
-  #        cargo-cache-fallback-key: cargo-programs
-  #        solana: true
+  #        toolchain: format
   #
-  #    - name: Test Programs
-  #      run: pnpm programs:test
-
-  # Currently using a manual IDL.
-  #
-  #generate_idls:
-  #  name: Check IDL Generation
-  #  runs-on: ubuntu-latest
-  #  needs: format_and_lint_programs
-  #  steps:
-  #    - name: Git Checkout
-  #      uses: actions/checkout@v4
-  #
-  #    - name: Setup Environment
-  #      uses: ./.github/actions/setup
-  #      with:
-  #        cargo-cache-key: cargo-programs
-  #        cargo-cache-local-key: cargo-local
-  #
-  #    - name: Generate IDLs
-  #      run: pnpm generate:idls
+  #    - name: Generate Clients
+  #      run: pnpm generate:clients
   #
   #    - name: Check Working Directory
   #      run: |
   #        git status --porcelain
   #        test -z "$(git status --porcelain)"
 
-  generate_clients:
-    name: Check Client Generation
-    runs-on: ubuntu-latest
-    needs: format_and_lint_programs
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          rustfmt: true
-
-      - name: Generate Clients
-        run: pnpm generate:clients
-
-      - name: Check Working Directory
-        run: |
-          git status --porcelain
-          test -z "$(git status --porcelain)"
-
   test_client_js:
     name: Test Client JS
     runs-on: ubuntu-latest
-    needs: build_programs
+    needs: format_and_lint_client_js
     steps:
       - name: Git Checkout
         uses: actions/checkout@v4
@@ -167,34 +121,23 @@ jobs:
         with:
           solana: true
 
-      - name: Restore Program Builds
-        uses: actions/cache/restore@v4
-        with:
-          path: ./**/*.so
-          key: ${{ runner.os }}-builds-${{ github.sha }}
-
       - name: Test Client JS
-        run: pnpm clients:js:test
+        run: pnpm js:test
 
-  #test_client_rust:
-  #  name: Test Client Rust
-  #  runs-on: ubuntu-latest
-  #  needs: build_programs
-  #  steps:
-  #    - name: Git Checkout
-  #      uses: actions/checkout@v4
-  #
-  #    - name: Setup Environment
-  #      uses: ./.github/actions/setup
-  #      with:
-  #        cargo-cache-key: cargo-rust-client
-  #        solana: true
-  #
-  #    - name: Restore Program Builds
-  #      uses: actions/cache/restore@v4
-  #      with:
-  #        path: ./**/*.so
-  #        key: ${{ runner.os }}-builds-${{ github.sha }}
-  #
-  #    - name: Test Client Rust
-  #      run: pnpm clients:rust:test
+  test_client_rust:
+    name: Test Client Rust
+    runs-on: ubuntu-latest
+    needs: format_and_lint_client_rust
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache-key: cargo-rust-client
+          toolchain: test
+          solana: true
+
+      - name: Test Client Rust
+        run: pnpm rust:test

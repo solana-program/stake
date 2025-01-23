@@ -11,6 +11,7 @@ use {
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lockup {
     pub unix_timestamp: i64,
     pub epoch: u64,
