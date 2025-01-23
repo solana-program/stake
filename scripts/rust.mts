@@ -27,16 +27,6 @@ enum Command {
 const { command, libraryPath, args } = parseCliArguments();
 const manifestPath = path.join(libraryPath, 'Cargo.toml');
 
-async function cargoBuildSbf(
-  toolchain: string,
-  defaultArgs?: string[],
-  variables?: [string, string][]
-) {
-  const [cargoArgs, commandArgs] = partitionArguments(args, '--', defaultArgs);
-  variables?.forEach(([k, v]) => ($.env[k] = v));
-  await $`cargo-build-sbf ${toolchain} ${command} --manifest-path ${manifestPath} ${cargoArgs} -- ${commandArgs}`;
-}
-
 async function cargo(
   toolchain: string,
   command: string | string[],
@@ -49,7 +39,7 @@ async function cargo(
 }
 
 async function buildSbf() {
-  return cargoBuildSbf(getToolchainArgument('build'), args);
+  return cargo(getToolchainArgument('build'), 'build-sbf', args);
 }
 
 async function format() {
@@ -140,7 +130,7 @@ async function publish() {
 }
 
 switch (command) {
-case Command.BuildSbf:
+  case Command.BuildSbf:
     await buildSbf();
     break;
   case Command.Format:
