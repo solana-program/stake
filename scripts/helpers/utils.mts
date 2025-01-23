@@ -65,9 +65,13 @@ export function getProgramFolders(): string[] {
 }
 
 export function getAllProgramFolders(): string[] {
-  return getCargo().workspace['members'].filter(
-    (member) => getCargo(member).package['metadata']?.['solana']?.['program-id']
-  );
+  return getCargo().workspace['members'].filter((member) => {
+    const cargo = getCargo(member);
+    return (
+      cargo.package['metadata']?.['solana']?.['program-id'] &&
+      cargo.lib['crate-type']?.includes('cdylib')
+    );
+  });
 }
 
 export function getCargo(folder?: string): JsonMap {
