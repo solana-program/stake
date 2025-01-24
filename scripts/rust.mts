@@ -92,7 +92,7 @@ async function publish() {
   const dryRun = argv['dry-run'] ?? false;
   const [level] = args;
   if (!level) {
-    throw new Error('A version level — e.g. "path" — must be provided.');
+    throw new Error('A version level — e.g. "patch" — must be provided.');
   }
 
   // Go to the client directory and install the dependencies.
@@ -111,12 +111,12 @@ async function publish() {
 
   // Get the crate information.
   const toml = getCargo(path.dirname(manifestPath));
-  const crateName = toml.package['name'];
+  const crateType = path.basename(manifestPath);
   const newVersion = toml.package['version'];
 
   // Expose the new version to CI if needed.
   if (process.env.CI) {
-    await $`echo "crate_name=${crateName}" >> $GITHUB_OUTPUT`;
+    await $`echo "crate_type=${crateType}" >> $GITHUB_OUTPUT`;
     await $`echo "new_version=${newVersion}" >> $GITHUB_OUTPUT`;
   }
 
@@ -124,10 +124,10 @@ async function publish() {
   await $`git reset --soft HEAD~1`;
 
   // Commit the new version.
-  await $`git commit -am "Publish ${crateName} v${newVersion}"`;
+  await $`git commit -am "Publish ${crateType} v${newVersion}"`;
 
   // Tag the new version.
-  await $`git tag -a ${crateName}@v${newVersion} -m "${crateName} v${newVersion}"`;
+  await $`git tag -a ${crateType}@v${newVersion} -m "${crateType} v${newVersion}"`;
 }
 
 switch (command) {
