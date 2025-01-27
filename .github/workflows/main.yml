@@ -144,78 +144,6 @@ jobs:
           path: ./**/*.so
           key: ${{ runner.os }}-build-${{ github.sha }}
 
-  test_interface:
-    name: Test Interface
-    runs-on: ubuntu-latest
-    needs: format_and_lint_interface
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          toolchain: test
-          cargo-cache-key: cargo-interface
-          solana: true
-
-      - name: Test Interface
-        run: pnpm interface:test
-
-  format_and_lint_program:
-    name: Format & Lint Program
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          toolchain: format, lint
-
-      - name: Format
-        run: pnpm program:format
-
-      - name: Lint / Clippy
-        run: pnpm program:lint:clippy
-
-      - name: Lint / Docs
-        run: pnpm program:lint:docs
-
-      - name: Lint / Features
-        run: pnpm program:lint:features
-
-  build_program:
-    name: Build program
-    runs-on: ubuntu-latest
-    needs: format_and_lint_program
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          cargo-cache-key: cargo-program
-          solana: true
-
-      - name: Build Program
-        run: pnpm program:build
-
-      - name: Upload Program Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: program-builds
-          path: ./target/deploy/*.so
-          if-no-files-found: error
-
-      - name: Save Program Builds For Client Jobs
-        uses: actions/cache/save@v4
-        with:
-          path: ./**/*.so
-          key: ${{ runner.os }}-build-${{ github.sha }}
-
   #generate_clients:
   #  name: Check Client Generation
   #  runs-on: ubuntu-latest
@@ -252,8 +180,8 @@ jobs:
       - name: Lint Client JS
         run: pnpm js:lint
 
-  test_client_rust:
-    name: Test Client Rust
+  test_client_js:
+    name: Test Client JS
     runs-on: ubuntu-latest
     needs: [format_and_lint_client_js, build_program]
     steps:
@@ -263,8 +191,6 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          cargo-cache-key: cargo-rust-client
-          toolchain: test
           solana: true
 
       - name: Restore Program Build
