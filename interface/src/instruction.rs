@@ -3,17 +3,16 @@
 // Required to avoid warnings from uses of deprecated types during trait derivations.
 #![allow(deprecated)]
 
+use {
+    crate::state::{Authorized, Lockup, StakeAuthorize},
+    solana_clock::{Epoch, UnixTimestamp},
+    solana_pubkey::Pubkey,
+};
 #[cfg(feature = "bincode")]
 use {
     crate::{config, state::StakeStateV2},
     solana_instruction::{AccountMeta, Instruction},
     solana_system_interface::program::ID,
-};
-
-use {
-    crate::state::{Authorized, Lockup, StakeAuthorize},
-    solana_clock::{Epoch, UnixTimestamp},
-    solana_pubkey::Pubkey,
 };
 
 // Inline some constants to avoid dependencies.

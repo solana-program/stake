@@ -166,9 +166,10 @@ codama.update(
       },
     },
     {
-      //
+      // enum discriminator -> u32
       select: '[definedTypeNode]stakeStateV2.[enumTypeNode]',
       transform: (node) => {
+        c.assertIsNode(node, 'enumTypeNode');
         return {
           ...node,
           size: c.numberTypeNode('u32'),

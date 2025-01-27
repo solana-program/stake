@@ -1050,9 +1050,10 @@ impl borsh0_10::ser::BorshSerialize for Stake {
 #[cfg(all(feature = "borsh", feature = "bincode"))]
 #[cfg(test)]
 mod test {
-    use super::*;
-    use solana_borsh::v1::try_from_slice_unchecked;
-    use {assert_matches::assert_matches, bincode::serialize};
+    use {
+        super::*, assert_matches::assert_matches, bincode::serialize,
+        solana_borsh::v1::try_from_slice_unchecked,
+    };
 
     fn check_borsh_deserialization(stake: StakeStateV2) {
         let serialized = serialize(&stake).unwrap();
