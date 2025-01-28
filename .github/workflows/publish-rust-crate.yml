@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       crate_path:
-        description: Path to directory with crate to release
+        description: Path to crate
         required: true
         type: string
       level:
@@ -49,20 +49,20 @@ jobs:
         with:
           cargo-cache-key: cargo-test-publish-${{ inputs.crate_path }}
           cargo-cache-fallback-key: cargo-test-publish
-          toolchain: format, lint, test
+          toolchain: build, format, lint, test
           solana: true
 
       - name: Format
-        run: tsx ./scripts/rust.mts format "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts format "${{ inputs.crate_path }}"
 
       - name: Lint
-        run: tsx ./scripts/rust.mts lint "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts lint "${{ inputs.crate_path }}"
 
       - name: Build Program
         run: pnpm program:build
 
       - name: Test
-        run: tsx ./scripts/rust.mts test "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts test "${{ inputs.crate_path }}"
 
   publish:
     name: Publish Rust Crate
@@ -115,7 +115,7 @@ jobs:
             OPTIONS=""
           fi
 
-          tsx ./scripts/rust.mts publish ${{ inputs.crate_path }} $LEVEL $OPTIONS
+          pnpm tsx ./scripts/rust.mts publish ${{ inputs.crate_path }} $LEVEL $OPTIONS
 
       - name: Push Commit and Tag
         if: github.event.inputs.dry_run != 'true'
