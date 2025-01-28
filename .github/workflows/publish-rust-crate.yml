@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       crate_path:
-        description: Path to directory with crate to release
+        description: Path to crate
         required: true
         type: string
       level:
