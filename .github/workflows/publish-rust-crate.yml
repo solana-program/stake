@@ -53,16 +53,16 @@ jobs:
           solana: true
 
       - name: Format
-        run: npx tsx ./scripts/rust.mts format "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts format "${{ inputs.crate_path }}"
 
       - name: Lint
-        run: npx tsx ./scripts/rust.mts lint "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts lint "${{ inputs.crate_path }}"
 
       - name: Build Program
         run: pnpm program:build
 
       - name: Test
-        run: npx tsx ./scripts/rust.mts test "${{ inputs.crate_path }}"
+        run: pnpm tsx ./scripts/rust.mts test "${{ inputs.crate_path }}"
 
   publish:
     name: Publish Rust Crate
@@ -115,7 +115,7 @@ jobs:
             OPTIONS=""
           fi
 
-          npx tsx ./scripts/rust.mts publish ${{ inputs.crate_path }} $LEVEL $OPTIONS
+          pnpm tsx ./scripts/rust.mts publish ${{ inputs.crate_path }} $LEVEL $OPTIONS
 
       - name: Push Commit and Tag
         if: github.event.inputs.dry_run != 'true'
