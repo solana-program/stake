@@ -49,7 +49,7 @@ jobs:
         with:
           cargo-cache-key: cargo-test-publish-${{ inputs.crate_path }}
           cargo-cache-fallback-key: cargo-test-publish
-          toolchain: format, lint, test
+          toolchain: build, format, lint, test
           solana: true
 
       - name: Format

@@ -126,6 +126,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           cargo-cache-key: cargo-program
+          toolchain: build
           solana: true
 
       - name: Build Program

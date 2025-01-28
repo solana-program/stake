@@ -17,6 +17,7 @@ edition = "2021"
 solana = "2.1.0"
 
 [workspace.metadata.toolchains]
+build = "1.81.0"
 format = "nightly-2024-08-08"
 lint = "nightly-2024-08-08"
 test = "nightly-2024-08-08"
