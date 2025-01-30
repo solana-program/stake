@@ -10,9 +10,8 @@ use {
 };
 #[cfg(feature = "bincode")]
 use {
-    crate::{config, state::StakeStateV2},
+    crate::{config, program::ID, state::StakeStateV2},
     solana_instruction::{AccountMeta, Instruction},
-    solana_system_interface::program::ID,
 };
 
 // Inline some constants to avoid dependencies.
