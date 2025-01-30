@@ -22,4 +22,4 @@ This will add the `solana-stake-interface` dependency with the `bincode` feature
 
 ## Documentation
 
-Read more about the Stake program on the crate [documentation](https://docs.rs/solana-stake-interface/latest/solana-stake-interface/).
+Read more about the Stake program on the crate [documentation](https://docs.rs/solana-stake-interface/latest/solana_stake_interface/).
