@@ -110,8 +110,8 @@ async function publish() {
   }
 
   // Get the crate information.
-  const toml = getCargo(manifestPath);
-  const crateType = path.basename(manifestPath);
+  const toml = getCargo(libraryPath);
+  const crateType = path.basename(libraryPath);
   const newVersion = toml.package['version'];
 
   // Expose the new version to CI if needed.
