@@ -24,7 +24,7 @@ enum Command {
   Publish = 'publish',
 }
 
-const { command, libraryPath, args } = parseCliArguments();
+const { command, relativePath, libraryPath, args } = parseCliArguments();
 const manifestPath = path.join(libraryPath, 'Cargo.toml');
 
 async function cargo(
@@ -110,13 +110,13 @@ async function publish() {
   }
 
   // Get the crate information.
-  const toml = getCargo(libraryPath);
-  const crateType = path.basename(libraryPath);
+  const toml = getCargo(relativePath);
+  const crate = path.basename(relativePath);
   const newVersion = toml.package['version'];
 
   // Expose the new version to CI if needed.
   if (process.env.CI) {
-    await $`echo "crate_type=${crateType}" >> $GITHUB_OUTPUT`;
+    await $`echo "crate=${crate}" >> $GITHUB_OUTPUT`;
     await $`echo "new_version=${newVersion}" >> $GITHUB_OUTPUT`;
   }
 
@@ -124,10 +124,10 @@ async function publish() {
   await $`git reset --soft HEAD~1`;
 
   // Commit the new version.
-  await $`git commit -am "Publish ${crateType} v${newVersion}"`;
+  await $`git commit -am "Publish ${crate} v${newVersion}"`;
 
   // Tag the new version.
-  await $`git tag -a ${crateType}@v${newVersion} -m "${crateType} v${newVersion}"`;
+  await $`git tag -a ${crate}@v${newVersion} -m "${crate} v${newVersion}"`;
 }
 
 switch (command) {
