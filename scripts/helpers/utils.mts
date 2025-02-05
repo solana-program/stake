@@ -146,6 +146,7 @@ export async function getInstalledSolanaVersion(): Promise<string | undefined> {
 
 export function parseCliArguments(): {
   command: string;
+  relativePath: string;
   libraryPath: string;
   args: string[];
 } {
@@ -162,6 +163,7 @@ export function parseCliArguments(): {
 
   return {
     command,
+    relativePath,
     libraryPath: path.join(workingDirectory, relativePath),
     args,
   };
