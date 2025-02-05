@@ -104,11 +104,6 @@ async function publish() {
     : ['--no-push', '--no-tag', '--no-confirm', '--execute'];
   await $`cargo release ${level} ${releaseArgs}`;
 
-  // Stop here if this is a dry run.
-  if (dryRun) {
-    process.exit(0);
-  }
-
   // Get the crate information.
   const toml = getCargo(libraryPath);
   const crate = path.basename(libraryPath);
@@ -118,6 +113,11 @@ async function publish() {
   if (process.env.CI) {
     await $`echo "crate=${crate}" >> $GITHUB_OUTPUT`;
     await $`echo "new_version=${newVersion}" >> $GITHUB_OUTPUT`;
+  }
+
+  // Stop here if this is a dry run.
+  if (dryRun) {
+    process.exit(0);
   }
 
   // Soft reset the last commit so we can create our own commit and tag.
