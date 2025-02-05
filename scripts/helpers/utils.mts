@@ -77,7 +77,7 @@ export function getAllProgramFolders(): string[] {
 export function getCargo(folder?: string): JsonMap {
   return parseToml(
     fs.readFileSync(
-      path.join(workingDirectory, folder ? folder : '.', 'Cargo.toml'),
+      path.resolve(workingDirectory, path.join(folder ? folder : '.', 'Cargo.toml')),
       'utf8'
     )
   );

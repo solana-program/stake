@@ -104,30 +104,30 @@ async function publish() {
     : ['--no-push', '--no-tag', '--no-confirm', '--execute'];
   await $`cargo release ${level} ${releaseArgs}`;
 
-  // Stop here if this is a dry run.
-  if (dryRun) {
-    process.exit(0);
-  }
-
   // Get the crate information.
   const toml = getCargo(libraryPath);
-  const crateType = path.basename(libraryPath);
+  const crate = path.basename(libraryPath);
   const newVersion = toml.package['version'];
 
   // Expose the new version to CI if needed.
   if (process.env.CI) {
-    await $`echo "crate_type=${crateType}" >> $GITHUB_OUTPUT`;
+    await $`echo "crate=${crate}" >> $GITHUB_OUTPUT`;
     await $`echo "new_version=${newVersion}" >> $GITHUB_OUTPUT`;
+  }
+
+  // Stop here if this is a dry run.
+  if (dryRun) {
+    process.exit(0);
   }
 
   // Soft reset the last commit so we can create our own commit and tag.
   await $`git reset --soft HEAD~1`;
 
   // Commit the new version.
-  await $`git commit -am "Publish ${crateType} v${newVersion}"`;
+  await $`git commit -am "Publish ${crate} v${newVersion}"`;
 
   // Tag the new version.
-  await $`git tag -a ${crateType}@v${newVersion} -m "${crateType} v${newVersion}"`;
+  await $`git tag -a ${crate}@v${newVersion} -m "${crate} v${newVersion}"`;
 }
 
 switch (command) {
