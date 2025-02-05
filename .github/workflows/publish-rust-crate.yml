@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       crate_path:
-        description: Path to crate
+        description: Crate to publish
         required: true
-        type: string
+        type: choice
+        options:
+          - clients/rust
+          - interface
+          - program
       level:
         description: Level
         required: true
