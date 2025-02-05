@@ -24,7 +24,7 @@ enum Command {
   Publish = 'publish',
 }
 
-const { command, relativePath, libraryPath, args } = parseCliArguments();
+const { command, libraryPath, args } = parseCliArguments();
 const manifestPath = path.join(libraryPath, 'Cargo.toml');
 
 async function cargo(
@@ -110,8 +110,8 @@ async function publish() {
   }
 
   // Get the crate information.
-  const toml = getCargo(relativePath);
-  const crate = path.basename(relativePath);
+  const toml = getCargo(libraryPath);
+  const crate = path.basename(libraryPath);
   const newVersion = toml.package['version'];
 
   // Expose the new version to CI if needed.

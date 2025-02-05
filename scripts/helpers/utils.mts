@@ -77,7 +77,7 @@ export function getAllProgramFolders(): string[] {
 export function getCargo(folder?: string): JsonMap {
   return parseToml(
     fs.readFileSync(
-      path.join(workingDirectory, folder ? folder : '.', 'Cargo.toml'),
+      path.resolve(workingDirectory, path.join(folder ? folder : '.', 'Cargo.toml')),
       'utf8'
     )
   );
@@ -146,7 +146,6 @@ export async function getInstalledSolanaVersion(): Promise<string | undefined> {
 
 export function parseCliArguments(): {
   command: string;
-  relativePath: string;
   libraryPath: string;
   args: string[];
 } {
@@ -163,7 +162,6 @@ export function parseCliArguments(): {
 
   return {
     command,
-    relativePath,
     libraryPath: path.join(workingDirectory, relativePath),
     args,
   };
