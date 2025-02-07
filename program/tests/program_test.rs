@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
@@ -7,33 +5,25 @@ use {
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
-        feature_set::{move_stake_and_move_lamports_ixs, stake_raise_minimum_delegation_to_1_sol},
-        hash::Hash,
         instruction::Instruction,
-        native_token::LAMPORTS_PER_SOL,
         program_error::ProgramError,
         pubkey::Pubkey,
         signature::{Keypair, Signer},
         signers::Signers,
         stake::{
             self,
-            instruction::{
-                self as ixn, LockupArgs, LockupCheckedArgs, StakeError, StakeInstruction,
-            },
-            state::{
-                Authorized, Delegation, Lockup, Meta, Stake, StakeActivationStatus, StakeAuthorize,
-                StakeStateV2,
-            },
+            instruction::{self as ixn, LockupArgs, StakeError},
+            state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
         },
         system_instruction, system_program,
-        sysvar::{clock::Clock, rent::Rent, stake_history::StakeHistory},
+        sysvar::{clock::Clock, stake_history::StakeHistory},
         transaction::{Transaction, TransactionError},
+        vote::{
+            instruction as vote_instruction,
+            state::{VoteInit, VoteState, VoteStateVersions},
+        },
     },
-    solana_stake_program::{id, processor::Processor},
-    solana_vote_program::{
-        self, vote_instruction,
-        vote_state::{self, VoteInit, VoteState, VoteStateVersions},
-    },
+    solana_stake_program::id,
     test_case::{test_case, test_matrix},
 };
 
@@ -987,8 +977,6 @@ impl StakeLifecycle {
     }
 }
 
-// TODO test whole-balance split (there are a lot more split tests i didnt port
-// yet tho)
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
@@ -1139,7 +1127,6 @@ async fn test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-// TODO lockup... unenforced and enforced? also maybe for split
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]

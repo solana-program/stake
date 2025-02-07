@@ -2362,6 +2362,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "mollusk-svm"
+version = "0.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fceaf67fe3f95a9478f4f5b0d71e77c073eee7a795a74d6143317a22454c289"
+dependencies = [
+ "bincode",
+ "mollusk-svm-error",
+ "mollusk-svm-keys",
+ "solana-bpf-loader-program",
+ "solana-compute-budget",
+ "solana-logger",
+ "solana-program-runtime",
+ "solana-sdk",
+ "solana-stake-program 2.1.0",
+ "solana-system-program",
+ "solana-timings",
+]
+
+[[package]]
+name = "mollusk-svm-error"
+version = "0.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8738bc85a52d123012209a573f17faffa1db440493396ae2e1f64fbb8f3579bf"
+dependencies = [
+ "solana-sdk",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mollusk-svm-keys"
+version = "0.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a7656d86d743de0a9788ce4c0e9ff63028a42e350131ebe67c476cdde6ac9f"
+dependencies = [
+ "mollusk-svm-error",
+ "solana-sdk",
+]
+
+[[package]]
 name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5159,12 +5198,18 @@ name = "solana-stake-program"
 version = "1.0.0"
 dependencies = [
  "arrayref",
+ "assert_matches",
  "bincode",
  "borsh 1.5.3",
+ "mollusk-svm",
  "num-derive 0.4.2",
  "num-traits",
  "num_enum",
+ "solana-account",
+ "solana-config-program",
+ "solana-feature-set",
  "solana-program",
+ "solana-program-runtime",
  "solana-program-test",
  "solana-sdk",
  "solana-vote-program",
