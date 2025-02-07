@@ -230,11 +230,9 @@ impl Env {
                     .keyed_account_for_stake_history_sysvar()
                     .1
             } else if let Some(account) = self.override_accounts.get(&key).cloned() {
-                account.into()
-            } else if let Some(account) = self.base_accounts.get(&key).cloned() {
-                account.into()
+                account
             } else {
-                Account::default()
+                self.base_accounts.get(&key).cloned().unwrap_or_default()
             };
 
             accounts.push((key, account_shared_data));
@@ -313,7 +311,7 @@ impl StakeInterface {
             Self::Authorize(checked, authority_type, lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &not_just_stake(
+                    &initialized_stake(
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
                         false,
@@ -348,7 +346,7 @@ impl StakeInterface {
                 let seed_authority =
                     Pubkey::create_with_seed(&seed_base, seed, &system_program::id()).unwrap();
 
-                let mut black_state = not_just_stake(
+                let mut black_state = initialized_stake(
                     STAKE_ACCOUNT_BLACK,
                     minimum_delegation,
                     false,
@@ -391,7 +389,7 @@ impl StakeInterface {
             Self::SetLockup(checked, existing_lockup_state, new_lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &not_just_stake(
+                    &initialized_stake(
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
                         false,
@@ -417,7 +415,7 @@ impl StakeInterface {
             Self::DelegateStake(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &not_just_stake(
+                    &initialized_stake(
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
                         false,
@@ -438,7 +436,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         delegated_stake,
@@ -460,7 +458,7 @@ impl StakeInterface {
             Self::Merge(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
@@ -473,7 +471,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_WHITE,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_WHITE,
                         minimum_delegation,
@@ -497,7 +495,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         source_delegation,
@@ -510,7 +508,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_WHITE,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_WHITE,
                         minimum_delegation,
@@ -542,7 +540,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
@@ -559,7 +557,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_WHITE,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_WHITE,
                         minimum_delegation,
@@ -587,7 +585,7 @@ impl StakeInterface {
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
@@ -621,7 +619,7 @@ impl StakeInterface {
             Self::Deactivate(lockup_state) => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
-                    &i_cant_believe_its_not_stake(
+                    &fully_configurable_stake(
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_BLACK,
                         minimum_delegation,
@@ -707,13 +705,13 @@ impl LockupState {
 }
 
 // initialized with settable authority and lockup
-fn not_just_stake(
+fn initialized_stake(
     stake_pubkey: Pubkey,
     stake: u64,
     common_authority: bool,
     lockup: Lockup,
 ) -> StakeStateV2 {
-    i_cant_believe_its_not_stake(
+    fully_configurable_stake(
         Pubkey::default(),
         stake_pubkey,
         stake,
@@ -724,7 +722,7 @@ fn not_just_stake(
 }
 
 // any point in the stake lifecycle with settable vote account, authority, and lockup
-fn i_cant_believe_its_not_stake(
+fn fully_configurable_stake(
     voter_pubkey: Pubkey,
     stake_pubkey: Pubkey,
     stake: u64,
