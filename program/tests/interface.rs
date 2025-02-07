@@ -3,7 +3,7 @@
 use {
     arbitrary::{Arbitrary, Unstructured},
     mollusk_svm::{result::Check, Mollusk},
-    solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
+    solana_account::{Account, ReadableAccount, WritableAccount},
     solana_sdk::{
         instruction::{AccountMeta, Instruction},
         native_token::LAMPORTS_PER_SOL,
@@ -206,7 +206,7 @@ impl Env {
 
     // get the accounts from our account store that this transaction expects to see
     // we dont need implicit sysvars, mollusk resolves them internally via syscall stub
-    fn resolve_accounts(&self, account_metas: &[AccountMeta]) -> Vec<(Pubkey, AccountSharedData)> {
+    fn resolve_accounts(&self, account_metas: &[AccountMeta]) -> Vec<(Pubkey, Account)> {
         let mut accounts = vec![];
         for account_meta in account_metas {
             let key = account_meta.pubkey;
@@ -234,7 +234,7 @@ impl Env {
             } else if let Some(account) = self.base_accounts.get(&key).cloned() {
                 account.into()
             } else {
-                AccountSharedData::default()
+                Account::default()
             };
 
             accounts.push((key, account_shared_data));
