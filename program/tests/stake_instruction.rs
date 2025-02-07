@@ -127,13 +127,19 @@ fn process_instruction(
         Err(e) => Check::err(e),
     };
 
-    let result =
-        mollusk.process_and_validate_instruction(&instruction, &transaction_accounts, &[check]);
+    let result = mollusk.process_and_validate_instruction(
+        &instruction,
+        &transaction_accounts
+            .into_iter()
+            .map(|(key, account)| (key, account.into()))
+            .collect::<Vec<_>>(),
+        &[check],
+    );
 
     result
         .resulting_accounts
         .into_iter()
-        .map(|(_, account)| account)
+        .map(|(_, account)| account.into())
         .collect()
 }
 
@@ -6499,7 +6505,10 @@ fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
     let stake_account = create_default_stake_account();
     let minimum_delegation = crate::get_minimum_delegation();
     let instruction_data = serialize(&StakeInstruction::GetMinimumDelegation).unwrap();
-    let transaction_accounts = vec![(stake_address, stake_account)];
+    let transaction_accounts = vec![(stake_address, stake_account)]
+        .into_iter()
+        .map(|(key, account)| (key, account.into()))
+        .collect::<Vec<_>>();
     let instruction_accounts = vec![AccountMeta {
         pubkey: stake_address,
         is_signer: false,
@@ -6517,7 +6526,7 @@ fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
         &transaction_accounts,
         &[
             Check::success(),
-            Check::return_data(minimum_delegation.to_le_bytes().to_vec()),
+            Check::return_data(&minimum_delegation.to_le_bytes()),
         ],
     );
 }
