@@ -25,6 +25,7 @@ thiserror = "1.0.63"
 assert_matches = "1.5.0"
 mollusk-svm = { version = "=0.0.15", features = ["all-builtins"] }
 solana-account = { version = "2.1", features = ["bincode"] }
+solana-logger = "2.1"
 solana-program-test = "2.1"
 solana-program-runtime = "2.1"
 solana-config-program = "2.1"
