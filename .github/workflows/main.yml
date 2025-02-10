@@ -166,7 +166,8 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
 
       - name: Run Program Tests
-        run: cargo test --features bpf-entrypoint
+        run: pnpm program:test
+        # HANA run: cargo test --features bpf-entrypoint
 
   #generate_clients:
   #  name: Check Client Generation
