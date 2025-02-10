@@ -145,6 +145,29 @@ jobs:
           path: ./**/*.so
           key: ${{ runner.os }}-build-${{ github.sha }}
 
+  test_program_sbf:
+    name: Test Program SBF
+    runs-on: ubuntu-latest
+    needs: build_program
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          toolchain: test
+          solana: true
+
+      - name: Restore Program Build
+        uses: actions/cache/restore@v4
+        with:
+          path: ./**/*.so
+          key: ${{ runner.os }}-build-${{ github.sha }}
+
+      - name: Run SBF Tests
+        run: cargo test-sbf --features bpf-entrypoint
+
   #generate_clients:
   #  name: Check Client Generation
   #  runs-on: ubuntu-latest
