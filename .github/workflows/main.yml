@@ -164,7 +164,9 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
 
       - name: Run Program Tests
-        run: cargo test -j2 --features bpf-entrypoint
+        run: cargo test --features bpf-entrypoint -- --test-threads 2
+        env:
+            CI: true
 
   #generate_clients:
   #  name: Check Client Generation
