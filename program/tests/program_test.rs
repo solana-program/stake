@@ -5,7 +5,6 @@ use {
     solana_sdk::{
         account::Account as SolanaAccount,
         entrypoint::ProgramResult,
-        feature_set::reserve_minimal_cus_for_builtin_instructions,
         instruction::Instruction,
         program_error::ProgramError,
         pubkey::Pubkey,
@@ -32,10 +31,7 @@ pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 pub const NO_SIGNERS: &[Keypair] = &[];
 
 pub fn program_test() -> ProgramTest {
-    // FIXME this recently added feature breaks the bpf stake program
-    // every builtin that migrates to bpf needs to be on a whitelist with custom cu handling
-    // disabling this is a stopgap until we can land the agave pr that adds us to it
-    program_test_without_features(&[reserve_minimal_cus_for_builtin_instructions::id()])
+    program_test_without_features(&[])
 }
 
 pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
