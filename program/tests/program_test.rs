@@ -38,6 +38,11 @@ pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
     let mut program_test = ProgramTest::default();
     program_test.prefer_bpf(true);
 
+    // disable verbose logging for ci
+    if std::env::var("CI").is_ok() {
+        solana_logger::setup();
+    }
+
     for feature_id in feature_ids {
         program_test.deactivate_feature(*feature_id);
     }
