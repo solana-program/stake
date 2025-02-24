@@ -34,6 +34,21 @@ use {
     },
 };
 
+// StakeInterface encapsulates every combination of instruction, account states, and input parameters
+// that we want to test, so that we can exhaustively generate valid, successful instructions. The
+// output instructions can be used as-is to verify the program interface works for all combinations of
+// input classes. They can also be changed to operations that must fail, to test error checks have no gaps.
+//
+// Env encapulates the mollusk test runner, a set of "base" accounts constituting the default state,
+// and a set of "override" accounts which change that state prior to instruction execution.
+// This is to allow us to repeatedly reuse one Env (by dropping the overrides and creating new ones)
+// instead of creating it from scratch for each test, which would make these tests take minutes
+// to run once we add more cases.
+//
+// All constants and addresses in this file are used with mollusk to set up base usable accounts,
+// which StakeInterface then puts into a suitable state for particular instructions. For example,
+// Merge sets up two stake accounts with appropriate lockups, authorities, and activation states.
+
 // NOTE ideas for future tests:
 // * fail with different vote accounts on operations that require them to match
 // * fail with different authorities on operations that require them to match
@@ -81,7 +96,7 @@ const CUSTODIAN_RIGHT: Pubkey =
 // with a warmup/cooldown rate of 9%, routine tests moving under 9sol can ignore stake history
 // while also making it easy to write tests involving partial (de)activations
 // if the warmup/cooldown rate changes, this number must be adjusted
-const PERSISTANT_ACTIVE_STAKE: u64 = 100 * LAMPORTS_PER_SOL;
+const PERSISTENT_ACTIVE_STAKE: u64 = 100 * LAMPORTS_PER_SOL;
 #[test]
 fn assert_warmup_cooldown_rate() {
     assert_eq!(warmup_cooldown_rate(0, Some(0)), NEW_WARMUP_COOLDOWN_RATE);
@@ -131,12 +146,12 @@ impl Env {
 
         // backfill stake history
         let stake_delta_amount =
-            (PERSISTANT_ACTIVE_STAKE as f64 * NEW_WARMUP_COOLDOWN_RATE).floor() as u64;
+            (PERSISTENT_ACTIVE_STAKE as f64 * NEW_WARMUP_COOLDOWN_RATE).floor() as u64;
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
                 StakeHistoryEntry {
-                    effective: PERSISTANT_ACTIVE_STAKE,
+                    effective: PERSISTENT_ACTIVE_STAKE,
                     activating: stake_delta_amount,
                     deactivating: stake_delta_amount,
                 },
@@ -267,18 +282,53 @@ impl Env {
 // the first two need never be added but the third should be when we have more tests
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
-    Initialize(LockupState),
+    Initialize {
+        lockup_state: LockupState,
+    },
     InitializeChecked,
-    Authorize(bool, AuthorityType, LockupState),
-    AuthorizeWithSeed(bool, AuthorityType, LockupState),
-    SetLockup(bool, LockupState, LockupState),
-    DelegateStake(LockupState),
-    Split(LockupState, bool),
-    Merge(LockupState),
-    MoveStake(LockupState, bool, bool),
-    MoveLamports(LockupState, bool, Option<bool>),
-    Withdraw(Option<bool>, LockupState, bool),
-    Deactivate(LockupState),
+    Authorize {
+        checked: bool,
+        authority_type: AuthorityType,
+        lockup_state: LockupState,
+    },
+    AuthorizeWithSeed {
+        checked: bool,
+        authority_type: AuthorityType,
+        lockup_state: LockupState,
+    },
+    SetLockup {
+        checked: bool,
+        existing_lockup_state: LockupState,
+        new_lockup_state: LockupState,
+    },
+    DelegateStake {
+        lockup_state: LockupState,
+    },
+    Split {
+        lockup_state: LockupState,
+        full_split: bool,
+    },
+    Merge {
+        lockup_state: LockupState,
+    },
+    MoveStake {
+        lockup_state: LockupState,
+        active_destination: bool,
+        full_move: bool,
+    },
+    MoveLamports {
+        lockup_state: LockupState,
+        active_source: bool,
+        destination_status: MoveLamportsStatus,
+    },
+    Withdraw {
+        lockup_state: LockupState,
+        source_status: WithdrawStatus,
+        full_withdraw: bool,
+    },
+    Deactivate {
+        lockup_state: LockupState,
+    },
 }
 
 impl StakeInterface {
@@ -293,7 +343,7 @@ impl StakeInterface {
         let minimum_delegation = get_minimum_delegation();
 
         match self {
-            Self::Initialize(lockup_state) => instruction::initialize(
+            Self::Initialize { lockup_state } => instruction::initialize(
                 &STAKE_ACCOUNT_BLACK,
                 &Authorized {
                     staker: STAKER_BLACK,
@@ -308,7 +358,11 @@ impl StakeInterface {
                     withdrawer: WITHDRAWER_BLACK,
                 },
             ),
-            Self::Authorize(checked, authority_type, lockup_state) => {
+            Self::Authorize {
+                checked,
+                authority_type,
+                lockup_state,
+            } => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &initialized_stake(
@@ -340,7 +394,11 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            Self::AuthorizeWithSeed(checked, authority_type, lockup_state) => {
+            Self::AuthorizeWithSeed {
+                checked,
+                authority_type,
+                lockup_state,
+            } => {
                 let seed_base = Pubkey::new_unique();
                 let seed = "seed";
                 let seed_authority =
@@ -386,7 +444,11 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            Self::SetLockup(checked, existing_lockup_state, new_lockup_state) => {
+            Self::SetLockup {
+                checked,
+                existing_lockup_state,
+                new_lockup_state,
+            } => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &initialized_stake(
@@ -412,7 +474,7 @@ impl StakeInterface {
                         .unwrap_or(&WITHDRAWER_BLACK),
                 )
             }
-            Self::DelegateStake(lockup_state) => {
+            Self::DelegateStake { lockup_state } => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &initialized_stake(
@@ -426,7 +488,10 @@ impl StakeInterface {
 
                 instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
             }
-            Self::Split(lockup_state, full_split) => {
+            Self::Split {
+                lockup_state,
+                full_split,
+            } => {
                 let delegated_stake = minimum_delegation * 2;
                 let split_amount = if full_split {
                     delegated_stake + STAKE_RENT_EXEMPTION
@@ -455,7 +520,7 @@ impl StakeInterface {
                 )
                 .remove(2)
             }
-            Self::Merge(lockup_state) => {
+            Self::Merge { lockup_state } => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &fully_configurable_stake(
@@ -485,7 +550,11 @@ impl StakeInterface {
                 instruction::merge(&STAKE_ACCOUNT_WHITE, &STAKE_ACCOUNT_BLACK, &STAKER_GRAY)
                     .remove(0)
             }
-            Self::MoveStake(lockup_state, active_destination, full_move) => {
+            Self::MoveStake {
+                lockup_state,
+                active_destination,
+                full_move,
+            } => {
                 let source_delegation = minimum_delegation * 2;
                 let move_amount = if full_move {
                     source_delegation
@@ -530,13 +599,12 @@ impl StakeInterface {
                     move_amount,
                 )
             }
-            Self::MoveLamports(lockup_state, active_source, fully_activated_destination) => {
+            Self::MoveLamports {
+                lockup_state,
+                active_source,
+                destination_status,
+            } => {
                 let free_lamports = LAMPORTS_PER_SOL;
-                let destination_status = match fully_activated_destination {
-                    None => StakeStatus::Initialized,
-                    Some(false) => StakeStatus::Activating,
-                    Some(true) => StakeStatus::Active,
-                };
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
@@ -561,7 +629,7 @@ impl StakeInterface {
                         VOTE_ACCOUNT_RED,
                         STAKE_ACCOUNT_WHITE,
                         minimum_delegation,
-                        destination_status,
+                        destination_status.into(),
                         true,
                         lockup_state.to_lockup(CUSTODIAN_LEFT),
                     ),
@@ -575,13 +643,13 @@ impl StakeInterface {
                     free_lamports,
                 )
             }
-            Self::Withdraw(source_has_delegation, lockup_state, full_withdraw) => {
+            Self::Withdraw {
+                lockup_state,
+                full_withdraw,
+                source_status,
+            } => {
                 let free_lamports = LAMPORTS_PER_SOL;
-                let source_status = match source_has_delegation {
-                    None => StakeStatus::Uninitialized,
-                    Some(false) => StakeStatus::Initialized,
-                    Some(true) => StakeStatus::Active,
-                };
+                let source_status = source_status.into();
 
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
@@ -616,7 +684,7 @@ impl StakeInterface {
                     lockup_state.to_custodian(&CUSTODIAN_LEFT),
                 )
             }
-            Self::Deactivate(lockup_state) => {
+            Self::Deactivate { lockup_state } => {
                 env.update_stake(
                     &STAKE_ACCOUNT_BLACK,
                     &fully_configurable_stake(
@@ -644,6 +712,40 @@ enum StakeStatus {
     Active,
     Deactivating,
     Deactive,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
+enum MoveLamportsStatus {
+    Initialized,
+    Activating,
+    Active,
+}
+
+impl From<MoveLamportsStatus> for StakeStatus {
+    fn from(status: MoveLamportsStatus) -> Self {
+        match status {
+            MoveLamportsStatus::Initialized => StakeStatus::Initialized,
+            MoveLamportsStatus::Activating => StakeStatus::Activating,
+            MoveLamportsStatus::Active => StakeStatus::Active,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
+enum WithdrawStatus {
+    Uninitialized,
+    Initialized,
+    Active,
+}
+
+impl From<WithdrawStatus> for StakeStatus {
+    fn from(status: WithdrawStatus) -> Self {
+        match status {
+            WithdrawStatus::Uninitialized => StakeStatus::Uninitialized,
+            WithdrawStatus::Initialized => StakeStatus::Initialized,
+            WithdrawStatus::Active => StakeStatus::Active,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
@@ -708,7 +810,7 @@ impl LockupState {
 fn initialized_stake(
     stake_pubkey: Pubkey,
     stake: u64,
-    common_authority: bool,
+    use_gray_authority: bool,
     lockup: Lockup,
 ) -> StakeStateV2 {
     fully_configurable_stake(
@@ -716,7 +818,7 @@ fn initialized_stake(
         stake_pubkey,
         stake,
         StakeStatus::Initialized,
-        common_authority,
+        use_gray_authority,
         lockup,
     )
 }
@@ -727,14 +829,14 @@ fn fully_configurable_stake(
     stake_pubkey: Pubkey,
     stake: u64,
     stake_status: StakeStatus,
-    common_authority: bool,
+    use_gray_authority: bool,
     lockup: Lockup,
 ) -> StakeStateV2 {
     assert!(stake_pubkey != VOTE_ACCOUNT_RED);
     assert!(stake_pubkey != VOTE_ACCOUNT_BLUE);
 
     let authorized = match stake_pubkey {
-        _ if common_authority => Authorized {
+        _ if use_gray_authority => Authorized {
             staker: STAKER_GRAY,
             withdrawer: WITHDRAWER_GRAY,
         },
