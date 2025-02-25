@@ -38,11 +38,6 @@ pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
     let mut program_test = ProgramTest::default();
     program_test.prefer_bpf(true);
 
-    // disable verbose logging for ci
-    if std::env::var("CI").is_ok() {
-        solana_logger::setup();
-    }
-
     for feature_id in feature_ids {
         program_test.deactivate_feature(*feature_id);
     }
@@ -340,7 +335,7 @@ pub async fn process_instruction<T: Signers + ?Sized>(
     }
 }
 
-pub async fn test_instruction_with_missing_signers(
+pub async fn process_instruction_test_missing_signers(
     context: &mut ProgramTestContext,
     instruction: &Instruction,
     additional_signers: &Vec<&Keypair>,
@@ -369,7 +364,7 @@ pub async fn test_instruction_with_missing_signers(
 }
 
 #[tokio::test]
-async fn test_stake_checked_instructions() {
+async fn program_test_stake_checked_instructions() {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -393,8 +388,12 @@ async fn test_stake_checked_instructions() {
     let stake = create_blank_stake_account(&mut context).await;
     let instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
 
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&withdrawer_keypair])
-        .await;
+    process_instruction_test_missing_signers(
+        &mut context,
+        &instruction,
+        &vec![&withdrawer_keypair],
+    )
+    .await;
 
     // Test AuthorizeChecked with non-signing staker
     let stake =
@@ -402,7 +401,7 @@ async fn test_stake_checked_instructions() {
     let instruction =
         ixn::authorize_checked(&stake, &staker, &authorized, StakeAuthorize::Staker, None);
 
-    test_instruction_with_missing_signers(
+    process_instruction_test_missing_signers(
         &mut context,
         &instruction,
         &vec![&staker_keypair, &authorized_keypair],
@@ -420,7 +419,7 @@ async fn test_stake_checked_instructions() {
         None,
     );
 
-    test_instruction_with_missing_signers(
+    process_instruction_test_missing_signers(
         &mut context,
         &instruction,
         &vec![&withdrawer_keypair, &authorized_keypair],
@@ -442,7 +441,7 @@ async fn test_stake_checked_instructions() {
             None,
         );
 
-        test_instruction_with_missing_signers(
+        process_instruction_test_missing_signers(
             &mut context,
             &instruction,
             &vec![&seed_base_keypair, &authorized_keypair],
@@ -463,7 +462,7 @@ async fn test_stake_checked_instructions() {
         &withdrawer,
     );
 
-    test_instruction_with_missing_signers(
+    process_instruction_test_missing_signers(
         &mut context,
         &instruction,
         &vec![&withdrawer_keypair, &custodian_keypair],
@@ -472,7 +471,7 @@ async fn test_stake_checked_instructions() {
 }
 
 #[tokio::test]
-async fn test_stake_initialize() {
+async fn program_test_stake_initialize() {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -582,7 +581,7 @@ async fn test_stake_initialize() {
 }
 
 #[tokio::test]
-async fn test_authorize() {
+async fn program_test_authorize() {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -629,7 +628,7 @@ async fn test_authorize() {
             authority_type,
             None,
         );
-        test_instruction_with_missing_signers(&mut context, &instruction, &vec![old_authority])
+        process_instruction_test_missing_signers(&mut context, &instruction, &vec![old_authority])
             .await;
 
         let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
@@ -674,7 +673,7 @@ async fn test_authorize() {
             authority_type,
             None,
         );
-        test_instruction_with_missing_signers(&mut context, &instruction, &vec![old_authority])
+        process_instruction_test_missing_signers(&mut context, &instruction, &vec![old_authority])
             .await;
 
         let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
@@ -706,7 +705,8 @@ async fn test_authorize() {
         StakeAuthorize::Staker,
         None,
     );
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&withdrawers[2]]).await;
+    process_instruction_test_missing_signers(&mut context, &instruction, &vec![&withdrawers[2]])
+        .await;
 
     let (meta, _, _) = get_stake_account(&mut context.banks_client, &stake).await;
     assert_eq!(meta.authorized.staker, stakers[0].pubkey());
@@ -729,7 +729,7 @@ async fn test_authorize() {
 }
 
 #[tokio::test]
-async fn test_stake_delegate() {
+async fn program_test_stake_delegate() {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -760,7 +760,8 @@ async fn test_stake_delegate() {
         create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
     let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
 
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+    process_instruction_test_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
+        .await;
 
     // verify that delegate() looks right
     let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
@@ -989,7 +990,7 @@ impl StakeLifecycle {
 #[test_case(StakeLifecycle::Deactivating; "deactivating")]
 #[test_case(StakeLifecycle::Deactive; "deactive")]
 #[tokio::test]
-async fn test_split(split_source_type: StakeLifecycle) {
+async fn program_test_split(split_source_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1087,7 +1088,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
         staked_amount / 2,
         &split_dest,
     )[2];
-    test_instruction_with_missing_signers(&mut context, instruction, &signers).await;
+    process_instruction_test_missing_signers(&mut context, instruction, &signers).await;
 
     // source lost split amount
     let source_lamports = get_account(&mut context.banks_client, &split_source)
@@ -1139,7 +1140,7 @@ async fn test_split(split_source_type: StakeLifecycle) {
 #[test_case(StakeLifecycle::Deactivating; "deactivating")]
 #[test_case(StakeLifecycle::Deactive; "deactive")]
 #[tokio::test]
-async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
+async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1220,7 +1221,7 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             reward_amount,
             None,
         );
-        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
 
         let recipient_lamports = get_account(&mut context.banks_client, &recipient)
             .await
@@ -1238,7 +1239,7 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             staked_amount,
             None,
         );
-        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
 
         let recipient_lamports = get_account(&mut context.banks_client, &recipient)
             .await
@@ -1262,7 +1263,7 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             staked_amount + stake_rent_exempt_reserve,
             None,
         );
-        test_instruction_with_missing_signers(&mut context, &instruction, &signers).await;
+        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
 
         let recipient_lamports = get_account(&mut context.banks_client, &recipient)
             .await
@@ -1302,7 +1303,7 @@ async fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
 #[test_case(false; "activating")]
 #[test_case(true; "active")]
 #[tokio::test]
-async fn test_deactivate(activate: bool) {
+async fn program_test_deactivate(activate: bool) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1348,7 +1349,8 @@ async fn test_deactivate(activate: bool) {
 
     // deactivate succeeds
     let instruction = ixn::deactivate_stake(&stake, &staker);
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+    process_instruction_test_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
+        .await;
 
     let clock = context.banks_client.get_sysvar::<Clock>().await.unwrap();
     let (_, stake_data, _) = get_stake_account(&mut context.banks_client, &stake).await;
@@ -1384,7 +1386,7 @@ async fn test_deactivate(activate: bool) {
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
 )]
 #[tokio::test]
-async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
+async fn program_test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
@@ -1476,8 +1478,12 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
 
     // failure can result in various different errors... dont worry about it for now
     if is_merge_allowed_by_type {
-        test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
-            .await;
+        process_instruction_test_missing_signers(
+            &mut context,
+            &instruction,
+            &vec![&staker_keypair],
+        )
+        .await;
 
         let dest_lamports = get_account(&mut context.banks_client, &merge_dest)
             .await
@@ -1499,7 +1505,7 @@ async fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLif
     [false, true]
 )]
 #[tokio::test]
-async fn test_move_stake(
+async fn program_test_move_stake(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     full_move: bool,
@@ -1677,7 +1683,8 @@ async fn test_move_stake(
         },
     );
 
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+    process_instruction_test_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
+        .await;
 
     if full_move {
         let (_, option_source_stake, source_lamports) =
@@ -1751,7 +1758,7 @@ async fn test_move_stake(
     [false, true]
 )]
 #[tokio::test]
-async fn test_move_lamports(
+async fn program_test_move_lamports(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     different_votes: bool,
@@ -1918,7 +1925,8 @@ async fn test_move_lamports(
         source_excess,
     );
 
-    test_instruction_with_missing_signers(&mut context, &instruction, &vec![&staker_keypair]).await;
+    process_instruction_test_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
+        .await;
 
     let (_, _, after_source_lamports) =
         get_stake_account(&mut context.banks_client, &move_source).await;
@@ -1962,7 +1970,7 @@ async fn test_move_lamports(
     [false, true]
 )]
 #[tokio::test]
-async fn test_move_uninitialized_fail(
+async fn program_test_move_uninitialized_fail(
     move_types: (StakeLifecycle, StakeLifecycle),
     move_lamports: bool,
 ) {
@@ -2032,7 +2040,7 @@ async fn test_move_uninitialized_fail(
     [false, true]
 )]
 #[tokio::test]
-async fn test_move_general_fail(
+async fn program_test_move_general_fail(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     move_lamports: bool,
