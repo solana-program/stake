@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct DelegateStake {
     /// Initialized stake account to be delegated
     pub stake: solana_program::pubkey::Pubkey,
@@ -56,7 +57,7 @@ impl DelegateStake {
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&DelegateStakeInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -298,7 +299,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&DelegateStakeInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,

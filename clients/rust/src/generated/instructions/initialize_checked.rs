@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct InitializeChecked {
     /// Uninitialized stake account
     pub stake: solana_program::pubkey::Pubkey,
@@ -45,9 +46,7 @@ impl InitializeChecked {
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = InitializeCheckedInstructionData::new()
-            .try_to_vec()
-            .unwrap();
+        let data = borsh::to_vec(&InitializeCheckedInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -258,9 +257,7 @@ impl<'a, 'b> InitializeCheckedCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = InitializeCheckedInstructionData::new()
-            .try_to_vec()
-            .unwrap();
+        let data = borsh::to_vec(&InitializeCheckedInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
