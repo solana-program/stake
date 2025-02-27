@@ -16,8 +16,6 @@ import {
   getStructEncoder,
   getU32Decoder,
   getU32Encoder,
-  getU8Decoder,
-  getU8Encoder,
   getUtf8Decoder,
   getUtf8Encoder,
   transformEncoder,
@@ -47,7 +45,7 @@ import {
 export const AUTHORIZE_WITH_SEED_DISCRIMINATOR = 8;
 
 export function getAuthorizeWithSeedDiscriminatorBytes() {
-  return getU8Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
+  return getU32Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
 }
 
 export type AuthorizeWithSeedInstruction<
@@ -98,7 +96,7 @@ export type AuthorizeWithSeedInstructionDataArgs = {
 export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['newAuthorizedPubkey', getAddressEncoder()],
       ['stakeAuthorize', getStakeAuthorizeEncoder()],
       [
@@ -113,7 +111,7 @@ export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeW
 
 export function getAuthorizeWithSeedInstructionDataDecoder(): Decoder<AuthorizeWithSeedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['newAuthorizedPubkey', getAddressDecoder()],
     ['stakeAuthorize', getStakeAuthorizeDecoder()],
     ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],

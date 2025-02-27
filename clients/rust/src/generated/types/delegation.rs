@@ -11,7 +11,6 @@ use {
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Delegation {
     #[cfg_attr(
         feature = "serde",

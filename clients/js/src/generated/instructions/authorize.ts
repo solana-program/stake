@@ -12,8 +12,8 @@ import {
   getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -41,7 +41,7 @@ import {
 export const AUTHORIZE_DISCRIMINATOR = 1;
 
 export function getAuthorizeDiscriminatorBytes() {
-  return getU8Encoder().encode(AUTHORIZE_DISCRIMINATOR);
+  return getU32Encoder().encode(AUTHORIZE_DISCRIMINATOR);
 }
 
 export type AuthorizeInstruction<
@@ -89,7 +89,7 @@ export type AuthorizeInstructionDataArgs = {
 export function getAuthorizeInstructionDataEncoder(): Encoder<AuthorizeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['arg0', getAddressEncoder()],
       ['arg1', getStakeAuthorizeEncoder()],
     ]),
@@ -99,7 +99,7 @@ export function getAuthorizeInstructionDataEncoder(): Encoder<AuthorizeInstructi
 
 export function getAuthorizeInstructionDataDecoder(): Decoder<AuthorizeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['arg0', getAddressDecoder()],
     ['arg1', getStakeAuthorizeDecoder()],
   ]);

@@ -14,10 +14,10 @@ import {
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -40,7 +40,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
 
 export function getSetLockupCheckedDiscriminatorBytes() {
-  return getU8Encoder().encode(SET_LOCKUP_CHECKED_DISCRIMINATOR);
+  return getU32Encoder().encode(SET_LOCKUP_CHECKED_DISCRIMINATOR);
 }
 
 export type SetLockupCheckedInstruction<
@@ -82,7 +82,7 @@ export type SetLockupCheckedInstructionDataArgs = {
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['unixTimestamp', getOptionEncoder(getI64Encoder())],
       ['epoch', getOptionEncoder(getU64Encoder())],
     ]),
@@ -92,7 +92,7 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['unixTimestamp', getOptionDecoder(getI64Decoder())],
     ['epoch', getOptionDecoder(getU64Decoder())],
   ]);

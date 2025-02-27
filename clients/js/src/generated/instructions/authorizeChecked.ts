@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -39,7 +39,7 @@ import {
 export const AUTHORIZE_CHECKED_DISCRIMINATOR = 10;
 
 export function getAuthorizeCheckedDiscriminatorBytes() {
-  return getU8Encoder().encode(AUTHORIZE_CHECKED_DISCRIMINATOR);
+  return getU32Encoder().encode(AUTHORIZE_CHECKED_DISCRIMINATOR);
 }
 
 export type AuthorizeCheckedInstruction<
@@ -90,7 +90,7 @@ export type AuthorizeCheckedInstructionDataArgs = {
 export function getAuthorizeCheckedInstructionDataEncoder(): Encoder<AuthorizeCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['stakeAuthorize', getStakeAuthorizeEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_CHECKED_DISCRIMINATOR })
@@ -99,7 +99,7 @@ export function getAuthorizeCheckedInstructionDataEncoder(): Encoder<AuthorizeCh
 
 export function getAuthorizeCheckedInstructionDataDecoder(): Decoder<AuthorizeCheckedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['stakeAuthorize', getStakeAuthorizeDecoder()],
   ]);
 }
