@@ -36,12 +36,12 @@
     "template:upgrade": "tsx ./scripts/helpers/upgrade-template.ts"
   },
   "devDependencies": {
-    "@codama/nodes-from-anchor": "^1.1.0",
-    "@codama/renderers-js": "^1.1.1",
-    "@codama/renderers-rust": "^1.0.6",
+    "@codama/nodes-from-anchor": "^1.1.6",
+    "@codama/renderers-js": "^1.2.5",
+    "@codama/renderers-rust": "^1.0.14",
     "@iarna/toml": "^2.2.5",
     "@metaplex-foundation/shank-js": "^0.1.7",
-    "codama": "^1.2.0",
+    "codama": "^1.2.6",
     "tsx": "^4.19.2",
     "typescript": "^5.5.2",
     "zx": "^7.2.3"
