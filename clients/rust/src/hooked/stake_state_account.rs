@@ -24,8 +24,8 @@ impl StakeStateAccount {
     }
 
     pub fn stake(&self) -> Option<Stake> {
-        match self.state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => Some(stake),
+        match &self.state {
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => Some(stake.clone()),
             StakeStateV2::Uninitialized
             | StakeStateV2::Initialized(_)
             | StakeStateV2::RewardsPool => None,
@@ -42,8 +42,8 @@ impl StakeStateAccount {
     }
 
     pub fn stake_flags(&self) -> Option<StakeFlags> {
-        match self.state {
-            StakeStateV2::Stake(_meta, _stake, stake_flags) => Some(stake_flags),
+        match &self.state {
+            StakeStateV2::Stake(_meta, _stake, stake_flags) => Some(stake_flags.clone()),
             StakeStateV2::Uninitialized
             | StakeStateV2::Initialized(_)
             | StakeStateV2::RewardsPool => None,
@@ -60,8 +60,8 @@ impl StakeStateAccount {
     }
 
     pub fn delegation(&self) -> Option<Delegation> {
-        match self.state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => Some(stake.delegation),
+        match &self.state {
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => Some(stake.delegation.clone()),
             StakeStateV2::Uninitialized
             | StakeStateV2::Initialized(_)
             | StakeStateV2::RewardsPool => None,
@@ -78,9 +78,9 @@ impl StakeStateAccount {
     }
 
     pub fn authorized(&self) -> Option<Authorized> {
-        match self.state {
-            StakeStateV2::Stake(meta, _stake, _stake_flags) => Some(meta.authorized),
-            StakeStateV2::Initialized(meta) => Some(meta.authorized),
+        match &self.state {
+            StakeStateV2::Stake(meta, _stake, _stake_flags) => Some(meta.authorized.clone()),
+            StakeStateV2::Initialized(meta) => Some(meta.authorized.clone()),
             StakeStateV2::Uninitialized | StakeStateV2::RewardsPool => None,
         }
     }
@@ -90,9 +90,9 @@ impl StakeStateAccount {
     }
 
     pub fn meta(&self) -> Option<Meta> {
-        match self.state {
-            StakeStateV2::Stake(meta, _stake, _stake_flags) => Some(meta),
-            StakeStateV2::Initialized(meta) => Some(meta),
+        match &self.state {
+            StakeStateV2::Stake(meta, _stake, _stake_flags) => Some(meta.clone()),
+            StakeStateV2::Initialized(meta) => Some(meta.clone()),
             StakeStateV2::Uninitialized | StakeStateV2::RewardsPool => None,
         }
     }
