@@ -169,6 +169,17 @@ codama.update(
     },
     {
       // enum discriminator -> u32
+      select: '[definedTypeNode]stakeState.[enumTypeNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'enumTypeNode');
+        return {
+          ...node,
+          size: c.numberTypeNode('u32'),
+        };
+      },
+    },
+    {
+      // enum discriminator -> u32
       select: '[definedTypeNode]stakeStateV2.[enumTypeNode]',
       transform: (node) => {
         c.assertIsNode(node, 'enumTypeNode');
@@ -207,5 +218,17 @@ codama.accept(
     crateFolder: rustClient,
     anchorTraits: false,
     toolchain: getToolchainArgument('format'),
+    traitOptions: {
+      baseDefaults: [
+        'borsh::BorshSerialize',
+        'borsh::BorshDeserialize',
+        'serde::Serialize',
+        'serde::Deserialize',
+        'Clone',
+        'Debug',
+        // 'Eq', <- Remove 'Eq' from the default traits.
+        'PartialEq',
+      ],
+    },
   })
 );
