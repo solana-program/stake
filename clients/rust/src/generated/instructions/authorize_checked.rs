@@ -78,10 +78,10 @@ impl AuthorizeChecked {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeCheckedInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl AuthorizeCheckedInstructionData {
@@ -96,7 +96,7 @@ impl Default for AuthorizeCheckedInstructionData {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeCheckedInstructionArgs {
     pub stake_authorize: StakeAuthorize,

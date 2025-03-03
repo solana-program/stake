@@ -10,7 +10,8 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Stake {
     pub delegation: Delegation,
     pub credits_observed: u64,

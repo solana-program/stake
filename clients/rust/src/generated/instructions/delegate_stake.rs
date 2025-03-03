@@ -67,10 +67,10 @@ impl DelegateStake {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DelegateStakeInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl DelegateStakeInstructionData {

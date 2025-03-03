@@ -57,10 +57,10 @@ impl MoveStake {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl MoveStakeInstructionData {
@@ -75,7 +75,7 @@ impl Default for MoveStakeInstructionData {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionArgs {
     pub args: u64,

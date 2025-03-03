@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -33,7 +33,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const DEACTIVATE_DISCRIMINATOR = 5;
 
 export function getDeactivateDiscriminatorBytes() {
-  return getU8Encoder().encode(DEACTIVATE_DISCRIMINATOR);
+  return getU32Encoder().encode(DEACTIVATE_DISCRIMINATOR);
 }
 
 export type DeactivateInstruction<
@@ -68,13 +68,13 @@ export type DeactivateInstructionDataArgs = {};
 
 export function getDeactivateInstructionDataEncoder(): Encoder<DeactivateInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: DEACTIVATE_DISCRIMINATOR })
   );
 }
 
 export function getDeactivateInstructionDataDecoder(): Decoder<DeactivateInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getDeactivateInstructionDataCodec(): Codec<
