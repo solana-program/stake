@@ -11,7 +11,7 @@ import {
   type Address,
   type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
   type SolanaError,
-} from '@solana/web3.js';
+} from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const STAKE_ERROR__NO_CREDITS_TO_REDEEM = 0x0; // 0
