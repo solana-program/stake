@@ -10,7 +10,7 @@ use {
 };
 #[cfg(feature = "bincode")]
 use {
-    crate::{config, program::ID, state::StakeStateV2},
+    crate::{program::ID, state::StakeStateV2},
     solana_instruction::{AccountMeta, Instruction},
 };
 
@@ -63,8 +63,7 @@ pub enum StakeInstruction {
     ///   1. `[]` Vote account to which this stake will be delegated
     ///   2. `[]` Clock sysvar
     ///   3. `[]` Stake history sysvar that carries stake warmup/cooldown history
-    ///   4. `[]` Unused account, formerly the stake config
-    ///   5. `[SIGNER]` Stake authority
+    ///   4. `[SIGNER]` Stake authority
     ///
     /// The entire balance of the staking account is staked. `DelegateStake`
     /// can be called multiple times, but re-delegation is delayed by one epoch.
@@ -242,8 +241,7 @@ pub enum StakeInstruction {
     ///      plus rent exempt minimum
     ///   1. `[WRITE]` Uninitialized stake account that will hold the redelegated stake
     ///   2. `[]` Vote account to which this stake will be re-delegated
-    ///   3. `[]` Unused account, formerly the stake config
-    ///   4. `[SIGNER]` Stake authority
+    ///   3. `[SIGNER]` Stake authority
     ///
     #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
     Redelegate,
@@ -703,8 +701,6 @@ pub fn delegate_stake(
         AccountMeta::new_readonly(*vote_pubkey, false),
         AccountMeta::new_readonly(CLOCK_ID, false),
         AccountMeta::new_readonly(STAKE_HISTORY_ID, false),
-        // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
     Instruction::new_with_bincode(ID, &StakeInstruction::DelegateStake, account_metas)
@@ -811,8 +807,6 @@ fn _redelegate(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new(*uninitialized_stake_pubkey, false),
         AccountMeta::new_readonly(*vote_pubkey, false),
-        // For backwards compatibility we pass the stake config, although this account is unused
-        AccountMeta::new_readonly(config::ID, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
     Instruction::new_with_bincode(ID, &StakeInstruction::Redelegate, account_metas)
