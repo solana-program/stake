@@ -48,7 +48,7 @@ jobs:
         run: pnpm js:lint
 
       - name: Build Programs
-        run: pnpm programs:build
+        run: pnpm program:build
 
       - name: Test JS Client
         run: pnpm js:test
