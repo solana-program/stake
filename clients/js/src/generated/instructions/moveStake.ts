@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -34,7 +34,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MOVE_STAKE_DISCRIMINATOR = 16;
 
 export function getMoveStakeDiscriminatorBytes() {
-  return getU8Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
+  return getU32Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
 }
 
 export type MoveStakeInstruction<
@@ -68,7 +68,7 @@ export type MoveStakeInstructionDataArgs = { args: number | bigint };
 export function getMoveStakeInstructionDataEncoder(): Encoder<MoveStakeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['args', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: MOVE_STAKE_DISCRIMINATOR })
@@ -77,7 +77,7 @@ export function getMoveStakeInstructionDataEncoder(): Encoder<MoveStakeInstructi
 
 export function getMoveStakeInstructionDataDecoder(): Decoder<MoveStakeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['args', getU64Decoder()],
   ]);
 }

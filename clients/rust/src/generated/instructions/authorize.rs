@@ -12,6 +12,7 @@ use {
 };
 
 /// Accounts.
+#[derive(Debug)]
 pub struct Authorize {
     /// Stake account to be updated
     pub stake: solana_program::pubkey::Pubkey,
@@ -60,8 +61,8 @@ impl Authorize {
             ));
         }
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = AuthorizeInstructionData::new().try_to_vec().unwrap();
-        let mut args = args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&AuthorizeInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&args).unwrap();
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
@@ -72,9 +73,10 @@ impl Authorize {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl AuthorizeInstructionData {
@@ -89,7 +91,7 @@ impl Default for AuthorizeInstructionData {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeInstructionArgs {
     pub arg0: Pubkey,
@@ -302,8 +304,8 @@ impl<'a, 'b> AuthorizeCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = AuthorizeInstructionData::new().try_to_vec().unwrap();
-        let mut args = self.__args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&AuthorizeInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&self.__args).unwrap();
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {

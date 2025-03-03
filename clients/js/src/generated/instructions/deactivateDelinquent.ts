@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -30,7 +30,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const DEACTIVATE_DELINQUENT_DISCRIMINATOR = 14;
 
 export function getDeactivateDelinquentDiscriminatorBytes() {
-  return getU8Encoder().encode(DEACTIVATE_DELINQUENT_DISCRIMINATOR);
+  return getU32Encoder().encode(DEACTIVATE_DELINQUENT_DISCRIMINATOR);
 }
 
 export type DeactivateDelinquentInstruction<
@@ -62,7 +62,7 @@ export type DeactivateDelinquentInstructionDataArgs = {};
 
 export function getDeactivateDelinquentInstructionDataEncoder(): Encoder<DeactivateDelinquentInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({
       ...value,
       discriminator: DEACTIVATE_DELINQUENT_DISCRIMINATOR,
@@ -71,7 +71,7 @@ export function getDeactivateDelinquentInstructionDataEncoder(): Encoder<Deactiv
 }
 
 export function getDeactivateDelinquentInstructionDataDecoder(): Decoder<DeactivateDelinquentInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getDeactivateDelinquentInstructionDataCodec(): Codec<

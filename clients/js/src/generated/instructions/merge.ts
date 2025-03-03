@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type Address,
   type Codec,
@@ -33,7 +33,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MERGE_DISCRIMINATOR = 7;
 
 export function getMergeDiscriminatorBytes() {
-  return getU8Encoder().encode(MERGE_DISCRIMINATOR);
+  return getU32Encoder().encode(MERGE_DISCRIMINATOR);
 }
 
 export type MergeInstruction<
@@ -76,13 +76,13 @@ export type MergeInstructionDataArgs = {};
 
 export function getMergeInstructionDataEncoder(): Encoder<MergeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: MERGE_DISCRIMINATOR })
   );
 }
 
 export function getMergeInstructionDataDecoder(): Decoder<MergeInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getMergeInstructionDataCodec(): Codec<

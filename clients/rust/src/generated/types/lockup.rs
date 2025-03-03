@@ -10,7 +10,7 @@ use {
     solana_program::pubkey::Pubkey,
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lockup {
     pub unix_timestamp: i64,

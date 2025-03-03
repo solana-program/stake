@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct SetLockupChecked {
     /// Initialized stake account
     pub stake: solana_program::pubkey::Pubkey,
@@ -50,8 +51,8 @@ impl SetLockupChecked {
             ));
         }
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = SetLockupCheckedInstructionData::new().try_to_vec().unwrap();
-        let mut args = args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&SetLockupCheckedInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&args).unwrap();
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
@@ -62,9 +63,10 @@ impl SetLockupChecked {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl SetLockupCheckedInstructionData {
@@ -79,7 +81,7 @@ impl Default for SetLockupCheckedInstructionData {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionArgs {
     pub unix_timestamp: Option<i64>,
@@ -273,8 +275,8 @@ impl<'a, 'b> SetLockupCheckedCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = SetLockupCheckedInstructionData::new().try_to_vec().unwrap();
-        let mut args = self.__args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&SetLockupCheckedInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&self.__args).unwrap();
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {

@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct Withdraw {
     /// Stake account from which to withdraw
     pub stake: solana_program::pubkey::Pubkey,
@@ -68,8 +69,8 @@ impl Withdraw {
             ));
         }
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = WithdrawInstructionData::new().try_to_vec().unwrap();
-        let mut args = args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&WithdrawInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&args).unwrap();
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
@@ -80,9 +81,10 @@ impl Withdraw {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WithdrawInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl WithdrawInstructionData {
@@ -97,7 +99,7 @@ impl Default for WithdrawInstructionData {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WithdrawInstructionArgs {
     pub args: u64,
@@ -343,8 +345,8 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = WithdrawInstructionData::new().try_to_vec().unwrap();
-        let mut args = self.__args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&WithdrawInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&self.__args).unwrap();
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {

@@ -4,10 +4,12 @@ import * as c from 'codama';
 import { rootNodeFromAnchor } from '@codama/nodes-from-anchor';
 import { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
 import { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';
-import { getToolchainArgument } from './utils.mjs';
+import { getToolchainArgument, workingDirectory } from './utils.mjs';
 
 // Instanciate Codama from the IDL.
-const idl = require(path.join(__dirname, '..', 'interface', 'idl.json'));
+const idl = JSON.parse(
+  fs.readFileSync(path.join(workingDirectory, 'interface', 'idl.json'), 'utf-8')
+);
 const codama = c.createFromRoot(rootNodeFromAnchor(idl));
 
 // Rename the program.
@@ -167,6 +169,17 @@ codama.update(
     },
     {
       // enum discriminator -> u32
+      select: '[definedTypeNode]stakeState.[enumTypeNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'enumTypeNode');
+        return {
+          ...node,
+          size: c.numberTypeNode('u32'),
+        };
+      },
+    },
+    {
+      // enum discriminator -> u32
       select: '[definedTypeNode]stakeStateV2.[enumTypeNode]',
       transform: (node) => {
         c.assertIsNode(node, 'enumTypeNode');
@@ -180,10 +193,12 @@ codama.update(
 );
 
 // Render JavaScript.
-const jsClient = path.join(__dirname, '..', 'clients', 'js');
+const jsClient = path.join(workingDirectory, 'clients', 'js');
 codama.accept(
   renderJavaScriptVisitor(path.join(jsClient, 'src', 'generated'), {
-    prettierOptions: require(path.join(jsClient, '.prettierrc.json')),
+    prettierOptions: JSON.parse(
+      fs.readFileSync(path.join(jsClient, '.prettierrc.json'), 'utf-8')
+    ),
   })
 );
 
@@ -196,7 +211,7 @@ codama.update(
 );
 
 // Render Rust.
-const rustClient = path.join(__dirname, '..', 'clients', 'rust');
+const rustClient = path.join(workingDirectory, 'clients', 'rust');
 codama.accept(
   renderRustVisitor(path.join(rustClient, 'src', 'generated'), {
     formatCode: true,
@@ -204,74 +219,16 @@ codama.accept(
     anchorTraits: false,
     toolchain: getToolchainArgument('format'),
     traitOptions: {
-      overrides: {
-        authorized: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'Eq',
-          'PartialEq',
-        ],
-        delegation: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-        lockup: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'Eq',
-          'PartialEq',
-        ],
-        meta: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-        stake: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-        stakeFlags: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-        stakeState: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-        stakeStateV2: [
-          'borsh::BorshSerialize',
-          'borsh::BorshDeserialize',
-          'Clone',
-          'Copy',
-          'Debug',
-          'PartialEq',
-        ],
-      },
+      baseDefaults: [
+        'borsh::BorshSerialize',
+        'borsh::BorshDeserialize',
+        'serde::Serialize',
+        'serde::Deserialize',
+        'Clone',
+        'Debug',
+        // 'Eq', <- Remove 'Eq' from the default traits.
+        'PartialEq',
+      ],
     },
   })
 );
