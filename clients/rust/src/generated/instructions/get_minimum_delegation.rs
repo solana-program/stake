@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct GetMinimumDelegation {}
 
 impl GetMinimumDelegation {
@@ -21,9 +22,7 @@ impl GetMinimumDelegation {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(remaining_accounts.len());
         accounts.extend_from_slice(remaining_accounts);
-        let data = GetMinimumDelegationInstructionData::new()
-            .try_to_vec()
-            .unwrap();
+        let data = borsh::to_vec(&GetMinimumDelegationInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -33,7 +32,8 @@ impl GetMinimumDelegation {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GetMinimumDelegationInstructionData {
     discriminator: u8,
 }
@@ -140,9 +140,7 @@ impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = GetMinimumDelegationInstructionData::new()
-            .try_to_vec()
-            .unwrap();
+        let data = borsh::to_vec(&GetMinimumDelegationInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,

@@ -11,7 +11,6 @@ use {
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Meta {
     pub rent_exempt_reserve: u64,
     pub authorized: Authorized,

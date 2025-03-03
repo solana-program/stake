@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct Deactivate {
     /// Delegated stake account
     pub stake: solana_program::pubkey::Pubkey,
@@ -39,7 +40,7 @@ impl Deactivate {
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = DeactivateInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&DeactivateInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -49,7 +50,8 @@ impl Deactivate {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeactivateInstructionData {
     discriminator: u8,
 }
@@ -226,7 +228,7 @@ impl<'a, 'b> DeactivateCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = DeactivateInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&DeactivateInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,

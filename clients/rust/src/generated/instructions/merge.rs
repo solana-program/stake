@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct Merge {
     /// Destination stake account
     pub destination_stake: solana_program::pubkey::Pubkey,
@@ -52,7 +53,7 @@ impl Merge {
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = MergeInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&MergeInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -62,7 +63,8 @@ impl Merge {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MergeInstructionData {
     discriminator: u8,
 }
@@ -280,7 +282,7 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = MergeInstructionData::new().try_to_vec().unwrap();
+        let data = borsh::to_vec(&MergeInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,

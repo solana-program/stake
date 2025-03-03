@@ -8,6 +8,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
+#[derive(Debug)]
 pub struct MoveLamports {
     /// Active or inactive source stake account
     pub source_stake: solana_program::pubkey::Pubkey,
@@ -44,8 +45,8 @@ impl MoveLamports {
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = MoveLamportsInstructionData::new().try_to_vec().unwrap();
-        let mut args = args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&MoveLamportsInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&args).unwrap();
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
@@ -56,7 +57,8 @@ impl MoveLamports {
     }
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveLamportsInstructionData {
     discriminator: u8,
 }
@@ -254,8 +256,8 @@ impl<'a, 'b> MoveLamportsCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = MoveLamportsInstructionData::new().try_to_vec().unwrap();
-        let mut args = self.__args.try_to_vec().unwrap();
+        let mut data = borsh::to_vec(&MoveLamportsInstructionData::new()).unwrap();
+        let mut args = borsh::to_vec(&self.__args).unwrap();
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {

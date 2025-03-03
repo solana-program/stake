@@ -4,10 +4,11 @@ import * as c from 'codama';
 import { rootNodeFromAnchor } from '@codama/nodes-from-anchor';
 import { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
 import { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';
-import { getToolchainArgument } from './utils.mjs';
+import { getToolchainArgument, workingDirectory } from './utils.mjs';
 
 // Instanciate Codama from the IDL.
-const idl = require(path.join(__dirname, '..', 'interface', 'idl.json'));
+const idlPath = path.join(workingDirectory, 'interface', 'idl.json');
+const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
 const codama = c.createFromRoot(rootNodeFromAnchor(idl));
 
 // Rename the program.
@@ -180,10 +181,12 @@ codama.update(
 );
 
 // Render JavaScript.
-const jsClient = path.join(__dirname, '..', 'clients', 'js');
+const jsClient = path.join(workingDirectory, 'clients', 'js');
 codama.accept(
   renderJavaScriptVisitor(path.join(jsClient, 'src', 'generated'), {
-    prettierOptions: require(path.join(jsClient, '.prettierrc.json')),
+    prettierOptions: JSON.parse(
+      fs.readFileSync(path.join(jsClient, '.prettierrc.json'), 'utf-8')
+    ),
   })
 );
 
@@ -196,7 +199,7 @@ codama.update(
 );
 
 // Render Rust.
-const rustClient = path.join(__dirname, '..', 'clients', 'rust');
+const rustClient = path.join(workingDirectory, 'clients', 'rust');
 codama.accept(
   renderRustVisitor(path.join(rustClient, 'src', 'generated'), {
     formatCode: true,
