@@ -18,7 +18,7 @@ Alternatively, you can go into the client directory and run the tests directly.
 
 ```sh
 # Build your programs and start the validator.
-pnpm programs:build
+pnpm program:build
 pnpm validator:restart
 
 # Go into the client directory and run the tests.

@@ -24,7 +24,7 @@ Whenever you add a new program folder to this repository, remember to add it to 
 That way, your programs will be recognized by the following scripts that allow you to build, test, format and lint your programs respectively.
 
 ```sh
-pnpm programs:build
+pnpm program:build
 pnpm programs:test
 pnpm programs:format
 pnpm programs:lint
@@ -98,6 +98,6 @@ program-dependencies = [
 Next time you build your program and run your validator, these external programs will automatically be fetched from mainnet and used in your local validator.
 
 ```sh
-pnpm programs:build
+pnpm program:build
 pnpm validator:restart
 ```
