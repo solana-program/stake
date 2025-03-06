@@ -14,10 +14,17 @@ license = "Apache-2.0"
 edition = "2021"
 
 [workspace.metadata.cli]
-solana = "2.1.0"
+solana = "2.2.0"
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(feature, values("custom-heap", "custom-panic", "frozen-abi", "no-entrypoint"))',
+]
 
 [workspace.metadata.toolchains]
-build = "1.81.0"
-format = "nightly-2024-08-08"
-lint = "nightly-2024-08-08"
-test = "nightly-2024-08-08"
+build = "1.84.1"
+format = "nightly-2024-11-22"
+lint = "nightly-2024-11-22"
+test = "nightly-2024-11-22"
