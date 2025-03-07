@@ -5288,6 +5288,7 @@ dependencies = [
  "static_assertions",
  "strum",
  "strum_macros",
+ "test-case",
 ]
 
 [[package]]
