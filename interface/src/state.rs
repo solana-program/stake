@@ -1047,17 +1047,16 @@ impl borsh0_10::ser::BorshSerialize for Stake {
     }
 }
 
+#[cfg(all(feature = "borsh", feature = "bincode"))]
 #[cfg(test)]
 mod tests {
     use {
         super::*,
+        crate::stake_history::{StakeHistory, StakeHistoryGetEntry},
         solana_account::{state_traits::StateMut, create_account_shared_data_for_test, AccountSharedData, ReadableAccount},
         solana_epoch_schedule::EpochSchedule,
-        solana_program_runtime::with_mock_invoke_context,
+        solana_program::{sysvar::{epoch_schedule}},
         solana_pubkey::Pubkey,
-        solana_sdk_ids::sysvar::epoch_schedule,
-        // XXX solana_stake_interface::state::warmup_cooldown_rate,
-        solana_sysvar::stake_history::StakeHistory,
         solana_sysvar_id::SysvarId,
         test_case::test_case,
     };
