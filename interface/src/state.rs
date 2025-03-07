@@ -1047,22 +1047,17 @@ impl borsh0_10::ser::BorshSerialize for Stake {
     }
 }
 
-#[cfg(test, all(feature = "borsh", feature = "bincode"))]
+#[cfg(all(feature = "borsh", feature = "bincode"))]
+#[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::stake_history::{StakeHistory, StakeHistoryGetEntry},
+        crate::stake_history::StakeHistory,
         assert_matches::assert_matches,
         bincode::serialize,
-        solana_account::{
-            create_account_shared_data_for_test, state_traits::StateMut, AccountSharedData,
-            ReadableAccount,
-        },
-        solana_borsh::v1::{ try_from_slice_unchecked},
-        solana_epoch_schedule::EpochSchedule,
-        solana_program::sysvar::epoch_schedule,
+        solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
+        solana_borsh::v1::try_from_slice_unchecked,
         solana_pubkey::Pubkey,
-        solana_sysvar_id::SysvarId,
         test_case::test_case,
     };
 
@@ -1072,6 +1067,20 @@ mod tests {
 
     fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stake> {
         from(account).and_then(|state: StakeStateV2| state.stake())
+    }
+
+    fn new_stake_history_entry<'a, I>(
+        epoch: Epoch,
+        stakes: I,
+        history: &StakeHistory,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> StakeHistoryEntry
+    where
+        I: Iterator<Item = &'a Delegation>,
+    {
+        stakes.fold(StakeHistoryEntry::default(), |sum, stake| {
+            sum + stake.stake_activating_and_deactivating(epoch, history, new_rate_activation_epoch)
+        })
     }
 
     fn create_stake_history_from_delegations(
