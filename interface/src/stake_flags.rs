@@ -106,7 +106,7 @@ impl Default for StakeFlags {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
