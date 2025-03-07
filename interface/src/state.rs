@@ -1049,11 +1049,840 @@ impl borsh0_10::ser::BorshSerialize for Stake {
 
 #[cfg(all(feature = "borsh", feature = "bincode"))]
 #[cfg(test)]
-mod test {
+mod tests {
     use {
-        super::*, assert_matches::assert_matches, bincode::serialize,
+        super::*,
+        crate::stake_history::StakeHistory,
+        assert_matches::assert_matches,
+        bincode::serialize,
+        solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
         solana_borsh::v1::try_from_slice_unchecked,
+        solana_pubkey::Pubkey,
+        test_case::test_case,
     };
+
+    fn from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<StakeStateV2> {
+        account.state().ok()
+    }
+
+    fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stake> {
+        from(account).and_then(|state: StakeStateV2| state.stake())
+    }
+
+    fn new_stake_history_entry<'a, I>(
+        epoch: Epoch,
+        stakes: I,
+        history: &StakeHistory,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> StakeHistoryEntry
+    where
+        I: Iterator<Item = &'a Delegation>,
+    {
+        stakes.fold(StakeHistoryEntry::default(), |sum, stake| {
+            sum + stake.stake_activating_and_deactivating(epoch, history, new_rate_activation_epoch)
+        })
+    }
+
+    fn create_stake_history_from_delegations(
+        bootstrap: Option<u64>,
+        epochs: std::ops::Range<Epoch>,
+        delegations: &[Delegation],
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> StakeHistory {
+        let mut stake_history = StakeHistory::default();
+
+        let bootstrap_delegation = if let Some(bootstrap) = bootstrap {
+            vec![Delegation {
+                activation_epoch: u64::MAX,
+                stake: bootstrap,
+                ..Delegation::default()
+            }]
+        } else {
+            vec![]
+        };
+
+        for epoch in epochs {
+            let entry = new_stake_history_entry(
+                epoch,
+                delegations.iter().chain(bootstrap_delegation.iter()),
+                &stake_history,
+                new_rate_activation_epoch,
+            );
+            stake_history.add(epoch, entry);
+        }
+
+        stake_history
+    }
+
+    #[test]
+    fn test_authorized_authorize() {
+        let staker = Pubkey::new_unique();
+        let mut authorized = Authorized::auto(&staker);
+        let mut signers = HashSet::new();
+        assert_eq!(
+            authorized.authorize(&signers, &staker, StakeAuthorize::Staker, None),
+            Err(InstructionError::MissingRequiredSignature)
+        );
+        signers.insert(staker);
+        assert_eq!(
+            authorized.authorize(&signers, &staker, StakeAuthorize::Staker, None),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn test_authorized_authorize_with_custodian() {
+        let staker = Pubkey::new_unique();
+        let custodian = Pubkey::new_unique();
+        let invalid_custodian = Pubkey::new_unique();
+        let mut authorized = Authorized::auto(&staker);
+        let mut signers = HashSet::new();
+        signers.insert(staker);
+
+        let lockup = Lockup {
+            epoch: 1,
+            unix_timestamp: 1,
+            custodian,
+        };
+        let clock = Clock {
+            epoch: 0,
+            unix_timestamp: 0,
+            ..Clock::default()
+        };
+
+        // No lockup, no custodian
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&Lockup::default(), &clock, None))
+            ),
+            Ok(())
+        );
+
+        // No lockup, invalid custodian not a signer
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&Lockup::default(), &clock, Some(&invalid_custodian)))
+            ),
+            Ok(()) // <== invalid custodian doesn't matter, there's no lockup
+        );
+
+        // Lockup active, invalid custodian not a signer
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&lockup, &clock, Some(&invalid_custodian)))
+            ),
+            Err(StakeError::CustodianSignatureMissing.into()),
+        );
+
+        signers.insert(invalid_custodian);
+
+        // No lockup, invalid custodian is a signer
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&Lockup::default(), &clock, Some(&invalid_custodian)))
+            ),
+            Ok(()) // <== invalid custodian doesn't matter, there's no lockup
+        );
+
+        // Lockup active, invalid custodian is a signer
+        signers.insert(invalid_custodian);
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&lockup, &clock, Some(&invalid_custodian)))
+            ),
+            Err(StakeError::LockupInForce.into()), // <== invalid custodian rejected
+        );
+
+        signers.remove(&invalid_custodian);
+
+        // Lockup active, no custodian
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&lockup, &clock, None))
+            ),
+            Err(StakeError::CustodianMissing.into()),
+        );
+
+        // Lockup active, custodian not a signer
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&lockup, &clock, Some(&custodian)))
+            ),
+            Err(StakeError::CustodianSignatureMissing.into()),
+        );
+
+        // Lockup active, custodian is a signer
+        signers.insert(custodian);
+        assert_eq!(
+            authorized.authorize(
+                &signers,
+                &staker,
+                StakeAuthorize::Withdrawer,
+                Some((&lockup, &clock, Some(&custodian)))
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn test_stake_state_stake_from_fail() {
+        let mut stake_account =
+            AccountSharedData::new(0, StakeStateV2::size_of(), &crate::program::id());
+
+        stake_account
+            .set_state(&StakeStateV2::default())
+            .expect("set_state");
+
+        assert_eq!(stake_from(&stake_account), None);
+    }
+
+    #[test]
+    fn test_stake_is_bootstrap() {
+        assert!(Delegation {
+            activation_epoch: u64::MAX,
+            ..Delegation::default()
+        }
+        .is_bootstrap());
+        assert!(!Delegation {
+            activation_epoch: 0,
+            ..Delegation::default()
+        }
+        .is_bootstrap());
+    }
+
+    #[test]
+    fn test_stake_activating_and_deactivating() {
+        let stake = Delegation {
+            stake: 1_000,
+            activation_epoch: 0, // activating at zero
+            deactivation_epoch: 5,
+            ..Delegation::default()
+        };
+
+        // save this off so stake.config.warmup_rate changes don't break this test
+        let increment = (1_000_f64 * warmup_cooldown_rate(0, None)) as u64;
+
+        let mut stake_history = StakeHistory::default();
+        // assert that this stake follows step function if there's no history
+        assert_eq!(
+            stake.stake_activating_and_deactivating(stake.activation_epoch, &stake_history, None),
+            StakeActivationStatus::with_effective_and_activating(0, stake.stake),
+        );
+        for epoch in stake.activation_epoch + 1..stake.deactivation_epoch {
+            assert_eq!(
+                stake.stake_activating_and_deactivating(epoch, &stake_history, None),
+                StakeActivationStatus::with_effective(stake.stake),
+            );
+        }
+        // assert that this stake is full deactivating
+        assert_eq!(
+            stake.stake_activating_and_deactivating(stake.deactivation_epoch, &stake_history, None),
+            StakeActivationStatus::with_deactivating(stake.stake),
+        );
+        // assert that this stake is fully deactivated if there's no history
+        assert_eq!(
+            stake.stake_activating_and_deactivating(
+                stake.deactivation_epoch + 1,
+                &stake_history,
+                None
+            ),
+            StakeActivationStatus::default(),
+        );
+
+        stake_history.add(
+            0u64, // entry for zero doesn't have my activating amount
+            StakeHistoryEntry {
+                effective: 1_000,
+                ..StakeHistoryEntry::default()
+            },
+        );
+        // assert that this stake is broken, because above setup is broken
+        assert_eq!(
+            stake.stake_activating_and_deactivating(1, &stake_history, None),
+            StakeActivationStatus::with_effective_and_activating(0, stake.stake),
+        );
+
+        stake_history.add(
+            0u64, // entry for zero has my activating amount
+            StakeHistoryEntry {
+                effective: 1_000,
+                activating: 1_000,
+                ..StakeHistoryEntry::default()
+            },
+            // no entry for 1, so this stake gets shorted
+        );
+        // assert that this stake is broken, because above setup is broken
+        assert_eq!(
+            stake.stake_activating_and_deactivating(2, &stake_history, None),
+            StakeActivationStatus::with_effective_and_activating(
+                increment,
+                stake.stake - increment
+            ),
+        );
+
+        // start over, test deactivation edge cases
+        let mut stake_history = StakeHistory::default();
+
+        stake_history.add(
+            stake.deactivation_epoch, // entry for zero doesn't have my de-activating amount
+            StakeHistoryEntry {
+                effective: 1_000,
+                ..StakeHistoryEntry::default()
+            },
+        );
+        // assert that this stake is broken, because above setup is broken
+        assert_eq!(
+            stake.stake_activating_and_deactivating(
+                stake.deactivation_epoch + 1,
+                &stake_history,
+                None,
+            ),
+            StakeActivationStatus::with_deactivating(stake.stake),
+        );
+
+        // put in my initial deactivating amount, but don't put in an entry for next
+        stake_history.add(
+            stake.deactivation_epoch, // entry for zero has my de-activating amount
+            StakeHistoryEntry {
+                effective: 1_000,
+                deactivating: 1_000,
+                ..StakeHistoryEntry::default()
+            },
+        );
+        // assert that this stake is broken, because above setup is broken
+        assert_eq!(
+            stake.stake_activating_and_deactivating(
+                stake.deactivation_epoch + 2,
+                &stake_history,
+                None,
+            ),
+            // hung, should be lower
+            StakeActivationStatus::with_deactivating(stake.stake - increment),
+        );
+    }
+
+    mod same_epoch_activation_then_deactivation {
+        use super::*;
+
+        enum OldDeactivationBehavior {
+            Stuck,
+            Slow,
+        }
+
+        fn do_test(
+            old_behavior: OldDeactivationBehavior,
+            expected_stakes: &[StakeActivationStatus],
+        ) {
+            let cluster_stake = 1_000;
+            let activating_stake = 10_000;
+            let some_stake = 700;
+            let some_epoch = 0;
+
+            let stake = Delegation {
+                stake: some_stake,
+                activation_epoch: some_epoch,
+                deactivation_epoch: some_epoch,
+                ..Delegation::default()
+            };
+
+            let mut stake_history = StakeHistory::default();
+            let cluster_deactivation_at_stake_modified_epoch = match old_behavior {
+                OldDeactivationBehavior::Stuck => 0,
+                OldDeactivationBehavior::Slow => 1000,
+            };
+
+            let stake_history_entries = vec![
+                (
+                    cluster_stake,
+                    activating_stake,
+                    cluster_deactivation_at_stake_modified_epoch,
+                ),
+                (cluster_stake, activating_stake, 1000),
+                (cluster_stake, activating_stake, 1000),
+                (cluster_stake, activating_stake, 100),
+                (cluster_stake, activating_stake, 100),
+                (cluster_stake, activating_stake, 100),
+                (cluster_stake, activating_stake, 100),
+            ];
+
+            for (epoch, (effective, activating, deactivating)) in
+                stake_history_entries.into_iter().enumerate()
+            {
+                stake_history.add(
+                    epoch as Epoch,
+                    StakeHistoryEntry {
+                        effective,
+                        activating,
+                        deactivating,
+                    },
+                );
+            }
+
+            assert_eq!(
+                expected_stakes,
+                (0..expected_stakes.len())
+                    .map(|epoch| stake.stake_activating_and_deactivating(
+                        epoch as u64,
+                        &stake_history,
+                        None,
+                    ))
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        #[test]
+        fn test_new_behavior_previously_slow() {
+            // any stake accounts activated and deactivated at the same epoch
+            // shouldn't been activated (then deactivated) at all!
+
+            do_test(
+                OldDeactivationBehavior::Slow,
+                &[
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                ],
+            );
+        }
+
+        #[test]
+        fn test_new_behavior_previously_stuck() {
+            // any stake accounts activated and deactivated at the same epoch
+            // shouldn't been activated (then deactivated) at all!
+
+            do_test(
+                OldDeactivationBehavior::Stuck,
+                &[
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                    StakeActivationStatus::default(),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn test_inflation_and_slashing_with_activating_and_deactivating_stake() {
+        // some really boring delegation and stake_history setup
+        let (delegated_stake, mut stake, stake_history) = {
+            let cluster_stake = 1_000;
+            let delegated_stake = 700;
+
+            let stake = Delegation {
+                stake: delegated_stake,
+                activation_epoch: 0,
+                deactivation_epoch: 4,
+                ..Delegation::default()
+            };
+
+            let mut stake_history = StakeHistory::default();
+            stake_history.add(
+                0,
+                StakeHistoryEntry {
+                    effective: cluster_stake,
+                    activating: delegated_stake,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+            let newly_effective_at_epoch1 = (cluster_stake as f64 * 0.25) as u64;
+            assert_eq!(newly_effective_at_epoch1, 250);
+            stake_history.add(
+                1,
+                StakeHistoryEntry {
+                    effective: cluster_stake + newly_effective_at_epoch1,
+                    activating: delegated_stake - newly_effective_at_epoch1,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+            let newly_effective_at_epoch2 =
+                ((cluster_stake + newly_effective_at_epoch1) as f64 * 0.25) as u64;
+            assert_eq!(newly_effective_at_epoch2, 312);
+            stake_history.add(
+                2,
+                StakeHistoryEntry {
+                    effective: cluster_stake
+                        + newly_effective_at_epoch1
+                        + newly_effective_at_epoch2,
+                    activating: delegated_stake
+                        - newly_effective_at_epoch1
+                        - newly_effective_at_epoch2,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+            stake_history.add(
+                3,
+                StakeHistoryEntry {
+                    effective: cluster_stake + delegated_stake,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+            stake_history.add(
+                4,
+                StakeHistoryEntry {
+                    effective: cluster_stake + delegated_stake,
+                    deactivating: delegated_stake,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+            let newly_not_effective_stake_at_epoch5 =
+                ((cluster_stake + delegated_stake) as f64 * 0.25) as u64;
+            assert_eq!(newly_not_effective_stake_at_epoch5, 425);
+            stake_history.add(
+                5,
+                StakeHistoryEntry {
+                    effective: cluster_stake + delegated_stake
+                        - newly_not_effective_stake_at_epoch5,
+                    deactivating: delegated_stake - newly_not_effective_stake_at_epoch5,
+                    ..StakeHistoryEntry::default()
+                },
+            );
+
+            (delegated_stake, stake, stake_history)
+        };
+
+        // helper closures
+        let calculate_each_staking_status = |stake: &Delegation, epoch_count: usize| -> Vec<_> {
+            (0..epoch_count)
+                .map(|epoch| {
+                    stake.stake_activating_and_deactivating(epoch as u64, &stake_history, None)
+                })
+                .collect::<Vec<_>>()
+        };
+        let adjust_staking_status = |rate: f64, status: &[StakeActivationStatus]| {
+            status
+                .iter()
+                .map(|entry| StakeActivationStatus {
+                    effective: (entry.effective as f64 * rate) as u64,
+                    activating: (entry.activating as f64 * rate) as u64,
+                    deactivating: (entry.deactivating as f64 * rate) as u64,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let expected_staking_status_transition = vec![
+            StakeActivationStatus::with_effective_and_activating(0, 700),
+            StakeActivationStatus::with_effective_and_activating(250, 450),
+            StakeActivationStatus::with_effective_and_activating(562, 138),
+            StakeActivationStatus::with_effective(700),
+            StakeActivationStatus::with_deactivating(700),
+            StakeActivationStatus::with_deactivating(275),
+            StakeActivationStatus::default(),
+        ];
+        let expected_staking_status_transition_base = vec![
+            StakeActivationStatus::with_effective_and_activating(0, 700),
+            StakeActivationStatus::with_effective_and_activating(250, 450),
+            StakeActivationStatus::with_effective_and_activating(562, 138 + 1), // +1 is needed for rounding
+            StakeActivationStatus::with_effective(700),
+            StakeActivationStatus::with_deactivating(700),
+            StakeActivationStatus::with_deactivating(275 + 1), // +1 is needed for rounding
+            StakeActivationStatus::default(),
+        ];
+
+        // normal stake activating and deactivating transition test, just in case
+        assert_eq!(
+            expected_staking_status_transition,
+            calculate_each_staking_status(&stake, expected_staking_status_transition.len())
+        );
+
+        // 10% inflation rewards assuming some sizable epochs passed!
+        let rate = 1.10;
+        stake.stake = (delegated_stake as f64 * rate) as u64;
+        let expected_staking_status_transition =
+            adjust_staking_status(rate, &expected_staking_status_transition_base);
+
+        assert_eq!(
+            expected_staking_status_transition,
+            calculate_each_staking_status(&stake, expected_staking_status_transition_base.len()),
+        );
+
+        // 50% slashing!!!
+        let rate = 0.5;
+        stake.stake = (delegated_stake as f64 * rate) as u64;
+        let expected_staking_status_transition =
+            adjust_staking_status(rate, &expected_staking_status_transition_base);
+
+        assert_eq!(
+            expected_staking_status_transition,
+            calculate_each_staking_status(&stake, expected_staking_status_transition_base.len()),
+        );
+    }
+
+    #[test]
+    fn test_stop_activating_after_deactivation() {
+        let stake = Delegation {
+            stake: 1_000,
+            activation_epoch: 0,
+            deactivation_epoch: 3,
+            ..Delegation::default()
+        };
+
+        let base_stake = 1_000;
+        let mut stake_history = StakeHistory::default();
+        let mut effective = base_stake;
+        let other_activation = 100;
+        let mut other_activations = vec![0];
+
+        // Build a stake history where the test staker always consumes all of the available warm
+        // up and cool down stake. However, simulate other stakers beginning to activate during
+        // the test staker's deactivation.
+        for epoch in 0..=stake.deactivation_epoch + 1 {
+            let (activating, deactivating) = if epoch < stake.deactivation_epoch {
+                (stake.stake + base_stake - effective, 0)
+            } else {
+                let other_activation_sum: u64 = other_activations.iter().sum();
+                let deactivating = effective - base_stake - other_activation_sum;
+                (other_activation, deactivating)
+            };
+
+            stake_history.add(
+                epoch,
+                StakeHistoryEntry {
+                    effective,
+                    activating,
+                    deactivating,
+                },
+            );
+
+            let effective_rate_limited = (effective as f64 * warmup_cooldown_rate(0, None)) as u64;
+            if epoch < stake.deactivation_epoch {
+                effective += effective_rate_limited.min(activating);
+                other_activations.push(0);
+            } else {
+                effective -= effective_rate_limited.min(deactivating);
+                effective += other_activation;
+                other_activations.push(other_activation);
+            }
+        }
+
+        for epoch in 0..=stake.deactivation_epoch + 1 {
+            let history = stake_history.get(epoch).unwrap();
+            let other_activations: u64 = other_activations[..=epoch as usize].iter().sum();
+            let expected_stake = history.effective - base_stake - other_activations;
+            let (expected_activating, expected_deactivating) = if epoch < stake.deactivation_epoch {
+                (history.activating, 0)
+            } else {
+                (0, history.deactivating)
+            };
+            assert_eq!(
+                stake.stake_activating_and_deactivating(epoch, &stake_history, None),
+                StakeActivationStatus {
+                    effective: expected_stake,
+                    activating: expected_activating,
+                    deactivating: expected_deactivating,
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_stake_warmup_cooldown_sub_integer_moves() {
+        let delegations = [Delegation {
+            stake: 2,
+            activation_epoch: 0, // activating at zero
+            deactivation_epoch: 5,
+            ..Delegation::default()
+        }];
+        // give 2 epochs of cooldown
+        let epochs = 7;
+        // make bootstrap stake smaller than warmup so warmup/cooldownn
+        //  increment is always smaller than 1
+        let bootstrap = (warmup_cooldown_rate(0, None) * 100.0 / 2.0) as u64;
+        let stake_history =
+            create_stake_history_from_delegations(Some(bootstrap), 0..epochs, &delegations, None);
+        let mut max_stake = 0;
+        let mut min_stake = 2;
+
+        for epoch in 0..epochs {
+            let stake = delegations
+                .iter()
+                .map(|delegation| delegation.stake(epoch, &stake_history, None))
+                .sum::<u64>();
+            max_stake = max_stake.max(stake);
+            min_stake = min_stake.min(stake);
+        }
+        assert_eq!(max_stake, 2);
+        assert_eq!(min_stake, 0);
+    }
+
+    #[test_case(None ; "old rate")]
+    #[test_case(Some(1) ; "new rate activated in epoch 1")]
+    #[test_case(Some(10) ; "new rate activated in epoch 10")]
+    #[test_case(Some(30) ; "new rate activated in epoch 30")]
+    #[test_case(Some(50) ; "new rate activated in epoch 50")]
+    #[test_case(Some(60) ; "new rate activated in epoch 60")]
+    fn test_stake_warmup_cooldown(new_rate_activation_epoch: Option<Epoch>) {
+        let delegations = [
+            Delegation {
+                // never deactivates
+                stake: 1_000,
+                activation_epoch: u64::MAX,
+                ..Delegation::default()
+            },
+            Delegation {
+                stake: 1_000,
+                activation_epoch: 0,
+                deactivation_epoch: 9,
+                ..Delegation::default()
+            },
+            Delegation {
+                stake: 1_000,
+                activation_epoch: 1,
+                deactivation_epoch: 6,
+                ..Delegation::default()
+            },
+            Delegation {
+                stake: 1_000,
+                activation_epoch: 2,
+                deactivation_epoch: 5,
+                ..Delegation::default()
+            },
+            Delegation {
+                stake: 1_000,
+                activation_epoch: 2,
+                deactivation_epoch: 4,
+                ..Delegation::default()
+            },
+            Delegation {
+                stake: 1_000,
+                activation_epoch: 4,
+                deactivation_epoch: 4,
+                ..Delegation::default()
+            },
+        ];
+        // chosen to ensure that the last activated stake (at 4) finishes
+        //  warming up and cooling down
+        //  a stake takes 2.0f64.log(1.0 + STAKE_WARMUP_RATE) epochs to warm up or cool down
+        //  when all alone, but the above overlap a lot
+        let epochs = 60;
+
+        let stake_history = create_stake_history_from_delegations(
+            None,
+            0..epochs,
+            &delegations,
+            new_rate_activation_epoch,
+        );
+
+        let mut prev_total_effective_stake = delegations
+            .iter()
+            .map(|delegation| delegation.stake(0, &stake_history, new_rate_activation_epoch))
+            .sum::<u64>();
+
+        // uncomment and add ! for fun with graphing
+        // eprintln("\n{:8} {:8} {:8}", "   epoch", "   total", "   delta");
+        for epoch in 1..epochs {
+            let total_effective_stake = delegations
+                .iter()
+                .map(|delegation| {
+                    delegation.stake(epoch, &stake_history, new_rate_activation_epoch)
+                })
+                .sum::<u64>();
+
+            let delta = if total_effective_stake > prev_total_effective_stake {
+                total_effective_stake - prev_total_effective_stake
+            } else {
+                prev_total_effective_stake - total_effective_stake
+            };
+
+            // uncomment and add ! for fun with graphing
+            // eprint("{:8} {:8} {:8} ", epoch, total_effective_stake, delta);
+            // (0..(total_effective_stake as usize / (delegations.len() * 5))).for_each(|_| eprint("#"));
+            // eprintln();
+
+            assert!(
+                delta
+                    <= ((prev_total_effective_stake as f64
+                        * warmup_cooldown_rate(epoch, new_rate_activation_epoch))
+                        as u64)
+                        .max(1)
+            );
+
+            prev_total_effective_stake = total_effective_stake;
+        }
+    }
+
+    #[test]
+    fn test_lockup_is_expired() {
+        let custodian = Pubkey::new_unique();
+        let lockup = Lockup {
+            epoch: 1,
+            unix_timestamp: 1,
+            custodian,
+        };
+        // neither time
+        assert!(lockup.is_in_force(
+            &Clock {
+                epoch: 0,
+                unix_timestamp: 0,
+                ..Clock::default()
+            },
+            None
+        ));
+        // not timestamp
+        assert!(lockup.is_in_force(
+            &Clock {
+                epoch: 2,
+                unix_timestamp: 0,
+                ..Clock::default()
+            },
+            None
+        ));
+        // not epoch
+        assert!(lockup.is_in_force(
+            &Clock {
+                epoch: 0,
+                unix_timestamp: 2,
+                ..Clock::default()
+            },
+            None
+        ));
+        // both, no custodian
+        assert!(!lockup.is_in_force(
+            &Clock {
+                epoch: 1,
+                unix_timestamp: 1,
+                ..Clock::default()
+            },
+            None
+        ));
+        // neither, but custodian
+        assert!(!lockup.is_in_force(
+            &Clock {
+                epoch: 0,
+                unix_timestamp: 0,
+                ..Clock::default()
+            },
+            Some(&custodian),
+        ));
+    }
 
     fn check_borsh_deserialization(stake: StakeStateV2) {
         let serialized = serialize(&stake).unwrap();
