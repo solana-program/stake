@@ -227,9 +227,12 @@ pub(crate) fn stake_weighted_credits_observed(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::arithmetic_side_effects)]
+
     use {
         super::*,
         crate::id,
+        proptest::prelude::*,
         solana_sdk::{
             account::{AccountSharedData, ReadableAccount},
             account_utils::StateMut,
@@ -859,5 +862,52 @@ mod tests {
             (credits_a * delegation + credits_b * delegation) / (delegation + delegation)
         );
         assert_eq!(new_stake.delegation.stake, delegation * 2);
+    }
+
+    prop_compose! {
+        pub fn sum_within(max: u64)(total in 1..max)
+            (intermediate in 1..total, total in Just(total))
+            -> (u64, u64) {
+                (intermediate, total - intermediate)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_stake_weighted_credits_observed(
+            (credits_a, credits_b) in sum_within(u64::MAX),
+            (delegation_a, delegation_b) in sum_within(u64::MAX),
+        ) {
+            let stake = Stake {
+                delegation: Delegation {
+                    stake: delegation_a,
+                    ..Delegation::default()
+                },
+                credits_observed: credits_a
+            };
+            let credits_observed = stake_weighted_credits_observed(
+                &stake,
+                delegation_b,
+                credits_b,
+            ).unwrap();
+
+            // calculated credits observed should always be between the credits of a and b
+            if credits_a < credits_b {
+                assert!(credits_a < credits_observed);
+                assert!(credits_observed <= credits_b);
+            } else {
+                assert!(credits_b <= credits_observed);
+                assert!(credits_observed <= credits_a);
+            }
+
+            // the difference of the combined weighted credits and the separate weighted credits
+            // should be 1 or 0
+            let weighted_credits_total = credits_observed as u128 * (delegation_a + delegation_b) as u128;
+            let weighted_credits_a = credits_a as u128 * delegation_a as u128;
+            let weighted_credits_b = credits_b as u128 * delegation_b as u128;
+            let raw_diff = weighted_credits_total - (weighted_credits_a + weighted_credits_b);
+            let credits_observed_diff = raw_diff / (delegation_a + delegation_b) as u128;
+            assert!(credits_observed_diff <= 1);
+        }
     }
 }
