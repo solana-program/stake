@@ -206,7 +206,7 @@ export function getWithdrawInstruction<
       getAccountMeta(accounts.stakeHistory),
       getAccountMeta(accounts.withdrawAuthority),
       getAccountMeta(accounts.lockupAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getWithdrawInstructionDataEncoder().encode(
       args as WithdrawInstructionDataArgs

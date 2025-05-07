@@ -222,7 +222,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.newAuthority),
       getAccountMeta(accounts.lockupAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeCheckedWithSeedInstructionDataEncoder().encode(
       args as AuthorizeCheckedWithSeedInstructionDataArgs

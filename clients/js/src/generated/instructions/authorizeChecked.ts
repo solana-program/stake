@@ -201,7 +201,7 @@ export function getAuthorizeCheckedInstruction<
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.newAuthority),
       getAccountMeta(accounts.lockupAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeCheckedInstructionDataEncoder().encode(
       args as AuthorizeCheckedInstructionDataArgs

@@ -195,7 +195,7 @@ export function getAuthorizeInstruction<
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.lockupAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeInstructionDataEncoder().encode(
       args as AuthorizeInstructionDataArgs

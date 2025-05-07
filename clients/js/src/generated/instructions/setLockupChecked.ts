@@ -171,7 +171,7 @@ export function getSetLockupCheckedInstruction<
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.newAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getSetLockupCheckedInstructionDataEncoder().encode(
       args as SetLockupCheckedInstructionDataArgs

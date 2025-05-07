@@ -211,7 +211,7 @@ export function getAuthorizeWithSeedInstruction<
       getAccountMeta(accounts.base),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.lockupAuthority),
-    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeWithSeedInstructionDataEncoder().encode(
       args as AuthorizeWithSeedInstructionDataArgs
