@@ -247,9 +247,9 @@ export function parseWithdrawInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 5 || instruction.accounts.length > 6) {
     // TODO: Coded error.
-    throw new Error('Not enough accounts');
+    throw new Error('Withdraw Instruction expects 5 or 6 accounts');
   }
   let accountIndex = 0;
   const getNextAccount = () => {
