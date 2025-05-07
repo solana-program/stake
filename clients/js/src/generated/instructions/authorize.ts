@@ -51,7 +51,10 @@ export type AuthorizeInstruction<
     | string
     | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
   TAccountAuthority extends string | IAccountMeta<string> = string,
-  TAccountLockupAuthority extends string | IAccountMeta<string> = string,
+  TAccountLockupAuthority extends
+    | string
+    | IAccountMeta<string>
+    | undefined = undefined,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -67,10 +70,14 @@ export type AuthorizeInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             IAccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      TAccountLockupAuthority extends string
-        ? ReadonlySignerAccount<TAccountLockupAuthority> &
-            IAccountSignerMeta<TAccountLockupAuthority>
-        : TAccountLockupAuthority,
+      ...(TAccountLockupAuthority extends undefined
+        ? []
+        : [
+            TAccountLockupAuthority extends string
+              ? ReadonlySignerAccount<TAccountLockupAuthority> &
+                  IAccountSignerMeta<TAccountLockupAuthority>
+              : TAccountLockupAuthority,
+          ]),
       ...TRemainingAccounts,
     ]
   >;
@@ -181,14 +188,14 @@ export function getAuthorizeInstruction<
       'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   const instruction = {
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.lockupAuthority),
-    ],
+    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeInstructionDataEncoder().encode(
       args as AuthorizeInstructionDataArgs
@@ -230,7 +237,7 @@ export function parseAuthorizeInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedAuthorizeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+  if (instruction.accounts.length < 3) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -240,11 +247,11 @@ export function parseAuthorizeInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  let optionalAccountsRemaining = instruction.accounts.length - 3;
   const getNextOptionalAccount = () => {
-    const accountMeta = getNextAccount();
-    return accountMeta.address === STAKE_PROGRAM_ADDRESS
-      ? undefined
-      : accountMeta;
+    if (optionalAccountsRemaining === 0) return undefined;
+    optionalAccountsRemaining -= 1;
+    return getNextAccount();
   };
   return {
     programAddress: instruction.programAddress,

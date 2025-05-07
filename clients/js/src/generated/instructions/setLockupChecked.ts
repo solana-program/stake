@@ -47,7 +47,10 @@ export type SetLockupCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | IAccountMeta<string> = string,
   TAccountAuthority extends string | IAccountMeta<string> = string,
-  TAccountNewAuthority extends string | IAccountMeta<string> = string,
+  TAccountNewAuthority extends
+    | string
+    | IAccountMeta<string>
+    | undefined = undefined,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -60,10 +63,14 @@ export type SetLockupCheckedInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             IAccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      TAccountNewAuthority extends string
-        ? ReadonlySignerAccount<TAccountNewAuthority> &
-            IAccountSignerMeta<TAccountNewAuthority>
-        : TAccountNewAuthority,
+      ...(TAccountNewAuthority extends undefined
+        ? []
+        : [
+            TAccountNewAuthority extends string
+              ? ReadonlySignerAccount<TAccountNewAuthority> &
+                  IAccountSignerMeta<TAccountNewAuthority>
+              : TAccountNewAuthority,
+          ]),
       ...TRemainingAccounts,
     ]
   >;
@@ -158,13 +165,13 @@ export function getSetLockupCheckedInstruction<
   // Original args.
   const args = { ...input };
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   const instruction = {
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.newAuthority),
-    ],
+    ].filter(<T,>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getSetLockupCheckedInstructionDataEncoder().encode(
       args as SetLockupCheckedInstructionDataArgs
@@ -203,7 +210,7 @@ export function parseSetLockupCheckedInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedSetLockupCheckedInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
+  if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -213,11 +220,11 @@ export function parseSetLockupCheckedInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  let optionalAccountsRemaining = instruction.accounts.length - 2;
   const getNextOptionalAccount = () => {
-    const accountMeta = getNextAccount();
-    return accountMeta.address === STAKE_PROGRAM_ADDRESS
-      ? undefined
-      : accountMeta;
+    if (optionalAccountsRemaining === 0) return undefined;
+    optionalAccountsRemaining -= 1;
+    return getNextAccount();
   };
   return {
     programAddress: instruction.programAddress,

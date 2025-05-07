@@ -62,11 +62,6 @@ impl Withdraw {
                 lockup_authority,
                 true,
             ));
-        } else {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-                crate::STAKE_ID,
-                false,
-            ));
         }
         accounts.extend_from_slice(remaining_accounts);
         let mut data = borsh::to_vec(&WithdrawInstructionData::new()).unwrap();
@@ -331,11 +326,6 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             accounts.push(solana_program::instruction::AccountMeta::new_readonly(
                 *lockup_authority.key,
                 true,
-            ));
-        } else {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-                crate::STAKE_ID,
-                false,
             ));
         }
         remaining_accounts.iter().for_each(|remaining_account| {
