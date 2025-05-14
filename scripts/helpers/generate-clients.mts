@@ -189,6 +189,14 @@ codama.update(
         };
       },
     },
+    {
+      // Use omitted optional account strategy for all instructions.
+      select: '[instructionNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'instructionNode');
+        return { ...node, optionalAccountStrategy: 'omitted' };
+      },
+    },
   ])
 );
 

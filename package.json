@@ -4,7 +4,7 @@
     "solana:check": "tsx ./scripts/helpers/check-solana-version.mts",
     "solana:link": "tsx ./scripts/helpers/link-solana-version.mts",
     "generate": "pnpm generate:clients",
-    "generate:clients": "tsx ./scripts/helpers/generate-clients.mts",
+    "generate:clients": "tsx ./scripts/helpers/generate-clients.mts && (cd clients/js && pnpm format:fix)",
     "validator:start": "tsx ./scripts/helpers/start-validator.mts",
     "validator:restart": "pnpm validator:start --restart",
     "validator:stop": "tsx ./scripts/helpers/stop-validator.mts",

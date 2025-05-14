@@ -44,11 +44,6 @@ impl SetLockupChecked {
                 new_authority,
                 true,
             ));
-        } else {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-                crate::STAKE_ID,
-                false,
-            ));
         }
         accounts.extend_from_slice(remaining_accounts);
         let mut data = borsh::to_vec(&SetLockupCheckedInstructionData::new()).unwrap();
@@ -261,11 +256,6 @@ impl<'a, 'b> SetLockupCheckedCpi<'a, 'b> {
             accounts.push(solana_program::instruction::AccountMeta::new_readonly(
                 *new_authority.key,
                 true,
-            ));
-        } else {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-                crate::STAKE_ID,
-                false,
             ));
         }
         remaining_accounts.iter().for_each(|remaining_account| {

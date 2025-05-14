@@ -47,7 +47,10 @@ export type WithdrawInstruction<
     | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
   TAccountStakeHistory extends string | IAccountMeta<string> = string,
   TAccountWithdrawAuthority extends string | IAccountMeta<string> = string,
-  TAccountLockupAuthority extends string | IAccountMeta<string> = string,
+  TAccountLockupAuthority extends
+    | string
+    | IAccountMeta<string>
+    | undefined = undefined,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -69,10 +72,14 @@ export type WithdrawInstruction<
         ? ReadonlySignerAccount<TAccountWithdrawAuthority> &
             IAccountSignerMeta<TAccountWithdrawAuthority>
         : TAccountWithdrawAuthority,
-      TAccountLockupAuthority extends string
-        ? ReadonlySignerAccount<TAccountLockupAuthority> &
-            IAccountSignerMeta<TAccountLockupAuthority>
-        : TAccountLockupAuthority,
+      ...(TAccountLockupAuthority extends undefined
+        ? []
+        : [
+            TAccountLockupAuthority extends string
+              ? ReadonlySignerAccount<TAccountLockupAuthority> &
+                  IAccountSignerMeta<TAccountLockupAuthority>
+              : TAccountLockupAuthority,
+          ]),
       ...TRemainingAccounts,
     ]
   >;
@@ -190,7 +197,7 @@ export function getWithdrawInstruction<
       'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   const instruction = {
     accounts: [
       getAccountMeta(accounts.stake),
@@ -199,7 +206,7 @@ export function getWithdrawInstruction<
       getAccountMeta(accounts.stakeHistory),
       getAccountMeta(accounts.withdrawAuthority),
       getAccountMeta(accounts.lockupAuthority),
-    ],
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getWithdrawInstructionDataEncoder().encode(
       args as WithdrawInstructionDataArgs
@@ -247,7 +254,7 @@ export function parseWithdrawInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 5) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -257,11 +264,11 @@ export function parseWithdrawInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  let optionalAccountsRemaining = instruction.accounts.length - 5;
   const getNextOptionalAccount = () => {
-    const accountMeta = getNextAccount();
-    return accountMeta.address === STAKE_PROGRAM_ADDRESS
-      ? undefined
-      : accountMeta;
+    if (optionalAccountsRemaining === 0) return undefined;
+    optionalAccountsRemaining -= 1;
+    return getNextAccount();
   };
   return {
     programAddress: instruction.programAddress,

@@ -55,7 +55,10 @@ export type AuthorizeWithSeedInstruction<
   TAccountClockSysvar extends
     | string
     | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountLockupAuthority extends string | IAccountMeta<string> = string,
+  TAccountLockupAuthority extends
+    | string
+    | IAccountMeta<string>
+    | undefined = undefined,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -70,10 +73,14 @@ export type AuthorizeWithSeedInstruction<
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
-      TAccountLockupAuthority extends string
-        ? ReadonlySignerAccount<TAccountLockupAuthority> &
-            IAccountSignerMeta<TAccountLockupAuthority>
-        : TAccountLockupAuthority,
+      ...(TAccountLockupAuthority extends undefined
+        ? []
+        : [
+            TAccountLockupAuthority extends string
+              ? ReadonlySignerAccount<TAccountLockupAuthority> &
+                  IAccountSignerMeta<TAccountLockupAuthority>
+              : TAccountLockupAuthority,
+          ]),
       ...TRemainingAccounts,
     ]
   >;
@@ -197,14 +204,14 @@ export function getAuthorizeWithSeedInstruction<
       'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
   }
 
-  const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+  const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   const instruction = {
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.base),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.lockupAuthority),
-    ],
+    ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     programAddress,
     data: getAuthorizeWithSeedInstructionDataEncoder().encode(
       args as AuthorizeWithSeedInstructionDataArgs
@@ -246,7 +253,7 @@ export function parseAuthorizeWithSeedInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedAuthorizeWithSeedInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+  if (instruction.accounts.length < 3) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -256,11 +263,11 @@ export function parseAuthorizeWithSeedInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  let optionalAccountsRemaining = instruction.accounts.length - 3;
   const getNextOptionalAccount = () => {
-    const accountMeta = getNextAccount();
-    return accountMeta.address === STAKE_PROGRAM_ADDRESS
-      ? undefined
-      : accountMeta;
+    if (optionalAccountsRemaining === 0) return undefined;
+    optionalAccountsRemaining -= 1;
+    return getNextAccount();
   };
   return {
     programAddress: instruction.programAddress,
