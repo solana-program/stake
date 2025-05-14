@@ -1,6 +1,6 @@
 {
   "name": "@solana-program/stake",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "JavaScript client for the Stake program",
   "sideEffects": false,
   "module": "./dist/src/index.mjs",
