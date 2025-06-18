@@ -329,6 +329,7 @@ pub struct AuthorizeCheckedWithSeedArgs {
     pub authority_owner: Pubkey,
 }
 
+#[deprecated(since = "1.2.0", note = "Please use `StakeInstructionBuilder` instead")]
 #[cfg(feature = "bincode")]
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
     Instruction::new_with_bincode(
@@ -341,6 +342,7 @@ pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Locku
     )
 }
 
+#[deprecated(since = "1.2.0", note = "Please use `StakeInstructionBuilder` instead")]
 #[cfg(feature = "bincode")]
 pub fn initialize_checked(stake_pubkey: &Pubkey, authorized: &Authorized) -> Instruction {
     Instruction::new_with_bincode(
@@ -457,6 +459,7 @@ fn _split(
     Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
 }
 
+#[deprecated(since = "1.2.0", note = "Please use `StakeInstructionBuilder` instead")]
 #[cfg(feature = "bincode")]
 pub fn split(
     stake_pubkey: &Pubkey,
@@ -479,6 +482,7 @@ pub fn split(
     ]
 }
 
+#[deprecated(since = "1.2.0", note = "Please use `StakeInstructionBuilder` instead")]
 #[cfg(feature = "bincode")]
 pub fn split_with_seed(
     stake_pubkey: &Pubkey,

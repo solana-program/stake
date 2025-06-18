@@ -7,6 +7,8 @@
 pub mod config;
 pub mod error;
 pub mod instruction;
+#[cfg(feature = "bincode")]
+pub mod instruction_builder;
 pub mod stake_flags;
 pub mod stake_history;
 pub mod state;
