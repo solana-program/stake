@@ -18,27 +18,30 @@ borsh = { version = "1.5.1", features = ["derive", "unstable__schema"] }
 num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.3"
-solana-program = "2.1.10"
+solana-program = "2.2.1"
 thiserror = "1.0.63"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 arbitrary = { version = "1.4.1", features = ["derive"] }
-mollusk-svm = { version = "=0.0.15", features = ["all-builtins"] }
+mollusk-svm = { version = "0.1.0", features = ["all-builtins"] }
 proptest = "1.6.0"
+solana-account = { version = "2.2.1", features = ["bincode"] }
+solana-logger = "2.2.1"
+solana-program-test = "2.2.0"
+solana-program-runtime = "2.2.0"
+solana-config-program = "2.2.0"
+solana-vote-program = "2.2.0"
+solana-sdk = "2.2.1"
+solana-feature-set = "2.2.1"
 rand = "0.8.5"
-solana-account = { version = "2.1.10", features = ["bincode"] }
-solana-logger = "2.1.10"
-solana-program-test = "2.1.10"
-solana-program-runtime = "2.1.10"
-solana-config-program = "2.1.10"
-solana-vote-program = "2.1.10"
-solana-sdk = "2.1.10"
-solana-feature-set = "2.1.10"
 test-case = "3.3.1"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[lints]
+workspace = true
 
 [package.metadata.solana]
 program-id = "Stake11111111111111111111111111111111111111"
