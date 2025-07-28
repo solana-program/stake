@@ -20,6 +20,27 @@ The BPF Stake Program has received one external audit:
     - Review commit hash [`5ec49ccb`](https://github.com/solana-program/stake/commit/5ec49ccb08c3e588940a2038c99efc7acf563b4a)
     - Final report (todo)
 
+## Building and Verifying
+
+To build the BPF Stake Program, you must pass the `bpf-entrypoint` flag:
+
+```
+cargo build-sbf --features bpf-entrypoint
+```
+
+The BPF program deployed on all clusters is built with [solana-verify](https://solana.com/developers/guides/advanced/verified-builds). It may be verified independently by comparing the output of:
+
+```solana-verify get-program-hash -um Stake11111111111111111111111111111111111111```
+
+with:
+
+```
+solana-verify build --library-name program -- --features bpf-entrypoint
+solana-verify get-executable-hash target/deploy/solana_stake_program.so
+```
+
+It is possible for a solana-verify version mismatch to affect the hash; [BPF Stake Program 1.0.0](https://github.com/solana-program/stake/releases/tag/program%40v1.0.0) was built with solana-verify 0.4.6.
+
 ## Interface
 
 Instructions, errors, and assorted structs related to the stake program, which used to live in the Solana SDK repo, now live here. For more, see [docs.rs](https://docs.rs/solana-stake-interface/latest/solana_stake_interface/).
