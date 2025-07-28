@@ -39,7 +39,7 @@ solana-verify build --library-name program -- --features bpf-entrypoint
 solana-verify get-executable-hash target/deploy/solana_stake_program.so
 ```
 
-It is possible for a solana-verify version mismatch to affect the hash; BPF Stake Program 1.0.0 was built with solana-verify 0.4.6.
+It is possible for a solana-verify version mismatch to affect the hash; [BPF Stake Program 1.0.0](https://github.com/solana-program/stake/releases/tag/program%40v1.0.0) was built with solana-verify 0.4.6.
 
 ## Interface
 
