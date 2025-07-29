@@ -18,7 +18,7 @@ The BPF Stake Program has received one external audit:
 
 * Zellic (2025-03-12)
     - Review commit hash [`5ec49ccb`](https://github.com/solana-program/stake/commit/5ec49ccb08c3e588940a2038c99efc7acf563b4a)
-    - Final report (todo)
+    - Final report <https://github.com/anza-xyz/security-audits/blob/master/core-bpf/ZellicStakeProgramAudit-2025-03-12.pdf>
 
 ## Building and Verifying
 
