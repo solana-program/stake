@@ -2572,7 +2572,7 @@ dependencies = [
  "solana-rent",
  "solana-sdk-ids",
  "solana-slot-hashes",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-stake-program 2.3.6",
  "solana-svm-callback",
  "solana-system-program",
@@ -5427,7 +5427,7 @@ dependencies = [
  "solana-slot-hashes",
  "solana-slot-history",
  "solana-stable-layout",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-system-interface",
  "solana-sysvar",
  "solana-sysvar-id",
@@ -5580,7 +5580,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signer",
  "solana-stable-layout",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-svm",
  "solana-system-interface",
  "solana-sysvar",
@@ -5971,7 +5971,7 @@ dependencies = [
  "solana-signer",
  "solana-slot-hashes",
  "solana-slot-history",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-stake-program 2.3.6",
  "solana-svm",
  "solana-svm-callback",
@@ -6370,7 +6370,7 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-interface"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -6399,27 +6399,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-stake-interface"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5269e89fde216b4d7e1d1739cf5303f8398a1ff372a81232abbee80e554a838c"
-dependencies = [
- "borsh 0.10.4",
- "borsh 1.5.7",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-clock",
- "solana-cpi",
- "solana-decode-error",
- "solana-instruction",
- "solana-program-error",
- "solana-pubkey",
- "solana-system-interface",
- "solana-sysvar-id",
-]
-
-[[package]]
 name = "solana-stake-program"
 version = "1.0.0"
 dependencies = [
@@ -6443,7 +6422,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "solana-sdk-ids",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-system-interface",
  "solana-sysvar",
  "solana-vote-program",
@@ -6473,7 +6452,7 @@ dependencies = [
  "solana-pubkey",
  "solana-rent",
  "solana-sdk-ids",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-sysvar",
  "solana-transaction-context",
  "solana-type-overrides",
@@ -6714,7 +6693,7 @@ dependencies = [
  "solana-sdk-macro",
  "solana-slot-hashes",
  "solana-slot-history",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface",
  "solana-sysvar-id",
 ]
 
