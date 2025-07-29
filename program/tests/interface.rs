@@ -17,7 +17,6 @@ use {
             },
         },
         stake_history::StakeHistoryEntry,
-        system_program,
         sysvar::{
             clock::Clock, epoch_rewards::EpochRewards, epoch_schedule::EpochSchedule, rent::Rent,
             stake_history::StakeHistory, SysvarId,
@@ -27,6 +26,7 @@ use {
             state::{VoteState, VoteStateVersions},
         },
     },
+    solana_sdk_ids::system_program,
     solana_stake_program::{get_minimum_delegation, id},
     std::{
         collections::{HashMap, HashSet},
