@@ -205,10 +205,7 @@ impl core::fmt::Display for StakeError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::StakeError, num_traits::FromPrimitive,
-        solana_instruction::error::InstructionError, strum::IntoEnumIterator,
-    };
+    use {super::StakeError, num_traits::FromPrimitive, strum::IntoEnumIterator};
 
     #[test]
     fn test_stake_error_from_primitive_exhaustive() {

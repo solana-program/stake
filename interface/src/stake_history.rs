@@ -133,7 +133,7 @@ mod tests {
     fn test_id() {
         assert_eq!(
             StakeHistory::id(),
-            solana_program::sysvar::stake_history::id()
+            solana_sdk_ids::sysvar::stake_history::id()
         );
     }
 }
