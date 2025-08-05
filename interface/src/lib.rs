@@ -10,6 +10,8 @@ pub mod instruction;
 pub mod stake_flags;
 pub mod stake_history;
 pub mod state;
+#[cfg(feature = "sysvar")]
+pub mod sysvar;
 pub mod tools;
 
 pub mod program {

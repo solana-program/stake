@@ -30,14 +30,17 @@ solana-instruction = "2.2.1"
 solana-program-error = "2.2.1"
 solana-pubkey = { version = "2.2.1", default-features = false }
 solana-system-interface = "1.0.0"
-solana-sysvar-id = "2.2.1"
+solana-sysvar = { version = "2.2.1", optional = true }
+solana-sysvar-id = { version = "2.2.1", optional = true }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
 bincode = "1.3.3"
+serial_test = "2.0.0"
 solana-account = {version = "2.2.1", features = ["bincode"] }
 solana-borsh = "2.2.1"
 solana-program = { version = "2.2.1", default-features = false }
+solana-stake-interface = { path = ".", features = ["bincode", "borsh", "sysvar"] }
 static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
@@ -54,6 +57,7 @@ bincode = [
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
+    "solana-sysvar/bincode",
     "serde"
 ]
 borsh = [
@@ -67,6 +71,8 @@ frozen-abi = [
     "dep:solana-frozen-abi",
     "dep:solana-frozen-abi-macro",
     "solana-instruction/frozen-abi",
-    "solana-pubkey/frozen-abi"
+    "solana-pubkey/frozen-abi",
+    "solana-sysvar/frozen-abi",
 ]
-serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde"]
+serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde", "solana-sysvar/serde"]
+sysvar = ["dep:solana-sysvar", "dep:solana-sysvar-id"]
