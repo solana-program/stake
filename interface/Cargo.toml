@@ -8,6 +8,7 @@ repository = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 edition = { workspace = true }
+rust_version = "1.81.0"
 
 [lib]
 crate-type = ["rlib"]
