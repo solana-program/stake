@@ -99,8 +99,6 @@ pub enum StakeState {
 }
 #[cfg(feature = "borsh")]
 impl_borsh_stake_state!(borsh);
-#[cfg(feature = "borsh")]
-impl_borsh_stake_state!(borsh0_10);
 impl StakeState {
     /// The fixed number of bytes used to serialize each stake account
     pub const fn size_of() -> usize {
@@ -205,8 +203,6 @@ macro_rules! impl_borsh_stake_state_v2 {
 }
 #[cfg(feature = "borsh")]
 impl_borsh_stake_state_v2!(borsh);
-#[cfg(feature = "borsh")]
-impl_borsh_stake_state_v2!(borsh0_10);
 
 impl StakeStateV2 {
     /// The fixed number of bytes used to serialize each stake account
@@ -304,68 +300,6 @@ impl Lockup {
         self.unix_timestamp > clock.unix_timestamp || self.epoch > clock.epoch
     }
 }
-#[cfg(feature = "borsh")]
-impl borsh0_10::de::BorshDeserialize for Lockup {
-    fn deserialize_reader<R: borsh0_10::maybestd::io::Read>(
-        reader: &mut R,
-    ) -> ::core::result::Result<Self, borsh0_10::maybestd::io::Error> {
-        Ok(Self {
-            unix_timestamp: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            epoch: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            custodian: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-        })
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::BorshSchema for Lockup {
-    fn declaration() -> borsh0_10::schema::Declaration {
-        "Lockup".to_string()
-    }
-    fn add_definitions_recursively(
-        definitions: &mut borsh0_10::maybestd::collections::HashMap<
-            borsh0_10::schema::Declaration,
-            borsh0_10::schema::Definition,
-        >,
-    ) {
-        let fields = borsh0_10::schema::Fields::NamedFields(<[_]>::into_vec(
-            borsh0_10::maybestd::boxed::Box::new([
-                (
-                    "unix_timestamp".to_string(),
-                    <UnixTimestamp as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "epoch".to_string(),
-                    <Epoch as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "custodian".to_string(),
-                    <Pubkey as borsh0_10::BorshSchema>::declaration(),
-                ),
-            ]),
-        ));
-        let definition = borsh0_10::schema::Definition::Struct { fields };
-        Self::add_definition(
-            <Self as borsh0_10::BorshSchema>::declaration(),
-            definition,
-            definitions,
-        );
-        <UnixTimestamp as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Epoch as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Pubkey as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::ser::BorshSerialize for Lockup {
-    fn serialize<W: borsh0_10::maybestd::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> ::core::result::Result<(), borsh0_10::maybestd::io::Error> {
-        borsh0_10::BorshSerialize::serialize(&self.unix_timestamp, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.epoch, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.custodian, writer)?;
-        Ok(())
-    }
-}
 
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
@@ -448,61 +382,6 @@ impl Authorized {
         Ok(())
     }
 }
-#[cfg(feature = "borsh")]
-impl borsh0_10::de::BorshDeserialize for Authorized {
-    fn deserialize_reader<R: borsh0_10::maybestd::io::Read>(
-        reader: &mut R,
-    ) -> ::core::result::Result<Self, borsh0_10::maybestd::io::Error> {
-        Ok(Self {
-            staker: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            withdrawer: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-        })
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::BorshSchema for Authorized {
-    fn declaration() -> borsh0_10::schema::Declaration {
-        "Authorized".to_string()
-    }
-    fn add_definitions_recursively(
-        definitions: &mut borsh0_10::maybestd::collections::HashMap<
-            borsh0_10::schema::Declaration,
-            borsh0_10::schema::Definition,
-        >,
-    ) {
-        let fields = borsh0_10::schema::Fields::NamedFields(<[_]>::into_vec(
-            borsh0_10::maybestd::boxed::Box::new([
-                (
-                    "staker".to_string(),
-                    <Pubkey as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "withdrawer".to_string(),
-                    <Pubkey as borsh0_10::BorshSchema>::declaration(),
-                ),
-            ]),
-        ));
-        let definition = borsh0_10::schema::Definition::Struct { fields };
-        Self::add_definition(
-            <Self as borsh0_10::BorshSchema>::declaration(),
-            definition,
-            definitions,
-        );
-        <Pubkey as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Pubkey as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::ser::BorshSerialize for Authorized {
-    fn serialize<W: borsh0_10::maybestd::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> ::core::result::Result<(), borsh0_10::maybestd::io::Error> {
-        borsh0_10::BorshSerialize::serialize(&self.staker, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.withdrawer, writer)?;
-        Ok(())
-    }
-}
 
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
@@ -555,68 +434,6 @@ impl Meta {
             authorized: Authorized::auto(authorized),
             ..Meta::default()
         }
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::de::BorshDeserialize for Meta {
-    fn deserialize_reader<R: borsh0_10::maybestd::io::Read>(
-        reader: &mut R,
-    ) -> ::core::result::Result<Self, borsh0_10::maybestd::io::Error> {
-        Ok(Self {
-            rent_exempt_reserve: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            authorized: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            lockup: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-        })
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::BorshSchema for Meta {
-    fn declaration() -> borsh0_10::schema::Declaration {
-        "Meta".to_string()
-    }
-    fn add_definitions_recursively(
-        definitions: &mut borsh0_10::maybestd::collections::HashMap<
-            borsh0_10::schema::Declaration,
-            borsh0_10::schema::Definition,
-        >,
-    ) {
-        let fields = borsh0_10::schema::Fields::NamedFields(<[_]>::into_vec(
-            borsh0_10::maybestd::boxed::Box::new([
-                (
-                    "rent_exempt_reserve".to_string(),
-                    <u64 as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "authorized".to_string(),
-                    <Authorized as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "lockup".to_string(),
-                    <Lockup as borsh0_10::BorshSchema>::declaration(),
-                ),
-            ]),
-        ));
-        let definition = borsh0_10::schema::Definition::Struct { fields };
-        Self::add_definition(
-            <Self as borsh0_10::BorshSchema>::declaration(),
-            definition,
-            definitions,
-        );
-        <u64 as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Authorized as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Lockup as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::ser::BorshSerialize for Meta {
-    fn serialize<W: borsh0_10::maybestd::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> ::core::result::Result<(), borsh0_10::maybestd::io::Error> {
-        borsh0_10::BorshSerialize::serialize(&self.rent_exempt_reserve, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.authorized, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.lockup, writer)?;
-        Ok(())
     }
 }
 
@@ -858,82 +675,6 @@ impl Delegation {
         }
     }
 }
-#[cfg(feature = "borsh")]
-impl borsh0_10::de::BorshDeserialize for Delegation {
-    fn deserialize_reader<R: borsh0_10::maybestd::io::Read>(
-        reader: &mut R,
-    ) -> ::core::result::Result<Self, borsh0_10::maybestd::io::Error> {
-        Ok(Self {
-            voter_pubkey: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            stake: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            activation_epoch: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            deactivation_epoch: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            warmup_cooldown_rate: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-        })
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::BorshSchema for Delegation {
-    fn declaration() -> borsh0_10::schema::Declaration {
-        "Delegation".to_string()
-    }
-    fn add_definitions_recursively(
-        definitions: &mut borsh0_10::maybestd::collections::HashMap<
-            borsh0_10::schema::Declaration,
-            borsh0_10::schema::Definition,
-        >,
-    ) {
-        let fields = borsh0_10::schema::Fields::NamedFields(<[_]>::into_vec(
-            borsh0_10::maybestd::boxed::Box::new([
-                (
-                    "voter_pubkey".to_string(),
-                    <Pubkey as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "stake".to_string(),
-                    <u64 as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "activation_epoch".to_string(),
-                    <Epoch as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "deactivation_epoch".to_string(),
-                    <Epoch as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "warmup_cooldown_rate".to_string(),
-                    <f64 as borsh0_10::BorshSchema>::declaration(),
-                ),
-            ]),
-        ));
-        let definition = borsh0_10::schema::Definition::Struct { fields };
-        Self::add_definition(
-            <Self as borsh0_10::BorshSchema>::declaration(),
-            definition,
-            definitions,
-        );
-        <Pubkey as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <u64 as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Epoch as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <Epoch as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <f64 as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::ser::BorshSerialize for Delegation {
-    fn serialize<W: borsh0_10::maybestd::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> ::core::result::Result<(), borsh0_10::maybestd::io::Error> {
-        borsh0_10::BorshSerialize::serialize(&self.voter_pubkey, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.stake, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.activation_epoch, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.deactivation_epoch, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.warmup_cooldown_rate, writer)?;
-        Ok(())
-    }
-}
 
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
@@ -989,61 +730,6 @@ impl Stake {
             self.delegation.deactivation_epoch = epoch;
             Ok(())
         }
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::de::BorshDeserialize for Stake {
-    fn deserialize_reader<R: borsh0_10::maybestd::io::Read>(
-        reader: &mut R,
-    ) -> ::core::result::Result<Self, borsh0_10::maybestd::io::Error> {
-        Ok(Self {
-            delegation: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-            credits_observed: borsh0_10::BorshDeserialize::deserialize_reader(reader)?,
-        })
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::BorshSchema for Stake {
-    fn declaration() -> borsh0_10::schema::Declaration {
-        "Stake".to_string()
-    }
-    fn add_definitions_recursively(
-        definitions: &mut borsh0_10::maybestd::collections::HashMap<
-            borsh0_10::schema::Declaration,
-            borsh0_10::schema::Definition,
-        >,
-    ) {
-        let fields = borsh0_10::schema::Fields::NamedFields(<[_]>::into_vec(
-            borsh0_10::maybestd::boxed::Box::new([
-                (
-                    "delegation".to_string(),
-                    <Delegation as borsh0_10::BorshSchema>::declaration(),
-                ),
-                (
-                    "credits_observed".to_string(),
-                    <u64 as borsh0_10::BorshSchema>::declaration(),
-                ),
-            ]),
-        ));
-        let definition = borsh0_10::schema::Definition::Struct { fields };
-        Self::add_definition(
-            <Self as borsh0_10::BorshSchema>::declaration(),
-            definition,
-            definitions,
-        );
-        <Delegation as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-        <u64 as borsh0_10::BorshSchema>::add_definitions_recursively(definitions);
-    }
-}
-#[cfg(feature = "borsh")]
-impl borsh0_10::ser::BorshSerialize for Stake {
-    fn serialize<W: borsh0_10::maybestd::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> ::core::result::Result<(), borsh0_10::maybestd::io::Error> {
-        borsh0_10::BorshSerialize::serialize(&self.delegation, writer)?;
-        borsh0_10::BorshSerialize::serialize(&self.credits_observed, writer)?;
-        Ok(())
     }
 }
 

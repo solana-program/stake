@@ -1,6 +1,5 @@
 use {
     num_traits::{FromPrimitive, ToPrimitive},
-    solana_decode_error::DecodeError,
     solana_program_error::ProgramError,
 };
 
@@ -157,7 +156,7 @@ impl ToPrimitive for StakeError {
     }
 }
 
-impl std::error::Error for StakeError {}
+impl core::error::Error for StakeError {}
 
 impl core::fmt::Display for StakeError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -204,18 +203,9 @@ impl core::fmt::Display for StakeError {
     }
 }
 
-impl<E> DecodeError<E> for StakeError {
-    fn type_of() -> &'static str {
-        "StakeError"
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use {
-        super::StakeError, num_traits::FromPrimitive, solana_decode_error::DecodeError,
-        solana_instruction::error::InstructionError, strum::IntoEnumIterator,
-    };
+    use {super::StakeError, num_traits::FromPrimitive, strum::IntoEnumIterator};
 
     #[test]
     fn test_stake_error_from_primitive_exhaustive() {
@@ -226,31 +216,5 @@ mod tests {
                 StakeError::from_i64(variant_i64)
             );
         }
-    }
-
-    #[test]
-    fn test_custom_error_decode() {
-        use num_traits::FromPrimitive;
-        fn pretty_err<T>(err: InstructionError) -> String
-        where
-            T: 'static + std::error::Error + DecodeError<T> + FromPrimitive,
-        {
-            if let InstructionError::Custom(code) = err {
-                let specific_error: T = T::decode_custom_error_to_enum(code).unwrap();
-                format!(
-                    "{:?}: {}::{:?} - {}",
-                    err,
-                    T::type_of(),
-                    specific_error,
-                    specific_error,
-                )
-            } else {
-                "".to_string()
-            }
-        }
-        assert_eq!(
-            "Custom(0): StakeError::NoCreditsToRedeem - not enough credits to redeem",
-            pretty_err::<StakeError>(StakeError::NoCreditsToRedeem.into())
-        )
     }
 }

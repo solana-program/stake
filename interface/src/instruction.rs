@@ -909,12 +909,12 @@ mod tests {
     #[test]
     fn test_constants() {
         // Ensure that the constants are in sync with the solana program.
-        assert_eq!(CLOCK_ID, solana_program::sysvar::clock::ID);
+        assert_eq!(CLOCK_ID, solana_sdk_ids::sysvar::clock::ID);
 
         // Ensure that the constants are in sync with the solana program.
-        assert_eq!(STAKE_HISTORY_ID, solana_program::sysvar::stake_history::ID);
+        assert_eq!(STAKE_HISTORY_ID, solana_sdk_ids::sysvar::stake_history::ID);
 
         // Ensure that the constants are in sync with the solana rent.
-        assert_eq!(RENT_ID, solana_program::sysvar::rent::ID);
+        assert_eq!(RENT_ID, solana_sdk_ids::sysvar::rent::ID);
     }
 }
