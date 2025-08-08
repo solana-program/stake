@@ -28,6 +28,3 @@ build = "1.86.0"
 format = "nightly-2025-02-16"
 lint = "nightly-2025-02-16"
 test = "nightly-2025-02-16"
-
-[patch.crates-io]
-solana-stake-interface = { path = "interface" }
