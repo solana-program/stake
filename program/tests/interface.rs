@@ -901,6 +901,7 @@ fn fully_configurable_stake(
     }
 }
 
+// test all unmodified transactions succeed, to ensure other tests test what they purport to test
 #[test]
 fn test_all_success() {
     let mut env = Env::init();
@@ -912,6 +913,7 @@ fn test_all_success() {
     }
 }
 
+// all signers are essential; missing any one signer is a fail
 #[test]
 fn test_no_signer_bypass() {
     let mut env = Env::init();
@@ -929,4 +931,24 @@ fn test_no_signer_bypass() {
             env.reset();
         }
     }
+}
+
+// the stake program cannot be used during the epoch rewards period
+// the only exception to this is GetMinimumDelegation
+#[test]
+fn test_epoch_rewards_period() {
+    let mut env = Env::init();
+    env.mollusk.sysvars.epoch_rewards = EpochRewards {
+        active: true,
+        ..EpochRewards::default()
+    };
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
+        env.process_fail(&instruction);
+        env.reset();
+    }
+
+    let instruction = instruction::get_minimum_delegation();
+    env.process_success(&instruction);
 }
