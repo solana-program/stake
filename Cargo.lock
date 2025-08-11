@@ -2579,7 +2579,7 @@ dependencies = [
  "solana-rent 2.2.1",
  "solana-sdk-ids 2.2.1",
  "solana-slot-hashes 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-stake-program 2.3.6",
  "solana-svm-callback",
  "solana-system-program",
@@ -5736,7 +5736,7 @@ dependencies = [
  "solana-slot-hashes 2.2.1",
  "solana-slot-history 2.2.1",
  "solana-stable-layout 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-system-interface 1.0.0",
  "solana-sysvar 2.2.2",
  "solana-sysvar-id 2.2.1",
@@ -5920,7 +5920,7 @@ dependencies = [
  "solana-sdk-ids 2.2.1",
  "solana-signer",
  "solana-stable-layout 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-svm",
  "solana-system-interface 1.0.0",
  "solana-sysvar 2.2.2",
@@ -6331,7 +6331,7 @@ dependencies = [
  "solana-signer",
  "solana-slot-hashes 2.2.1",
  "solana-slot-history 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-stake-program 2.3.6",
  "solana-svm",
  "solana-svm-callback",
@@ -6814,6 +6814,27 @@ dependencies = [
 [[package]]
 name = "solana-stake-interface"
 version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5269e89fde216b4d7e1d1739cf5303f8398a1ff372a81232abbee80e554a838c"
+dependencies = [
+ "borsh 0.10.4",
+ "borsh 1.5.7",
+ "num-traits",
+ "serde",
+ "serde_derive",
+ "solana-clock 2.2.2",
+ "solana-cpi 2.2.1",
+ "solana-decode-error",
+ "solana-instruction 2.3.0",
+ "solana-program-error 2.2.1",
+ "solana-pubkey 2.4.0",
+ "solana-system-interface 1.0.0",
+ "solana-sysvar-id 2.2.1",
+]
+
+[[package]]
+name = "solana-stake-interface"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -6834,7 +6855,7 @@ dependencies = [
  "solana-program-error 3.0.0",
  "solana-pubkey 3.0.0",
  "solana-sdk-ids 3.0.0",
- "solana-stake-interface 1.2.1",
+ "solana-stake-interface 2.0.0",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.0.0",
  "solana-sysvar-id 3.0.0",
@@ -6842,27 +6863,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "test-case",
-]
-
-[[package]]
-name = "solana-stake-interface"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5269e89fde216b4d7e1d1739cf5303f8398a1ff372a81232abbee80e554a838c"
-dependencies = [
- "borsh 0.10.4",
- "borsh 1.5.7",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-clock 2.2.2",
- "solana-cpi 2.2.1",
- "solana-decode-error",
- "solana-instruction 2.3.0",
- "solana-program-error 2.2.1",
- "solana-pubkey 2.4.0",
- "solana-system-interface 1.0.0",
- "solana-sysvar-id 2.2.1",
 ]
 
 [[package]]
@@ -6889,7 +6889,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "solana-sdk-ids 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-system-interface 1.0.0",
  "solana-sysvar 2.2.2",
  "solana-vote-program",
@@ -6919,7 +6919,7 @@ dependencies = [
  "solana-pubkey 2.4.0",
  "solana-rent 2.2.1",
  "solana-sdk-ids 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-sysvar 2.2.2",
  "solana-transaction-context",
  "solana-type-overrides",
@@ -7175,7 +7175,7 @@ dependencies = [
  "solana-sdk-macro 2.2.1",
  "solana-slot-hashes 2.2.1",
  "solana-slot-history 2.2.1",
- "solana-stake-interface 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 1.2.1",
  "solana-sysvar-id 2.2.1",
 ]
 
