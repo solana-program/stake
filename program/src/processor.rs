@@ -18,6 +18,7 @@ use {
             state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
+        system_program,
         sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
         vote::{program as solana_vote_program, state::VoteState},
     },
@@ -56,6 +57,11 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
 
     bincode::serialize_into(&mut stake_account_info.data.borrow_mut()[..], new_state)
         .map_err(|_| ProgramError::InvalidAccountData)
+}
+
+fn deallocate_stake_account(stake_account_info: &AccountInfo) -> ProgramResult {
+    stake_account_info.assign(&system_program::id());
+    stake_account_info.realloc(0, false)
 }
 
 // dont call this "move" because we have an instruction MoveLamports
@@ -582,7 +588,7 @@ impl Processor {
 
         // Deinitialize state upon zero balance
         if split_lamports == source_lamport_balance {
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            deallocate_stake_account(source_stake_account_info)?;
         }
 
         relocate_lamports(
@@ -667,7 +673,7 @@ impl Processor {
             }
 
             // Deinitialize state upon zero balance
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            deallocate_stake_account(source_stake_account_info)?;
         } else {
             // a partial withdrawal must not deplete the reserve
             let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -784,7 +790,7 @@ impl Processor {
         }
 
         // Source is about to be drained, deinitialize its state
-        set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+        deallocate_stake_account(source_stake_account_info)?;
 
         // Drain the source stake account
         relocate_lamports(
