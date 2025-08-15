@@ -5,7 +5,6 @@ use {
     bincode::serialize,
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, ReadableAccount, WritableAccount},
-    solana_program_runtime::loaded_programs::ProgramCacheEntryOwner,
     solana_sdk::{
         account::create_account_shared_data_for_test,
         account_utils::StateMut,
@@ -44,16 +43,7 @@ use {
         vote_state::{self, VoteState, VoteStateVersions},
     },
     std::{collections::HashSet, str::FromStr},
-    test_case::test_case,
 };
-
-fn mollusk_native() -> Mollusk {
-    let mut mollusk = Mollusk::default();
-    mollusk
-        .feature_set
-        .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
-    mollusk
-}
 
 fn mollusk_bpf() -> Mollusk {
     let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
@@ -61,19 +51,6 @@ fn mollusk_bpf() -> Mollusk {
         .feature_set
         .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
     mollusk
-}
-
-trait IsBpf {
-    fn is_bpf(&self) -> bool;
-}
-impl IsBpf for Mollusk {
-    fn is_bpf(&self) -> bool {
-        self.program_cache
-            .load_program(&id())
-            .unwrap()
-            .account_owner
-            != ProgramCacheEntryOwner::NativeLoader
-    }
 }
 
 fn create_default_account() -> AccountSharedData {
@@ -326,9 +303,10 @@ mod config {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_process_instruction(mollusk: Mollusk) {
+#[test]
+fn test_stake_process_instruction() {
+    let mollusk = mollusk_bpf();
+
     process_instruction_as_one_arg(
         &mollusk,
         &instruction::initialize(
@@ -463,9 +441,10 @@ fn test_stake_process_instruction(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_process_instruction_decode_bail(mollusk: Mollusk) {
+#[test]
+fn test_stake_process_instruction_decode_bail() {
+    let mollusk = mollusk_bpf();
+
     // these will not call stake_state, have bogus contents
     let stake_address = Pubkey::new_unique();
     let stake_account = create_default_stake_account();
@@ -736,9 +715,10 @@ fn test_stake_process_instruction_decode_bail(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_checked_instructions(mollusk: Mollusk) {
+#[test]
+fn test_stake_checked_instructions() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = Pubkey::new_unique();
     let staker = Pubkey::new_unique();
     let staker_account = create_default_account();
@@ -1097,9 +1077,10 @@ fn test_stake_checked_instructions(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_initialize(mollusk: Mollusk) {
+#[test]
+fn test_stake_initialize() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_lamports = rent_exempt_reserve;
@@ -1200,9 +1181,10 @@ fn test_stake_initialize(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_authorize(mollusk: Mollusk) {
+#[test]
+fn test_authorize() {
+    let mollusk = mollusk_bpf();
+
     let authority_address = solana_sdk::pubkey::new_rand();
     let authority_address_2 = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -1385,9 +1367,10 @@ fn test_authorize(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_authorize_override(mollusk: Mollusk) {
+#[test]
+fn test_authorize_override() {
+    let mollusk = mollusk_bpf();
+
     let authority_address = solana_sdk::pubkey::new_rand();
     let mallory_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -1504,9 +1487,10 @@ fn test_authorize_override(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_authorize_with_seed(mollusk: Mollusk) {
+#[test]
+fn test_authorize_with_seed() {
+    let mollusk = mollusk_bpf();
+
     let authority_base_address = solana_sdk::pubkey::new_rand();
     let authority_address = solana_sdk::pubkey::new_rand();
     let seed = "42";
@@ -1621,9 +1605,10 @@ fn test_authorize_with_seed(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_authorize_delegated_stake(mollusk: Mollusk) {
+#[test]
+fn test_authorize_delegated_stake() {
+    let mollusk = mollusk_bpf();
+
     let authority_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
@@ -1820,9 +1805,10 @@ fn test_authorize_delegated_stake(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_delegate(mollusk: Mollusk) {
+#[test]
+fn test_stake_delegate() {
+    let mollusk = mollusk_bpf();
+
     let mut vote_state = VoteState::default();
     for i in 0..1000 {
         vote_state::process_slot_vote_unchecked(&mut vote_state, i);
@@ -2064,9 +2050,10 @@ fn test_stake_delegate(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_redelegate_consider_balance_changes(mollusk: Mollusk) {
+#[test]
+fn test_redelegate_consider_balance_changes() {
+    let mollusk = mollusk_bpf();
+
     let mut clock = Clock::default();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -2267,9 +2254,10 @@ fn test_redelegate_consider_balance_changes(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split(mollusk: Mollusk) {
+#[test]
+fn test_split() {
+    let mollusk = mollusk_bpf();
+
     let stake_history = StakeHistory::default();
     let current_epoch = 100;
     let clock = Clock {
@@ -2394,17 +2382,14 @@ fn test_split(mollusk: Mollusk) {
         &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
         transaction_accounts,
         instruction_accounts,
-        Err(if mollusk.is_bpf() {
-            ProgramError::InvalidAccountOwner
-        } else {
-            ProgramError::IncorrectProgramId
-        }),
+        Err(ProgramError::InvalidAccountOwner),
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_withdraw_stake(mollusk: Mollusk) {
+#[test]
+fn test_withdraw_stake() {
+    let mollusk = mollusk_bpf();
+
     let recipient_address = solana_sdk::pubkey::new_rand();
     let authority_address = solana_sdk::pubkey::new_rand();
     let custodian_address = solana_sdk::pubkey::new_rand();
@@ -2696,9 +2681,10 @@ fn test_withdraw_stake(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_withdraw_stake_before_warmup(mollusk: Mollusk) {
+#[test]
+fn test_withdraw_stake_before_warmup() {
+    let mollusk = mollusk_bpf();
+
     let recipient_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
@@ -2830,9 +2816,10 @@ fn test_withdraw_stake_before_warmup(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_withdraw_lockup(mollusk: Mollusk) {
+#[test]
+fn test_withdraw_lockup() {
+    let mollusk = mollusk_bpf();
+
     let recipient_address = solana_sdk::pubkey::new_rand();
     let custodian_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -2954,9 +2941,10 @@ fn test_withdraw_lockup(mollusk: Mollusk) {
     assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_withdraw_rent_exempt(mollusk: Mollusk) {
+#[test]
+fn test_withdraw_rent_exempt() {
+    let mollusk = mollusk_bpf();
+
     let recipient_address = solana_sdk::pubkey::new_rand();
     let custodian_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -3050,9 +3038,10 @@ fn test_withdraw_rent_exempt(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_deactivate(mollusk: Mollusk) {
+#[test]
+fn test_deactivate() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
@@ -3180,9 +3169,10 @@ fn test_deactivate(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_set_lockup(mollusk: Mollusk) {
+#[test]
+fn test_set_lockup() {
+    let mollusk = mollusk_bpf();
+
     let custodian_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -3469,9 +3459,10 @@ fn test_set_lockup(mollusk: Mollusk) {
 /// Ensure that `initialize()` respects the minimum balance requirements
 /// - Assert 1: accounts with a balance equal-to the rent exemption initialize OK
 /// - Assert 2: accounts with a balance less-than the rent exemption do not initialize
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_initialize_minimum_balance(mollusk: Mollusk) {
+#[test]
+fn test_initialize_minimum_balance() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = solana_sdk::pubkey::new_rand();
@@ -3524,9 +3515,10 @@ fn test_initialize_minimum_balance(mollusk: Mollusk) {
 /// withdrawing below the minimum delegation, then re-delegating successfully (see
 /// `test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation()` for
 /// more information.)
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_delegate_minimum_stake_delegation(mollusk: Mollusk) {
+#[test]
+fn test_delegate_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -3625,9 +3617,10 @@ fn test_delegate_minimum_stake_delegation(mollusk: Mollusk) {
 ///  EQ     | LT   | Err
 ///  LT     | EQ   | Err
 ///  LT     | LT   | Err
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_minimum_stake_delegation(mollusk: Mollusk) {
+#[test]
+fn test_split_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -3726,9 +3719,10 @@ fn test_split_minimum_stake_delegation(mollusk: Mollusk) {
 ///             delegation is OK
 /// - Assert 2: splitting the full amount from an account that has less than the minimum
 ///             delegation is not OK
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_full_amount_minimum_stake_delegation(mollusk: Mollusk) {
+#[test]
+fn test_split_full_amount_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -3820,9 +3814,10 @@ fn test_split_full_amount_minimum_stake_delegation(mollusk: Mollusk) {
 /// Ensure that `split()` correctly handles prefunded destination accounts from
 /// initialized stakes.  When a destination account already has funds, ensure
 /// the minimum split amount reduces accordingly.
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_initialized_split_destination_minimum_balance(mollusk: Mollusk) {
+#[test]
+fn test_initialized_split_destination_minimum_balance() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let source_address = Pubkey::new_unique();
@@ -3910,14 +3905,13 @@ fn test_initialized_split_destination_minimum_balance(mollusk: Mollusk) {
 /// Ensure that `split()` correctly handles prefunded destination accounts from staked stakes.
 /// When a destination account already has funds, ensure the minimum split amount reduces
 /// accordingly.
-#[test_case(mollusk_native(), &[Ok(()), Ok(())]; "native_stake")]
-#[test_case(mollusk_bpf(), &[Ok(()), Ok(())]; "bpf_stake")]
 // NOTE it is not presently possible to test 1sol minimum delegation
 // #[test_case(feature_set_all_enabled(), &[Err(StakeError::InsufficientDelegation.into()), Err(StakeError::InsufficientDelegation.into())]; "all_enabled")]
-fn test_staked_split_destination_minimum_balance(
-    mollusk: Mollusk,
-    expected_results: &[Result<(), ProgramError>],
-) {
+#[test]
+fn test_staked_split_destination_minimum_balance() {
+    let mollusk = mollusk_bpf();
+    let expected_results = &[Ok(()), Ok(())];
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -4095,9 +4089,10 @@ fn test_staked_split_destination_minimum_balance(
 /// Ensure that `withdraw()` respects the minimum delegation requirements
 /// - Assert 1: withdrawing so remaining stake is equal-to the minimum is OK
 /// - Assert 2: withdrawing so remaining stake is less-than the minimum is not OK
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_withdraw_minimum_stake_delegation(mollusk: Mollusk) {
+#[test]
+fn test_withdraw_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -4202,11 +4197,10 @@ fn test_withdraw_minimum_stake_delegation(mollusk: Mollusk) {
 /// 3. Deactives the delegation
 /// 4. Withdraws from the account such that the ending balance is *below* rent + minimum delegation
 /// 5. Re-delegates, now with less than the minimum delegation, but it still succeeds
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation(
-    mollusk: Mollusk,
-) {
+#[test]
+fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -4373,9 +4367,10 @@ fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegat
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_source_uninitialized(mollusk: Mollusk) {
+#[test]
+fn test_split_source_uninitialized() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let minimum_delegation = crate::get_minimum_delegation();
@@ -4473,9 +4468,10 @@ fn test_split_source_uninitialized(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_split_not_uninitialized(mollusk: Mollusk) {
+#[test]
+fn test_split_split_not_uninitialized() {
+    let mollusk = mollusk_bpf();
+
     let stake_lamports = 42;
     let stake_address = solana_sdk::pubkey::new_rand();
     let stake_account = AccountSharedData::new_data_with_space(
@@ -4524,9 +4520,10 @@ fn test_split_split_not_uninitialized(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_more_than_staked(mollusk: Mollusk) {
+#[test]
+fn test_split_more_than_staked() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -4597,9 +4594,10 @@ fn test_split_more_than_staked(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_with_rent(mollusk: Mollusk) {
+#[test]
+fn test_split_with_rent() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -4729,9 +4727,10 @@ fn test_split_with_rent(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
+#[test]
+fn test_split_to_account_with_rent_exempt_reserve() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let current_epoch = 100;
@@ -4902,9 +4901,10 @@ fn test_split_to_account_with_rent_exempt_reserve(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_from_larger_sized_account(mollusk: Mollusk) {
+#[test]
+fn test_split_from_larger_sized_account() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let source_larger_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
     let split_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5070,9 +5070,10 @@ fn test_split_from_larger_sized_account(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_from_smaller_sized_account(mollusk: Mollusk) {
+#[test]
+fn test_split_from_smaller_sized_account() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let source_smaller_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let split_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
@@ -5163,9 +5164,10 @@ fn test_split_from_smaller_sized_account(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_100_percent_of_source(mollusk: Mollusk) {
+#[test]
+fn test_split_100_percent_of_source() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -5282,9 +5284,10 @@ fn test_split_100_percent_of_source(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_100_percent_of_source_to_account_with_lamports(mollusk: Mollusk) {
+#[test]
+fn test_split_100_percent_of_source_to_account_with_lamports() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -5401,9 +5404,10 @@ fn test_split_100_percent_of_source_to_account_with_lamports(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_rent_exemptness(mollusk: Mollusk) {
+#[test]
+fn test_split_rent_exemptness() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let source_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
     let split_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5573,9 +5577,10 @@ fn test_split_rent_exemptness(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
+#[test]
+fn test_split_require_rent_exempt_destination() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let current_epoch = 100;
@@ -5767,9 +5772,10 @@ fn test_split_require_rent_exempt_destination(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge(mollusk: Mollusk) {
+#[test]
+fn test_merge() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let merge_from_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
@@ -5902,9 +5908,10 @@ fn test_merge(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge_self_fails(mollusk: Mollusk) {
+#[test]
+fn test_merge_self_fails() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
     let rent = Rent::default();
@@ -5979,9 +5986,10 @@ fn test_merge_self_fails(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge_incorrect_authorized_staker(mollusk: Mollusk) {
+#[test]
+fn test_merge_incorrect_authorized_staker() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let merge_from_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
@@ -6077,9 +6085,10 @@ fn test_merge_incorrect_authorized_staker(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge_invalid_account_data(mollusk: Mollusk) {
+#[test]
+fn test_merge_invalid_account_data() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let merge_from_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
@@ -6162,9 +6171,10 @@ fn test_merge_invalid_account_data(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge_fake_stake_source(mollusk: Mollusk) {
+#[test]
+fn test_merge_fake_stake_source() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let merge_from_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
@@ -6229,17 +6239,14 @@ fn test_merge_fake_stake_source(mollusk: Mollusk) {
         &serialize(&StakeInstruction::Merge).unwrap(),
         transaction_accounts,
         instruction_accounts,
-        Err(if mollusk.is_bpf() {
-            ProgramError::InvalidAccountOwner
-        } else {
-            ProgramError::IncorrectProgramId
-        }),
+        Err(ProgramError::InvalidAccountOwner),
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_merge_active_stake(mollusk: Mollusk) {
+#[test]
+fn test_merge_active_stake() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = solana_sdk::pubkey::new_rand();
     let merge_from_address = solana_sdk::pubkey::new_rand();
     let authorized_address = solana_sdk::pubkey::new_rand();
@@ -6506,9 +6513,10 @@ fn test_merge_active_stake(mollusk: Mollusk) {
     try_merge(&mollusk, transaction_accounts, instruction_accounts, Ok(()));
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
+#[test]
+fn test_stake_get_minimum_delegation() {
+    let mollusk = mollusk_bpf();
+
     let stake_address = Pubkey::new_unique();
     let stake_account = create_default_stake_account();
     let minimum_delegation = crate::get_minimum_delegation();
@@ -6544,9 +6552,10 @@ fn test_stake_get_minimum_delegation(mollusk: Mollusk) {
 // The GetMinimumDelegation instruction does not take any accounts; so when it was added,
 // `process_instruction()` needed to be updated to *not* need a stake account passed in, which
 // changes the error *ordering* conditions.
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_process_instruction_error_ordering(mollusk: Mollusk) {
+#[test]
+fn test_stake_process_instruction_error_ordering() {
+    let mollusk = mollusk_bpf();
+
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let rent_address = rent::id();
@@ -6614,9 +6623,10 @@ fn test_stake_process_instruction_error_ordering(mollusk: Mollusk) {
     }
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_deactivate_delinquent(mollusk: Mollusk) {
+#[test]
+fn test_deactivate_delinquent() {
+    let mollusk = mollusk_bpf();
+
     let reference_vote_address = Pubkey::new_unique();
     let vote_address = Pubkey::new_unique();
     let stake_address = Pubkey::new_unique();
@@ -6883,9 +6893,10 @@ fn test_deactivate_delinquent(mollusk: Mollusk) {
     );
 }
 
-#[test_case(mollusk_native(); "native_stake")]
-#[test_case(mollusk_bpf(); "bpf_stake")]
-fn test_stake_process_instruction_with_epoch_rewards_active(mollusk: Mollusk) {
+#[test]
+fn test_stake_process_instruction_with_epoch_rewards_active() {
+    let mollusk = mollusk_bpf();
+
     let process_instruction_as_one_arg = |mollusk: &Mollusk,
                                           instruction: &Instruction,
                                           expected_result: Result<(), ProgramError>|
