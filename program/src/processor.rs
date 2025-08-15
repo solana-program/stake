@@ -18,7 +18,6 @@ use {
             state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        system_program,
         sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
         vote::{program as solana_vote_program, state::VoteState},
     },
@@ -57,11 +56,6 @@ fn set_stake_state(stake_account_info: &AccountInfo, new_state: &StakeStateV2) -
 
     bincode::serialize_into(&mut stake_account_info.data.borrow_mut()[..], new_state)
         .map_err(|_| ProgramError::InvalidAccountData)
-}
-
-fn deallocate_stake_account(stake_account_info: &AccountInfo) -> ProgramResult {
-    stake_account_info.assign(&system_program::id());
-    stake_account_info.realloc(0, false)
 }
 
 // dont call this "move" because we have an instruction MoveLamports
@@ -586,9 +580,9 @@ impl Processor {
             _ => return Err(ProgramError::InvalidAccountData),
         }
 
-        // Deinitialize state upon zero balance
+        // Truncate state upon zero balance
         if split_lamports == source_lamport_balance {
-            deallocate_stake_account(source_stake_account_info)?;
+            source_stake_account_info.realloc(0, false)?;
         }
 
         relocate_lamports(
@@ -672,8 +666,8 @@ impl Processor {
                 return Err(ProgramError::InsufficientFunds);
             }
 
-            // Deinitialize state upon zero balance
-            deallocate_stake_account(source_stake_account_info)?;
+            // Truncate state upon zero balance
+            source_stake_account_info.realloc(0, false)?;
         } else {
             // a partial withdrawal must not deplete the reserve
             let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -789,8 +783,8 @@ impl Processor {
             set_stake_state(destination_stake_account_info, &merged_state)?;
         }
 
-        // Source is about to be drained, deinitialize its state
-        deallocate_stake_account(source_stake_account_info)?;
+        // Source is about to be drained, truncate its state
+        source_stake_account_info.realloc(0, false)?;
 
         // Drain the source stake account
         relocate_lamports(
