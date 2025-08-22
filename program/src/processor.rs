@@ -580,9 +580,9 @@ impl Processor {
             _ => return Err(ProgramError::InvalidAccountData),
         }
 
-        // Deinitialize state upon zero balance
+        // Truncate state upon zero balance
         if split_lamports == source_lamport_balance {
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            source_stake_account_info.realloc(0, false)?;
         }
 
         relocate_lamports(
@@ -666,8 +666,8 @@ impl Processor {
                 return Err(ProgramError::InsufficientFunds);
             }
 
-            // Deinitialize state upon zero balance
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            // Truncate state upon zero balance
+            source_stake_account_info.realloc(0, false)?;
         } else {
             // a partial withdrawal must not deplete the reserve
             let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -783,8 +783,8 @@ impl Processor {
             set_stake_state(destination_stake_account_info, &merged_state)?;
         }
 
-        // Source is about to be drained, deinitialize its state
-        set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+        // Source is about to be drained, truncate its state
+        source_stake_account_info.realloc(0, false)?;
 
         // Drain the source stake account
         relocate_lamports(
