@@ -214,6 +214,10 @@ fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
     )
 }
 
+fn is_closed(account: &AccountSharedData) -> bool {
+    account.lamports() == 0 && *account.owner() == id() && account.data().len() == 0
+}
+
 fn get_active_stake_for_tests(
     stake_accounts: &[AccountSharedData],
     clock: &Clock,
@@ -221,7 +225,7 @@ fn get_active_stake_for_tests(
 ) -> u64 {
     let mut active_stake = 0;
     for account in stake_accounts {
-        if let StakeStateV2::Stake(_meta, stake, _stake_flags) = account.state().unwrap() {
+        if let Ok(StakeStateV2::Stake(_meta, stake, _stake_flags)) = account.state() {
             let stake_status = stake.delegation.stake_activating_and_deactivating(
                 clock.epoch,
                 stake_history,
@@ -1354,7 +1358,7 @@ fn test_authorize() {
         instruction_accounts.clone(),
         Ok(()),
     );
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
 
     // Test that withdrawal to account fails without authorized withdrawer
     instruction_accounts[4].is_signer = false;
@@ -2488,7 +2492,7 @@ fn test_withdraw_stake() {
         Ok(()),
     );
     assert_eq!(accounts[0].lamports(), 0);
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
 
     // initialize stake
     let lockup = Lockup {
@@ -2633,7 +2637,7 @@ fn test_withdraw_stake() {
         Ok(()),
     );
     assert_eq!(accounts[0].lamports(), 0);
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
 
     // overflow
     let rent = Rent::default();
@@ -2904,7 +2908,7 @@ fn test_withdraw_lockup() {
         instruction_accounts.clone(),
         Ok(()),
     );
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
 
     // should pass, custodian is the same as the withdraw authority
     instruction_accounts[5].pubkey = stake_address;
@@ -2924,7 +2928,7 @@ fn test_withdraw_lockup() {
         instruction_accounts.clone(),
         Ok(()),
     );
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
     transaction_accounts[0] = (stake_address, stake_account);
 
     // should pass, lockup has expired
@@ -2938,7 +2942,7 @@ fn test_withdraw_lockup() {
         instruction_accounts,
         Ok(()),
     );
-    assert_eq!(from(&accounts[0]).unwrap(), StakeStateV2::Uninitialized);
+    assert!(is_closed(&accounts[0]));
 }
 
 #[test]
@@ -5260,7 +5264,7 @@ fn test_split_100_percent_of_source() {
         match state {
             StakeStateV2::Initialized(_) => {
                 assert_eq!(Ok(*state), accounts[1].state());
-                assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+                assert!(is_closed(&accounts[0]));
             }
             StakeStateV2::Stake(meta, stake, stake_flags) => {
                 assert_eq!(
@@ -5277,7 +5281,7 @@ fn test_split_100_percent_of_source() {
                     )),
                     accounts[1].state()
                 );
-                assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+                assert!(is_closed(&accounts[0]));
             }
             _ => unreachable!(),
         }
@@ -5399,7 +5403,7 @@ fn test_split_100_percent_of_source_to_account_with_lamports() {
                 )),
                 accounts[1].state()
             );
-            assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+            assert!(is_closed(&accounts[0]));
         }
     }
 }
@@ -5545,7 +5549,7 @@ fn test_split_rent_exemptness() {
                     Ok(StakeStateV2::Initialized(expected_split_meta)),
                     accounts[1].state()
                 );
-                assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+                assert!(is_closed(&accounts[0]));
             }
             StakeStateV2::Stake(_meta, stake, stake_flags) => {
                 // Expected stake should reflect original stake amount so that extra lamports
@@ -5570,7 +5574,7 @@ fn test_split_rent_exemptness() {
                     accounts[1].lamports(),
                     expected_stake + source_rent_exempt_reserve,
                 );
-                assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+                assert!(is_closed(&accounts[0]));
             }
             _ => unreachable!(),
         }
@@ -5719,7 +5723,7 @@ fn test_split_require_rent_exempt_destination() {
                 if let StakeStateV2::Stake(meta, stake, stake_flags) = state {
                     // split entire source account, including rent-exempt reserve
                     if accounts[0].lamports() == 0 {
-                        assert_eq!(Ok(StakeStateV2::Uninitialized), accounts[0].state());
+                        assert!(is_closed(&accounts[0]));
                         assert_eq!(
                             Ok(StakeStateV2::Stake(
                                 *meta,
@@ -5903,7 +5907,7 @@ fn test_merge() {
                 }
                 _ => unreachable!(),
             }
-            assert_eq!(accounts[1].state(), Ok(StakeStateV2::Uninitialized));
+            assert!(is_closed(&accounts[1]));
         }
     }
 }
@@ -6365,10 +6369,7 @@ fn test_merge_active_stake() {
                 expected_result.clone(),
             );
             if expected_result.is_ok() {
-                assert_eq!(
-                    accounts[1 - iteration].state(),
-                    Ok(StakeStateV2::Uninitialized)
-                );
+                assert!(is_closed(&accounts[1 - iteration]));
             }
         }
     }
