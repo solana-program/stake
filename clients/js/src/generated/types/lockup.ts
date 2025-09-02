@@ -17,9 +17,9 @@ import {
   getU64Decoder,
   getU64Encoder,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type Lockup = {
@@ -34,7 +34,7 @@ export type LockupArgs = {
   custodian: Address;
 };
 
-export function getLockupEncoder(): Encoder<LockupArgs> {
+export function getLockupEncoder(): FixedSizeEncoder<LockupArgs> {
   return getStructEncoder([
     ['unixTimestamp', getI64Encoder()],
     ['epoch', getU64Encoder()],
@@ -42,7 +42,7 @@ export function getLockupEncoder(): Encoder<LockupArgs> {
   ]);
 }
 
-export function getLockupDecoder(): Decoder<Lockup> {
+export function getLockupDecoder(): FixedSizeDecoder<Lockup> {
   return getStructDecoder([
     ['unixTimestamp', getI64Decoder()],
     ['epoch', getU64Decoder()],
@@ -50,6 +50,6 @@ export function getLockupDecoder(): Decoder<Lockup> {
   ]);
 }
 
-export function getLockupCodec(): Codec<LockupArgs, Lockup> {
+export function getLockupCodec(): FixedSizeCodec<LockupArgs, Lockup> {
   return combineCodec(getLockupEncoder(), getLockupDecoder());
 }

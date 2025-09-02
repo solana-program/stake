@@ -15,17 +15,18 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -46,19 +47,19 @@ export function getAuthorizeDiscriminatorBytes() {
 
 export type AuthorizeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
+  TAccountStake extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountAuthority extends string | IAccountMeta<string> = string,
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
-    | IAccountMeta<string>
+    | AccountMeta<string>
     | undefined = undefined,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
@@ -68,14 +69,14 @@ export type AuthorizeInstruction<
         : TAccountClockSysvar,
       TAccountAuthority extends string
         ? ReadonlySignerAccount<TAccountAuthority> &
-            IAccountSignerMeta<TAccountAuthority>
+            AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
       ...(TAccountLockupAuthority extends undefined
         ? []
         : [
             TAccountLockupAuthority extends string
               ? ReadonlySignerAccount<TAccountLockupAuthority> &
-                  IAccountSignerMeta<TAccountLockupAuthority>
+                  AccountSignerMeta<TAccountLockupAuthority>
               : TAccountLockupAuthority,
           ]),
       ...TRemainingAccounts,
@@ -93,7 +94,7 @@ export type AuthorizeInstructionDataArgs = {
   arg1: StakeAuthorizeArgs;
 };
 
-export function getAuthorizeInstructionDataEncoder(): Encoder<AuthorizeInstructionDataArgs> {
+export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<AuthorizeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
@@ -104,7 +105,7 @@ export function getAuthorizeInstructionDataEncoder(): Encoder<AuthorizeInstructi
   );
 }
 
-export function getAuthorizeInstructionDataDecoder(): Decoder<AuthorizeInstructionData> {
+export function getAuthorizeInstructionDataDecoder(): FixedSizeDecoder<AuthorizeInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
     ['arg0', getAddressDecoder()],
@@ -112,7 +113,7 @@ export function getAuthorizeInstructionDataDecoder(): Decoder<AuthorizeInstructi
   ]);
 }
 
-export function getAuthorizeInstructionDataCodec(): Codec<
+export function getAuthorizeInstructionDataCodec(): FixedSizeCodec<
   AuthorizeInstructionDataArgs,
   AuthorizeInstructionData
 > {
@@ -213,7 +214,7 @@ export function getAuthorizeInstruction<
 
 export type ParsedAuthorizeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -231,11 +232,11 @@ export type ParsedAuthorizeInstruction<
 
 export function parseAuthorizeInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedAuthorizeInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 3) {
     // TODO: Coded error.
@@ -243,7 +244,7 @@ export function parseAuthorizeInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

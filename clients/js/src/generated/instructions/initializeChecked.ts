@@ -13,17 +13,18 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -38,16 +39,16 @@ export function getInitializeCheckedDiscriminatorBytes() {
 
 export type InitializeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
+  TAccountStake extends string | AccountMeta<string> = string,
   TAccountRentSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
-  TAccountStakeAuthority extends string | IAccountMeta<string> = string,
-  TAccountWithdrawAuthority extends string | IAccountMeta<string> = string,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountStakeAuthority extends string | AccountMeta<string> = string,
+  TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
@@ -60,7 +61,7 @@ export type InitializeCheckedInstruction<
         : TAccountStakeAuthority,
       TAccountWithdrawAuthority extends string
         ? ReadonlySignerAccount<TAccountWithdrawAuthority> &
-            IAccountSignerMeta<TAccountWithdrawAuthority>
+            AccountSignerMeta<TAccountWithdrawAuthority>
         : TAccountWithdrawAuthority,
       ...TRemainingAccounts,
     ]
@@ -70,18 +71,18 @@ export type InitializeCheckedInstructionData = { discriminator: number };
 
 export type InitializeCheckedInstructionDataArgs = {};
 
-export function getInitializeCheckedInstructionDataEncoder(): Encoder<InitializeCheckedInstructionDataArgs> {
+export function getInitializeCheckedInstructionDataEncoder(): FixedSizeEncoder<InitializeCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: INITIALIZE_CHECKED_DISCRIMINATOR })
   );
 }
 
-export function getInitializeCheckedInstructionDataDecoder(): Decoder<InitializeCheckedInstructionData> {
+export function getInitializeCheckedInstructionDataDecoder(): FixedSizeDecoder<InitializeCheckedInstructionData> {
   return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
-export function getInitializeCheckedInstructionDataCodec(): Codec<
+export function getInitializeCheckedInstructionDataCodec(): FixedSizeCodec<
   InitializeCheckedInstructionDataArgs,
   InitializeCheckedInstructionData
 > {
@@ -175,7 +176,7 @@ export function getInitializeCheckedInstruction<
 
 export type ParsedInitializeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -193,11 +194,11 @@ export type ParsedInitializeCheckedInstruction<
 
 export function parseInitializeCheckedInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedInitializeCheckedInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
     // TODO: Coded error.
@@ -205,7 +206,7 @@ export function parseInitializeCheckedInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

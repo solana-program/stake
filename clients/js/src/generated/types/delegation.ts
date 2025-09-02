@@ -17,9 +17,9 @@ import {
   getU64Decoder,
   getU64Encoder,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type Delegation = {
@@ -38,7 +38,7 @@ export type DelegationArgs = {
   warmupCooldownRate: number;
 };
 
-export function getDelegationEncoder(): Encoder<DelegationArgs> {
+export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
   return getStructEncoder([
     ['voterPubkey', getAddressEncoder()],
     ['stake', getU64Encoder()],
@@ -48,7 +48,7 @@ export function getDelegationEncoder(): Encoder<DelegationArgs> {
   ]);
 }
 
-export function getDelegationDecoder(): Decoder<Delegation> {
+export function getDelegationDecoder(): FixedSizeDecoder<Delegation> {
   return getStructDecoder([
     ['voterPubkey', getAddressDecoder()],
     ['stake', getU64Decoder()],
@@ -58,6 +58,9 @@ export function getDelegationDecoder(): Decoder<Delegation> {
   ]);
 }
 
-export function getDelegationCodec(): Codec<DelegationArgs, Delegation> {
+export function getDelegationCodec(): FixedSizeCodec<
+  DelegationArgs,
+  Delegation
+> {
   return combineCodec(getDelegationEncoder(), getDelegationDecoder());
 }

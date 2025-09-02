@@ -15,17 +15,18 @@ import {
   getU64Decoder,
   getU64Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -40,21 +41,21 @@ export function getWithdrawDiscriminatorBytes() {
 
 export type WithdrawInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountRecipient extends string | IAccountMeta<string> = string,
+  TAccountStake extends string | AccountMeta<string> = string,
+  TAccountRecipient extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | IAccountMeta<string> = string,
-  TAccountWithdrawAuthority extends string | IAccountMeta<string> = string,
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
-    | IAccountMeta<string>
+    | AccountMeta<string>
     | undefined = undefined,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
@@ -70,14 +71,14 @@ export type WithdrawInstruction<
         : TAccountStakeHistory,
       TAccountWithdrawAuthority extends string
         ? ReadonlySignerAccount<TAccountWithdrawAuthority> &
-            IAccountSignerMeta<TAccountWithdrawAuthority>
+            AccountSignerMeta<TAccountWithdrawAuthority>
         : TAccountWithdrawAuthority,
       ...(TAccountLockupAuthority extends undefined
         ? []
         : [
             TAccountLockupAuthority extends string
               ? ReadonlySignerAccount<TAccountLockupAuthority> &
-                  IAccountSignerMeta<TAccountLockupAuthority>
+                  AccountSignerMeta<TAccountLockupAuthority>
               : TAccountLockupAuthority,
           ]),
       ...TRemainingAccounts,
@@ -88,7 +89,7 @@ export type WithdrawInstructionData = { discriminator: number; args: bigint };
 
 export type WithdrawInstructionDataArgs = { args: number | bigint };
 
-export function getWithdrawInstructionDataEncoder(): Encoder<WithdrawInstructionDataArgs> {
+export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
@@ -98,14 +99,14 @@ export function getWithdrawInstructionDataEncoder(): Encoder<WithdrawInstruction
   );
 }
 
-export function getWithdrawInstructionDataDecoder(): Decoder<WithdrawInstructionData> {
+export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<WithdrawInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
     ['args', getU64Decoder()],
   ]);
 }
 
-export function getWithdrawInstructionDataCodec(): Codec<
+export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
   WithdrawInstructionDataArgs,
   WithdrawInstructionData
 > {
@@ -226,7 +227,7 @@ export function getWithdrawInstruction<
 
 export type ParsedWithdrawInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -248,11 +249,11 @@ export type ParsedWithdrawInstruction<
 
 export function parseWithdrawInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 5) {
     // TODO: Coded error.
@@ -260,7 +261,7 @@ export function parseWithdrawInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

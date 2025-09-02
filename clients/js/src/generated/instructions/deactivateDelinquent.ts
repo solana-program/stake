@@ -13,15 +13,16 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlyUint8Array,
   type WritableAccount,
 } from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
@@ -35,13 +36,13 @@ export function getDeactivateDelinquentDiscriminatorBytes() {
 
 export type DeactivateDelinquentInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountDelinquentVote extends string | IAccountMeta<string> = string,
-  TAccountReferenceVote extends string | IAccountMeta<string> = string,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+  TAccountStake extends string | AccountMeta<string> = string,
+  TAccountDelinquentVote extends string | AccountMeta<string> = string,
+  TAccountReferenceVote extends string | AccountMeta<string> = string,
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
@@ -60,7 +61,7 @@ export type DeactivateDelinquentInstructionData = { discriminator: number };
 
 export type DeactivateDelinquentInstructionDataArgs = {};
 
-export function getDeactivateDelinquentInstructionDataEncoder(): Encoder<DeactivateDelinquentInstructionDataArgs> {
+export function getDeactivateDelinquentInstructionDataEncoder(): FixedSizeEncoder<DeactivateDelinquentInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({
@@ -70,11 +71,11 @@ export function getDeactivateDelinquentInstructionDataEncoder(): Encoder<Deactiv
   );
 }
 
-export function getDeactivateDelinquentInstructionDataDecoder(): Decoder<DeactivateDelinquentInstructionData> {
+export function getDeactivateDelinquentInstructionDataDecoder(): FixedSizeDecoder<DeactivateDelinquentInstructionData> {
   return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
-export function getDeactivateDelinquentInstructionDataCodec(): Codec<
+export function getDeactivateDelinquentInstructionDataCodec(): FixedSizeCodec<
   DeactivateDelinquentInstructionDataArgs,
   DeactivateDelinquentInstructionData
 > {
@@ -150,7 +151,7 @@ export function getDeactivateDelinquentInstruction<
 
 export type ParsedDeactivateDelinquentInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -166,11 +167,11 @@ export type ParsedDeactivateDelinquentInstruction<
 
 export function parseDeactivateDelinquentInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedDeactivateDelinquentInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 3) {
     // TODO: Coded error.
@@ -178,7 +179,7 @@ export function parseDeactivateDelinquentInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };
