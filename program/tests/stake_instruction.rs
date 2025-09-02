@@ -380,7 +380,7 @@ fn test_stake_process_instruction() {
             100,
             None,
         ),
-        Err(ProgramError::InvalidAccountData),
+        Err(ProgramError::MissingRequiredSignature),
     );
     process_instruction_as_one_arg(
         &mollusk,

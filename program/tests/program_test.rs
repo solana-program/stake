@@ -10,6 +10,7 @@ use {
         pubkey::Pubkey,
         signature::{Keypair, Signer},
         signers::Signers,
+        sysvar::rent::Rent,
         transaction::{Transaction, TransactionError},
         vote::{
             instruction as vote_instruction,
@@ -280,13 +281,20 @@ pub async fn create_independent_stake_account_with_lockup(
 
 pub async fn create_blank_stake_account(context: &mut ProgramTestContext) -> Pubkey {
     let stake = Keypair::new();
-    create_blank_stake_account_from_keypair(context, &stake).await
+    create_blank_stake_account_from_keypair(context, &stake, false).await
+}
+
+pub async fn create_closed_stake_account(context: &mut ProgramTestContext) -> Pubkey {
+    let stake = Keypair::new();
+    create_blank_stake_account_from_keypair(context, &stake, true).await
 }
 
 pub async fn create_blank_stake_account_from_keypair(
     context: &mut ProgramTestContext,
     stake: &Keypair,
+    is_closed: bool,
 ) -> Pubkey {
+    // lamports in a "closed" account is arbitrary, a real one via split/merge/withdraw would have 0
     let lamports = get_stake_account_rent(&mut context.banks_client).await;
 
     let transaction = Transaction::new_signed_with_payer(
@@ -294,7 +302,11 @@ pub async fn create_blank_stake_account_from_keypair(
             &context.payer.pubkey(),
             &stake.pubkey(),
             lamports,
-            StakeStateV2::size_of() as u64,
+            if is_closed {
+                0
+            } else {
+                StakeStateV2::size_of() as u64
+            },
             &id(),
         )],
         Some(&context.payer.pubkey()),
@@ -594,7 +606,7 @@ async fn program_test_authorize() {
     let withdrawers: [_; 3] = std::array::from_fn(|_| Keypair::new());
 
     let stake_keypair = Keypair::new();
-    let stake = create_blank_stake_account_from_keypair(&mut context, &stake_keypair).await;
+    let stake = create_blank_stake_account_from_keypair(&mut context, &stake_keypair, false).await;
 
     // authorize uninitialized fails
     for (authority, authority_type) in [
@@ -880,6 +892,7 @@ pub enum StakeLifecycle {
     Active,
     Deactivating,
     Deactive,
+    Closed,
 }
 impl StakeLifecycle {
     // (stake, staker, withdrawer)
@@ -918,15 +931,22 @@ impl StakeLifecycle {
         withdrawer_keypair: &Keypair,
         lockup: &Lockup,
     ) {
+        let is_closed = self == StakeLifecycle::Closed;
+
+        let stake =
+            create_blank_stake_account_from_keypair(context, stake_keypair, is_closed).await;
+        if staked_amount > 0 {
+            transfer(context, &stake, staked_amount).await;
+        }
+
+        if is_closed {
+            return;
+        }
+
         let authorized = Authorized {
             staker: staker_keypair.pubkey(),
             withdrawer: withdrawer_keypair.pubkey(),
         };
-
-        let stake = create_blank_stake_account_from_keypair(context, stake_keypair).await;
-        if staked_amount > 0 {
-            transfer(context, &stake, staked_amount).await;
-        }
 
         if self >= StakeLifecycle::Initialized {
             let instruction = ixn::initialize(&stake, &authorized, lockup);
@@ -973,14 +993,14 @@ impl StakeLifecycle {
     pub fn split_minimum_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
-            Self::Uninitialized | Self::Initialized => false,
+            Self::Uninitialized | Self::Initialized | Self::Closed => false,
         }
     }
 
     pub fn withdraw_minimum_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating => true,
-            Self::Uninitialized | Self::Initialized | Self::Deactive => false,
+            Self::Uninitialized | Self::Initialized | Self::Deactive | Self::Closed => false,
         }
     }
 }
@@ -1141,6 +1161,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
 #[test_case(StakeLifecycle::Active; "active")]
 #[test_case(StakeLifecycle::Deactivating; "deactivating")]
 #[test_case(StakeLifecycle::Deactive; "deactive")]
+#[test_case(StakeLifecycle::Closed; "closed")]
 #[tokio::test]
 async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let mut context = program_test().start_with_context().await;
@@ -1167,16 +1188,22 @@ async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
 
     let signers = match withdraw_source_type {
-        StakeLifecycle::Uninitialized => vec![&withdraw_source_keypair],
+        StakeLifecycle::Uninitialized | StakeLifecycle::Closed => vec![&withdraw_source_keypair],
         _ => vec![&withdrawer_keypair],
     };
 
     // withdraw that would end rent-exemption always fails
+    let rent_spillover = if withdraw_source_type == StakeLifecycle::Closed {
+        stake_rent_exempt_reserve - Rent::default().minimum_balance(0) + 1
+    } else {
+        1
+    };
+
     let instruction = ixn::withdraw(
         &withdraw_source,
         &signers[0].pubkey(),
         &recipient,
-        staked_amount + 1,
+        staked_amount + rent_spillover,
         None,
     );
     let e = process_instruction(&mut context, &instruction, &signers)
