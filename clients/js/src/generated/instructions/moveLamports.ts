@@ -15,16 +15,17 @@ import {
   getU64Decoder,
   getU64Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -39,13 +40,13 @@ export function getMoveLamportsDiscriminatorBytes() {
 
 export type MoveLamportsInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountSourceStake extends string | IAccountMeta<string> = string,
-  TAccountDestinationStake extends string | IAccountMeta<string> = string,
-  TAccountStakeAuthority extends string | IAccountMeta<string> = string,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+  TAccountSourceStake extends string | AccountMeta<string> = string,
+  TAccountDestinationStake extends string | AccountMeta<string> = string,
+  TAccountStakeAuthority extends string | AccountMeta<string> = string,
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountSourceStake extends string
         ? WritableAccount<TAccountSourceStake>
@@ -55,7 +56,7 @@ export type MoveLamportsInstruction<
         : TAccountDestinationStake,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
-            IAccountSignerMeta<TAccountStakeAuthority>
+            AccountSignerMeta<TAccountStakeAuthority>
         : TAccountStakeAuthority,
       ...TRemainingAccounts,
     ]
@@ -68,7 +69,7 @@ export type MoveLamportsInstructionData = {
 
 export type MoveLamportsInstructionDataArgs = { args: number | bigint };
 
-export function getMoveLamportsInstructionDataEncoder(): Encoder<MoveLamportsInstructionDataArgs> {
+export function getMoveLamportsInstructionDataEncoder(): FixedSizeEncoder<MoveLamportsInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
@@ -78,14 +79,14 @@ export function getMoveLamportsInstructionDataEncoder(): Encoder<MoveLamportsIns
   );
 }
 
-export function getMoveLamportsInstructionDataDecoder(): Decoder<MoveLamportsInstructionData> {
+export function getMoveLamportsInstructionDataDecoder(): FixedSizeDecoder<MoveLamportsInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
     ['args', getU64Decoder()],
   ]);
 }
 
-export function getMoveLamportsInstructionDataCodec(): Codec<
+export function getMoveLamportsInstructionDataCodec(): FixedSizeCodec<
   MoveLamportsInstructionDataArgs,
   MoveLamportsInstructionData
 > {
@@ -170,7 +171,7 @@ export function getMoveLamportsInstruction<
 
 export type ParsedMoveLamportsInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -186,11 +187,11 @@ export type ParsedMoveLamportsInstruction<
 
 export function parseMoveLamportsInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedMoveLamportsInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 3) {
     // TODO: Coded error.
@@ -198,7 +199,7 @@ export function parseMoveLamportsInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

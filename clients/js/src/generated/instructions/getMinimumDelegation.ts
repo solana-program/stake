@@ -13,14 +13,15 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
+  type ReadonlyUint8Array,
 } from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
@@ -32,16 +33,16 @@ export function getGetMinimumDelegationDiscriminatorBytes() {
 
 export type GetMinimumDelegationInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<TRemainingAccounts>;
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<TRemainingAccounts>;
 
 export type GetMinimumDelegationInstructionData = { discriminator: number };
 
 export type GetMinimumDelegationInstructionDataArgs = {};
 
-export function getGetMinimumDelegationInstructionDataEncoder(): Encoder<GetMinimumDelegationInstructionDataArgs> {
+export function getGetMinimumDelegationInstructionDataEncoder(): FixedSizeEncoder<GetMinimumDelegationInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({
@@ -51,11 +52,11 @@ export function getGetMinimumDelegationInstructionDataEncoder(): Encoder<GetMini
   );
 }
 
-export function getGetMinimumDelegationInstructionDataDecoder(): Decoder<GetMinimumDelegationInstructionData> {
+export function getGetMinimumDelegationInstructionDataDecoder(): FixedSizeDecoder<GetMinimumDelegationInstructionData> {
   return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
-export function getGetMinimumDelegationInstructionDataCodec(): Codec<
+export function getGetMinimumDelegationInstructionDataCodec(): FixedSizeCodec<
   GetMinimumDelegationInstructionDataArgs,
   GetMinimumDelegationInstructionData
 > {
@@ -91,7 +92,7 @@ export type ParsedGetMinimumDelegationInstruction<
 };
 
 export function parseGetMinimumDelegationInstruction<TProgram extends string>(
-  instruction: IInstruction<TProgram> & IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>
 ): ParsedGetMinimumDelegationInstruction<TProgram> {
   return {
     programAddress: instruction.programAddress,

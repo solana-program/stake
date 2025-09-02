@@ -19,17 +19,18 @@ import {
   getUtf8Decoder,
   getUtf8Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
   type Codec,
   type Decoder,
   type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -50,40 +51,40 @@ export function getAuthorizeCheckedWithSeedDiscriminatorBytes() {
 
 export type AuthorizeCheckedWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountBase extends string | IAccountMeta<string> = string,
+  TAccountStake extends string | AccountMeta<string> = string,
+  TAccountBase extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountNewAuthority extends string | IAccountMeta<string> = string,
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
-    | IAccountMeta<string>
+    | AccountMeta<string>
     | undefined = undefined,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
       TAccountBase extends string
-        ? ReadonlySignerAccount<TAccountBase> & IAccountSignerMeta<TAccountBase>
+        ? ReadonlySignerAccount<TAccountBase> & AccountSignerMeta<TAccountBase>
         : TAccountBase,
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
       TAccountNewAuthority extends string
         ? ReadonlySignerAccount<TAccountNewAuthority> &
-            IAccountSignerMeta<TAccountNewAuthority>
+            AccountSignerMeta<TAccountNewAuthority>
         : TAccountNewAuthority,
       ...(TAccountLockupAuthority extends undefined
         ? []
         : [
             TAccountLockupAuthority extends string
               ? ReadonlySignerAccount<TAccountLockupAuthority> &
-                  IAccountSignerMeta<TAccountLockupAuthority>
+                  AccountSignerMeta<TAccountLockupAuthority>
               : TAccountLockupAuthority,
           ]),
       ...TRemainingAccounts,
@@ -241,7 +242,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
 
 export type ParsedAuthorizeCheckedWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -261,11 +262,11 @@ export type ParsedAuthorizeCheckedWithSeedInstruction<
 
 export function parseAuthorizeCheckedWithSeedInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedAuthorizeCheckedWithSeedInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
     // TODO: Coded error.
@@ -273,7 +274,7 @@ export function parseAuthorizeCheckedWithSeedInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

@@ -12,9 +12,9 @@ import {
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
 } from '@solana/kit';
 import {
   getDelegationDecoder,
@@ -30,20 +30,20 @@ export type StakeArgs = {
   creditsObserved: number | bigint;
 };
 
-export function getStakeEncoder(): Encoder<StakeArgs> {
+export function getStakeEncoder(): FixedSizeEncoder<StakeArgs> {
   return getStructEncoder([
     ['delegation', getDelegationEncoder()],
     ['creditsObserved', getU64Encoder()],
   ]);
 }
 
-export function getStakeDecoder(): Decoder<Stake> {
+export function getStakeDecoder(): FixedSizeDecoder<Stake> {
   return getStructDecoder([
     ['delegation', getDelegationDecoder()],
     ['creditsObserved', getU64Decoder()],
   ]);
 }
 
-export function getStakeCodec(): Codec<StakeArgs, Stake> {
+export function getStakeCodec(): FixedSizeCodec<StakeArgs, Stake> {
   return combineCodec(getStakeEncoder(), getStakeDecoder());
 }

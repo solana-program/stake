@@ -12,9 +12,9 @@ import {
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
 } from '@solana/kit';
 import {
   getAuthorizedDecoder,
@@ -39,7 +39,7 @@ export type MetaArgs = {
   lockup: LockupArgs;
 };
 
-export function getMetaEncoder(): Encoder<MetaArgs> {
+export function getMetaEncoder(): FixedSizeEncoder<MetaArgs> {
   return getStructEncoder([
     ['rentExemptReserve', getU64Encoder()],
     ['authorized', getAuthorizedEncoder()],
@@ -47,7 +47,7 @@ export function getMetaEncoder(): Encoder<MetaArgs> {
   ]);
 }
 
-export function getMetaDecoder(): Decoder<Meta> {
+export function getMetaDecoder(): FixedSizeDecoder<Meta> {
   return getStructDecoder([
     ['rentExemptReserve', getU64Decoder()],
     ['authorized', getAuthorizedDecoder()],
@@ -55,6 +55,6 @@ export function getMetaDecoder(): Decoder<Meta> {
   ]);
 }
 
-export function getMetaCodec(): Codec<MetaArgs, Meta> {
+export function getMetaCodec(): FixedSizeCodec<MetaArgs, Meta> {
   return combineCodec(getMetaEncoder(), getMetaDecoder());
 }

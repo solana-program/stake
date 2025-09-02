@@ -13,17 +13,18 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -38,18 +39,18 @@ export function getDelegateStakeDiscriminatorBytes() {
 
 export type DelegateStakeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountStake extends string | IAccountMeta<string> = string,
-  TAccountVote extends string | IAccountMeta<string> = string,
+  TAccountStake extends string | AccountMeta<string> = string,
+  TAccountVote extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | IAccountMeta<string> = string,
-  TAccountUnused extends string | IAccountMeta<string> = string,
-  TAccountStakeAuthority extends string | IAccountMeta<string> = string,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountUnused extends string | AccountMeta<string> = string,
+  TAccountStakeAuthority extends string | AccountMeta<string> = string,
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
@@ -68,7 +69,7 @@ export type DelegateStakeInstruction<
         : TAccountUnused,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
-            IAccountSignerMeta<TAccountStakeAuthority>
+            AccountSignerMeta<TAccountStakeAuthority>
         : TAccountStakeAuthority,
       ...TRemainingAccounts,
     ]
@@ -78,18 +79,18 @@ export type DelegateStakeInstructionData = { discriminator: number };
 
 export type DelegateStakeInstructionDataArgs = {};
 
-export function getDelegateStakeInstructionDataEncoder(): Encoder<DelegateStakeInstructionDataArgs> {
+export function getDelegateStakeInstructionDataEncoder(): FixedSizeEncoder<DelegateStakeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: DELEGATE_STAKE_DISCRIMINATOR })
   );
 }
 
-export function getDelegateStakeInstructionDataDecoder(): Decoder<DelegateStakeInstructionData> {
+export function getDelegateStakeInstructionDataDecoder(): FixedSizeDecoder<DelegateStakeInstructionData> {
   return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
-export function getDelegateStakeInstructionDataCodec(): Codec<
+export function getDelegateStakeInstructionDataCodec(): FixedSizeCodec<
   DelegateStakeInstructionDataArgs,
   DelegateStakeInstructionData
 > {
@@ -198,7 +199,7 @@ export function getDelegateStakeInstruction<
 
 export type ParsedDelegateStakeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -220,11 +221,11 @@ export type ParsedDelegateStakeInstruction<
 
 export function parseDelegateStakeInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedDelegateStakeInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 6) {
     // TODO: Coded error.
@@ -232,7 +233,7 @@ export function parseDelegateStakeInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };

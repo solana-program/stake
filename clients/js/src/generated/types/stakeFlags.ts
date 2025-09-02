@@ -12,23 +12,26 @@ import {
   getStructEncoder,
   getU8Decoder,
   getU8Encoder,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type StakeFlags = { bits: number };
 
 export type StakeFlagsArgs = StakeFlags;
 
-export function getStakeFlagsEncoder(): Encoder<StakeFlagsArgs> {
+export function getStakeFlagsEncoder(): FixedSizeEncoder<StakeFlagsArgs> {
   return getStructEncoder([['bits', getU8Encoder()]]);
 }
 
-export function getStakeFlagsDecoder(): Decoder<StakeFlags> {
+export function getStakeFlagsDecoder(): FixedSizeDecoder<StakeFlags> {
   return getStructDecoder([['bits', getU8Decoder()]]);
 }
 
-export function getStakeFlagsCodec(): Codec<StakeFlagsArgs, StakeFlags> {
+export function getStakeFlagsCodec(): FixedSizeCodec<
+  StakeFlagsArgs,
+  StakeFlags
+> {
   return combineCodec(getStakeFlagsEncoder(), getStakeFlagsDecoder());
 }

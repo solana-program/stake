@@ -13,17 +13,18 @@ import {
   getU32Decoder,
   getU32Encoder,
   transformEncoder,
+  type AccountMeta,
+  type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type IAccountMeta,
-  type IAccountSignerMeta,
-  type IInstruction,
-  type IInstructionWithAccounts,
-  type IInstructionWithData,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
+  type Instruction,
+  type InstructionWithAccounts,
+  type InstructionWithData,
   type ReadonlyAccount,
   type ReadonlySignerAccount,
+  type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
 } from '@solana/kit';
@@ -38,17 +39,17 @@ export function getMergeDiscriminatorBytes() {
 
 export type MergeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountDestinationStake extends string | IAccountMeta<string> = string,
-  TAccountSourceStake extends string | IAccountMeta<string> = string,
+  TAccountDestinationStake extends string | AccountMeta<string> = string,
+  TAccountSourceStake extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends
     | string
-    | IAccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | IAccountMeta<string> = string,
-  TAccountStakeAuthority extends string | IAccountMeta<string> = string,
-  TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
-> = IInstruction<TProgram> &
-  IInstructionWithData<Uint8Array> &
-  IInstructionWithAccounts<
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountStakeAuthority extends string | AccountMeta<string> = string,
+  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> &
+  InstructionWithData<ReadonlyUint8Array> &
+  InstructionWithAccounts<
     [
       TAccountDestinationStake extends string
         ? WritableAccount<TAccountDestinationStake>
@@ -64,7 +65,7 @@ export type MergeInstruction<
         : TAccountStakeHistory,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
-            IAccountSignerMeta<TAccountStakeAuthority>
+            AccountSignerMeta<TAccountStakeAuthority>
         : TAccountStakeAuthority,
       ...TRemainingAccounts,
     ]
@@ -74,18 +75,18 @@ export type MergeInstructionData = { discriminator: number };
 
 export type MergeInstructionDataArgs = {};
 
-export function getMergeInstructionDataEncoder(): Encoder<MergeInstructionDataArgs> {
+export function getMergeInstructionDataEncoder(): FixedSizeEncoder<MergeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: MERGE_DISCRIMINATOR })
   );
 }
 
-export function getMergeInstructionDataDecoder(): Decoder<MergeInstructionData> {
+export function getMergeInstructionDataDecoder(): FixedSizeDecoder<MergeInstructionData> {
   return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
-export function getMergeInstructionDataCodec(): Codec<
+export function getMergeInstructionDataCodec(): FixedSizeCodec<
   MergeInstructionDataArgs,
   MergeInstructionData
 > {
@@ -188,7 +189,7 @@ export function getMergeInstruction<
 
 export type ParsedMergeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountMetas extends readonly IAccountMeta[] = readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
@@ -208,11 +209,11 @@ export type ParsedMergeInstruction<
 
 export function parseMergeInstruction<
   TProgram extends string,
-  TAccountMetas extends readonly IAccountMeta[],
+  TAccountMetas extends readonly AccountMeta[],
 >(
-  instruction: IInstruction<TProgram> &
-    IInstructionWithAccounts<TAccountMetas> &
-    IInstructionWithData<Uint8Array>
+  instruction: Instruction<TProgram> &
+    InstructionWithAccounts<TAccountMetas> &
+    InstructionWithData<ReadonlyUint8Array>
 ): ParsedMergeInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 5) {
     // TODO: Coded error.
@@ -220,7 +221,7 @@ export function parseMergeInstruction<
   }
   let accountIndex = 0;
   const getNextAccount = () => {
-    const accountMeta = instruction.accounts![accountIndex]!;
+    const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
     accountIndex += 1;
     return accountMeta;
   };
