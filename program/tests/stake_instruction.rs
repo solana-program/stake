@@ -219,7 +219,7 @@ fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
 }
 
 fn is_closed(account: &AccountSharedData) -> bool {
-    account.lamports() == 0 && *account.owner() == id() && account.data().len() == 0
+    account.lamports() == 0 && *account.owner() == id() && account.data().is_empty()
 }
 
 fn get_active_stake_for_tests(
@@ -492,8 +492,6 @@ fn test_stake_process_instruction_decode_bail() {
     let rent_address = rent::id();
     let rent = Rent::default();
     let rent_account = create_account_shared_data_for_test(&rent);
-    let rewards_address = rewards::id();
-    let rewards_account = create_account_shared_data_for_test(&rewards::Rewards::new(0.0));
     let stake_history_address = StakeHistory::id();
     let stake_history_account = create_account_shared_data_for_test(&StakeHistory::default());
     let vote_address = Pubkey::new_unique();
@@ -518,23 +516,6 @@ fn test_stake_process_instruction_decode_bail() {
         .unwrap(),
         Vec::new(),
         Vec::new(),
-        Err(ProgramError::NotEnoughAccountKeys),
-    );
-
-    // no account for rent
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Initialize(
-            Authorized::default(),
-            Lockup::default(),
-        ))
-        .unwrap(),
-        vec![(stake_address, stake_account.clone())],
-        vec![AccountMeta {
-            pubkey: stake_address,
-            is_signer: false,
-            is_writable: true,
-        }],
         Err(ProgramError::NotEnoughAccountKeys),
     );
 
@@ -632,46 +613,6 @@ fn test_stake_process_instruction_decode_bail() {
         Err(ProgramError::InvalidAccountData),
     );
 
-    // Tests 3rd keyed account is of correct type (Clock instead of rewards) in withdraw
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Withdraw(withdrawal_amount)).unwrap(),
-        vec![
-            (stake_address, stake_account.clone()),
-            (vote_address, vote_account.clone()),
-            (rewards_address, rewards_account.clone()),
-            (stake_history_address, stake_history_account),
-        ],
-        vec![
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: vote_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: rewards_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: stake_history_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: true,
-                is_writable: false,
-            },
-        ],
-        Err(ProgramError::InvalidArgument),
-    );
-
     // Tests correct number of accounts are provided in withdraw
     process_instruction(
         &mollusk,
@@ -683,29 +624,6 @@ fn test_stake_process_instruction_decode_bail() {
             is_writable: true,
         }],
         Err(ProgramError::NotEnoughAccountKeys),
-    );
-
-    // Tests 2nd keyed account is of correct type (Clock instead of rewards) in deactivate
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Deactivate).unwrap(),
-        vec![
-            (stake_address, stake_account.clone()),
-            (rewards_address, rewards_account),
-        ],
-        vec![
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: rewards_address,
-                is_signer: false,
-                is_writable: false,
-            },
-        ],
-        Err(ProgramError::InvalidArgument),
     );
 
     // Tests correct number of accounts are provided in deactivate

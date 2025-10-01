@@ -993,3 +993,30 @@ fn test_no_use_dealloc() {
         }
     }
 }
+
+// the original stake interface passed in sysvars and stake config
+// we no longer retrieve these via account info in any instruction processors
+// since instruction builders still provide them, we test the program does not require them
+// NOTE this function and test can be deleted after the instruction builders are updated
+#[allow(deprecated)]
+fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
+    pubkey == Clock::id()
+        || pubkey == Rent::id()
+        || pubkey == StakeHistory::id()
+        || pubkey == solana_sdk_ids::stake::config::id()
+}
+#[test]
+fn test_all_success_no_sysvars() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        instruction
+            .accounts
+            .retain(|account| !is_stake_program_sysvar_or_config(account.pubkey));
+
+        env.process_success(&instruction);
+        env.reset();
+    }
+}
