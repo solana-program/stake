@@ -22,8 +22,9 @@ use {
     solana_transaction::{Signers, Transaction, TransactionError},
     solana_vote_interface::{
         instruction as vote_instruction,
-        state::{VoteInit, VoteStateV3 as VoteState},
+        state::{VoteInit, VoteStateV3, VoteStateV4},
     },
+    solana_vote_program::vote_state::handler::VoteStateTargetVersion,
     test_case::{test_case, test_matrix},
 };
 
@@ -56,12 +57,17 @@ pub struct Accounts {
 }
 
 impl Accounts {
-    pub async fn initialize(&self, context: &mut ProgramTestContext) {
+    pub async fn initialize(
+        &self,
+        context: &mut ProgramTestContext,
+        vote_state_version: VoteStateTargetVersion,
+    ) {
         let slot = context.genesis_config().epoch_schedule.first_normal_slot + 1;
         context.warp_to_slot(slot).unwrap();
 
         create_vote(
             context,
+            vote_state_version,
             &self.validator,
             &self.voter.pubkey(),
             &self.withdrawer.pubkey(),
@@ -86,13 +92,18 @@ impl Default for Accounts {
 
 pub async fn create_vote(
     context: &mut ProgramTestContext,
+    vote_state_version: VoteStateTargetVersion,
     validator: &Keypair,
     voter: &Pubkey,
     withdrawer: &Pubkey,
     vote_account: &Keypair,
 ) {
+    let space = match vote_state_version {
+        VoteStateTargetVersion::V3 => VoteStateV3::size_of(),
+        VoteStateTargetVersion::V4 => VoteStateV4::size_of(),
+    };
     let rent = context.banks_client.get_rent().await.unwrap();
-    let rent_voter = rent.minimum_balance(VoteState::size_of());
+    let rent_voter = rent.minimum_balance(space);
 
     let mut instructions = vec![system_instruction::create_account(
         &context.payer.pubkey(),
@@ -112,7 +123,7 @@ pub async fn create_vote(
         },
         rent_voter,
         vote_instruction::CreateVoteAccountConfig {
-            space: VoteState::size_of() as u64,
+            space: space as u64,
             ..Default::default()
         },
     ));
@@ -363,11 +374,13 @@ pub async fn process_instruction_test_missing_signers(
         .unwrap();
 }
 
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
 #[tokio::test]
-async fn program_test_stake_checked_instructions() {
+async fn program_test_stake_checked_instructions(vote_state_version: VoteStateTargetVersion) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
@@ -470,11 +483,13 @@ async fn program_test_stake_checked_instructions() {
     .await;
 }
 
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
 #[tokio::test]
-async fn program_test_stake_initialize() {
+async fn program_test_stake_initialize(vote_state_version: VoteStateTargetVersion) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
 
@@ -580,11 +595,13 @@ async fn program_test_stake_initialize() {
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
 #[tokio::test]
-async fn program_test_authorize() {
+async fn program_test_authorize(vote_state_version: VoteStateTargetVersion) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
 
@@ -728,15 +745,18 @@ async fn program_test_authorize() {
     }
 }
 
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
 #[tokio::test]
-async fn program_test_stake_delegate() {
+async fn program_test_stake_delegate(vote_state_version: VoteStateTargetVersion) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let vote_account2 = Keypair::new();
     create_vote(
         &mut context,
+        vote_state_version,
         &Keypair::new(),
         &Pubkey::new_unique(),
         &Pubkey::new_unique(),
@@ -983,17 +1003,18 @@ impl StakeLifecycle {
     }
 }
 
-#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
-#[test_case(StakeLifecycle::Initialized; "initialized")]
-#[test_case(StakeLifecycle::Activating; "activating")]
-#[test_case(StakeLifecycle::Active; "active")]
-#[test_case(StakeLifecycle::Deactivating; "deactivating")]
-#[test_case(StakeLifecycle::Deactive; "deactive")]
+#[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
+    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
+)]
 #[tokio::test]
-async fn program_test_split(split_source_type: StakeLifecycle) {
+async fn program_test_split(
+    vote_state_version: VoteStateTargetVersion,
+    split_source_type: StakeLifecycle,
+) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -1133,17 +1154,18 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
     }
 }
 
-#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
-#[test_case(StakeLifecycle::Initialized; "initialized")]
-#[test_case(StakeLifecycle::Activating; "activating")]
-#[test_case(StakeLifecycle::Active; "active")]
-#[test_case(StakeLifecycle::Deactivating; "deactivating")]
-#[test_case(StakeLifecycle::Deactive; "deactive")]
+#[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
+    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
+)]
 #[tokio::test]
-async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
+async fn program_test_withdraw_stake(
+    vote_state_version: VoteStateTargetVersion,
+    withdraw_source_type: StakeLifecycle,
+) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let stake_rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -1300,13 +1322,15 @@ async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
-#[test_case(false; "activating")]
-#[test_case(true; "active")]
+#[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
+    [false, true]
+)]
 #[tokio::test]
-async fn program_test_deactivate(activate: bool) {
+async fn program_test_deactivate(vote_state_version: VoteStateTargetVersion, activate: bool) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let minimum_delegation = get_minimum_delegation(&mut context).await;
 
@@ -1380,16 +1404,21 @@ async fn program_test_deactivate(activate: bool) {
 // stake_history but im just trying to smoke test rn so lets do something
 // simpler
 #[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
 )]
 #[tokio::test]
-async fn program_test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
+async fn program_test_merge(
+    vote_state_version: VoteStateTargetVersion,
+    merge_source_type: StakeLifecycle,
+    merge_dest_type: StakeLifecycle,
+) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -1497,6 +1526,7 @@ async fn program_test_merge(merge_source_type: StakeLifecycle, merge_dest_type: 
 }
 
 #[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
@@ -1506,6 +1536,7 @@ async fn program_test_merge(merge_source_type: StakeLifecycle, merge_dest_type: 
 )]
 #[tokio::test]
 async fn program_test_move_stake(
+    vote_state_version: VoteStateTargetVersion,
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     full_move: bool,
@@ -1513,7 +1544,7 @@ async fn program_test_move_stake(
 ) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -1750,6 +1781,7 @@ async fn program_test_move_stake(
 }
 
 #[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
@@ -1759,6 +1791,7 @@ async fn program_test_move_stake(
 )]
 #[tokio::test]
 async fn program_test_move_lamports(
+    vote_state_version: VoteStateTargetVersion,
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     different_votes: bool,
@@ -1766,7 +1799,7 @@ async fn program_test_move_lamports(
 ) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
     let minimum_delegation = get_minimum_delegation(&mut context).await;
@@ -1814,6 +1847,7 @@ async fn program_test_move_lamports(
         let vote_account = Keypair::new();
         create_vote(
             &mut context,
+            vote_state_version,
             &Keypair::new(),
             &Pubkey::new_unique(),
             &Pubkey::new_unique(),
@@ -1964,6 +1998,7 @@ async fn program_test_move_lamports(
 }
 
 #[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
     [(StakeLifecycle::Active, StakeLifecycle::Uninitialized),
      (StakeLifecycle::Uninitialized, StakeLifecycle::Initialized),
      (StakeLifecycle::Uninitialized, StakeLifecycle::Uninitialized)],
@@ -1971,12 +2006,13 @@ async fn program_test_move_lamports(
 )]
 #[tokio::test]
 async fn program_test_move_uninitialized_fail(
+    vote_state_version: VoteStateTargetVersion,
     move_types: (StakeLifecycle, StakeLifecycle),
     move_lamports: bool,
 ) {
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let minimum_delegation = get_minimum_delegation(&mut context).await;
     let source_staked_amount = minimum_delegation * 2;
@@ -2035,12 +2071,14 @@ async fn program_test_move_uninitialized_fail(
 }
 
 #[test_matrix(
+    [VoteStateTargetVersion::V3, VoteStateTargetVersion::V4],
     [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactive],
     [false, true]
 )]
 #[tokio::test]
 async fn program_test_move_general_fail(
+    vote_state_version: VoteStateTargetVersion,
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     move_lamports: bool,
@@ -2059,7 +2097,7 @@ async fn program_test_move_general_fail(
 
     let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
+    accounts.initialize(&mut context, vote_state_version).await;
 
     let minimum_delegation = get_minimum_delegation(&mut context).await;
     let source_staked_amount = minimum_delegation * 2;
@@ -2278,6 +2316,7 @@ async fn program_test_move_general_fail(
         let dest_vote_account_keypair = Keypair::new();
         create_vote(
             &mut context,
+            vote_state_version,
             &Keypair::new(),
             &Pubkey::new_unique(),
             &Pubkey::new_unique(),

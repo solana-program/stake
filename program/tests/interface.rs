@@ -25,12 +25,14 @@ use {
     solana_sysvar_id::SysvarId,
     solana_vote_interface::{
         program as vote_program,
-        state::{VoteStateV3 as VoteState, VoteStateVersions},
+        state::{VoteStateV3, VoteStateV4, VoteStateVersions},
     },
+    solana_vote_program::vote_state::handler::VoteStateTargetVersion,
     std::{
         collections::{HashMap, HashSet},
         sync::LazyLock,
     },
+    test_case::test_case,
 };
 
 // StakeInterface encapsulates every combination of instruction, account states, and input parameters
@@ -136,7 +138,7 @@ struct Env {
 }
 impl Env {
     // set up a test environment with valid stake history, two vote accounts, and two blank stake accounts
-    fn init() -> Self {
+    fn init(vote_state_version: VoteStateTargetVersion) -> Self {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
         let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
@@ -163,8 +165,16 @@ impl Env {
         base_accounts.insert(PAYER, payer_account);
 
         // create two vote accounts
-        let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
-        let vote_state_versions = VoteStateVersions::new_v3(VoteState::default());
+        let (vote_state_versions, vote_rent_exemption) = match vote_state_version {
+            VoteStateTargetVersion::V3 => (
+                VoteStateVersions::new_v3(VoteStateV3::default()),
+                Rent::default().minimum_balance(VoteStateV3::size_of()),
+            ),
+            VoteStateTargetVersion::V4 => (
+                VoteStateVersions::new_v4(VoteStateV4::default()),
+                Rent::default().minimum_balance(VoteStateV4::size_of()),
+            ),
+        };
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
         let vote_account = Account::create(
             vote_rent_exemption,
@@ -901,9 +911,10 @@ fn fully_configurable_stake(
 }
 
 // test all unmodified transactions succeed, to ensure other tests test what they purport to test
-#[test]
-fn test_all_success() {
-    let mut env = Env::init();
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_all_success(vote_state_version: VoteStateTargetVersion) {
+    let mut env = Env::init(vote_state_version);
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let instruction = declaration.to_instruction(&mut env);
@@ -913,9 +924,10 @@ fn test_all_success() {
 }
 
 // all signers are essential; missing any one signer is a fail
-#[test]
-fn test_no_signer_bypass() {
-    let mut env = Env::init();
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_no_signer_bypass(vote_state_version: VoteStateTargetVersion) {
+    let mut env = Env::init(vote_state_version);
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let instruction = declaration.to_instruction(&mut env);
@@ -934,9 +946,10 @@ fn test_no_signer_bypass() {
 
 // the stake program cannot be used during the epoch rewards period
 // the only exception to this is GetMinimumDelegation
-#[test]
-fn test_epoch_rewards_period() {
-    let mut env = Env::init();
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_epoch_rewards_period(vote_state_version: VoteStateTargetVersion) {
+    let mut env = Env::init(vote_state_version);
     env.mollusk.sysvars.epoch_rewards = EpochRewards {
         active: true,
         ..EpochRewards::default()
