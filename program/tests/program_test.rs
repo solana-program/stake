@@ -1,23 +1,17 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
+    solana_account::Account as SolanaAccount,
+    solana_clock::Clock,
+    solana_instruction::Instruction,
+    solana_keypair::Keypair,
+    solana_program_entrypoint::ProgramResult,
+    solana_program_error::ProgramError,
     solana_program_test::*,
-    solana_sdk::{
-        account::Account as SolanaAccount,
-        entrypoint::ProgramResult,
-        instruction::Instruction,
-        program_error::ProgramError,
-        pubkey::Pubkey,
-        signature::{Keypair, Signer},
-        signers::Signers,
-        sysvar::rent::Rent,
-        transaction::{Transaction, TransactionError},
-        vote::{
-            instruction as vote_instruction,
-            state::{VoteInit, VoteState, VoteStateVersions},
-        },
-    },
+    solana_pubkey::Pubkey,
+    solana_rent::Rent,
     solana_sdk_ids::system_program,
+    solana_signer::Signer,
     solana_stake_interface::{
         error::StakeError,
         instruction::{self as ixn, LockupArgs},
@@ -26,7 +20,11 @@ use {
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
     },
     solana_system_interface::instruction as system_instruction,
-    solana_sysvar::clock::Clock,
+    solana_transaction::{Signers, Transaction, TransactionError},
+    solana_vote_interface::{
+        instruction as vote_instruction,
+        state::{VoteInit, VoteStateV3 as VoteState},
+    },
     test_case::{test_case, test_matrix},
 };
 
@@ -115,7 +113,7 @@ pub async fn create_vote(
         },
         rent_voter,
         vote_instruction::CreateVoteAccountConfig {
-            space: VoteStateVersions::vote_state_size_of(true) as u64,
+            space: VoteState::size_of() as u64,
             ..Default::default()
         },
     ));
