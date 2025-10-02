@@ -19,21 +19,47 @@ use {
         tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
     },
     solana_sysvar::{epoch_rewards::EpochRewards, Sysvar, SysvarSerialize},
-    solana_vote_interface::{program as solana_vote_program, state::VoteStateV3 as VoteState},
+    solana_vote_interface::{
+        program as solana_vote_program,
+        state::{VoteStateV3, VoteStateV4},
+    },
     std::{collections::HashSet, mem::MaybeUninit},
 };
 
-fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
+fn get_vote_state_epoch_credits(
+    vote_account_info: &AccountInfo,
+) -> Result<Vec<(u64, u64, u64)>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
 
-    let mut vote_state = Box::new(MaybeUninit::uninit());
-    VoteState::deserialize_into_uninit(&vote_account_info.try_borrow_data()?, vote_state.as_mut())
-        .map_err(|_| ProgramError::InvalidAccountData)?;
-    let vote_state = unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteState) };
-
-    Ok(vote_state)
+    // Check the variant first.
+    let data = vote_account_info.try_borrow_data()?;
+    match data.first() {
+        Some(2) => {
+            // VoteStateV3
+            let mut vote_state = Box::new(MaybeUninit::uninit());
+            VoteStateV3::deserialize_into_uninit(&data, vote_state.as_mut())
+                .map_err(|_| ProgramError::InvalidAccountData)?;
+            let vote_state =
+                unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteStateV3) };
+            Ok(vote_state.epoch_credits)
+        }
+        Some(3) => {
+            // VoteStateV4
+            let mut vote_state = Box::new(MaybeUninit::uninit());
+            VoteStateV4::deserialize_into_uninit(&data, vote_state.as_mut(), vote_account_info.key)
+                .map_err(|_| ProgramError::InvalidAccountData)?;
+            let vote_state =
+                unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteStateV4) };
+            Ok(vote_state.epoch_credits)
+        }
+        _ => {
+            // Older versions are not supported.
+            // Neither is zero data.
+            Err(ProgramError::InvalidAccountData)
+        }
+    }
 }
 
 fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, ProgramError> {
@@ -376,7 +402,8 @@ impl Processor {
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
-        let vote_state = get_vote_state(vote_account_info)?;
+        let vote_state_epoch_credits = get_vote_state_epoch_credits(vote_account_info)?;
+        let credits_observed = get_vote_credits_observed(&vote_state_epoch_credits);
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Initialized(meta) => {
@@ -390,7 +417,7 @@ impl Processor {
                 let stake = new_stake(
                     stake_amount,
                     vote_account_info.key,
-                    &vote_state,
+                    credits_observed,
                     clock.epoch,
                 );
 
@@ -411,7 +438,7 @@ impl Processor {
                     &mut stake,
                     stake_amount,
                     vote_account_info.key,
-                    &vote_state,
+                    credits_observed,
                     clock.epoch,
                     stake_history,
                 )?;
@@ -988,10 +1015,12 @@ impl Processor {
 
         let clock = Clock::get()?;
 
-        let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
-        let reference_vote_state = get_vote_state(reference_vote_account_info)?;
+        let delinquent_vote_state_epoch_credits =
+            get_vote_state_epoch_credits(delinquent_vote_account_info)?;
+        let reference_vote_state_epoch_credits =
+            get_vote_state_epoch_credits(reference_vote_account_info)?;
 
-        if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
+        if !acceptable_reference_epoch_credits(&reference_vote_state_epoch_credits, clock.epoch) {
             return Err(StakeError::InsufficientReferenceVotes.into());
         }
 
@@ -1005,7 +1034,7 @@ impl Processor {
             // Deactivate the stake account if its delegated vote account has never voted or
             // has not voted in the last
             // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
-            if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
+            if eligible_for_deactivate_delinquent(&delinquent_vote_state_epoch_credits, clock.epoch)
             {
                 stake.deactivate(clock.epoch)?;
 

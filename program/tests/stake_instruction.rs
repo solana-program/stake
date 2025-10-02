@@ -38,9 +38,14 @@ use {
     solana_sysvar_id::SysvarId,
     solana_vote_program::{
         self,
-        vote_state::{self, VoteStateV3 as VoteState, VoteStateVersions},
+        vote_state::{
+            self,
+            handler::{VoteStateHandle, VoteStateTargetVersion},
+            VoteStateV3, VoteStateV4, VoteStateVersions,
+        },
     },
     std::{collections::HashSet, str::FromStr},
+    test_case::test_case,
 };
 
 fn mollusk_bpf() -> Mollusk {
@@ -177,12 +182,12 @@ fn process_instruction_as_one_arg(
 fn new_stake(
     stake: u64,
     voter_pubkey: &Pubkey,
-    vote_state: &VoteState,
+    credits_observed: u64,
     activation_epoch: Epoch,
 ) -> Stake {
     Stake {
         delegation: Delegation::new(voter_pubkey, stake, activation_epoch),
-        credits_observed: vote_state.credits(),
+        credits_observed,
     }
 }
 
@@ -278,6 +283,56 @@ fn create_stake_history_from_delegations(
     }
 
     stake_history
+}
+
+fn create_vote_account(vote_state_version: VoteStateTargetVersion) -> AccountSharedData {
+    let node_pubkey = solana_pubkey::new_rand();
+    let authorized_pubkey = solana_pubkey::new_rand();
+    match vote_state_version {
+        VoteStateTargetVersion::V3 => vote_state::create_account_with_authorized(
+            &node_pubkey,
+            &authorized_pubkey,
+            &authorized_pubkey,
+            0,
+            100,
+        ),
+        VoteStateTargetVersion::V4 => vote_state::create_v4_account_with_authorized(
+            &node_pubkey,
+            &authorized_pubkey,
+            &authorized_pubkey,
+            None,
+            0,
+            100,
+        ),
+    }
+}
+
+fn create_default_vote_account(vote_state_version: VoteStateTargetVersion) -> AccountSharedData {
+    let (versioned, space) = match vote_state_version {
+        VoteStateTargetVersion::V3 => (
+            VoteStateVersions::new_v3(VoteStateV3::default()),
+            VoteStateV3::size_of(),
+        ),
+        VoteStateTargetVersion::V4 => (
+            VoteStateVersions::new_v4(VoteStateV4::default()),
+            VoteStateV4::size_of(),
+        ),
+    };
+    AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(space),
+        &versioned,
+        space,
+        &solana_sdk_ids::vote::id(),
+    )
+    .unwrap()
+}
+
+fn get_credits<T: VoteStateHandle>(vote_state: &T) -> u64 {
+    if vote_state.epoch_credits().is_empty() {
+        0
+    } else {
+        vote_state.epoch_credits().last().unwrap().1
+    }
 }
 
 mod config {
@@ -1603,8 +1658,9 @@ fn test_authorize_with_seed() {
     );
 }
 
-#[test]
-fn test_authorize_delegated_stake() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_authorize_delegated_stake(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let authority_address = solana_pubkey::new_rand();
@@ -1619,14 +1675,9 @@ fn test_authorize_delegated_stake() {
     )
     .unwrap();
     let vote_address = solana_pubkey::new_rand();
-    let vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
+    let vote_account = create_vote_account(vote_state_version);
     let vote_address_2 = solana_pubkey::new_rand();
-    let mut vote_account_2 =
-        vote_state::create_account(&vote_address_2, &solana_pubkey::new_rand(), 0, 100);
-    vote_account_2
-        .set_state(&VoteStateVersions::new_v3(VoteState::default()))
-        .unwrap();
+    let vote_account_2 = create_default_vote_account(vote_state_version);
     #[allow(deprecated)]
     let mut transaction_accounts = vec![
         (stake_address, stake_account),
@@ -1803,27 +1854,43 @@ fn test_authorize_delegated_stake() {
     );
 }
 
-#[test]
-fn test_stake_delegate() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_stake_delegate(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
-    let mut vote_state = VoteState::default();
-    for i in 0..1000 {
-        vote_state::process_slot_vote_unchecked(&mut vote_state, i);
-    }
-    let vote_state_credits = vote_state.credits();
     let vote_address = solana_pubkey::new_rand();
     let vote_address_2 = solana_pubkey::new_rand();
-    let mut vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
-    let mut vote_account_2 =
-        vote_state::create_account(&vote_address_2, &solana_pubkey::new_rand(), 0, 100);
-    vote_account
-        .set_state(&VoteStateVersions::new_v3(vote_state.clone()))
-        .unwrap();
-    vote_account_2
-        .set_state(&VoteStateVersions::new_v3(vote_state))
-        .unwrap();
+    let mut vote_account = create_vote_account(vote_state_version);
+    let mut vote_account_2 = create_vote_account(vote_state_version);
+
+    let (versioned, vote_state_credits) = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            for i in 0..1000 {
+                vote_state::process_slot_vote_unchecked(&mut vote_state, i);
+            }
+
+            let credits = get_credits(&vote_state);
+            let versioned = VoteStateVersions::new_v3(vote_state);
+
+            (versioned, credits)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            for i in 0..1000 {
+                vote_state::process_slot_vote_unchecked(&mut vote_state, i);
+            }
+
+            let credits = get_credits(&vote_state);
+            let versioned = VoteStateVersions::new_v4(vote_state);
+
+            (versioned, credits)
+        }
+    };
+    vote_account.set_state(&versioned).unwrap();
+    vote_account_2.set_state(&versioned).unwrap();
+
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
@@ -2048,8 +2115,9 @@ fn test_stake_delegate() {
     );
 }
 
-#[test]
-fn test_redelegate_consider_balance_changes() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_redelegate_consider_balance_changes(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let mut clock = Clock::default();
@@ -2060,8 +2128,7 @@ fn test_redelegate_consider_balance_changes() {
     let recipient_address = solana_pubkey::new_rand();
     let authority_address = solana_pubkey::new_rand();
     let vote_address = solana_pubkey::new_rand();
-    let vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
+    let vote_account = create_vote_account(vote_state_version);
     let stake_address = solana_pubkey::new_rand();
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -2384,8 +2451,9 @@ fn test_split() {
     );
 }
 
-#[test]
-fn test_withdraw_stake() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_withdraw_stake(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
@@ -2402,11 +2470,7 @@ fn test_withdraw_stake() {
     )
     .unwrap();
     let vote_address = solana_pubkey::new_rand();
-    let mut vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
-    vote_account
-        .set_state(&VoteStateVersions::new_v3(VoteState::default()))
-        .unwrap();
+    let vote_account = create_default_vote_account(vote_state_version);
     #[allow(deprecated)]
     let mut transaction_accounts = vec![
         (stake_address, stake_account),
@@ -2679,8 +2743,9 @@ fn test_withdraw_stake() {
     );
 }
 
-#[test]
-fn test_withdraw_stake_before_warmup() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_withdraw_stake_before_warmup(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
@@ -2696,11 +2761,7 @@ fn test_withdraw_stake_before_warmup() {
     )
     .unwrap();
     let vote_address = solana_pubkey::new_rand();
-    let mut vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
-    vote_account
-        .set_state(&VoteStateVersions::new_v3(VoteState::default()))
-        .unwrap();
+    let vote_account = create_default_vote_account(vote_state_version);
     let mut clock = Clock {
         epoch: 16,
         ..Clock::default()
@@ -3036,8 +3097,9 @@ fn test_withdraw_rent_exempt() {
     );
 }
 
-#[test]
-fn test_deactivate() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_deactivate(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
@@ -3051,11 +3113,7 @@ fn test_deactivate() {
     )
     .unwrap();
     let vote_address = solana_pubkey::new_rand();
-    let mut vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
-    vote_account
-        .set_state(&VoteStateVersions::new_v3(VoteState::default()))
-        .unwrap();
+    let vote_account = create_default_vote_account(vote_state_version);
     #[allow(deprecated)]
     let mut transaction_accounts = vec![
         (stake_address, stake_account),
@@ -3167,8 +3225,9 @@ fn test_deactivate() {
     );
 }
 
-#[test]
-fn test_set_lockup() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_set_lockup(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let custodian_address = solana_pubkey::new_rand();
@@ -3184,11 +3243,7 @@ fn test_set_lockup() {
     )
     .unwrap();
     let vote_address = solana_pubkey::new_rand();
-    let mut vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
-    vote_account
-        .set_state(&VoteStateVersions::new_v3(VoteState::default()))
-        .unwrap();
+    let vote_account = create_default_vote_account(vote_state_version);
     let instruction_data = serialize(&StakeInstruction::SetLockup(LockupArgs {
         unix_timestamp: Some(1),
         epoch: Some(1),
@@ -3513,8 +3568,9 @@ fn test_initialize_minimum_balance() {
 /// withdrawing below the minimum delegation, then re-delegating successfully (see
 /// `test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation()` for
 /// more information.)
-#[test]
-fn test_delegate_minimum_stake_delegation() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_delegate_minimum_stake_delegation(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let minimum_delegation = crate::get_minimum_delegation();
@@ -3526,8 +3582,7 @@ fn test_delegate_minimum_stake_delegation() {
         ..Meta::auto(&stake_address)
     };
     let vote_address = solana_pubkey::new_rand();
-    let vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
+    let vote_account = create_vote_account(vote_state_version);
     #[allow(deprecated)]
     let instruction_accounts = vec![
         AccountMeta {
@@ -4195,8 +4250,11 @@ fn test_withdraw_minimum_stake_delegation() {
 /// 3. Deactives the delegation
 /// 4. Withdraws from the account such that the ending balance is *below* rent + minimum delegation
 /// 5. Re-delegates, now with less than the minimum delegation, but it still succeeds
-#[test]
-fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation(
+    vote_state_version: VoteStateTargetVersion,
+) {
     let mollusk = mollusk_bpf();
 
     let minimum_delegation = crate::get_minimum_delegation();
@@ -4209,8 +4267,7 @@ fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegat
         &id(),
     );
     let vote_address = solana_pubkey::new_rand();
-    let vote_account =
-        vote_state::create_account(&vote_address, &solana_pubkey::new_rand(), 0, 100);
+    let vote_account = create_vote_account(vote_state_version);
     let recipient_address = solana_pubkey::new_rand();
     let mut clock = Clock::default();
     #[allow(deprecated)]
@@ -6621,8 +6678,9 @@ fn test_stake_process_instruction_error_ordering() {
     }
 }
 
-#[test]
-fn test_deactivate_delinquent() {
+#[test_case(VoteStateTargetVersion::V3)]
+#[test_case(VoteStateTargetVersion::V4)]
+fn test_deactivate_delinquent(vote_state_version: VoteStateTargetVersion) {
     let mollusk = mollusk_bpf();
 
     let reference_vote_address = Pubkey::new_unique();
@@ -6634,7 +6692,7 @@ fn test_deactivate_delinquent() {
         new_stake(
             1, /* stake */
             &vote_address,
-            &VoteState::default(),
+            0, /* credits_observed */
             1, /* activation_epoch */
         ),
         StakeFlags::empty(),
@@ -6648,18 +6706,29 @@ fn test_deactivate_delinquent() {
     )
     .unwrap();
 
+    let (versioned, space) = match vote_state_version {
+        VoteStateTargetVersion::V3 => (
+            VoteStateVersions::new_v3(VoteStateV3::default()),
+            VoteStateV3::size_of(),
+        ),
+        VoteStateTargetVersion::V4 => (
+            VoteStateVersions::new_v4(VoteStateV4::default()),
+            VoteStateV4::size_of(),
+        ),
+    };
+
     let mut vote_account = AccountSharedData::new_data_with_space(
         1, /* lamports */
-        &VoteStateVersions::new_v3(VoteState::default()),
-        VoteState::size_of(),
+        &versioned,
+        space,
         &solana_vote_program::id(),
     )
     .unwrap();
 
     let mut reference_vote_account = AccountSharedData::new_data_with_space(
         1, /* lamports */
-        &VoteStateVersions::new_v3(VoteState::default()),
-        VoteState::size_of(),
+        &versioned,
+        space,
         &solana_vote_program::id(),
     )
     .unwrap();
@@ -6724,13 +6793,23 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has not consistently voted for at least
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will fail
-    let mut reference_vote_state = VoteState::default();
-    for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
-        reference_vote_state.increment_credits(epoch as Epoch, 1);
-    }
-    reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
+                vote_state.increment_credits(epoch as Epoch, 1);
+            }
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
+                vote_state.increment_credits(epoch as Epoch, 1);
+            }
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    reference_vote_account.serialize_data(&versioned).unwrap();
 
     process_instruction_deactivate_delinquent(
         &stake_address,
@@ -6743,24 +6822,41 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has not consistently voted for the last
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will fail
-    let mut reference_vote_state = VoteState::default();
-    for epoch in 0..=current_epoch {
-        reference_vote_state.increment_credits(epoch, 1);
-    }
-    assert_eq!(
-        reference_vote_state.epoch_credits[current_epoch as usize - 2].0,
-        current_epoch - 2
-    );
-    reference_vote_state
-        .epoch_credits
-        .remove(current_epoch as usize - 2);
-    assert_eq!(
-        reference_vote_state.epoch_credits[current_epoch as usize - 2].0,
-        current_epoch - 1
-    );
-    reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            for epoch in 0..=current_epoch {
+                vote_state.increment_credits(epoch, 1);
+            }
+            assert_eq!(
+                vote_state.epoch_credits[current_epoch as usize - 2].0,
+                current_epoch - 2
+            );
+            vote_state.epoch_credits.remove(current_epoch as usize - 2);
+            assert_eq!(
+                vote_state.epoch_credits[current_epoch as usize - 2].0,
+                current_epoch - 1
+            );
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            for epoch in 0..=current_epoch {
+                vote_state.increment_credits(epoch, 1);
+            }
+            assert_eq!(
+                vote_state.epoch_credits[current_epoch as usize - 2].0,
+                current_epoch - 2
+            );
+            vote_state.epoch_credits.remove(current_epoch as usize - 2);
+            assert_eq!(
+                vote_state.epoch_credits[current_epoch as usize - 2].0,
+                current_epoch - 1
+            );
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    reference_vote_account.serialize_data(&versioned).unwrap();
 
     process_instruction_deactivate_delinquent(
         &stake_address,
@@ -6772,13 +6868,23 @@ fn test_deactivate_delinquent() {
 
     // `reference_vote_account` has consistently voted and `vote_account` has never voted.
     // Instruction will succeed
-    let mut reference_vote_state = VoteState::default();
-    for epoch in 0..=current_epoch {
-        reference_vote_state.increment_credits(epoch, 1);
-    }
-    reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            for epoch in 0..=current_epoch {
+                vote_state.increment_credits(epoch, 1);
+            }
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            for epoch in 0..=current_epoch {
+                vote_state.increment_credits(epoch, 1);
+            }
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    reference_vote_account.serialize_data(&versioned).unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
         &stake_address,
@@ -6800,13 +6906,23 @@ fn test_deactivate_delinquent() {
     // last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will succeed
 
-    let mut vote_state = VoteState::default();
-    for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
-        vote_state.increment_credits(epoch as Epoch, 1);
-    }
-    vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
+                vote_state.increment_credits(epoch as Epoch, 1);
+            }
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
+                vote_state.increment_credits(epoch as Epoch, 1);
+            }
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    vote_account.serialize_data(&versioned).unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
         &stake_address,
@@ -6837,7 +6953,7 @@ fn test_deactivate_delinquent() {
             new_stake(
                 1, /* stake */
                 &unrelated_vote_address,
-                &VoteState::default(),
+                VoteStateV3::default().credits(),
                 1, /* activation_epoch */
             ),
             StakeFlags::empty(),
@@ -6855,14 +6971,25 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has consistently voted and `vote_account` voted once
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` ago.
     // Instruction will succeed
-    let mut vote_state = VoteState::default();
-    vote_state.increment_credits(
-        current_epoch - MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION as Epoch,
-        1,
-    );
-    vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            vote_state.increment_credits(
+                current_epoch - MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION as Epoch,
+                1,
+            );
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            vote_state.increment_credits(
+                current_epoch - MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION as Epoch,
+                1,
+            );
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    vote_account.serialize_data(&versioned).unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
         &stake_account,
@@ -6874,14 +7001,25 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has consistently voted and `vote_account` voted once
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` - 1 epochs ago
     // Instruction will fail
-    let mut vote_state = VoteState::default();
-    vote_state.increment_credits(
-        current_epoch - (MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION - 1) as Epoch,
-        1,
-    );
-    vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
-        .unwrap();
+    let versioned = match vote_state_version {
+        VoteStateTargetVersion::V3 => {
+            let mut vote_state = VoteStateV3::default();
+            vote_state.increment_credits(
+                current_epoch - (MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION - 1) as Epoch,
+                1,
+            );
+            VoteStateVersions::new_v3(vote_state)
+        }
+        VoteStateTargetVersion::V4 => {
+            let mut vote_state = VoteStateV4::default();
+            vote_state.increment_credits(
+                current_epoch - (MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION - 1) as Epoch,
+                1,
+            );
+            VoteStateVersions::new_v4(vote_state)
+        }
+    };
+    vote_account.serialize_data(&versioned).unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
         &stake_account,
