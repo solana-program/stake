@@ -1,17 +1,15 @@
 use {
     crate::PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
-    solana_program::{
-        account_info::AccountInfo,
-        clock::Epoch,
-        program_error::ProgramError,
-        pubkey::Pubkey,
-        stake::{
-            instruction::StakeError,
-            state::{Delegation, Meta, Stake},
-        },
+    solana_account_info::AccountInfo,
+    solana_clock::Epoch,
+    solana_program_error::ProgramError,
+    solana_pubkey::Pubkey,
+    solana_stake_interface::{
+        error::StakeError,
+        state::{Delegation, Meta, Stake},
         sysvar::stake_history::StakeHistorySysvar,
-        vote::state::VoteState,
     },
+    solana_vote_interface::state::VoteStateV3 as VoteState,
 };
 
 /// After calling `validate_delegated_amount()`, this struct contains calculated
