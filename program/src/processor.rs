@@ -532,9 +532,9 @@ impl Processor {
         // relocate lamports, copy data, and close the original account
         if split_lamports == source_lamport_balance {
             let mut destination_stake_state = source_stake_state;
-            let delegation = match &mut destination_stake_state {
-                StakeStateV2::Stake(meta, stake, _) => {
-                    *meta = option_dest_meta.unwrap();
+            let delegation = match (&mut destination_stake_state, option_dest_meta) {
+                (StakeStateV2::Stake(meta, stake, _), Some(dest_meta)) => {
+                    *meta = dest_meta;
 
                     if is_active_or_activating {
                         stake.delegation.stake
@@ -542,13 +542,13 @@ impl Processor {
                         0
                     }
                 }
-                StakeStateV2::Initialized(meta) => {
-                    *meta = option_dest_meta.unwrap();
+                (StakeStateV2::Initialized(meta), Some(dest_meta)) => {
+                    *meta = dest_meta;
 
                     0
                 }
-                StakeStateV2::Uninitialized => 0,
-                StakeStateV2::RewardsPool => unreachable!(),
+                (StakeStateV2::Uninitialized, None) => 0,
+                _ => unreachable!(),
             };
 
             if destination_lamport_balance
@@ -579,12 +579,13 @@ impl Processor {
         // special case: if stake is fully inactive, we only care that both accounts meet rent-exemption
         if !is_active_or_activating {
             let mut destination_stake_state = source_stake_state;
-            match &mut destination_stake_state {
-                StakeStateV2::Stake(meta, _, _) | StakeStateV2::Initialized(meta) => {
-                    *meta = option_dest_meta.unwrap();
+            match (&mut destination_stake_state, option_dest_meta) {
+                (StakeStateV2::Stake(meta, _, _), Some(dest_meta))
+                | (StakeStateV2::Initialized(meta), Some(dest_meta)) => {
+                    *meta = dest_meta;
                 }
-                StakeStateV2::Uninitialized => (),
-                StakeStateV2::RewardsPool => unreachable!(),
+                (StakeStateV2::Uninitialized, None) => (),
+                _ => unreachable!(),
             }
 
             let post_source_lamports = source_lamport_balance.saturating_sub(split_lamports);
@@ -614,8 +615,8 @@ impl Processor {
         // * source meets rent exemption less its remaining delegation
         // * source and destination both meet the minimum delegation
         // destination delegation is matched 1:1 by split lamports. in other words, free source lamports are never split
-        match source_stake_state {
-            StakeStateV2::Stake(source_meta, mut source_stake, stake_flags) => {
+        match (source_stake_state, option_dest_meta) {
+            (StakeStateV2::Stake(source_meta, mut source_stake, stake_flags), Some(dest_meta)) => {
                 if destination_lamport_balance < destination_rent_exempt_reserve {
                     return Err(ProgramError::InsufficientFunds);
                 }
@@ -650,7 +651,7 @@ impl Processor {
 
                 set_stake_state(
                     destination_stake_account_info,
-                    &StakeStateV2::Stake(option_dest_meta.unwrap(), dest_stake, stake_flags),
+                    &StakeStateV2::Stake(dest_meta, dest_stake, stake_flags),
                 )?;
 
                 relocate_lamports(
