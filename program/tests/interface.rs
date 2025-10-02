@@ -997,7 +997,7 @@ fn test_no_use_dealloc() {
 
 // the original stake interface passed in sysvars and stake config
 // we no longer retrieve these via account info in any instruction processors
-// since instruction builder still provide them, we test the program does not require them
+// since instruction builders still provide them, we test the program does not require them
 // NOTE this function and test can be deleted after the instruction builders are updated
 #[allow(deprecated)]
 fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
