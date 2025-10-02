@@ -1,4 +1,4 @@
-use solana_program::native_token::LAMPORTS_PER_SOL;
+use solana_native_token::LAMPORTS_PER_SOL;
 
 pub mod helpers;
 pub mod processor;
@@ -6,9 +6,7 @@ pub mod processor;
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint;
 
-pub use solana_program;
-
-solana_program::declare_id!("Stake11111111111111111111111111111111111111");
+solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");
 
 // placeholders for features
 // we have ONE feature in the current stake program we care about:

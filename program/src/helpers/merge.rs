@@ -1,12 +1,10 @@
 use {
     crate::{helpers::checked_add, PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH},
-    solana_program::{
-        clock::{Clock, Epoch},
-        entrypoint::ProgramResult,
-        msg,
-        program_error::ProgramError,
-        stake::{instruction::StakeError, stake_flags::StakeFlags, state::*},
-        stake_history::StakeHistoryGetEntry,
+    solana_clock::{Clock, Epoch},
+    solana_msg::msg,
+    solana_program_error::{ProgramError, ProgramResult},
+    solana_stake_interface::{
+        error::StakeError, stake_flags::StakeFlags, stake_history::StakeHistoryGetEntry, state::*,
     },
     std::convert::TryFrom,
 };
@@ -233,13 +231,10 @@ mod tests {
         super::*,
         crate::id,
         proptest::prelude::*,
-        solana_sdk::{
-            account::{AccountSharedData, ReadableAccount},
-            account_utils::StateMut,
-            pubkey::Pubkey,
-            stake_history::{StakeHistory, StakeHistoryEntry},
-            sysvar::rent::Rent,
-        },
+        solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
+        solana_pubkey::Pubkey,
+        solana_rent::Rent,
+        solana_stake_interface::stake_history::{StakeHistory, StakeHistoryEntry},
     };
 
     #[test]

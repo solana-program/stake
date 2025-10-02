@@ -1,4 +1,7 @@
-use solana_program::{program_error::ProgramError, rent::Rent, stake::state::Meta, sysvar::Sysvar};
+use {
+    solana_program_error::ProgramError, solana_rent::Rent, solana_stake_interface::state::Meta,
+    solana_sysvar::Sysvar,
+};
 
 /// After calling `validate_split_amount()`, this struct contains calculated
 /// values that are used by the caller.

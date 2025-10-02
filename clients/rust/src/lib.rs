@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)] // <-- Rustc warning on `FromPrimitive`
+
 mod generated;
 mod hooked;
 

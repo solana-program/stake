@@ -4,30 +4,29 @@ use {
     arbitrary::{Arbitrary, Unstructured},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{Account, ReadableAccount, WritableAccount},
-    solana_sdk::{
-        instruction::{AccountMeta, Instruction},
-        native_token::LAMPORTS_PER_SOL,
-        pubkey::Pubkey,
-        stake::{
-            instruction::{self, LockupArgs},
-            stake_flags::StakeFlags,
-            state::{
-                warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
-                StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
-            },
-        },
-        stake_history::StakeHistoryEntry,
-        sysvar::{
-            clock::Clock, epoch_rewards::EpochRewards, epoch_schedule::EpochSchedule, rent::Rent,
-            stake_history::StakeHistory, SysvarId,
-        },
-        vote::{
-            program as vote_program,
-            state::{VoteState, VoteStateVersions},
+    solana_clock::Clock,
+    solana_epoch_rewards::EpochRewards,
+    solana_epoch_schedule::EpochSchedule,
+    solana_instruction::{AccountMeta, Instruction},
+    solana_native_token::LAMPORTS_PER_SOL,
+    solana_pubkey::Pubkey,
+    solana_rent::Rent,
+    solana_sdk_ids::system_program,
+    solana_stake_interface::{
+        instruction::{self, LockupArgs},
+        stake_flags::StakeFlags,
+        stake_history::{StakeHistory, StakeHistoryEntry},
+        state::{
+            warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
+            StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
         },
     },
-    solana_sdk_ids::system_program,
     solana_stake_program::{get_minimum_delegation, id},
+    solana_sysvar_id::SysvarId,
+    solana_vote_interface::{
+        program as vote_program,
+        state::{VoteStateV3 as VoteState, VoteStateVersions},
+    },
     std::{
         collections::{HashMap, HashSet},
         sync::LazyLock,
@@ -165,7 +164,7 @@ impl Env {
 
         // create two vote accounts
         let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
-        let vote_state_versions = VoteStateVersions::new_current(VoteState::default());
+        let vote_state_versions = VoteStateVersions::new_v3(VoteState::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
         let vote_account = Account::create(
             vote_rent_exemption,

@@ -1,4 +1,4 @@
-use solana_program::{instruction::InstructionError, program_error::ProgramError};
+use {solana_instruction_error::InstructionError, solana_program_error::ProgramError};
 
 pub(crate) mod delegate;
 pub(crate) use delegate::*;
