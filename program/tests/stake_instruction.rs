@@ -455,8 +455,6 @@ fn test_stake_process_instruction_decode_bail() {
     let rent_address = rent::id();
     let rent = Rent::default();
     let rent_account = create_account_shared_data_for_test(&rent);
-    let rewards_address = rewards::id();
-    let rewards_account = create_account_shared_data_for_test(&rewards::Rewards::new(0.0));
     let stake_history_address = stake_history::id();
     let stake_history_account = create_account_shared_data_for_test(&StakeHistory::default());
     let vote_address = Pubkey::new_unique();
@@ -481,23 +479,6 @@ fn test_stake_process_instruction_decode_bail() {
         .unwrap(),
         Vec::new(),
         Vec::new(),
-        Err(ProgramError::NotEnoughAccountKeys),
-    );
-
-    // no account for rent
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Initialize(
-            Authorized::default(),
-            Lockup::default(),
-        ))
-        .unwrap(),
-        vec![(stake_address, stake_account.clone())],
-        vec![AccountMeta {
-            pubkey: stake_address,
-            is_signer: false,
-            is_writable: true,
-        }],
         Err(ProgramError::NotEnoughAccountKeys),
     );
 
@@ -595,46 +576,6 @@ fn test_stake_process_instruction_decode_bail() {
         Err(ProgramError::InvalidAccountData),
     );
 
-    // Tests 3rd keyed account is of correct type (Clock instead of rewards) in withdraw
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Withdraw(withdrawal_amount)).unwrap(),
-        vec![
-            (stake_address, stake_account.clone()),
-            (vote_address, vote_account.clone()),
-            (rewards_address, rewards_account.clone()),
-            (stake_history_address, stake_history_account),
-        ],
-        vec![
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: vote_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: rewards_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: stake_history_address,
-                is_signer: false,
-                is_writable: false,
-            },
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: true,
-                is_writable: false,
-            },
-        ],
-        Err(ProgramError::InvalidArgument),
-    );
-
     // Tests correct number of accounts are provided in withdraw
     process_instruction(
         &mollusk,
@@ -646,29 +587,6 @@ fn test_stake_process_instruction_decode_bail() {
             is_writable: true,
         }],
         Err(ProgramError::NotEnoughAccountKeys),
-    );
-
-    // Tests 2nd keyed account is of correct type (Clock instead of rewards) in deactivate
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Deactivate).unwrap(),
-        vec![
-            (stake_address, stake_account.clone()),
-            (rewards_address, rewards_account),
-        ],
-        vec![
-            AccountMeta {
-                pubkey: stake_address,
-                is_signer: false,
-                is_writable: true,
-            },
-            AccountMeta {
-                pubkey: rewards_address,
-                is_signer: false,
-                is_writable: false,
-            },
-        ],
-        Err(ProgramError::InvalidArgument),
     );
 
     // Tests correct number of accounts are provided in deactivate
@@ -3659,6 +3577,8 @@ fn test_split_minimum_stake_delegation() {
             is_writable: true,
         },
     ];
+    // NOTE with a 1lamp minimum delegation, cases 2 and 4 merely hit the zero split error
+    // these would be InsufficientDelegation if the minimum were 1sol
     for (source_delegation, split_amount, expected_result) in [
         (minimum_delegation * 2, minimum_delegation, Ok(())),
         (
@@ -3669,7 +3589,7 @@ fn test_split_minimum_stake_delegation() {
         (
             (minimum_delegation * 2) - 1,
             minimum_delegation,
-            Err(ProgramError::InsufficientFunds),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
         (
             (minimum_delegation - 1) * 2,
@@ -4412,24 +4332,27 @@ fn test_split_source_uninitialized() {
         },
     ];
 
+    // splitting zero always fails
+    {
+        process_instruction(
+            &mollusk,
+            &serialize(&StakeInstruction::Split(0)).unwrap(),
+            transaction_accounts.clone(),
+            instruction_accounts.clone(),
+            Err(ProgramError::InsufficientFunds),
+        );
+    }
+
     // splitting an uninitialized account where the destination is the same as the source
     {
         // splitting should work when...
         // - when split amount is the full balance
-        // - when split amount is zero
         // - when split amount is non-zero and less than the full balance
         //
         // and splitting should fail when the split amount is greater than the balance
         process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(stake_lamports)).unwrap(),
-            transaction_accounts.clone(),
-            instruction_accounts.clone(),
-            Ok(()),
-        );
-        process_instruction(
-            &mollusk,
-            &serialize(&StakeInstruction::Split(0)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
             Ok(()),

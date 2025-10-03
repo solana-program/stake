@@ -1,7 +1,7 @@
 use {
     crate::{helpers::*, id, PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH},
     solana_program::{
-        account_info::{next_account_info, AccountInfo},
+        account_info::AccountInfo,
         clock::Clock,
         entrypoint::ProgramResult,
         msg,
@@ -18,11 +18,34 @@ use {
             state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
             tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
         },
-        sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
+        sysvar::{
+            epoch_rewards::EpochRewards,
+            stake_history::{StakeHistory, StakeHistorySysvar},
+            Sysvar, SysvarId,
+        },
         vote::{program as solana_vote_program, state::VoteState},
     },
     std::{collections::HashSet, mem::MaybeUninit},
 };
+
+#[allow(deprecated)]
+fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
+    pubkey == Clock::id()
+        || pubkey == Rent::id()
+        || pubkey == StakeHistory::id()
+        || pubkey == solana_sdk_ids::stake::config::id()
+}
+
+fn next_non_sysvar_account<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
+    iter: &mut I,
+) -> Result<I::Item, ProgramError> {
+    loop {
+        let account_info = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+        if !is_stake_program_sysvar_or_config(*account_info.key) {
+            return Ok(account_info);
+        }
+    }
+}
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
@@ -131,11 +154,12 @@ fn do_initialize(
     stake_account_info: &AccountInfo,
     authorized: Authorized,
     lockup: Lockup,
-    rent: &Rent,
 ) -> ProgramResult {
     if stake_account_info.data_len() != StakeStateV2::size_of() {
         return Err(ProgramError::InvalidAccountData);
     }
+
+    let rent = Rent::get()?;
 
     if let StakeStateV2::Uninitialized = get_stake_state(stake_account_info)? {
         let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
@@ -161,8 +185,9 @@ fn do_authorize(
     new_authority: &Pubkey,
     authority_type: StakeAuthorize,
     custodian: Option<&Pubkey>,
-    clock: &Clock,
 ) -> ProgramResult {
+    let clock = Clock::get()?;
+
     match get_stake_state(stake_account_info)? {
         StakeStateV2::Initialized(mut meta) => {
             meta.authorized
@@ -170,7 +195,7 @@ fn do_authorize(
                     signers,
                     new_authority,
                     authority_type,
-                    Some((&meta.lockup, clock, custodian)),
+                    Some((&meta.lockup, &clock, custodian)),
                 )
                 .map_err(to_program_error)?;
 
@@ -182,7 +207,7 @@ fn do_authorize(
                     signers,
                     new_authority,
                     authority_type,
-                    Some((&meta.lockup, clock, custodian)),
+                    Some((&meta.lockup, &clock, custodian)),
                 )
                 .map_err(to_program_error)?;
 
@@ -291,19 +316,22 @@ fn move_stake_or_lamports_shared_checks(
 // when lengths are asserted in setup, accounts are retrieved via hardcoded index from InstructionContext
 // but after control is passed to main processing functions, they are pulled from the TransactionContext
 //
-// we aim to implement this behavior exactly, such that both programs are consensus compatible:
+// when porting to bpf, we reimplemented this behavior exactly, such that both programs would be consensus compatible:
 // * all transactions that would fail on one program also fail on the other
 // * all transactions that would succeed on one program also succeed on the other
 // * for successful transactions, all account state transitions are identical
 // error codes and log output may differ
 //
-// this is not strictly necessary, since the switchover will be feature-gated. so this is not a security issue
-// mostly its so no one can blame the bpf switchover for breaking their usecase, even pathological ones
+// now that the switchover is complete, there may be opportunities to tighten up the interface
+// particularly by asserting that some "optional" accounts must exist
+// we should avoid breaking odd workflows (such as self-signed stake accounts) but may consider breaking pathological flows
+// commented-out `next_non_sysvar_account()` calls mark accounts that should typically be included
+// this differs from `.ok()` account retrievals (lockup custodians) which are optional by design
 //
-// in service to this end, all accounts iters are commented with how the native program uses them
-// for accounts that should always, or almost always, exist, which the native program does not assert...
-// ...we leave a commented-out `next_account_info()` call, to aid in a future refactor
-// after the bpf switchover ships, we may update to strictly assert these accounts exist
+// the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
+// this was done for backwards compatibility but the end result was highly inconsistent
+// now, we skip all sysvar accounts previously required (clock, rent, stake history) and retrieve them via syscall
+// we also skip the stake config account, which was removed from native stake but is still included in instruction builders
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -313,14 +341,11 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 2 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let rent_info = next_account_info(account_info_iter)?;
-
-        let rent = &Rent::from_account_info(rent_info)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // `get_stake_state()` is called unconditionally, which checks owner
-        do_initialize(stake_account_info, authorized, lockup, rent)?;
+        do_initialize(stake_account_info, authorized, lockup)?;
 
         Ok(())
     }
@@ -333,15 +358,12 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let _stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
+        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
         let custodian = option_lockup_authority_info
             .filter(|a| a.is_signer)
@@ -354,7 +376,6 @@ impl Processor {
             &new_authority,
             authority_type,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -364,17 +385,14 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 5 accounts (2 sysvars + stake config)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let vote_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
-        let _stake_config_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let vote_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         let vote_state = get_vote_state(vote_account_info)?;
@@ -429,20 +447,17 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 2 accounts
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let destination_stake_account_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
 
+        let rent = Rent::get()?;
         let clock = Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
-
-        let destination_data_len = destination_stake_account_info.data_len();
-        if destination_data_len != StakeStateV2::size_of() {
-            return Err(ProgramError::InvalidAccountData);
-        }
+        let minimum_delegation = crate::get_minimum_delegation();
 
         if let StakeStateV2::Uninitialized = get_stake_state(destination_stake_account_info)? {
             // we can split into this
@@ -457,84 +472,179 @@ impl Processor {
             return Err(ProgramError::InsufficientFunds);
         }
 
-        match get_stake_state(source_stake_account_info)? {
-            StakeStateV2::Stake(source_meta, mut source_stake, stake_flags) => {
+        if split_lamports == 0 {
+            return Err(ProgramError::InsufficientFunds);
+        }
+
+        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
+
+        let destination_data_len = destination_stake_account_info.data_len();
+        if destination_data_len != StakeStateV2::size_of() {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        let destination_rent_exempt_reserve = rent.minimum_balance(destination_data_len);
+
+        // check signers and get delegation status along with a destination meta
+        let source_stake_state = get_stake_state(source_stake_account_info)?;
+        let (is_active_or_activating, option_dest_meta) = match source_stake_state {
+            StakeStateV2::Stake(source_meta, source_stake, _) => {
                 source_meta
                     .authorized
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(to_program_error)?;
 
-                let minimum_delegation = crate::get_minimum_delegation();
-
-                let status = source_stake.delegation.stake_activating_and_deactivating(
+                let source_status = source_stake.delegation.stake_activating_and_deactivating(
                     clock.epoch,
                     stake_history,
                     PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
                 );
+                let is_active_or_activating =
+                    source_status.effective > 0 || source_status.activating > 0;
 
-                let is_active = status.effective > 0;
+                let mut dest_meta = source_meta;
+                dest_meta.rent_exempt_reserve = destination_rent_exempt_reserve;
 
-                // NOTE this function also internally summons Rent via syscall
-                let validated_split_info = validate_split_amount(
-                    source_lamport_balance,
-                    destination_lamport_balance,
-                    split_lamports,
-                    &source_meta,
-                    destination_data_len,
-                    minimum_delegation,
-                    is_active,
-                )?;
+                (is_active_or_activating, Some(dest_meta))
+            }
+            StakeStateV2::Initialized(source_meta) => {
+                source_meta
+                    .authorized
+                    .check(&signers, StakeAuthorize::Staker)
+                    .map_err(to_program_error)?;
 
-                // split the stake, subtract rent_exempt_balance unless
-                // the destination account already has those lamports
-                // in place.
-                // this means that the new stake account will have a stake equivalent to
-                // lamports minus rent_exempt_reserve if it starts out with a zero balance
-                let (remaining_stake_delta, split_stake_amount) =
-                    if validated_split_info.source_remaining_balance == 0 {
-                        // If split amount equals the full source stake (as implied by 0
-                        // source_remaining_balance), the new split stake must equal the same
-                        // amount, regardless of any current lamport balance in the split account.
-                        // Since split accounts retain the state of their source account, this
-                        // prevents any magic activation of stake by prefunding the split account.
-                        //
-                        // The new split stake also needs to ignore any positive delta between the
-                        // original rent_exempt_reserve and the split_rent_exempt_reserve, in order
-                        // to prevent magic activation of stake by splitting between accounts of
-                        // different sizes.
-                        let remaining_stake_delta =
-                            split_lamports.saturating_sub(source_meta.rent_exempt_reserve);
-                        (remaining_stake_delta, remaining_stake_delta)
+                let mut dest_meta = source_meta;
+                dest_meta.rent_exempt_reserve = destination_rent_exempt_reserve;
+
+                (false, Some(dest_meta))
+            }
+            StakeStateV2::Uninitialized => {
+                if !source_stake_account_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+
+                (false, None)
+            }
+            StakeStateV2::RewardsPool => return Err(ProgramError::InvalidAccountData),
+        };
+
+        // special case: for a full split, we only care that the destination becomes a valid stake account
+        // this prevents state changes in exceptional cases where a once-valid source has become invalid
+        // relocate lamports, copy data, and close the original account
+        if split_lamports == source_lamport_balance {
+            let mut destination_stake_state = source_stake_state;
+            let delegation = match (&mut destination_stake_state, option_dest_meta) {
+                (StakeStateV2::Stake(meta, stake, _), Some(dest_meta)) => {
+                    *meta = dest_meta;
+
+                    if is_active_or_activating {
+                        stake.delegation.stake
                     } else {
-                        // Otherwise, the new split stake should reflect the entire split
-                        // requested, less any lamports needed to cover the
-                        // split_rent_exempt_reserve.
-                        if source_stake.delegation.stake.saturating_sub(split_lamports)
-                            < minimum_delegation
-                        {
-                            return Err(StakeError::InsufficientDelegation.into());
-                        }
+                        0
+                    }
+                }
+                (StakeStateV2::Initialized(meta), Some(dest_meta)) => {
+                    *meta = dest_meta;
 
-                        (
-                            split_lamports,
-                            split_lamports.saturating_sub(
-                                validated_split_info
-                                    .destination_rent_exempt_reserve
-                                    .saturating_sub(destination_lamport_balance),
-                            ),
-                        )
-                    };
+                    0
+                }
+                (StakeStateV2::Uninitialized, None) => 0,
+                _ => unreachable!(),
+            };
 
-                if split_stake_amount < minimum_delegation {
+            if destination_lamport_balance
+                .saturating_add(split_lamports)
+                .saturating_sub(delegation)
+                < destination_rent_exempt_reserve
+            {
+                return Err(ProgramError::InsufficientFunds);
+            }
+
+            if is_active_or_activating && delegation < minimum_delegation {
+                return Err(StakeError::InsufficientDelegation.into());
+            }
+
+            set_stake_state(destination_stake_account_info, &destination_stake_state)?;
+            if source_stake_account_info.key != destination_stake_account_info.key {
+                source_stake_account_info.realloc(0, false)?;
+            }
+
+            relocate_lamports(
+                source_stake_account_info,
+                destination_stake_account_info,
+                split_lamports,
+            )?;
+            debug_assert!(source_stake_account_info.lamports() == 0);
+
+            return Ok(());
+        }
+
+        // special case: if stake is fully inactive, we only care that both accounts meet rent-exemption
+        if !is_active_or_activating {
+            let mut destination_stake_state = source_stake_state;
+            match (&mut destination_stake_state, option_dest_meta) {
+                (StakeStateV2::Stake(meta, _, _), Some(dest_meta))
+                | (StakeStateV2::Initialized(meta), Some(dest_meta)) => {
+                    *meta = dest_meta;
+                }
+                (StakeStateV2::Uninitialized, None) => (),
+                _ => unreachable!(),
+            }
+
+            let post_source_lamports = source_lamport_balance.saturating_sub(split_lamports);
+            let post_destination_lamports =
+                destination_lamport_balance.saturating_add(split_lamports);
+
+            if post_source_lamports < source_rent_exempt_reserve
+                || post_destination_lamports < destination_rent_exempt_reserve
+            {
+                return Err(ProgramError::InsufficientFunds);
+            }
+
+            set_stake_state(destination_stake_account_info, &destination_stake_state)?;
+
+            relocate_lamports(
+                source_stake_account_info,
+                destination_stake_account_info,
+                split_lamports,
+            )?;
+
+            return Ok(());
+        }
+
+        // at this point, we know we have a StakeStateV2::Stake source that is either activating or has nonzero effective
+        // this means we must redistribute the delegation across both accounts and enforce:
+        // * destination has a pre-funded rent exemption
+        // * source meets rent exemption less its remaining delegation
+        // * source and destination both meet the minimum delegation
+        // destination delegation is matched 1:1 by split lamports. in other words, free source lamports are never split
+        match (source_stake_state, option_dest_meta) {
+            (StakeStateV2::Stake(source_meta, mut source_stake, stake_flags), Some(dest_meta)) => {
+                if destination_lamport_balance < destination_rent_exempt_reserve {
+                    return Err(ProgramError::InsufficientFunds);
+                }
+
+                let mut dest_stake = source_stake;
+
+                source_stake.delegation.stake =
+                    source_stake.delegation.stake.saturating_sub(split_lamports);
+
+                if source_stake.delegation.stake < minimum_delegation {
                     return Err(StakeError::InsufficientDelegation.into());
                 }
 
-                let destination_stake =
-                    source_stake.split(remaining_stake_delta, split_stake_amount)?;
+                // minimum delegation is by definition nonzero, and we remove one delegated lamport per split lamport
+                // since the remaining source delegation > 0, it is impossible that we took from its rent-exempt reserve
+                debug_assert!(
+                    source_lamport_balance
+                        .saturating_sub(split_lamports)
+                        .saturating_sub(source_stake.delegation.stake)
+                        >= source_meta.rent_exempt_reserve
+                );
 
-                let mut destination_meta = source_meta;
-                destination_meta.rent_exempt_reserve =
-                    validated_split_info.destination_rent_exempt_reserve;
+                dest_stake.delegation.stake = split_lamports;
+                if dest_stake.delegation.stake < minimum_delegation {
+                    return Err(StakeError::InsufficientDelegation.into());
+                }
 
                 set_stake_state(
                     source_stake_account_info,
@@ -543,53 +653,17 @@ impl Processor {
 
                 set_stake_state(
                     destination_stake_account_info,
-                    &StakeStateV2::Stake(destination_meta, destination_stake, stake_flags),
-                )?;
-            }
-            StakeStateV2::Initialized(source_meta) => {
-                source_meta
-                    .authorized
-                    .check(&signers, StakeAuthorize::Staker)
-                    .map_err(to_program_error)?;
-
-                // NOTE this function also internally summons Rent via syscall
-                let validated_split_info = validate_split_amount(
-                    source_lamport_balance,
-                    destination_lamport_balance,
-                    split_lamports,
-                    &source_meta,
-                    destination_data_len,
-                    0,     // additional_required_lamports
-                    false, // is_active
+                    &StakeStateV2::Stake(dest_meta, dest_stake, stake_flags),
                 )?;
 
-                let mut destination_meta = source_meta;
-                destination_meta.rent_exempt_reserve =
-                    validated_split_info.destination_rent_exempt_reserve;
-
-                set_stake_state(
+                relocate_lamports(
+                    source_stake_account_info,
                     destination_stake_account_info,
-                    &StakeStateV2::Initialized(destination_meta),
+                    split_lamports,
                 )?;
             }
-            StakeStateV2::Uninitialized => {
-                if !source_stake_account_info.is_signer {
-                    return Err(ProgramError::MissingRequiredSignature);
-                }
-            }
-            _ => return Err(ProgramError::InvalidAccountData),
+            _ => unreachable!(),
         }
-
-        // Truncate state upon zero balance
-        if split_lamports == source_lamport_balance {
-            source_stake_account_info.realloc(0, false)?;
-        }
-
-        relocate_lamports(
-            source_stake_account_info,
-            destination_stake_account_info,
-            split_lamports,
-        )?;
 
         Ok(())
     }
@@ -597,17 +671,15 @@ impl Processor {
     fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 5 accounts (2 sysvars)
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let destination_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
-        let withdraw_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let destination_info = next_non_sysvar_account(account_info_iter)?;
+        let withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
+        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         // this is somewhat subtle. for Initialized and Stake, there is a real authority
@@ -699,14 +771,13 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 2 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
@@ -731,11 +802,11 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 1 account
-        let stake_account_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        // let _old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter);
+        // let _old_withdraw_or_lockup_authority_info = next_non_sysvar_account(account_info_iter);
 
         let clock = Clock::get()?;
 
@@ -749,16 +820,14 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (2 sysvars)
-        let destination_stake_account_info = next_account_info(account_info_iter)?;
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         if source_stake_account_info.key == destination_stake_account_info.key {
@@ -812,15 +881,12 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_or_withdraw_authority_base_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
+        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
         let (mut signers, custodian) = collect_signers_checked(None, option_lockup_authority_info)?;
 
@@ -839,7 +905,6 @@ impl Processor {
             &authorize_args.new_authorized_pubkey,
             authorize_args.stake_authorize,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -848,13 +913,10 @@ impl Processor {
     fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let rent_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
-        let withdraw_authority_info = next_account_info(account_info_iter)?;
-
-        let rent = &Rent::from_account_info(rent_info)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         if !withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -866,7 +928,7 @@ impl Processor {
         };
 
         // `get_stake_state()` is called unconditionally, which checks owner
-        do_initialize(stake_account_info, authorized, Lockup::default(), rent)?;
+        do_initialize(stake_account_info, authorized, Lockup::default())?;
 
         Ok(())
     }
@@ -878,16 +940,13 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let _old_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
+        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
         if !new_stake_or_withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -904,7 +963,6 @@ impl Processor {
             new_stake_or_withdraw_authority_info.key,
             authority_type,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -916,16 +974,13 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let old_stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let old_stake_or_withdraw_authority_base_info = next_non_sysvar_account(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
+        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
         let (mut signers, custodian) = collect_signers_checked(
             Some(new_stake_or_withdraw_authority_info),
@@ -947,7 +1002,6 @@ impl Processor {
             new_stake_or_withdraw_authority_info.key,
             authorize_args.stake_authorize,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -960,12 +1014,12 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 1 account
-        let stake_account_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
 
         // other accounts
-        let _old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter);
-        let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
+        let _old_withdraw_or_lockup_authority_info = next_non_sysvar_account(account_info_iter);
+        let option_new_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
 
         let clock = Clock::get()?;
 
@@ -992,10 +1046,10 @@ impl Processor {
     fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
-        let reference_vote_account_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let delinquent_vote_account_info = next_non_sysvar_account(account_info_iter)?;
+        let reference_vote_account_info = next_non_sysvar_account(account_info_iter)?;
 
         let clock = Clock::get()?;
 
@@ -1037,10 +1091,10 @@ impl Processor {
     fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let destination_stake_account_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         let (source_merge_kind, destination_merge_kind) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,
@@ -1174,10 +1228,10 @@ impl Processor {
     fn process_move_lamports(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
-        let source_stake_account_info = next_account_info(account_info_iter)?;
-        let destination_stake_account_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
+        // required accounts
+        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
 
         let (source_merge_kind, _) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,

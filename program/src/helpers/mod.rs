@@ -3,9 +3,6 @@ use solana_program::{instruction::InstructionError, program_error::ProgramError}
 pub(crate) mod delegate;
 pub(crate) use delegate::*;
 
-pub(crate) mod split;
-pub(crate) use split::*;
-
 pub(crate) mod merge;
 pub(crate) use merge::*;
 
