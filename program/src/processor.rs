@@ -563,8 +563,10 @@ impl Processor {
                 return Err(StakeError::InsufficientDelegation.into());
             }
 
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
             set_stake_state(destination_stake_account_info, &destination_stake_state)?;
+            if source_stake_account_info.key != destination_stake_account_info.key {
+                source_stake_account_info.realloc(0, false)?;
+            }
 
             relocate_lamports(
                 source_stake_account_info,
