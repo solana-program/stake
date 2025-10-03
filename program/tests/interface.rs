@@ -952,3 +952,45 @@ fn test_epoch_rewards_period() {
     let instruction = instruction::get_minimum_delegation();
     env.process_success(&instruction);
 }
+
+// other than Withdraw, instructions should fail with a zero-length stake account
+// account data is truncated for instructions that intend to deallocate the account
+// we want to ensure topping up such an account mid-transaction does not allow reuse
+#[test]
+fn test_no_use_dealloc() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let is_withdraw = matches!(declaration, StakeInterface::Withdraw { .. });
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        for stake_address in [STAKE_ACCOUNT_BLACK, STAKE_ACCOUNT_WHITE] {
+            if instruction
+                .accounts
+                .iter()
+                .any(|account| account.pubkey == stake_address)
+            {
+                // replace stake account, if we use it, with its zero-length same-lamports equivalent
+                let lamports = env
+                    .override_accounts
+                    .get(&stake_address)
+                    .unwrap_or_else(|| env.base_accounts.get(&stake_address).unwrap())
+                    .lamports();
+                let stake_account = Account::create(lamports, vec![], id(), false, u64::MAX);
+                env.override_accounts.insert(stake_address, stake_account);
+
+                if is_withdraw {
+                    // truncating source account data makes this a self-signed withdraw
+                    if instruction.accounts[0].pubkey == stake_address {
+                        instruction.accounts[4].pubkey = stake_address;
+                    }
+                    env.process_success(&instruction);
+                } else {
+                    env.process_fail(&instruction);
+                }
+
+                env.reset();
+            }
+        }
+    }
+}

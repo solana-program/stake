@@ -580,9 +580,9 @@ impl Processor {
             _ => return Err(ProgramError::InvalidAccountData),
         }
 
-        // Deinitialize state upon zero balance
+        // Truncate state upon zero balance
         if split_lamports == source_lamport_balance {
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            source_stake_account_info.realloc(0, false)?;
         }
 
         relocate_lamports(
@@ -615,8 +615,8 @@ impl Processor {
         let (signers, custodian) =
             collect_signers_checked(Some(withdraw_authority_info), option_lockup_authority_info)?;
 
-        let (lockup, reserve, is_staked) = match get_stake_state(source_stake_account_info)? {
-            StakeStateV2::Stake(meta, stake, _stake_flag) => {
+        let (lockup, reserve, is_staked) = match get_stake_state(source_stake_account_info) {
+            Ok(StakeStateV2::Stake(meta, stake, _stake_flag)) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Withdrawer)
                     .map_err(to_program_error)?;
@@ -637,20 +637,30 @@ impl Processor {
                 let staked_and_reserve = checked_add(staked, meta.rent_exempt_reserve)?;
                 (meta.lockup, staked_and_reserve, staked != 0)
             }
-            StakeStateV2::Initialized(meta) => {
+            Ok(StakeStateV2::Initialized(meta)) => {
                 meta.authorized
                     .check(&signers, StakeAuthorize::Withdrawer)
                     .map_err(to_program_error)?;
                 // stake accounts must have a balance >= rent_exempt_reserve
                 (meta.lockup, meta.rent_exempt_reserve, false)
             }
-            StakeStateV2::Uninitialized => {
+            Ok(StakeStateV2::Uninitialized) => {
                 if !signers.contains(source_stake_account_info.key) {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
                 (Lockup::default(), 0, false) // no lockup, no restrictions
             }
-            _ => return Err(ProgramError::InvalidAccountData),
+            Err(e)
+                if e == ProgramError::InvalidAccountData
+                    && source_stake_account_info.data_len() == 0 =>
+            {
+                if !signers.contains(source_stake_account_info.key) {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+                (Lockup::default(), 0, false) // no lockup, no restrictions
+            }
+            Ok(StakeStateV2::RewardsPool) => return Err(ProgramError::InvalidAccountData),
+            Err(e) => return Err(e),
         };
 
         // verify that lockup has expired or that the withdrawal is signed by the
@@ -666,8 +676,8 @@ impl Processor {
                 return Err(ProgramError::InsufficientFunds);
             }
 
-            // Deinitialize state upon zero balance
-            set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+            // Truncate state upon zero balance
+            source_stake_account_info.realloc(0, false)?;
         } else {
             // a partial withdrawal must not deplete the reserve
             let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -783,8 +793,8 @@ impl Processor {
             set_stake_state(destination_stake_account_info, &merged_state)?;
         }
 
-        // Source is about to be drained, deinitialize its state
-        set_stake_state(source_stake_account_info, &StakeStateV2::Uninitialized)?;
+        // Source is about to be drained, truncate its state
+        source_stake_account_info.realloc(0, false)?;
 
         // Drain the source stake account
         relocate_lamports(
