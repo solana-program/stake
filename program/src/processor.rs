@@ -1,26 +1,25 @@
 use {
     crate::{helpers::*, id, PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH},
-    solana_program::{
-        account_info::{next_account_info, AccountInfo},
-        clock::Clock,
-        entrypoint::ProgramResult,
-        msg,
-        program::set_return_data,
-        program_error::ProgramError,
-        pubkey::Pubkey,
-        rent::Rent,
-        stake::{
-            instruction::{
-                AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs, LockupArgs, LockupCheckedArgs,
-                StakeError, StakeInstruction,
-            },
-            stake_flags::StakeFlags,
-            state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
-            tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
+    solana_account_info::{next_account_info, AccountInfo},
+    solana_clock::Clock,
+    solana_cpi::set_return_data,
+    solana_msg::msg,
+    solana_program_error::{ProgramError, ProgramResult},
+    solana_pubkey::Pubkey,
+    solana_rent::Rent,
+    solana_stake_interface::{
+        error::StakeError,
+        instruction::{
+            AuthorizeCheckedWithSeedArgs, AuthorizeWithSeedArgs, LockupArgs, LockupCheckedArgs,
+            StakeInstruction,
         },
-        sysvar::{epoch_rewards::EpochRewards, stake_history::StakeHistorySysvar, Sysvar},
-        vote::{program as solana_vote_program, state::VoteState},
+        stake_flags::StakeFlags,
+        state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
+        sysvar::stake_history::StakeHistorySysvar,
+        tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
     },
+    solana_sysvar::{epoch_rewards::EpochRewards, Sysvar, SysvarSerialize},
+    solana_vote_interface::{program as solana_vote_program, state::VoteStateV3 as VoteState},
     std::{collections::HashSet, mem::MaybeUninit},
 };
 
@@ -582,7 +581,7 @@ impl Processor {
 
         // Truncate state upon zero balance
         if split_lamports == source_lamport_balance {
-            source_stake_account_info.realloc(0, false)?;
+            source_stake_account_info.resize(0)?;
         }
 
         relocate_lamports(
@@ -677,7 +676,7 @@ impl Processor {
             }
 
             // Truncate state upon zero balance
-            source_stake_account_info.realloc(0, false)?;
+            source_stake_account_info.resize(0)?;
         } else {
             // a partial withdrawal must not deplete the reserve
             let withdraw_lamports_and_reserve = checked_add(withdraw_lamports, reserve)?;
@@ -794,7 +793,7 @@ impl Processor {
         }
 
         // Source is about to be drained, truncate its state
-        source_stake_account_info.realloc(0, false)?;
+        source_stake_account_info.resize(0)?;
 
         // Drain the source stake account
         relocate_lamports(
