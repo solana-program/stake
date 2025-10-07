@@ -5051,19 +5051,6 @@ dependencies = [
 
 [[package]]
 name = "solana-config-interface"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbdbcfedb467322ac9686ca61da0a1fdede2fd99a01fb2ed52b49452abd22e0"
-dependencies = [
- "serde",
- "serde_derive",
- "solana-pubkey 2.4.0",
- "solana-sdk-ids 2.2.1",
- "solana-short-vec 2.2.1",
-]
-
-[[package]]
-name = "solana-config-interface"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63e401ae56aed512821cc7a0adaa412ff97fecd2dff4602be7b1330d2daec0c4"
@@ -7194,7 +7181,7 @@ dependencies = [
  "solana-account 3.0.0",
  "solana-account-info 3.0.0",
  "solana-clock 3.0.0",
- "solana-config-interface 1.0.0",
+ "solana-config-interface",
  "solana-cpi 3.0.0",
  "solana-epoch-rewards 3.0.0",
  "solana-epoch-schedule 3.0.0",
@@ -7234,7 +7221,7 @@ dependencies = [
  "solana-account 3.0.0",
  "solana-bincode 3.0.0",
  "solana-clock 3.0.0",
- "solana-config-interface 2.0.0",
+ "solana-config-interface",
  "solana-genesis-config",
  "solana-instruction 3.0.0",
  "solana-native-token 3.0.0",
