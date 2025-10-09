@@ -390,7 +390,7 @@ impl Processor {
                 let stake = new_stake(
                     stake_amount,
                     vote_account_info.key,
-                    &vote_state,
+                    vote_state.credits(),
                     clock.epoch,
                 );
 
@@ -411,7 +411,7 @@ impl Processor {
                     &mut stake,
                     stake_amount,
                     vote_account_info.key,
-                    &vote_state,
+                    vote_state.credits(),
                     clock.epoch,
                     stake_history,
                 )?;

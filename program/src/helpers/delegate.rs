@@ -9,7 +9,6 @@ use {
         state::{Delegation, Meta, Stake},
         sysvar::stake_history::StakeHistorySysvar,
     },
-    solana_vote_interface::state::VoteStateV3 as VoteState,
 };
 
 /// After calling `validate_delegated_amount()`, this struct contains calculated
@@ -21,12 +20,12 @@ pub(crate) struct ValidatedDelegatedInfo {
 pub(crate) fn new_stake(
     stake: u64,
     voter_pubkey: &Pubkey,
-    vote_state: &VoteState,
+    credits_observed: u64,
     activation_epoch: Epoch,
 ) -> Stake {
     Stake {
         delegation: Delegation::new(voter_pubkey, stake, activation_epoch),
-        credits_observed: vote_state.credits(),
+        credits_observed,
     }
 }
 
@@ -34,7 +33,7 @@ pub(crate) fn redelegate_stake(
     stake: &mut Stake,
     stake_lamports: u64,
     voter_pubkey: &Pubkey,
-    vote_state: &VoteState,
+    credits_observed: u64,
     epoch: Epoch,
     stake_history: &StakeHistorySysvar,
 ) -> Result<(), ProgramError> {
@@ -66,7 +65,7 @@ pub(crate) fn redelegate_stake(
     stake.delegation.activation_epoch = epoch;
     stake.delegation.deactivation_epoch = u64::MAX;
     stake.delegation.voter_pubkey = *voter_pubkey;
-    stake.credits_observed = vote_state.credits();
+    stake.credits_observed = credits_observed;
     Ok(())
 }
 
