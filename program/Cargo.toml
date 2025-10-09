@@ -48,7 +48,6 @@ solana-signer = "3.0.0"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-sysvar-id = "3.0.0"
 solana-transaction = "3.0.0"
-solana-vote-program = "3.0.0"
 test-case = "3.3.1"
 
 [lib]
