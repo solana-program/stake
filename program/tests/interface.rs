@@ -1025,7 +1025,7 @@ fn test_fail_new_interface_drop_last() {
     let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
-        // all instructions that use `consume_next_normal_account()`
+        // all instructions that use `consume_next_account()`
         match declaration {
             StakeInterface::DelegateStake { .. }
             | StakeInterface::Split { .. }

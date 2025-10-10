@@ -51,7 +51,7 @@ fn next_account_to_use<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
 // thus if we do *not* see sysvar/config, we *can* assert authority, knowing that there being *no* account is always an error
 // doing it this way is non-breaking, and we can consider breaking the old interface after people switch over
 // we return () to prevent refactors where the caller uses the result, because it might not be the desired account
-fn consume_next_normal_account<T, I: Iterator<Item = T>>(iter: &mut I) -> Result<(), ProgramError> {
+fn consume_next_account<T, I: Iterator<Item = T>>(iter: &mut I) -> Result<(), ProgramError> {
     iter.next()
         .map(|_| ())
         .ok_or(ProgramError::NotEnoughAccountKeys)
@@ -337,7 +337,7 @@ fn move_stake_or_lamports_shared_checks(
 // error codes and log output may differ
 //
 // the new interface is designed to be more restrictive, asserting the presence of accounts which were technically optional
-// when we remove the old interface, `consume_next_normal_account()` calls can become `next_account_to_use()`
+// when we remove the old interface, `consume_next_account()` calls can become `next_account_to_use()`
 // this differs from `.ok()` account retrievals (lockup custodians) which are optional by design
 //
 // the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
@@ -402,7 +402,7 @@ impl Processor {
         let vote_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
+        let _stake_authority_info = consume_next_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -464,7 +464,7 @@ impl Processor {
         let destination_stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
+        let _stake_authority_info = consume_next_account(account_info_iter)?;
 
         let clock = Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -731,7 +731,7 @@ impl Processor {
         let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
+        let _stake_authority_info = consume_next_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
 
@@ -762,8 +762,7 @@ impl Processor {
         let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _old_withdraw_or_lockup_authority_info =
-            consume_next_normal_account(account_info_iter)?;
+        let _old_withdraw_or_lockup_authority_info = consume_next_account(account_info_iter)?;
 
         let clock = Clock::get()?;
 
@@ -782,7 +781,7 @@ impl Processor {
         let source_stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
+        let _stake_authority_info = consume_next_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
