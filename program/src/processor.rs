@@ -47,16 +47,14 @@ fn next_account_to_use<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
 }
 
 // this unusual function exists to enforce stricter constraints on the new interface without affecting the old
-// we call this at points where the old interface has some sysvar/config accounts
-// followed by an authority which it did not enforece the presence of
-// thus if we do *not* see a sysvar/config, we *can* enforce it, knowing that there being *no* account is always an error
+// we call this where the old interface expected sysvar/config followed by an authority it did not assert must be present
+// thus if we do *not* see sysvar/config, we *can* assert authority, knowing that there being *no* account is always an error
 // doing it this way is non-breaking, and we can consider breaking the old interface after people switch over
 // we return () to prevent refactors where the caller uses the result, because it might not be the desired account
 fn consume_next_normal_account<T, I: Iterator<Item = T>>(iter: &mut I) -> Result<(), ProgramError> {
-    match iter.next() {
-        Some(_) => Ok(()),
-        None => Err(ProgramError::NotEnoughAccountKeys),
-    }
+    iter.next()
+        .map(|_| ())
+        .ok_or(ProgramError::NotEnoughAccountKeys)
 }
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4>, ProgramError> {
