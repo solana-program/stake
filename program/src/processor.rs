@@ -33,7 +33,9 @@ fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
         || pubkey == solana_sdk_ids::stake::config::id()
 }
 
-fn next_non_sysvar_account<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
+// `next_account_info()` that skips sysvars and stake config
+// returns an error if it reaches the end of accounts without a match
+fn next_account_to_use<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
     iter: &mut I,
 ) -> Result<I::Item, ProgramError> {
     loop {
@@ -41,6 +43,19 @@ fn next_non_sysvar_account<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
         if !is_stake_program_sysvar_or_config(*account_info.key) {
             return Ok(account_info);
         }
+    }
+}
+
+// this unusual function exists to enforce stricter constraints on the new interface without affecting the old
+// we call this at points where the old interface has some sysvar/config accounts
+// followed by an authority which it did not enforece the presence of
+// thus if we do *not* see a sysvar/config, we *can* enforce it, knowing that there being *no* account is always an error
+// doing it this way is non-breaking, and we can consider breaking the old interface after people switch over
+// we return () to prevent refactors where the caller uses the result, because it might not be the desired account
+fn consume_next_normal_account<T, I: Iterator<Item = T>>(iter: &mut I) -> Result<(), ProgramError> {
+    match iter.next() {
+        Some(_) => Ok(()),
+        None => Err(ProgramError::NotEnoughAccountKeys),
     }
 }
 
@@ -323,10 +338,8 @@ fn move_stake_or_lamports_shared_checks(
 // * for successful transactions, all account state transitions are identical
 // error codes and log output may differ
 //
-// now that the switchover is complete, there may be opportunities to tighten up the interface
-// particularly by asserting that some "optional" accounts must exist
-// we should avoid breaking odd workflows (such as self-signed stake accounts) but may consider breaking pathological flows
-// commented-out `next_non_sysvar_account()` calls mark accounts that should typically be included
+// the new interface is designed to be more restrictive, asserting the presence of accounts which were technically optional
+// when we remove the old interface, `consume_next_normal_account()` calls can become `next_account_to_use()`
 // this differs from `.ok()` account retrievals (lockup custodians) which are optional by design
 //
 // the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
@@ -343,7 +356,7 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // `get_stake_state()` is called unconditionally, which checks owner
         do_initialize(stake_account_info, authorized, lockup)?;
@@ -360,11 +373,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let _stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let _stake_or_withdraw_authority_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        let option_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         let custodian = option_lockup_authority_info
             .filter(|a| a.is_signer)
@@ -387,11 +400,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let vote_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let vote_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
+        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -449,11 +462,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let source_stake_account_info = next_account_to_use(account_info_iter)?;
+        let destination_stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
+        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
 
         let clock = Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -617,12 +630,12 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let destination_info = next_non_sysvar_account(account_info_iter)?;
-        let withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let source_stake_account_info = next_account_to_use(account_info_iter)?;
+        let destination_info = next_account_to_use(account_info_iter)?;
+        let withdraw_authority_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        let option_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -717,10 +730,10 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
+        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
 
@@ -748,10 +761,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // let _old_withdraw_or_lockup_authority_info = next_non_sysvar_account(account_info_iter);
+        let _old_withdraw_or_lockup_authority_info =
+            consume_next_normal_account(account_info_iter)?;
 
         let clock = Clock::get()?;
 
@@ -766,11 +780,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let destination_stake_account_info = next_account_to_use(account_info_iter)?;
+        let source_stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // let _stake_authority_info = next_non_sysvar_account(account_info_iter);
+        let _stake_authority_info = consume_next_normal_account(account_info_iter)?;
 
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
@@ -827,11 +841,11 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let stake_or_withdraw_authority_base_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let stake_or_withdraw_authority_base_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        let option_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         let (mut signers, custodian) = collect_signers_checked(None, option_lockup_authority_info)?;
 
@@ -859,9 +873,9 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
-        let withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let stake_authority_info = next_account_to_use(account_info_iter)?;
+        let withdraw_authority_info = next_account_to_use(account_info_iter)?;
 
         if !withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -886,12 +900,12 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let _old_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let _old_stake_or_withdraw_authority_info = next_account_to_use(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        let option_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         if !new_stake_or_withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -920,12 +934,12 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let old_stake_or_withdraw_authority_base_info = next_non_sysvar_account(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let old_stake_or_withdraw_authority_base_info = next_account_to_use(account_info_iter)?;
+        let new_stake_or_withdraw_authority_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let option_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        let option_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         let (mut signers, custodian) = collect_signers_checked(
             Some(new_stake_or_withdraw_authority_info),
@@ -960,11 +974,14 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _old_withdraw_or_lockup_authority_info = next_non_sysvar_account(account_info_iter);
-        let option_new_lockup_authority_info = next_non_sysvar_account(account_info_iter).ok();
+        // NOTE we cannot unconditionally consume the old authority without a breaking change
+        // it was technically not required by native stake if removing a lockup
+        // but if this interaction pattern is not used on mainnet, we can add `?`
+        let _old_withdraw_or_lockup_authority_info = next_account_to_use(account_info_iter);
+        let option_new_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
         let clock = Clock::get()?;
 
@@ -992,9 +1009,9 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let delinquent_vote_account_info = next_non_sysvar_account(account_info_iter)?;
-        let reference_vote_account_info = next_non_sysvar_account(account_info_iter)?;
+        let stake_account_info = next_account_to_use(account_info_iter)?;
+        let delinquent_vote_account_info = next_account_to_use(account_info_iter)?;
+        let reference_vote_account_info = next_account_to_use(account_info_iter)?;
 
         let clock = Clock::get()?;
 
@@ -1037,9 +1054,9 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let source_stake_account_info = next_account_to_use(account_info_iter)?;
+        let destination_stake_account_info = next_account_to_use(account_info_iter)?;
+        let stake_authority_info = next_account_to_use(account_info_iter)?;
 
         let (source_merge_kind, destination_merge_kind) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,
@@ -1174,9 +1191,9 @@ impl Processor {
         let account_info_iter = &mut accounts.iter();
 
         // required accounts
-        let source_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let destination_stake_account_info = next_non_sysvar_account(account_info_iter)?;
-        let stake_authority_info = next_non_sysvar_account(account_info_iter)?;
+        let source_stake_account_info = next_account_to_use(account_info_iter)?;
+        let destination_stake_account_info = next_account_to_use(account_info_iter)?;
+        let stake_authority_info = next_account_to_use(account_info_iter)?;
 
         let (source_merge_kind, _) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,
