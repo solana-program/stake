@@ -51,10 +51,15 @@ fn next_account_to_use<'a, 'b, I: Iterator<Item = &'a AccountInfo<'b>>>(
 // thus if we do *not* see sysvar/config, we *can* assert authority, knowing that there being *no* account is always an error
 // doing it this way is non-breaking, and we can consider breaking the old interface after people switch over
 // we return () to prevent refactors where the caller uses the result, because it might not be the desired account
-fn consume_next_account<T, I: Iterator<Item = T>>(iter: &mut I) -> Result<(), ProgramError> {
-    iter.next()
-        .map(|_| ())
-        .ok_or(ProgramError::NotEnoughAccountKeys)
+fn consume_next_account<'a, 'b: 'a, I: Iterator<Item = &'a AccountInfo<'b>>>(
+    iter: &mut I,
+) -> Result<(), ProgramError> {
+    let account_info = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    if is_stake_program_sysvar_or_config(*account_info.key) || account_info.is_signer {
+        Ok(())
+    } else {
+        Err(ProgramError::NotEnoughAccountKeys)
+    }
 }
 
 fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4>, ProgramError> {
