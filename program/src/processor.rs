@@ -464,7 +464,10 @@ impl Processor {
         let destination_stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _stake_authority_info = consume_next_account(account_info_iter)?;
+        // NOTE we cannot consume this account without a breaking change
+        // its presence was never enforced and Split never accepted sysvars as args
+        // we may decide to enforce this as a breaking change if the pattern is not used on mainnet
+        // let _stake_authority_info = next_account_to_use(account_info_iter)?;
 
         let clock = Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
