@@ -25,7 +25,7 @@ use {
     solana_sysvar_id::SysvarId,
     solana_vote_interface::{
         program as vote_program,
-        state::{VoteStateV3 as VoteState, VoteStateVersions},
+        state::{VoteStateV4, VoteStateVersions},
     },
     std::{
         collections::{HashMap, HashSet},
@@ -163,8 +163,8 @@ impl Env {
         base_accounts.insert(PAYER, payer_account);
 
         // create two vote accounts
-        let vote_rent_exemption = Rent::default().minimum_balance(VoteState::size_of());
-        let vote_state_versions = VoteStateVersions::new_v3(VoteState::default());
+        let vote_rent_exemption = Rent::default().minimum_balance(VoteStateV4::size_of());
+        let vote_state_versions = VoteStateVersions::new_v4(VoteStateV4::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
         let vote_account = Account::create(
             vote_rent_exemption,

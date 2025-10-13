@@ -25,7 +25,7 @@ solana-pubkey = "3.0.0"
 solana-rent = "3.0.0"
 solana-stake-interface = { version = "2", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "3.0.0"
-solana-vote-interface = { version = "4.0.1", features = ["bincode"] }
+solana-vote-interface = { version = "4.0.3", features = ["bincode"] }
 
 [dev-dependencies]
 agave-feature-set = "3.0.0"
