@@ -23,7 +23,7 @@ use {
     solana_transaction::{Signers, Transaction, TransactionError},
     solana_vote_interface::{
         instruction as vote_instruction,
-        state::{VoteInit, VoteStateV3 as VoteState},
+        state::{VoteInit, VoteStateV4},
     },
     test_case::{test_case, test_matrix},
 };
@@ -93,7 +93,7 @@ pub async fn create_vote(
     vote_account: &Keypair,
 ) {
     let rent = context.banks_client.get_rent().await.unwrap();
-    let rent_voter = rent.minimum_balance(VoteState::size_of());
+    let rent_voter = rent.minimum_balance(VoteStateV4::size_of());
 
     let mut instructions = vec![system_instruction::create_account(
         &context.payer.pubkey(),
@@ -113,7 +113,7 @@ pub async fn create_vote(
         },
         rent_voter,
         vote_instruction::CreateVoteAccountConfig {
-            space: VoteState::size_of() as u64,
+            space: VoteStateV4::size_of() as u64,
             ..Default::default()
         },
     ));

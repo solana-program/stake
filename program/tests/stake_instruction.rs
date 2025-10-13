@@ -36,8 +36,9 @@ use {
     solana_stake_program::{get_minimum_delegation, id},
     solana_sysvar::{clock, epoch_rewards, epoch_schedule, rent, rewards},
     solana_sysvar_id::SysvarId,
-    solana_vote_interface::state::{VoteStateV3, VoteStateVersions},
+    solana_vote_interface::state::{VoteStateV4, VoteStateVersions, MAX_EPOCH_CREDITS_HISTORY},
     std::{collections::HashSet, str::FromStr},
+    test_case::test_case,
 };
 
 fn mollusk_bpf() -> Mollusk {
@@ -57,9 +58,9 @@ fn create_default_stake_account() -> AccountSharedData {
 }
 
 fn create_default_vote_account() -> AccountSharedData {
-    let space = VoteStateV3::size_of();
+    let space = VoteStateV4::size_of();
     let lamports = Rent::default().minimum_balance(space);
-    let state = VoteStateVersions::new_v3(VoteStateV3::default());
+    let state = VoteStateVersions::new_v4(VoteStateV4::default());
     AccountSharedData::new_data_with_space(lamports, &state, space, &solana_sdk_ids::vote::id())
         .unwrap()
 }
@@ -182,7 +183,7 @@ fn process_instruction_as_one_arg(
 fn new_stake(
     stake: u64,
     voter_pubkey: &Pubkey,
-    vote_state: &VoteStateV3,
+    vote_state: &VoteStateV4,
     activation_epoch: Epoch,
 ) -> Stake {
     Stake {
@@ -287,6 +288,39 @@ fn create_stake_history_from_delegations(
     }
 
     stake_history
+}
+
+// Reimplemented from vote program.
+fn increment_credits(vote_state: &mut VoteStateV4, epoch: Epoch, credits: u64) {
+    // increment credits, record by epoch
+
+    // never seen a credit
+    if vote_state.epoch_credits.is_empty() {
+        vote_state.epoch_credits.push((epoch, 0, 0));
+    } else if epoch != vote_state.epoch_credits.last().unwrap().0 {
+        let (_, credits, prev_credits) = *vote_state.epoch_credits.last().unwrap();
+
+        if credits != prev_credits {
+            // if credits were earned previous epoch
+            // append entry at end of list for the new epoch
+            vote_state.epoch_credits.push((epoch, credits, credits));
+        } else {
+            // else just move the current epoch
+            vote_state.epoch_credits.last_mut().unwrap().0 = epoch;
+        }
+
+        // Remove too old epoch_credits
+        if vote_state.epoch_credits.len() > MAX_EPOCH_CREDITS_HISTORY {
+            vote_state.epoch_credits.remove(0);
+        }
+    }
+
+    vote_state.epoch_credits.last_mut().unwrap().1 = vote_state
+        .epoch_credits
+        .last()
+        .unwrap()
+        .1
+        .saturating_add(credits);
 }
 
 mod config {
@@ -1811,10 +1845,10 @@ fn test_authorize_delegated_stake() {
 fn test_stake_delegate() {
     let mollusk = mollusk_bpf();
 
-    let mut vote_state = VoteStateV3::default();
+    let mut vote_state = VoteStateV4::default();
     for _ in 0..1000 {
         // This test only cares about the credits.
-        vote_state.increment_credits(/* epoch */ 0, 1);
+        increment_credits(&mut vote_state, /* epoch */ 0, 1);
     }
     let vote_state_credits = vote_state.credits();
     let vote_address = solana_pubkey::new_rand();
@@ -1822,10 +1856,10 @@ fn test_stake_delegate() {
     let mut vote_account = create_default_vote_account();
     let mut vote_account_2 = create_default_vote_account();
     vote_account
-        .set_state(&VoteStateVersions::new_v3(vote_state.clone()))
+        .set_state(&VoteStateVersions::new_v4(vote_state.clone()))
         .unwrap();
     vote_account_2
-        .set_state(&VoteStateVersions::new_v3(vote_state))
+        .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
@@ -6615,7 +6649,7 @@ fn test_deactivate_delinquent() {
         new_stake(
             1, /* stake */
             &vote_address,
-            &VoteStateV3::default(),
+            &VoteStateV4::default(),
             1, /* activation_epoch */
         ),
         StakeFlags::empty(),
@@ -6631,16 +6665,16 @@ fn test_deactivate_delinquent() {
 
     let mut vote_account = AccountSharedData::new_data_with_space(
         1, /* lamports */
-        &VoteStateVersions::new_v3(VoteStateV3::default()),
-        VoteStateV3::size_of(),
+        &VoteStateVersions::new_v4(VoteStateV4::default()),
+        VoteStateV4::size_of(),
         &solana_sdk_ids::vote::id(),
     )
     .unwrap();
 
     let mut reference_vote_account = AccountSharedData::new_data_with_space(
         1, /* lamports */
-        &VoteStateVersions::new_v3(VoteStateV3::default()),
-        VoteStateV3::size_of(),
+        &VoteStateVersions::new_v4(VoteStateV4::default()),
+        VoteStateV4::size_of(),
         &solana_sdk_ids::vote::id(),
     )
     .unwrap();
@@ -6705,12 +6739,12 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has not consistently voted for at least
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will fail
-    let mut reference_vote_state = VoteStateV3::default();
+    let mut reference_vote_state = VoteStateV4::default();
     for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
-        reference_vote_state.increment_credits(epoch as Epoch, 1);
+        increment_credits(&mut reference_vote_state, epoch as Epoch, 1);
     }
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     process_instruction_deactivate_delinquent(
@@ -6724,9 +6758,9 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has not consistently voted for the last
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will fail
-    let mut reference_vote_state = VoteStateV3::default();
+    let mut reference_vote_state = VoteStateV4::default();
     for epoch in 0..=current_epoch {
-        reference_vote_state.increment_credits(epoch, 1);
+        increment_credits(&mut reference_vote_state, epoch, 1);
     }
     assert_eq!(
         reference_vote_state.epoch_credits[current_epoch as usize - 2].0,
@@ -6740,7 +6774,7 @@ fn test_deactivate_delinquent() {
         current_epoch - 1
     );
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     process_instruction_deactivate_delinquent(
@@ -6753,12 +6787,12 @@ fn test_deactivate_delinquent() {
 
     // `reference_vote_account` has consistently voted and `vote_account` has never voted.
     // Instruction will succeed
-    let mut reference_vote_state = VoteStateV3::default();
+    let mut reference_vote_state = VoteStateV4::default();
     for epoch in 0..=current_epoch {
-        reference_vote_state.increment_credits(epoch, 1);
+        increment_credits(&mut reference_vote_state, epoch, 1);
     }
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v3(reference_vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
@@ -6781,12 +6815,12 @@ fn test_deactivate_delinquent() {
     // last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`.
     // Instruction will succeed
 
-    let mut vote_state = VoteStateV3::default();
+    let mut vote_state = VoteStateV4::default();
     for epoch in 0..MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION / 2 {
-        vote_state.increment_credits(epoch as Epoch, 1);
+        increment_credits(&mut vote_state, epoch as Epoch, 1);
     }
     vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
@@ -6818,7 +6852,7 @@ fn test_deactivate_delinquent() {
             new_stake(
                 1, /* stake */
                 &unrelated_vote_address,
-                &VoteStateV3::default(),
+                &VoteStateV4::default(),
                 1, /* activation_epoch */
             ),
             StakeFlags::empty(),
@@ -6836,13 +6870,14 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has consistently voted and `vote_account` voted once
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` ago.
     // Instruction will succeed
-    let mut vote_state = VoteStateV3::default();
-    vote_state.increment_credits(
+    let mut vote_state = VoteStateV4::default();
+    increment_credits(
+        &mut vote_state,
         current_epoch - MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION as Epoch,
         1,
     );
     vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
@@ -6855,13 +6890,14 @@ fn test_deactivate_delinquent() {
     // `reference_vote_account` has consistently voted and `vote_account` voted once
     // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` - 1 epochs ago
     // Instruction will fail
-    let mut vote_state = VoteStateV3::default();
-    vote_state.increment_credits(
+    let mut vote_state = VoteStateV4::default();
+    increment_credits(
+        &mut vote_state,
         current_epoch - (MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION - 1) as Epoch,
         1,
     );
     vote_account
-        .serialize_data(&VoteStateVersions::new_v3(vote_state))
+        .serialize_data(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
@@ -7058,4 +7094,290 @@ fn test_stake_process_instruction_with_epoch_rewards_active() {
 
     // Only GetMinimumDelegation should not return StakeError::EpochRewardsActive
     process_instruction_as_one_arg(&mollusk, &instruction::get_minimum_delegation(), Ok(()));
+}
+
+// The next four tests deal with deserializing vote state from all versions.
+//
+// Only the `Delegate` and `DeactivateDelinquent` instructions will deserialize
+// a vote account's state, so we need only test those two instructions.
+
+#[derive(Debug, Clone, Copy)]
+enum VoteStateVersion {
+    V0_23_5,
+    V1_14_11,
+    V3,
+    V4,
+}
+
+impl VoteStateVersion {
+    fn default_vote_state(&self) -> VoteStateVersions {
+        match self {
+            Self::V0_23_5 => VoteStateVersions::V0_23_5(Box::default()),
+            Self::V1_14_11 => VoteStateVersions::V1_14_11(Box::default()),
+            Self::V3 => VoteStateVersions::V3(Box::default()),
+            Self::V4 => VoteStateVersions::V4(Box::default()),
+        }
+    }
+}
+
+fn setup_delegate_test_with_vote_account(
+    vote_account: AccountSharedData,
+) -> (Mollusk, Vec<AccountMeta>, Vec<(Pubkey, AccountSharedData)>) {
+    let mollusk = mollusk_bpf();
+
+    let vote_address = Pubkey::new_unique();
+    let stake_address = Pubkey::new_unique();
+
+    let minimum_delegation = crate::get_minimum_delegation();
+    let stake_account = AccountSharedData::new_data_with_space(
+        minimum_delegation,
+        &StakeStateV2::Initialized(Meta {
+            authorized: Authorized {
+                staker: stake_address,
+                withdrawer: stake_address,
+            },
+            ..Meta::default()
+        }),
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+
+    let clock = Clock {
+        epoch: 1,
+        ..Clock::default()
+    };
+
+    #[allow(deprecated)]
+    let transaction_accounts = vec![
+        (stake_address, stake_account),
+        (vote_address, vote_account),
+        (clock::id(), create_account_shared_data_for_test(&clock)),
+        (StakeHistory::id(), create_empty_stake_history_for_test()),
+        (
+            stake_config::id(),
+            config::create_account(0, &stake_config::Config::default()),
+        ),
+    ];
+
+    #[allow(deprecated)]
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: StakeHistory::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_config::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    (mollusk, instruction_accounts, transaction_accounts)
+}
+
+fn setup_deactivate_delinquent_test_with_vote_account(
+    vote_account: AccountSharedData,
+) -> (Mollusk, Vec<AccountMeta>, Vec<(Pubkey, AccountSharedData)>) {
+    let mollusk = mollusk_bpf();
+
+    let reference_vote_address = Pubkey::new_unique();
+    let vote_address = Pubkey::new_unique();
+    let stake_address = Pubkey::new_unique();
+
+    let initial_stake_state = StakeStateV2::Stake(
+        Meta::default(),
+        new_stake(
+            1, /* stake */
+            &vote_address,
+            &VoteStateV4::default(),
+            1, /* activation_epoch */
+        ),
+        StakeFlags::empty(),
+    );
+
+    let stake_account = AccountSharedData::new_data_with_space(
+        1, /* lamports */
+        &initial_stake_state,
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+
+    // Create reference vote account with sufficient credits
+    let mut reference_vote_state = VoteStateV4::default();
+    let current_epoch = 20;
+    for epoch in 0..=current_epoch {
+        increment_credits(&mut reference_vote_state, epoch, 1);
+    }
+    let reference_vote_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(VoteStateV4::size_of()),
+        &VoteStateVersions::new_v4(reference_vote_state),
+        VoteStateV4::size_of(),
+        &solana_sdk_ids::vote::id(),
+    )
+    .unwrap();
+
+    let transaction_accounts = vec![
+        (stake_address, stake_account),
+        (vote_address, vote_account),
+        (reference_vote_address, reference_vote_account),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock {
+                epoch: current_epoch,
+                ..Clock::default()
+            }),
+        ),
+    ];
+
+    let instruction_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: reference_vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+
+    (mollusk, instruction_accounts, transaction_accounts)
+}
+
+#[test]
+fn test_delegate_incorrect_vote_owner() {
+    // Create vote account with incorrect owner.
+    let wrong_owner = Pubkey::new_unique();
+    let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
+    let vote_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(VoteStateV4::size_of()),
+        &vote_state,
+        VoteStateV4::size_of(),
+        &wrong_owner,
+    )
+    .unwrap();
+
+    let (mollusk, instruction_accounts, transaction_accounts) =
+        setup_delegate_test_with_vote_account(vote_account);
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::IncorrectProgramId), // <-- Always throws
+    );
+}
+
+// Just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
+// deserialize with `InvalidAccountData`. In other words, the behavior is
+// unchanged.
+#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
+#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
+#[test_case(VoteStateVersion::V3, Ok(()))]
+#[test_case(VoteStateVersion::V4, Ok(()))]
+fn test_delegate_deserialize_vote_state(
+    vote_state_version: VoteStateVersion,
+    expected_result: Result<(), ProgramError>,
+) {
+    let vote_state = vote_state_version.default_vote_state();
+    let vote_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(VoteStateV4::size_of()),
+        &vote_state,
+        VoteStateV4::size_of(),
+        &solana_sdk_ids::vote::id(),
+    )
+    .unwrap();
+
+    let (mollusk, instruction_accounts, transaction_accounts) =
+        setup_delegate_test_with_vote_account(vote_account);
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        expected_result,
+    );
+}
+
+#[test]
+fn test_deactivate_delinquent_incorrect_vote_owner() {
+    // Create vote account with incorrect owner.
+    let wrong_owner = Pubkey::new_unique();
+    let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
+    let vote_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(VoteStateV4::size_of()),
+        &vote_state,
+        VoteStateV4::size_of(),
+        &wrong_owner,
+    )
+    .unwrap();
+
+    let (mollusk, instruction_accounts, transaction_accounts) =
+        setup_deactivate_delinquent_test_with_vote_account(vote_account);
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Err(ProgramError::IncorrectProgramId), // <-- Always throws
+    );
+}
+
+// Again, just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
+// deserialize with `InvalidAccountData`. Again, the behavior is unchanged.
+#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
+#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
+#[test_case(VoteStateVersion::V3, Ok(()))]
+#[test_case(VoteStateVersion::V4, Ok(()))]
+fn test_deactivate_delinquent_deserialize_vote_state(
+    vote_state_version: VoteStateVersion,
+    expected_result: Result<(), ProgramError>,
+) {
+    // Create delinquent vote account with the specified version
+    let vote_state = vote_state_version.default_vote_state();
+    let vote_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(VoteStateV4::size_of()),
+        &vote_state,
+        VoteStateV4::size_of(),
+        &solana_sdk_ids::vote::id(),
+    )
+    .unwrap();
+
+    let (mollusk, instruction_accounts, transaction_accounts) =
+        setup_deactivate_delinquent_test_with_vote_account(vote_account);
+
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        expected_result,
+    );
 }

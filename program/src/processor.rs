@@ -19,19 +19,23 @@ use {
         tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
     },
     solana_sysvar::{epoch_rewards::EpochRewards, Sysvar, SysvarSerialize},
-    solana_vote_interface::{program as solana_vote_program, state::VoteStateV3 as VoteState},
+    solana_vote_interface::{program as solana_vote_program, state::VoteStateV4},
     std::{collections::HashSet, mem::MaybeUninit},
 };
 
-fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteState>, ProgramError> {
+fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4>, ProgramError> {
     if *vote_account_info.owner != solana_vote_program::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
 
     let mut vote_state = Box::new(MaybeUninit::uninit());
-    VoteState::deserialize_into_uninit(&vote_account_info.try_borrow_data()?, vote_state.as_mut())
-        .map_err(|_| ProgramError::InvalidAccountData)?;
-    let vote_state = unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteState) };
+    VoteStateV4::deserialize_into_uninit(
+        &vote_account_info.try_borrow_data()?,
+        vote_state.as_mut(),
+        vote_account_info.key,
+    )
+    .map_err(|_| ProgramError::InvalidAccountData)?;
+    let vote_state = unsafe { Box::from_raw(Box::into_raw(vote_state) as *mut VoteStateV4) };
 
     Ok(vote_state)
 }
