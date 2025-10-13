@@ -329,26 +329,27 @@ fn move_stake_or_lamports_shared_checks(
 }
 
 // NOTE our usage of the accounts iter is idiosyncratic, in imitation of the native stake program
-// native stake typically accumulates all signers from the accounts array indiscriminately
-// each instruction processor also asserts a required number of instruction accounts
-// but this is extremely ad hoc, essentially allowing any account to act as a signing authority
-// when lengths are asserted in setup, accounts are retrieved via hardcoded index from InstructionContext
-// but after control is passed to main processing functions, they are pulled from the TransactionContext
+// native stake typically, but not always, accumulated signers from the accounts array indiscriminately
+// this was done extremely ad hoc, essentially allowing any account to act as a signing authority
+// instruction processors also asserted a required number of instruction accounts, often fewer than the actual number
+// when lengths were asserted in setup, accounts were retrieved via hardcoded index from InstructionContext
+// but after control was passed to main processing functions, they were pulled from the TransactionContext
 //
 // when porting to bpf, we reimplemented this behavior exactly, such that both programs would be consensus compatible:
 // * all transactions that would fail on one program also fail on the other
 // * all transactions that would succeed on one program also succeed on the other
 // * for successful transactions, all account state transitions are identical
-// error codes and log output may differ
-//
-// the new interface is designed to be more restrictive, asserting the presence of accounts which were technically optional
-// when we remove the old interface, `consume_next_account()` calls can become `next_account_to_use()`
-// this differs from `.ok()` account retrievals (lockup custodians) which are optional by design
+// error codes and log output sometimes differed
 //
 // the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
 // this was done for backwards compatibility but the end result was highly inconsistent
 // now, we skip all sysvar accounts previously required (clock, rent, stake history) and retrieve them via syscall
 // we also skip the stake config account, which was removed from native stake but is still included in instruction builders
+//
+// the sysvar-free interface is more restrictive, requiring positional authorities which were previously optional
+// if or when we remove the old interface, `consume_next_account()` calls can become `next_account_to_use()`
+// these differ from `.ok()` account retrievals (lockup custodians) which will always be optional by design
+// eventually we may be able to move away from signer globbing to a standard fully positional interface
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -470,7 +471,7 @@ impl Processor {
 
         // other accounts
         // NOTE we cannot consume this account without a breaking change
-        // its presence was never enforced and Split never accepted sysvars as args
+        // its presence was never enforced and `Split` never accepted sysvars as args
         // we may decide to enforce this as a breaking change if the pattern is not used on mainnet
         // let _stake_authority_info = next_account_to_use(account_info_iter)?;
 
@@ -770,7 +771,10 @@ impl Processor {
         let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        let _old_withdraw_or_lockup_authority_info = consume_next_account(account_info_iter)?;
+        // NOTE we cannot consume this account without a breaking change
+        // its presence was never enforced and `SetLockup` never accepted sysvars as args
+        // we may decide to enforce this as a breaking change if the pattern is not used on mainnet
+        // let _old_withdraw_or_lockup_authority_info = next_account_to_use(account_info_iter)?;
 
         let clock = Clock::get()?;
 
@@ -982,9 +986,9 @@ impl Processor {
         let stake_account_info = next_account_to_use(account_info_iter)?;
 
         // other accounts
-        // NOTE we cannot unconditionally consume the old authority without a breaking change
-        // it was technically not required by native stake if removing a lockup
-        // but if this interaction pattern is not used on mainnet, we can add `?`
+        // NOTE we cannot consume this account without a breaking change
+        // its presence was never enforced and `SetLockupChecked` never accepted sysvars as args
+        // we may decide to enforce this as a breaking change if the pattern is not used on mainnet
         let _old_withdraw_or_lockup_authority_info = next_account_to_use(account_info_iter);
         let option_new_lockup_authority_info = next_account_to_use(account_info_iter).ok();
 
@@ -1314,8 +1318,6 @@ impl Processor {
             }
             #[allow(deprecated)]
             StakeInstruction::Redelegate => Err(ProgramError::InvalidInstructionData),
-            // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is
-            // activated
             StakeInstruction::MoveStake(lamports) => {
                 msg!("Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)
