@@ -1030,7 +1030,6 @@ fn test_fail_new_interface_drop_last() {
             StakeInterface::DelegateStake { .. }
             | StakeInterface::Split { .. }
             | StakeInterface::Merge { .. }
-            | StakeInterface::SetLockup { checked: false, .. }
             | StakeInterface::Deactivate { .. } => (),
             _ => continue,
         }
