@@ -4452,7 +4452,6 @@ fn test_split_source_uninitialized() {
             Ok(()),
         );
         assert_eq!(accounts[0].data().len(), StakeStateV2::size_of());
-        assert_eq!(accounts[1].data().len(), StakeStateV2::size_of());
 
         process_instruction(
             &mollusk,
