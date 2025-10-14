@@ -7,7 +7,7 @@ A generated JavaScript library for the Stake program.
 To build and test your JavaScript client from the root of the repository, you may use the following command.
 
 ```sh
-make test-js
+make test-js-clients-js
 ```
 
 This will start a new local validator, if one is not already running, and run the tests for your JavaScript client.
@@ -31,6 +31,6 @@ pnpm test
 You may also use the following `make` targets from the root of the repository to lint and format your JavaScript client:
 
 ```sh
-make lint-js
-make format-check-js
+make lint-js-clients-js
+make format-check-js-clients-js
 ```

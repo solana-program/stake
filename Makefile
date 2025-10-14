@@ -21,7 +21,10 @@ cargo-nightly:
 	cargo $(nightly) $(ARGS)
 
 audit:
-	@echo "TODO: Implement cargo audit and make remediations"
+	cargo audit \
+		--ignore RUSTSEC-2022-0093 \
+		--ignore RUSTSEC-2024-0421 \
+		--ignore RUSTSEC-2024-0344 $(ARGS)
 
 spellcheck:
 	@echo "TODO: Implement cargo spellcheck and make fixes"
@@ -58,8 +61,14 @@ test-js-%:
 	cd $(call make-path,$*) && pnpm install && pnpm build && pnpm test $(ARGS)
 	make stop-test-validator
 
+# TODO program_test is too unreliable to run in ci
+# the tests are fine, but the underlying transport panics frequently, even with `--test-threads 1`
+# we exclude these tests for now because mollusk tests at least provide decent ci coverage
+# in the future if we cannot debug the cause we should move program_test to a different execution engine
+test-program: ARGS = --features bpf-entrypoint -- --skip program_test
+
 test-%:
-	SBF_OUT_DIR=$(PWD)/target/deploy cargo $(nightly) test --manifest-path program/Cargo.toml --features bpf-entrypoint $(ARGS)
+	SBF_OUT_DIR=$(PWD)/target/deploy cargo $(nightly) test --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
 
 lint-js-%:
 	cd $(call make-path,$*) && pnpm install && pnpm lint $(ARGS)
