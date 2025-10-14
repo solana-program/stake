@@ -584,7 +584,9 @@ impl Processor {
         }
 
         // Truncate state upon zero balance
-        if split_lamports == source_lamport_balance {
+        if source_stake_account_info.key != destination_stake_account_info.key
+            && split_lamports == source_lamport_balance
+        {
             source_stake_account_info.resize(0)?;
         }
 
@@ -612,6 +614,10 @@ impl Processor {
 
         let clock = &Clock::from_account_info(clock_info)?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
+
+        if source_stake_account_info.key == destination_info.key {
+            return Err(ProgramError::InvalidArgument);
+        }
 
         // this is somewhat subtle. for Initialized and Stake, there is a real authority
         // but for Uninitialized, the source account is passed twice, and signed for

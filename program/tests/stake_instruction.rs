@@ -2509,6 +2509,17 @@ fn test_withdraw_stake() {
     );
     instruction_accounts[4].is_signer = true;
 
+    // should fail, no self-withdraws
+    instruction_accounts[1].pubkey = stake_address;
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(stake_lamports)).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InvalidArgument),
+    );
+    instruction_accounts[1].pubkey = recipient_address;
+
     // should pass, signed keyed account and uninitialized
     let accounts = process_instruction(
         &mollusk,
@@ -4432,13 +4443,16 @@ fn test_split_source_uninitialized() {
         // - when split amount is non-zero and less than the full balance
         //
         // and splitting should fail when the split amount is greater than the balance
-        process_instruction(
+        // self-splitting also must not resize the source-destination
+        let accounts = process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(stake_lamports)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
             Ok(()),
         );
+        assert_eq!(accounts[0].data().len(), StakeStateV2::size_of());
+
         process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(0)).unwrap(),
@@ -4472,6 +4486,19 @@ fn test_split_source_uninitialized() {
         Ok(()),
     );
     assert_eq!(accounts[0].lamports(), accounts[1].lamports());
+
+    // so should this
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Split(stake_lamports)).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Ok(()),
+    );
+    assert_eq!(accounts[0].lamports(), 0);
+    assert_eq!(accounts[1].lamports(), stake_lamports);
+    assert_eq!(accounts[0].data().len(), 0);
+    assert_eq!(accounts[1].data().len(), StakeStateV2::size_of());
 
     // no signers should fail
     instruction_accounts[0].is_signer = false;
