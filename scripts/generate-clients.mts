@@ -4,7 +4,7 @@ import * as c from 'codama';
 import { rootNodeFromAnchor } from '@codama/nodes-from-anchor';
 import { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
 import { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';
-import { getToolchainArgument, workingDirectory } from './utils.mjs';
+import { getToolchainArgument, workingDirectory } from './utils.mts';
 
 // Instanciate Codama from the IDL.
 const idl = JSON.parse(
