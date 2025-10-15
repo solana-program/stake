@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 program-id = "Stake11111111111111111111111111111111111111"
 
 [dependencies]
-borsh = { version = "1.5.1", features = ["derive", "unstable__schema"], optional = true }
+borsh = { version = "1.5.7", features = ["derive", "unstable__schema"], optional = true }
 num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
 serde_derive = { version = "1.0.210", optional = true }
