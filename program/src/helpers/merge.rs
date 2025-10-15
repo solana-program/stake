@@ -181,10 +181,11 @@ pub(crate) fn merge_delegation_stake_and_credits_observed(
 /// observed of the merged stake is the weighted average of the two stakes'
 /// credits observed.
 ///
-/// This is because we can derive the effective credits_observed by reversing
+/// This is because we can derive the effective `credits_observed` by reversing
 /// the staking rewards equation, _while keeping the rewards unchanged after
 /// merge (i.e. strong requirement)_, like below:
 ///
+/// ```text
 /// a(N) => account, r => rewards, s => stake, c => credits:
 /// assume:
 ///   a3 = merge(a1, a2)
@@ -197,9 +198,10 @@ pub(crate) fn merge_delegation_stake_and_credits_observed(
 ///        a3.r = a1.r + a2.r
 /// a3.c * a3.s = a1.c * a1.s + a2.c * a2.s
 ///        a3.c = (a1.c * a1.s + a2.c * a2.s) / (a1.s + a2.s)     // QED
+/// ```
 ///
 /// (For this discussion, we omitted irrelevant variables, including distance
-///  calculation against vote_account and point indirection.)
+///  calculation against `vote_account` and point indirection.)
 pub(crate) fn stake_weighted_credits_observed(
     stake: &Stake,
     absorbed_lamports: u64,

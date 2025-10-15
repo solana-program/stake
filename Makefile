@@ -27,7 +27,7 @@ audit:
 		--ignore RUSTSEC-2024-0344 $(ARGS)
 
 spellcheck:
-	@echo "TODO: Implement cargo spellcheck and make fixes"
+	cargo spellcheck --code 1 $(ARGS)
 
 clippy-%:
 	cargo $(nightly) clippy --manifest-path $(call make-path,$*)/Cargo.toml \
