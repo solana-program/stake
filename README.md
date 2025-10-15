@@ -22,20 +22,24 @@ The BPF Stake Program has received one external audit:
 
 ## Building and Verifying
 
-To build the BPF Stake Program, you must pass the `bpf-entrypoint` flag:
+To build the BPF Stake Program, you can run `cargo-build-sbf` or use the Makefile
+command:
 
-```
-cargo build-sbf --features bpf-entrypoint
+```console
+cargo build-sbf --manifest-path program/Cargo.toml
+make build-sbf-program
 ```
 
 The BPF program deployed on all clusters is built with [solana-verify](https://solana.com/developers/guides/advanced/verified-builds). It may be verified independently by comparing the output of:
 
-```solana-verify get-program-hash -um Stake11111111111111111111111111111111111111```
+```console
+solana-verify get-program-hash -um Stake11111111111111111111111111111111111111
+```
 
 with:
 
-```
-solana-verify build --library-name program -- --features bpf-entrypoint
+```console
+solana-verify build --library-name program
 solana-verify get-executable-hash target/deploy/solana_stake_program.so
 ```
 
