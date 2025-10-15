@@ -6691,7 +6691,7 @@ dependencies = [
  "solana-vote-program",
  "spl-generic-token",
  "static_assertions",
- "strum",
+ "strum 0.24.1",
  "strum_macros 0.24.3",
  "symlink",
  "tar",
@@ -7148,7 +7148,7 @@ dependencies = [
  "solana-sysvar 3.0.0",
  "solana-sysvar-id 3.0.0",
  "static_assertions",
- "strum",
+ "strum 0.27.2",
  "strum_macros 0.27.2",
  "test-case",
 ]
@@ -8094,6 +8094,12 @@ checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 dependencies = [
  "strum_macros 0.24.3",
 ]
+
+[[package]]
+name = "strum"
+version = "0.27.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 
 [[package]]
 name = "strum_macros"
