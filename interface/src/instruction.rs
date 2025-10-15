@@ -52,7 +52,7 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be updated
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` The stake or withdraw authority
-    ///   3. Optional: `[SIGNER]` Lockup authority, if updating StakeAuthorize::Withdrawer before
+    ///   3. Optional: `[SIGNER]` Lockup authority, if updating `StakeAuthorize::Withdrawer` before
     ///      lockup expiration
     Authorize(Pubkey, StakeAuthorize),
 
@@ -205,7 +205,7 @@ pub enum StakeInstruction {
     /// # Account references
     ///   None
     ///
-    /// Returns the minimum delegation as a little-endian encoded u64 value.
+    /// Returns the minimum delegation as a little-endian encoded `u64` value.
     /// Programs can use the [`get_minimum_delegation()`] helper function to invoke and
     /// retrieve the return value for this instruction.
     ///

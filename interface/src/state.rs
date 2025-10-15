@@ -282,7 +282,7 @@ pub enum StakeAuthorize {
 )]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Lockup {
-    /// UnixTimestamp at which this stake will allow withdrawal, unless the
+    /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
     pub unix_timestamp: UnixTimestamp,
     /// epoch height at which this stake will allow withdrawal, unless the
