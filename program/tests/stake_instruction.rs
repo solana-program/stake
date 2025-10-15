@@ -219,7 +219,7 @@ fn just_stake(meta: Meta, stake: u64) -> StakeStateV2 {
 }
 
 fn is_closed(account: &AccountSharedData) -> bool {
-    account.lamports() == 0 && *account.owner() == id() && account.data().len() == 0
+    account.lamports() == 0 && *account.owner() == id() && account.data().is_empty()
 }
 
 fn get_active_stake_for_tests(
@@ -3536,6 +3536,7 @@ fn test_initialize_minimum_balance() {
 /// Ensure that `delegate()` respects the minimum delegation requirements
 /// - Assert 1: delegating an amount equal-to the minimum succeeds
 /// - Assert 2: delegating an amount less-than the minimum fails
+///
 /// Also test both asserts above over both StakeStateV2::{Initialized and Stake}, since the logic
 /// is slightly different for the variants.
 ///
@@ -3744,9 +3745,9 @@ fn test_split_minimum_stake_delegation() {
 /// requirements.  This ensures that we are future-proofing/testing any raises to the minimum
 /// delegation.
 /// - Assert 1: splitting the full amount from an account that has at least the minimum
-///             delegation is OK
+///   delegation is OK
 /// - Assert 2: splitting the full amount from an account that has less than the minimum
-///             delegation is not OK
+///   delegation is not OK
 #[test]
 fn test_split_full_amount_minimum_stake_delegation() {
     let mollusk = mollusk_bpf();
