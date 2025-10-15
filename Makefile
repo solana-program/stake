@@ -30,7 +30,15 @@ spellcheck:
 	@echo "TODO: Implement cargo spellcheck and make fixes"
 
 clippy-%:
-	cargo $(nightly) clippy --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
+	cargo $(nightly) clippy --manifest-path $(call make-path,$*)/Cargo.toml \
+	  --all-targets \
+	  --all-features \
+		-- \
+		--deny=warnings \
+		--deny=clippy::default_trait_access \
+		--deny=clippy::arithmetic_side_effects \
+		--deny=clippy::manual_let_else \
+		--deny=clippy::used_underscore_binding $(ARGS)
 
 format-check-js-%:
 	cd $(call make-path,$*) && pnpm install && pnpm format $(ARGS)
