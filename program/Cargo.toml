@@ -31,7 +31,7 @@ solana-vote-interface = { version = "4.0.3", features = ["bincode"] }
 agave-feature-set = "3.0.0"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 assert_matches = "1.5.0"
-mollusk-svm = { version = "0.6.1", features = ["all-builtins"] }
+mollusk-svm = { version = "0.7.0", features = ["all-builtins"] }
 proptest = "1.6.0"
 rand = "0.8.5"
 solana-account = { version = "3.0.0", features = ["bincode"] }
