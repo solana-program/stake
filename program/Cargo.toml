@@ -25,7 +25,7 @@ solana-vote-interface = { version = "4.0.3", features = ["bincode"] }
 
 [dev-dependencies]
 agave-feature-set = "3.0.0"
-arbitrary = { version = "1.4.1", features = ["derive"] }
+arbitrary = { version = "1.4.2", features = ["derive"] }
 assert_matches = "1.5.0"
 mollusk-svm = { version = "0.7.0", features = ["all-builtins"] }
 proptest = "1.6.0"
