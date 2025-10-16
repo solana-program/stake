@@ -29,6 +29,10 @@ const RENT_ID: Pubkey = Pubkey::from_str_const("SysvarRent1111111111111111111111
 const STAKE_HISTORY_ID: Pubkey =
     Pubkey::from_str_const("SysvarStakeHistory1111111111111111111111111");
 
+// NOTE the stake program is in the process of removing dependence on all sysvars
+// once this version of the program is live on all clusters, we can remove them here
+// namely, from all doc comments in `StakeInstruction` and in all instruction builders
+// we may also remove all use of and reference to the stake config account
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)

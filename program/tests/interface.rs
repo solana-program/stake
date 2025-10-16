@@ -1125,6 +1125,58 @@ fn test_no_use_dealloc() {
     }
 }
 
+// the original stake interface passed in sysvars and stake config
+// we no longer retrieve these via account info in any instruction processors
+// since instruction builders still provide them, we test the program does not require them
+// NOTE this function and all `_new_interface` tests can be deleted after the instruction builders are updated
+#[allow(deprecated)]
+fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
+    pubkey == Clock::id()
+        || pubkey == Rent::id()
+        || pubkey == StakeHistory::id()
+        || pubkey == solana_sdk_ids::stake::config::id()
+}
+
+#[test]
+fn test_all_success_new_interface() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        instruction
+            .accounts
+            .retain(|account| !is_stake_program_sysvar_or_config(account.pubkey));
+
+        env.process_success(&instruction);
+        env.reset();
+    }
+}
+
+#[test]
+fn test_no_signer_bypass_new_interface() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        instruction
+            .accounts
+            .retain(|account| !is_stake_program_sysvar_or_config(account.pubkey));
+
+        for i in 0..instruction.accounts.len() {
+            if !instruction.accounts[i].is_signer {
+                continue;
+            }
+
+            let mut instruction = instruction.clone();
+            instruction.accounts[i].is_signer = false;
+            env.process_fail(&instruction);
+            env.reset();
+        }
+    }
+}
+
 // this prints ballpark compute unit costs suitable for insertion in README.md
 // run with `cargo test --test interface show_compute_usage -- --nocapture --ignored`
 #[test]
