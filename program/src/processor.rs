@@ -394,6 +394,7 @@ impl Processor {
             if Clock::check_id(branch_account.key) {
                 let _stake_history_info = next_account_info(account_info_iter)?;
                 let _stake_config_info = next_account_info(account_info_iter)?;
+                // let _stake_authority_info = next_account_info(account_info_iter);
             } else {
                 let stake_authority_info = branch_account;
                 if !stake_authority_info.is_signer {
@@ -752,7 +753,9 @@ impl Processor {
         // diverge
         {
             let branch_account = next_account_info(account_info_iter)?;
-            if !Clock::check_id(branch_account.key) {
+            if Clock::check_id(branch_account.key) {
+                // let _stake_authority_info = next_account_info(account_info_iter);
+            } else {
                 let stake_authority_info = branch_account;
                 if !stake_authority_info.is_signer {
                     return Err(ProgramError::MissingRequiredSignature);
@@ -813,6 +816,7 @@ impl Processor {
             let branch_account = next_account_info(account_info_iter)?;
             if Clock::check_id(branch_account.key) {
                 let _stake_history_info = next_account_info(account_info_iter)?;
+                // let _stake_authority_info = next_account_info(account_info_iter);
             } else {
                 let stake_authority_info = branch_account;
                 if !stake_authority_info.is_signer {
@@ -957,18 +961,17 @@ impl Processor {
         let stake_account_info = next_account_info(account_info_iter)?;
 
         // diverge
-        let _old_stake_or_withdraw_authority_info = {
+        {
             let branch_account = next_account_info(account_info_iter)?;
             if Clock::check_id(branch_account.key) {
-                next_account_info(account_info_iter)?
+                let _old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
             } else {
                 let old_stake_or_withdraw_authority_info = branch_account;
                 if !old_stake_or_withdraw_authority_info.is_signer {
                     return Err(ProgramError::MissingRequiredSignature);
                 }
-                old_stake_or_withdraw_authority_info
             }
-        };
+        }
 
         // converge
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
