@@ -1164,6 +1164,8 @@ fn test_no_signer_bypass_new_interface() {
             .accounts
             .retain(|account| !is_stake_program_sysvar_or_config(account.pubkey));
 
+        let instruction = instruction;
+
         for i in 0..instruction.accounts.len() {
             if !instruction.accounts[i].is_signer {
                 continue;
