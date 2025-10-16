@@ -18,7 +18,8 @@ use {
         sysvar::stake_history::StakeHistorySysvar,
         tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
     },
-    solana_sysvar::{epoch_rewards::EpochRewards, Sysvar, SysvarSerialize},
+    solana_sysvar::{epoch_rewards::EpochRewards, Sysvar},
+    solana_sysvar_id::SysvarId,
     solana_vote_interface::{program as solana_vote_program, state::VoteStateV4},
     std::{collections::HashSet, mem::MaybeUninit},
 };
@@ -134,13 +135,13 @@ fn do_initialize(
     stake_account_info: &AccountInfo,
     authorized: Authorized,
     lockup: Lockup,
-    rent: &Rent,
 ) -> ProgramResult {
     if stake_account_info.data_len() != StakeStateV2::size_of() {
         return Err(ProgramError::InvalidAccountData);
     }
 
     if let StakeStateV2::Uninitialized = get_stake_state(stake_account_info)? {
+        let rent = Rent::get()?;
         let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
         if stake_account_info.lamports() >= rent_exempt_reserve {
             let stake_state = StakeStateV2::Initialized(Meta {
@@ -164,8 +165,9 @@ fn do_authorize(
     new_authority: &Pubkey,
     authority_type: StakeAuthorize,
     custodian: Option<&Pubkey>,
-    clock: &Clock,
 ) -> ProgramResult {
+    let clock = &Clock::get()?;
+
     match get_stake_state(stake_account_info)? {
         StakeStateV2::Initialized(mut meta) => {
             meta.authorized
@@ -288,25 +290,35 @@ fn move_stake_or_lamports_shared_checks(
 }
 
 // NOTE our usage of the accounts iter is idiosyncratic, in imitation of the native stake program
-// native stake typically accumulates all signers from the accounts array indiscriminately
-// each instruction processor also asserts a required number of instruction accounts
-// but this is extremely ad hoc, essentially allowing any account to act as a signing authority
-// when lengths are asserted in setup, accounts are retrieved via hardcoded index from InstructionContext
-// but after control is passed to main processing functions, they are pulled from the TransactionContext
+// native stake typically, but not always, accumulated signers from the accounts array indiscriminately
+// this essentially allowed any account to act as a stake account signing authority
+// instruction processors also asserted a required number of instruction accounts, often fewer than the actual number
+// when lengths were asserted in setup, accounts were retrieved via hardcoded index from InstructionContext
+// but after control was passed to main processing functions, they were pulled from the TransactionContext
 //
-// we aim to implement this behavior exactly, such that both programs are consensus compatible:
+// when porting to bpf, we reimplemented this behavior exactly, such that both programs would be consensus-compatible:
 // * all transactions that would fail on one program also fail on the other
 // * all transactions that would succeed on one program also succeed on the other
 // * for successful transactions, all account state transitions are identical
-// error codes and log output may differ
+// error codes and log output sometimes differed
 //
-// this is not strictly necessary, since the switchover will be feature-gated. so this is not a security issue
-// mostly its so no one can blame the bpf switchover for breaking their usecase, even pathological ones
+// the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
+// this was done for backwards compatibility but the end result was highly inconsistent
 //
-// in service to this end, all accounts iters are commented with how the native program uses them
-// for accounts that should always, or almost always, exist, which the native program does not assert...
-// ...we leave a commented-out `next_account_info()` call, to aid in a future refactor
-// after the bpf switchover ships, we may update to strictly assert these accounts exist
+// bpf stake implements a new, stricter, interface, and supports both by branching when necessary
+// this new interface asserts that authorities are present in expected positions, and that they are signers
+// self-signed stake accounts are still supported; the key simply must be passed in twice
+// the new interface also requires no sysvar accounts, retrieving all sysvars by syscall
+// thus we can fall back to the old interface if we encounter the first old-interface sysvar
+// each processor has its own special logic, but we annotate "invariant," "diverge," and "converge" to make the flow obvious
+//
+// we do not modify `Split`, `SetLockup`, and `SetLockupChecked`, as it would be a breaking change
+// these instructions never accepted sysvar accounts so there is no way to distinguish "old" from "new"
+// however we may make this change if we determine there are no legitimate mainnet users of the lax constraints
+// eventually we may be able to remove the old interface and move to standard positional accounts for all instructions
+//
+// new interface signer checks may duplicate later signer hashset checks. this is intended and harmless
+// `ok()` account retrievals (lockup custodians) were, are, and will always be optional by design
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
@@ -316,14 +328,11 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 2 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
-        let rent_info = next_account_info(account_info_iter)?;
-
-        let rent = &Rent::from_account_info(rent_info)?;
 
         // `get_stake_state()` is called unconditionally, which checks owner
-        do_initialize(stake_account_info, authorized, lockup, rent)?;
+        do_initialize(stake_account_info, authorized, lockup)?;
 
         Ok(())
     }
@@ -336,15 +345,24 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // diverge
+        {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                let _stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+            } else {
+                let stake_or_withdraw_authority_info = branch_account;
+                if !stake_or_withdraw_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+            }
+        }
+
+        // converge
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
 
         let custodian = option_lockup_authority_info
             .filter(|a| a.is_signer)
@@ -357,7 +375,6 @@ impl Processor {
             &new_authority,
             authority_type,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -367,17 +384,25 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 5 accounts (2 sysvars + stake config)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
         let vote_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
-        let _stake_config_info = next_account_info(account_info_iter)?;
 
-        // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // diverge
+        {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                let _stake_history_info = next_account_info(account_info_iter)?;
+                let _stake_config_info = next_account_info(account_info_iter)?;
+            } else {
+                let stake_authority_info = branch_account;
+                if !stake_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+            }
+        };
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         let vote_state = get_vote_state(vote_account_info)?;
@@ -436,7 +461,8 @@ impl Processor {
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // NOTE we cannot check this account without a breaking change
+        // we may decide to enforce this if the pattern is not used on mainnet
         // let _stake_authority_info = next_account_info(account_info_iter);
 
         let clock = Clock::get()?;
@@ -602,17 +628,29 @@ impl Processor {
     fn process_withdraw(accounts: &[AccountInfo], withdraw_lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 5 accounts (2 sysvars)
+        // invariant
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
-        let withdraw_authority_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // diverge
+        let withdraw_authority_info = {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                let _stake_history_info = next_account_info(account_info_iter)?;
+                next_account_info(account_info_iter)?
+            } else {
+                let withdraw_authority_info = branch_account;
+                if !withdraw_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+                withdraw_authority_info
+            }
+        };
+
+        // converge
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         if source_stake_account_info.key == destination_info.key {
@@ -708,14 +746,21 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 2 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
 
-        // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // diverge
+        {
+            let branch_account = next_account_info(account_info_iter)?;
+            if !Clock::check_id(branch_account.key) {
+                let stake_authority_info = branch_account;
+                if !stake_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+            }
+        }
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Stake(meta, mut stake, stake_flags) => {
@@ -743,7 +788,8 @@ impl Processor {
         // native asserts: 1 account
         let stake_account_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // NOTE we cannot check this account without a breaking change
+        // we may decide to enforce this if the pattern is not used on mainnet
         // let _old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter);
 
         let clock = Clock::get()?;
@@ -758,16 +804,24 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (2 sysvars)
+        // invariant
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let source_stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _stake_history_info = next_account_info(account_info_iter)?;
 
-        // other accounts
-        // let _stake_authority_info = next_account_info(account_info_iter);
+        // diverge
+        {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                let _stake_history_info = next_account_info(account_info_iter)?;
+            } else {
+                let stake_authority_info = branch_account;
+                if !stake_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+            }
+        }
 
-        let clock = &Clock::from_account_info(clock_info)?;
+        let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         if source_stake_account_info.key == destination_stake_account_info.key {
@@ -821,15 +875,19 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
         let stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
 
-        // other accounts
-        let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
+        // diverge
+        let option_lockup_authority_info = {
+            let branch_account = next_account_info(account_info_iter).ok();
+            if branch_account.is_some_and(|account| Clock::check_id(account.key)) {
+                next_account_info(account_info_iter).ok()
+            } else {
+                branch_account
+            }
+        };
 
         let (mut signers, custodian) = collect_signers_checked(None, option_lockup_authority_info)?;
 
@@ -848,7 +906,6 @@ impl Processor {
             &authorize_args.new_authorized_pubkey,
             authorize_args.stake_authorize,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -857,13 +914,22 @@ impl Processor {
     fn process_initialize_checked(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
-        let rent_info = next_account_info(account_info_iter)?;
-        let stake_authority_info = next_account_info(account_info_iter)?;
-        let withdraw_authority_info = next_account_info(account_info_iter)?;
 
-        let rent = &Rent::from_account_info(rent_info)?;
+        // diverge
+        let stake_authority_info = {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Rent::check_id(branch_account.key) {
+                next_account_info(account_info_iter)?
+            } else {
+                // we do not need to check this, withdraw_authority is the only signer
+                branch_account
+            }
+        };
+
+        // converge
+        let withdraw_authority_info = next_account_info(account_info_iter)?;
 
         if !withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -875,7 +941,7 @@ impl Processor {
         };
 
         // `get_stake_state()` is called unconditionally, which checks owner
-        do_initialize(stake_account_info, authorized, Lockup::default(), rent)?;
+        do_initialize(stake_account_info, authorized, Lockup::default())?;
 
         Ok(())
     }
@@ -887,16 +953,26 @@ impl Processor {
         let signers = collect_signers(accounts);
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let _old_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
+
+        // diverge
+        let _old_stake_or_withdraw_authority_info = {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                next_account_info(account_info_iter)?
+            } else {
+                let old_stake_or_withdraw_authority_info = branch_account;
+                if !old_stake_or_withdraw_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+                old_stake_or_withdraw_authority_info
+            }
+        };
+
+        // converge
         let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
-
-        // other accounts
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
 
         if !new_stake_or_withdraw_authority_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
@@ -913,7 +989,6 @@ impl Processor {
             new_stake_or_withdraw_authority_info.key,
             authority_type,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -925,16 +1000,26 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 4 accounts (1 sysvar)
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
         let old_stake_or_withdraw_authority_base_info = next_account_info(account_info_iter)?;
-        let clock_info = next_account_info(account_info_iter)?;
-        let new_stake_or_withdraw_authority_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // diverge
+        let new_stake_or_withdraw_authority_info = {
+            let branch_account = next_account_info(account_info_iter)?;
+            if Clock::check_id(branch_account.key) {
+                next_account_info(account_info_iter)?
+            } else {
+                let new_stake_or_withdraw_authority_info = branch_account;
+                if !new_stake_or_withdraw_authority_info.is_signer {
+                    return Err(ProgramError::MissingRequiredSignature);
+                }
+                new_stake_or_withdraw_authority_info
+            }
+        };
+
+        // converge
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
-
-        let clock = &Clock::from_account_info(clock_info)?;
 
         let (mut signers, custodian) = collect_signers_checked(
             Some(new_stake_or_withdraw_authority_info),
@@ -956,7 +1041,6 @@ impl Processor {
             new_stake_or_withdraw_authority_info.key,
             authorize_args.stake_authorize,
             custodian,
-            clock,
         )?;
 
         Ok(())
@@ -972,7 +1056,8 @@ impl Processor {
         // native asserts: 1 account
         let stake_account_info = next_account_info(account_info_iter)?;
 
-        // other accounts
+        // NOTE we cannot check this account without a breaking change
+        // we may decide to enforce this if the pattern is not used on mainnet
         let _old_withdraw_or_lockup_authority_info = next_account_info(account_info_iter);
         let option_new_lockup_authority_info = next_account_info(account_info_iter).ok();
 
@@ -1001,7 +1086,7 @@ impl Processor {
     fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
+        // invariant
         let stake_account_info = next_account_info(account_info_iter)?;
         let delinquent_vote_account_info = next_account_info(account_info_iter)?;
         let reference_vote_account_info = next_account_info(account_info_iter)?;
@@ -1046,7 +1131,7 @@ impl Processor {
     fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
+        // invariant
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
@@ -1183,7 +1268,7 @@ impl Processor {
     fn process_move_lamports(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
-        // native asserts: 3 accounts
+        // invariant
         let source_stake_account_info = next_account_info(account_info_iter)?;
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
@@ -1302,8 +1387,6 @@ impl Processor {
             }
             #[allow(deprecated)]
             StakeInstruction::Redelegate => Err(ProgramError::InvalidInstructionData),
-            // NOTE we assume the program is going live after `move_stake_and_move_lamports_ixs` is
-            // activated
             StakeInstruction::MoveStake(lamports) => {
                 msg!("Instruction: MoveStake");
                 Self::process_move_stake(accounts, lamports)
