@@ -60,11 +60,15 @@ const EXECUTION_EPOCH: u64 = 8;
 const PAYER: Pubkey = Pubkey::from_str_const("PAYER11111111111111111111111111111111111111");
 const PAYER_BALANCE: u64 = 1_000_000 * LAMPORTS_PER_SOL;
 
-// two vote accounts with no credits, fine for all stake tests except DeactivateDelinquent
+// two vote accounts with no credits
 const VOTE_ACCOUNT_RED: Pubkey =
     Pubkey::from_str_const("RED1111111111111111111111111111111111111111");
 const VOTE_ACCOUNT_BLUE: Pubkey =
     Pubkey::from_str_const("BLUE111111111111111111111111111111111111111");
+
+// reference vote account for DeactivateDelinquent
+const VOTE_ACCOUNT_GOLD: Pubkey =
+    Pubkey::from_str_const("GXLD111111111111111111111111111111111111111");
 
 // two blank stake accounts that can be serialized into for tests
 const STAKE_ACCOUNT_BLACK: Pubkey =
@@ -162,7 +166,7 @@ impl Env {
             Account::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
         base_accounts.insert(PAYER, payer_account);
 
-        // create two vote accounts
+        // create two blank vote accounts
         let vote_rent_exemption = Rent::default().minimum_balance(VoteStateV4::size_of());
         let vote_state_versions = VoteStateVersions::new_v4(VoteStateV4::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
@@ -175,6 +179,24 @@ impl Env {
         );
         base_accounts.insert(VOTE_ACCOUNT_RED, vote_account.clone());
         base_accounts.insert(VOTE_ACCOUNT_BLUE, vote_account);
+
+        // create a reference vote account
+        let mut reference_vote_state = VoteStateV4::default();
+        for epoch in 0..=EXECUTION_EPOCH {
+            reference_vote_state
+                .epoch_credits
+                .push((epoch, epoch, epoch.saturating_sub(1)));
+        }
+        let vote_state_versions = VoteStateVersions::new_v4(reference_vote_state);
+        let vote_data = bincode::serialize(&vote_state_versions).unwrap();
+        let vote_account = Account::create(
+            vote_rent_exemption,
+            vote_data,
+            vote_program::id(),
+            false,
+            u64::MAX,
+        );
+        base_accounts.insert(VOTE_ACCOUNT_GOLD, vote_account);
 
         // create two blank stake accounts
         let stake_account = Account::create(
@@ -277,8 +299,6 @@ impl Env {
 // NOTE we skip:
 // * redelegate: will never be enabled
 // * minimum delegation: cannot fail in any nontrivial way
-// * deactivate delinquent: requires no signers, and our only failure test is missing signers
-// the first two need never be added but the third should be when we have more tests
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
     Initialize {
@@ -326,6 +346,9 @@ enum StakeInterface {
         full_withdraw: bool,
     },
     Deactivate {
+        lockup_state: LockupState,
+    },
+    DeactivateDelinquent {
         lockup_state: LockupState,
     },
 }
@@ -698,6 +721,26 @@ impl StakeInterface {
                 );
 
                 instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
+            }
+            Self::DeactivateDelinquent { lockup_state } => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &fully_configurable_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        StakeStatus::Active,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                instruction::deactivate_delinquent_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &VOTE_ACCOUNT_RED,
+                    &VOTE_ACCOUNT_GOLD,
+                )
             }
         }
     }
