@@ -50,8 +50,7 @@ use {
 
 // NOTE ideas for future tests:
 // * fail with different vote accounts on operations that require them to match
-// * fail with different authorities on operations that require them to match
-// * adding/changing lockups to ensure we always fail when violating lockup
+// * fail with different authorities/lockups on operations that require metas to match
 
 // arbitrary, gives us room to set up activations/deactivations
 const EXECUTION_EPOCH: u64 = 8;
@@ -358,6 +357,32 @@ impl StakeInterface {
     // we substantially overshoot to avoid mistakes
     fn max_size() -> usize {
         128
+    }
+
+    // state of any existing lockup on the stake accounts
+    fn lockup_state(self) -> LockupState {
+        match self {
+            Self::Initialize { .. }
+            | Self::InitializeChecked
+            | Self::Withdraw {
+                source_status: WithdrawStatus::Uninitialized,
+                ..
+            } => LockupState::None,
+            Self::Authorize { lockup_state, .. }
+            | Self::AuthorizeWithSeed { lockup_state, .. }
+            | Self::SetLockup {
+                existing_lockup_state: lockup_state,
+                ..
+            }
+            | Self::DelegateStake { lockup_state, .. }
+            | Self::Split { lockup_state, .. }
+            | Self::Merge { lockup_state, .. }
+            | Self::MoveStake { lockup_state, .. }
+            | Self::MoveLamports { lockup_state, .. }
+            | Self::Withdraw { lockup_state, .. }
+            | Self::Deactivate { lockup_state, .. }
+            | Self::DeactivateDelinquent { lockup_state, .. } => lockup_state,
+        }
     }
 
     // creates an instruction with the given combination of settings that is guaranteed to succeed
@@ -972,6 +997,68 @@ fn test_no_signer_bypass() {
             env.process_fail(&instruction);
             env.reset();
         }
+    }
+}
+
+// operations that require a custodian fail without it
+#[test]
+fn test_no_custodian_bypass() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        // skip if no lockup
+        if declaration.lockup_state() != LockupState::Active {
+            continue;
+        }
+
+        // changing staker does not require custodian
+        match declaration {
+            StakeInterface::Authorize {
+                authority_type: AuthorityType::Staker,
+                ..
+            }
+            | StakeInterface::AuthorizeWithSeed {
+                authority_type: AuthorityType::Staker,
+                ..
+            } => {
+                continue;
+            }
+            _ => (),
+        }
+
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        // skip if successful instruction requires no custodian
+        if !instruction
+            .accounts
+            .iter()
+            .any(|account| account.pubkey == CUSTODIAN_LEFT)
+        {
+            continue;
+        }
+
+        // remove the custodian
+        // active custodian is always Left. we only use Right as a new lockup target
+        // the only instruction that takes Right as account data is SetLockupChecked
+        // and we must remove it too because it comes after Left in the accounts list
+        instruction.accounts.retain(|account| {
+            account.pubkey != CUSTODIAN_LEFT && account.pubkey != CUSTODIAN_RIGHT
+        });
+
+        env.process_fail(&instruction);
+        env.reset();
+
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        // change to the wrong custodian
+        instruction.accounts.iter_mut().for_each(|account| {
+            if account.pubkey == CUSTODIAN_LEFT {
+                account.pubkey = CUSTODIAN_RIGHT
+            }
+        });
+
+        env.process_fail(&instruction);
+        env.reset();
     }
 }
 
