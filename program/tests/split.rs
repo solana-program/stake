@@ -4,13 +4,13 @@ mod helpers;
 
 use {
     helpers::{
-        add_sysvars, get_effective_stake, parse_stake_account, StakeLifecycle, StakeTestContext,
+        get_effective_stake, parse_stake_account, SplitConfig, StakeLifecycle, StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
-    solana_stake_interface::{instruction as ixn, state::StakeStateV2},
+    solana_stake_interface::state::StakeStateV2,
     solana_stake_program::id,
     test_case::test_case,
 };
@@ -43,26 +43,19 @@ fn test_split(split_source_type: StakeLifecycle) {
     };
 
     // Fail: split more than available (would violate rent exemption)
-    let instructions = ixn::split(&split_source, &signer, staked_amount + 1, &split_dest);
-    let instruction = &instructions[2]; // The actual split instruction
-
-    let accounts = vec![
-        (split_source, split_source_account.clone()),
-        (split_dest, split_dest_account.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, instruction, accounts);
-
     // For initialized/delegated accounts, the program itself checks and fails with InsufficientFunds
     // For uninitialized accounts, the program succeeds but leaves accounts below rent exemption
     if split_source_type == StakeLifecycle::Uninitialized {
         // Expect program success but rent check should fail - catch the panic
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            ctx.mollusk.process_and_validate_instruction(
-                instruction,
-                &accounts,
-                &[Check::success(), Check::all_rent_exempt()],
-            )
+            ctx.process_with(SplitConfig {
+                source: (&split_source, &split_source_account),
+                destination: (&split_dest, &split_dest_account),
+                signer: &signer,
+                amount: staked_amount + 1,
+            })
+            .checks(&[Check::success(), Check::all_rent_exempt()])
+            .execute()
         }));
         // The rent exemption check should panic
         assert!(
@@ -71,72 +64,47 @@ fn test_split(split_source_type: StakeLifecycle) {
         );
     } else {
         // Program fails with InsufficientFunds
-        ctx.mollusk.process_and_validate_instruction(
-            instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(SplitConfig {
+            source: (&split_source, &split_source_account),
+            destination: (&split_dest, &split_dest_account),
+            signer: &signer,
+            amount: staked_amount + 1,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
     }
 
     // Test minimum delegation enforcement for active/transitioning stakes
     if split_source_type.split_minimum_enforced() {
         // Zero split fails
-        let instructions = ixn::split(&split_source, &signer, 0, &split_dest);
-        let instruction = &instructions[2];
-
-        let accounts = vec![
-            (split_source, split_source_account.clone()),
-            (split_dest, split_dest_account.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(SplitConfig {
+            source: (&split_source, &split_source_account),
+            destination: (&split_dest, &split_dest_account),
+            signer: &signer,
+            amount: 0,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
 
         // Underfunded destination fails
-        let instructions = ixn::split(
-            &split_source,
-            &signer,
-            ctx.minimum_delegation - 1,
-            &split_dest,
-        );
-        let instruction = &instructions[2];
-
-        let accounts = vec![
-            (split_source, split_source_account.clone()),
-            (split_dest, split_dest_account.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(SplitConfig {
+            source: (&split_source, &split_source_account),
+            destination: (&split_dest, &split_dest_account),
+            signer: &signer,
+            amount: ctx.minimum_delegation - 1,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
 
         // Underfunded source fails
-        let instructions = ixn::split(
-            &split_source,
-            &signer,
-            ctx.minimum_delegation + 1,
-            &split_dest,
-        );
-        let instruction = &instructions[2];
-
-        let accounts = vec![
-            (split_source, split_source_account.clone()),
-            (split_dest, split_dest_account.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(SplitConfig {
+            source: (&split_source, &split_source_account),
+            destination: (&split_dest, &split_dest_account),
+            signer: &signer,
+            amount: ctx.minimum_delegation + 1,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
     }
 
     // Split to account with wrong owner fails
@@ -144,35 +112,24 @@ fn test_split(split_source_type: StakeLifecycle) {
     let mut fake_split_dest_account = split_dest_account.clone();
     fake_split_dest_account.set_owner(Pubkey::new_unique());
 
-    let instructions = ixn::split(&split_source, &signer, staked_amount / 2, &fake_split_dest);
-    let instruction = &instructions[2];
-
-    let accounts = vec![
-        (split_source, split_source_account.clone()),
-        (fake_split_dest, fake_split_dest_account),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountOwner)],
-    );
+    ctx.process_with(SplitConfig {
+        source: (&split_source, &split_source_account),
+        destination: (&fake_split_dest, &fake_split_dest_account),
+        signer: &signer,
+        amount: staked_amount / 2,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
+    .execute();
 
     // Success: split half
-    let instructions = ixn::split(&split_source, &signer, staked_amount / 2, &split_dest);
-    let instruction = &instructions[2];
-
-    let accounts = vec![
-        (split_source, split_source_account.clone()),
-        (split_dest, split_dest_account),
-    ];
-
-    let result = helpers::process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(SplitConfig {
+            source: (&split_source, &split_source_account),
+            destination: (&split_dest, &split_dest_account),
+            signer: &signer,
+            amount: staked_amount / 2,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&split_source)
@@ -185,8 +142,9 @@ fn test_split(split_source_type: StakeLifecycle) {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
 
     split_source_account = result.resulting_accounts[0].1.clone().into();
     let split_dest_account: AccountSharedData = result.resulting_accounts[1].1.clone().into();

@@ -3,15 +3,14 @@
 mod helpers;
 
 use {
-    crate::helpers::add_sysvars,
     helpers::{
-        get_effective_stake, parse_stake_account, true_up_transient_stake_epoch, StakeLifecycle,
-        StakeTestContext,
+        get_effective_stake, parse_stake_account, true_up_transient_stake_epoch, MoveStakeConfig,
+        MoveStakeWithSignerConfig, MoveStakeWithVoteConfig, StakeLifecycle, StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_account::WritableAccount,
     solana_program_error::ProgramError,
-    solana_stake_interface::{error::StakeError, instruction as ixn, state::Lockup},
+    solana_stake_interface::{error::StakeError, state::Lockup},
     test_case::test_matrix,
 };
 
@@ -94,25 +93,18 @@ fn test_move_stake(
         }
         _ => {
             // Invalid state combination
-            let instruction = ixn::move_stake(
-                &move_source,
-                &move_dest,
-                &ctx.staker,
-                if full_move {
-                    source_staked_amount
-                } else {
-                    ctx.minimum_delegation
-                },
-            );
-
-            let accounts = vec![
-                (move_source, move_source_account),
-                (move_dest, move_dest_account),
-                (ctx.vote_account, ctx.vote_account_data),
-            ];
-
-            let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-            let result = ctx.mollusk.process_instruction(&instruction, &accounts);
+            let result = ctx
+                .process_with(MoveStakeConfig {
+                    source: (&move_source, &move_source_account),
+                    destination: (&move_dest, &move_dest_account),
+                    amount: if full_move {
+                        source_staked_amount
+                    } else {
+                        ctx.minimum_delegation
+                    },
+                })
+                .checks(&[])
+                .execute();
             assert!(result.program_result.is_err());
             return;
         }
@@ -122,74 +114,38 @@ fn test_move_stake(
     if ctx.minimum_delegation > 1 {
         // Undershoot destination for inactive accounts
         if move_dest_type != StakeLifecycle::Active {
-            let instruction = ixn::move_stake(
-                &move_source,
-                &move_dest,
-                &ctx.staker,
-                ctx.minimum_delegation - 1,
-            );
-
-            let accounts = vec![
-                (move_source, move_source_account.clone()),
-                (move_dest, move_dest_account.clone()),
-                (ctx.vote_account, ctx.vote_account_data.clone()),
-            ];
-
-            let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-            ctx.mollusk.process_and_validate_instruction(
-                &instruction,
-                &accounts,
-                &[Check::err(ProgramError::InvalidArgument)],
-            );
+            ctx.process_with(MoveStakeConfig {
+                source: (&move_source, &move_source_account),
+                destination: (&move_dest, &move_dest_account),
+                amount: ctx.minimum_delegation - 1,
+            })
+            .checks(&[Check::err(ProgramError::InvalidArgument)])
+            .execute();
         }
 
         // Overshoot source (would leave source underfunded)
-        let instruction = ixn::move_stake(
-            &move_source,
-            &move_dest,
-            &ctx.staker,
-            ctx.minimum_delegation + 1,
-        );
-
-        let accounts = vec![
-            (move_source, move_source_account.clone()),
-            (move_dest, move_dest_account.clone()),
-            (ctx.vote_account, ctx.vote_account_data.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(ProgramError::InvalidArgument)],
-        );
+        ctx.process_with(MoveStakeConfig {
+            source: (&move_source, &move_source_account),
+            destination: (&move_dest, &move_dest_account),
+            amount: ctx.minimum_delegation + 1,
+        })
+        .checks(&[Check::err(ProgramError::InvalidArgument)])
+        .execute();
     }
 
-    // Now do it just right
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest,
-        &ctx.staker,
-        if full_move {
-            source_staked_amount
-        } else {
-            ctx.minimum_delegation
-        },
-    );
-
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data),
-    ];
-
-    // Matches program_test line 1713: test that removing any signer causes MissingRequiredSignature, then succeeds
-    let result = helpers::process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[Check::success()],
-    );
+    let result = ctx
+        .process_with(MoveStakeConfig {
+            source: (&move_source, &move_source_account),
+            destination: (&move_dest, &move_dest_account),
+            amount: if full_move {
+                source_staked_amount
+            } else {
+                ctx.minimum_delegation
+            },
+        })
+        .checks(&[Check::success()])
+        .test_missing_signers(true)
+        .execute();
 
     move_source_account = result.resulting_accounts[0].1.clone().into();
     move_dest_account = result.resulting_accounts[1].1.clone().into();
@@ -269,24 +225,14 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
         ctx.staker
     };
 
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest,
-        &source_signer,
-        ctx.minimum_delegation,
-    );
-
-    let accounts = vec![
-        (move_source, move_source_account),
-        (move_dest, move_dest_account),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(MoveStakeWithSignerConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        signer: &source_signer,
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }
 
 #[test_matrix(
@@ -312,61 +258,35 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         .unwrap();
 
     // Self-move fails
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_source,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidInstructionData)],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_source, &move_source_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(ProgramError::InvalidInstructionData)])
+    .execute();
 
     // Zero move fails
     let (move_dest, move_dest_account) =
         ctx.create_stake_account(move_dest_type, ctx.minimum_delegation);
 
-    let instruction = ixn::move_stake(&move_source, &move_dest, &ctx.staker, 0);
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidArgument)],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        amount: 0,
+    })
+    .checks(&[Check::err(ProgramError::InvalidArgument)])
+    .execute();
 
     // Sign with withdrawer fails
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest,
-        &ctx.withdrawer,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(MoveStakeWithSignerConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        signer: &ctx.withdrawer,
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Source lockup fails
     let (move_locked_source, mut move_locked_source_account) = ctx
@@ -378,24 +298,13 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let (move_dest2, move_dest2_account) =
         ctx.create_stake_account(move_dest_type, ctx.minimum_delegation);
 
-    let instruction = ixn::move_stake(
-        &move_locked_source,
-        &move_dest2,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_locked_source, move_locked_source_account),
-        (move_dest2, move_dest2_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_locked_source, &move_locked_source_account),
+        destination: (&move_dest2, &move_dest2_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
     // Staker mismatch fails
     let throwaway_staker = solana_pubkey::Pubkey::new_unique();
@@ -407,24 +316,13 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         &withdrawer,
     );
 
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest3,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest3, move_dest3_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest3, &move_dest3_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
     // Withdrawer mismatch fails
     let throwaway_withdrawer = solana_pubkey::Pubkey::new_unique();
@@ -436,24 +334,13 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         &throwaway_withdrawer,
     );
 
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest4,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest4, move_dest4_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest4, &move_dest4_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
     // Dest lockup fails
     let (move_dest5, move_dest5_account) = ctx.create_stake_account_with_lockup(
@@ -462,24 +349,13 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         &in_force_lockup,
     );
 
-    let instruction = ixn::move_stake(
-        &move_source,
-        &move_dest5,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest5, move_dest5_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest5, &move_dest5_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
     // Different vote accounts for active dest
     if move_dest_type == StakeLifecycle::Active {
@@ -500,24 +376,15 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         let (move_source2, move_source2_account) =
             ctx.create_stake_account(move_source_type, source_staked_amount);
 
-        let instruction = ixn::move_stake(
-            &move_source2,
-            &move_dest6_pubkey,
-            &ctx.staker,
-            ctx.minimum_delegation,
-        );
-        let accounts = vec![
-            (move_source2, move_source2_account),
-            (move_dest6_pubkey, move_dest6_account),
-            (ctx.vote_account, ctx.vote_account_data),
-            (dest_vote_account, dest_vote_account_data),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(StakeError::VoteAddressMismatch.into())],
-        );
+        ctx.process_with(MoveStakeWithVoteConfig {
+            source: (&move_source2, &move_source2_account),
+            destination: (&move_dest6_pubkey, &move_dest6_account),
+            signer: &ctx.staker,
+            amount: ctx.minimum_delegation,
+            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            dest_vote: Some((&dest_vote_account, &dest_vote_account_data)),
+        })
+        .checks(&[Check::err(StakeError::VoteAddressMismatch.into())])
+        .execute();
     }
 }

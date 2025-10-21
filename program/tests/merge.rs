@@ -3,7 +3,7 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, StakeLifecycle, StakeTestContext},
+    helpers::{add_sysvars, MergeConfig, StakeLifecycle, StakeTestContext},
     mollusk_svm::result::Check,
     solana_account::ReadableAccount,
     solana_stake_interface::{instruction as ixn, state::StakeStateV2},
@@ -71,36 +71,36 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
     merge_source_account.set_data(bincode::serialize(&source_stake_state).unwrap());
 
     // Attempt to merge
-    let instructions = ixn::merge(&merge_dest, &merge_source, &ctx.staker);
-    let instruction = &instructions[0];
-
-    let accounts = vec![
-        (merge_dest, merge_dest_account.clone()),
-        (merge_source, merge_source_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
     if is_merge_allowed_by_type {
-        helpers::process_instruction_after_testing_missing_signers(
-            &ctx.mollusk,
-            instruction,
-            &accounts,
-            &[
-                Check::success(),
-                Check::account(&merge_dest)
-                    .lamports(staked_amount * 2 + ctx.rent_exempt_reserve * 2)
-                    .owner(&id())
-                    .space(StakeStateV2::size_of())
-                    .rent_exempt()
-                    .build(),
-            ],
-        );
+        ctx.process_with(MergeConfig {
+            destination: (&merge_dest, &merge_dest_account),
+            source: (&merge_source, &merge_source_account),
+        })
+        .checks(&[
+            Check::success(),
+            Check::account(&merge_dest)
+                .lamports(staked_amount * 2 + ctx.rent_exempt_reserve * 2)
+                .owner(&id())
+                .space(StakeStateV2::size_of())
+                .rent_exempt()
+                .build(),
+        ])
+        .test_missing_signers(true)
+        .execute();
     } else {
         // Various errors can occur for invalid merges, we just check it fails
-        let accounts_with_sysvars = add_sysvars(&ctx.mollusk, instruction, accounts);
-        let result = ctx
-            .mollusk
-            .process_instruction(instruction, &accounts_with_sysvars);
+        let result = ctx.mollusk.process_instruction(
+            &ixn::merge(&merge_dest, &merge_source, &ctx.staker)[0],
+            &add_sysvars(
+                &ctx.mollusk,
+                &ixn::merge(&merge_dest, &merge_source, &ctx.staker)[0],
+                vec![
+                    (merge_dest, merge_dest_account.clone()),
+                    (merge_source, merge_source_account),
+                    (ctx.vote_account, ctx.vote_account_data.clone()),
+                ],
+            ),
+        );
         assert!(result.program_result.is_err());
     }
 }

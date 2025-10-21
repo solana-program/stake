@@ -4,9 +4,10 @@ mod helpers;
 
 use {
     helpers::{
-        initialize_stake_account, process_instruction_after_testing_missing_signers,
-        StakeTestContext,
+        initialize_stake_account, AuthorizeCheckedConfig, AuthorizeCheckedWithSeedConfig,
+        InitializeCheckedConfig, SetLockupCheckedConfig, StakeTestContext,
     },
+    mollusk_svm::result::Check,
     solana_account::AccountSharedData,
     solana_pubkey::Pubkey,
     solana_sdk_ids::system_program,
@@ -22,14 +23,6 @@ fn test_initialize_checked() {
     let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
-    let instruction = ixn::initialize_checked(
-        &stake,
-        &Authorized {
-            staker: ctx.staker,
-            withdrawer: ctx.withdrawer,
-        },
-    );
-
     let stake_account = AccountSharedData::new_data_with_space(
         ctx.rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
@@ -38,14 +31,16 @@ fn test_initialize_checked() {
     )
     .unwrap();
 
-    let accounts = vec![(stake, stake_account)];
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[mollusk_svm::result::Check::success()],
-    );
+    ctx.process_with(InitializeCheckedConfig {
+        stake: (&stake, &stake_account),
+        authorized: &Authorized {
+            staker: ctx.staker,
+            withdrawer: ctx.withdrawer,
+        },
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }
 
 #[test]
@@ -67,20 +62,16 @@ fn test_authorize_checked_staker() {
     );
 
     // Now test authorize checked
-    let instruction = ixn::authorize_checked(
-        &stake,
-        &ctx.staker,
-        &new_authority,
-        StakeAuthorize::Staker,
-        None,
-    );
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &[(stake, initialized_stake_account)],
-        &[mollusk_svm::result::Check::success()],
-    );
+    ctx.process_with(AuthorizeCheckedConfig {
+        stake: (&stake, &initialized_stake_account),
+        authority: &ctx.staker,
+        new_authority: &new_authority,
+        stake_authorize: StakeAuthorize::Staker,
+        custodian: None,
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }
 
 #[test]
@@ -102,20 +93,16 @@ fn test_authorize_checked_withdrawer() {
     );
 
     // Now test authorize checked
-    let instruction = ixn::authorize_checked(
-        &stake,
-        &ctx.withdrawer,
-        &new_authority,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &[(stake, initialized_stake_account)],
-        &[mollusk_svm::result::Check::success()],
-    );
+    ctx.process_with(AuthorizeCheckedConfig {
+        stake: (&stake, &initialized_stake_account),
+        authority: &ctx.withdrawer,
+        new_authority: &new_authority,
+        stake_authorize: StakeAuthorize::Withdrawer,
+        custodian: None,
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }
 
 #[test]
@@ -140,22 +127,18 @@ fn test_authorize_checked_with_seed_staker() {
     );
 
     // Now test authorize checked with seed
-    let instruction = ixn::authorize_checked_with_seed(
-        &stake,
-        &seed_base,
-        seed.to_string(),
-        &system_program::id(),
-        &new_authority,
-        StakeAuthorize::Staker,
-        None,
-    );
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &[(stake, initialized_stake_account)],
-        &[mollusk_svm::result::Check::success()],
-    );
+    ctx.process_with(AuthorizeCheckedWithSeedConfig {
+        stake: (&stake, &initialized_stake_account),
+        authority_base: &seed_base,
+        authority_seed: seed.to_string(),
+        authority_owner: &system_program::id(),
+        new_authority: &new_authority,
+        stake_authorize: StakeAuthorize::Staker,
+        custodian: None,
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }
 
 #[test]
@@ -180,22 +163,18 @@ fn test_authorize_checked_with_seed_withdrawer() {
     );
 
     // Now test authorize checked with seed
-    let instruction = ixn::authorize_checked_with_seed(
-        &stake,
-        &seed_base,
-        seed.to_string(),
-        &system_program::id(),
-        &new_authority,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &[(stake, initialized_stake_account)],
-        &[mollusk_svm::result::Check::success()],
-    );
+    ctx.process_with(AuthorizeCheckedWithSeedConfig {
+        stake: (&stake, &initialized_stake_account),
+        authority_base: &seed_base,
+        authority_seed: seed.to_string(),
+        authority_owner: &system_program::id(),
+        new_authority: &new_authority,
+        stake_authorize: StakeAuthorize::Withdrawer,
+        custodian: None,
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }
 
 #[test]
@@ -217,20 +196,16 @@ fn test_set_lockup_checked() {
     );
 
     // Now test set lockup checked
-    let instruction = ixn::set_lockup_checked(
-        &stake,
-        &ixn::LockupArgs {
+    ctx.process_with(SetLockupCheckedConfig {
+        stake: (&stake, &initialized_stake_account),
+        lockup_args: &ixn::LockupArgs {
             unix_timestamp: None,
             epoch: Some(1),
             custodian: Some(custodian),
         },
-        &ctx.withdrawer,
-    );
-
-    process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &[(stake, initialized_stake_account)],
-        &[mollusk_svm::result::Check::success()],
-    );
+        custodian: &ctx.withdrawer,
+    })
+    .checks(&[Check::success()])
+    .test_missing_signers(true)
+    .execute();
 }

@@ -3,17 +3,13 @@
 mod helpers;
 
 use {
-    crate::helpers::add_sysvars,
-    helpers::StakeTestContext,
+    helpers::{InitializeConfig, StakeTestContext},
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
-    solana_stake_interface::{
-        instruction as ixn,
-        state::{Authorized, Lockup, StakeStateV2},
-    },
+    solana_stake_interface::state::{Authorized, Lockup, StakeStateV2},
     solana_stake_program::id,
 };
 
@@ -42,15 +38,13 @@ fn test_initialize() {
     )
     .unwrap();
 
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let accounts = vec![(stake, stake_account)];
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-
-    // Should succeed
-    let result = ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(InitializeConfig {
+            stake: (&stake, &stake_account),
+            authorized: &authorized,
+            lockup: &lockup,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -58,8 +52,8 @@ fn test_initialize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .execute();
 
     // Check that we see what we expect
     let resulting_account: AccountSharedData = result.resulting_accounts[0].1.clone().into();
@@ -73,13 +67,13 @@ fn test_initialize() {
         }),
     );
 
-    // 2nd time fails, can't move it from anything other than uninit->init
-    let accounts2 = add_sysvars(&ctx.mollusk, &instruction, vec![(stake, resulting_account)]);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts2,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(InitializeConfig {
+        stake: (&stake, &resulting_account),
+        authorized: &authorized,
+        lockup: &lockup,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }
 
 #[test]
@@ -106,15 +100,13 @@ fn test_initialize_insufficient_funds() {
     )
     .unwrap();
 
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let accounts = vec![(stake, stake_account)];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InsufficientFunds)],
-    );
+    ctx.process_with(InitializeConfig {
+        stake: (&stake, &stake_account),
+        authorized: &authorized,
+        lockup: &lockup,
+    })
+    .checks(&[Check::err(ProgramError::InsufficientFunds)])
+    .execute();
 }
 
 #[test]
@@ -145,15 +137,13 @@ fn test_initialize_incorrect_size_larger() {
     )
     .unwrap();
 
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let accounts = vec![(stake, stake_account)];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(InitializeConfig {
+        stake: (&stake, &stake_account),
+        authorized: &authorized,
+        lockup: &lockup,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }
 
 #[test]
@@ -184,13 +174,11 @@ fn test_initialize_incorrect_size_smaller() {
     )
     .unwrap();
 
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let accounts = vec![(stake, stake_account)];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(InitializeConfig {
+        stake: (&stake, &stake_account),
+        authorized: &authorized,
+        lockup: &lockup,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }

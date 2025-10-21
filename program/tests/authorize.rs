@@ -4,17 +4,14 @@ mod helpers;
 
 use {
     helpers::{
-        add_sysvars, initialize_stake_account, parse_stake_account,
-        process_instruction_after_testing_missing_signers, StakeTestContext,
+        initialize_stake_account, parse_stake_account, AuthorizeWithAuthorityConfig,
+        StakeTestContext, WithdrawWithSignerConfig,
     },
     mollusk_svm::result::Check,
     solana_account::AccountSharedData,
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
-    solana_stake_interface::{
-        instruction as ixn,
-        state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
-    },
+    solana_stake_interface::state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
     solana_stake_program::id,
 };
 
@@ -40,32 +37,24 @@ fn test_authorize() {
     .unwrap();
 
     // Authorize uninitialized fails for staker
-    let instruction = ixn::authorize(&stake, &stake, &staker1, StakeAuthorize::Staker, None);
-    let accounts = vec![(stake, stake_account.clone())];
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(AuthorizeWithAuthorityConfig {
+        stake: (&stake, &stake_account),
+        authority: &stake,
+        new_authority: &staker1,
+        stake_authorize: StakeAuthorize::Staker,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 
     // Authorize uninitialized fails for withdrawer
-    let instruction = ixn::authorize(
-        &stake,
-        &stake,
-        &withdrawer1,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(AuthorizeWithAuthorityConfig {
+        stake: (&stake, &stake_account),
+        authority: &stake,
+        new_authority: &withdrawer1,
+        stake_authorize: StakeAuthorize::Withdrawer,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 
     let mut stake_account = initialize_stake_account(
         &ctx.mollusk,
@@ -79,15 +68,15 @@ fn test_authorize() {
     );
 
     // Change staker authority
-    let instruction = ixn::authorize(&stake, &staker1, &staker2, StakeAuthorize::Staker, None);
-    let accounts = vec![(stake, stake_account.clone())];
-
     // Test that removing any signer causes failure, then verify success
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(AuthorizeWithAuthorityConfig {
+            stake: (&stake, &stake_account),
+            authority: &staker1,
+            new_authority: &staker2,
+            stake_authorize: StakeAuthorize::Staker,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -95,29 +84,24 @@ fn test_authorize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let (meta, _, _) = parse_stake_account(&stake_account);
     assert_eq!(meta.authorized.staker, staker2);
 
     // Change withdrawer authority
-    let instruction = ixn::authorize(
-        &stake,
-        &withdrawer1,
-        &withdrawer2,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-
     // Test that removing any signer causes failure, then verify success
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(AuthorizeWithAuthorityConfig {
+            stake: (&stake, &stake_account),
+            authority: &withdrawer1,
+            new_authority: &withdrawer2,
+            stake_authorize: StakeAuthorize::Withdrawer,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -125,57 +109,44 @@ fn test_authorize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let (meta, _, _) = parse_stake_account(&stake_account);
     assert_eq!(meta.authorized.withdrawer, withdrawer2);
 
     // Old staker authority no longer works
-    let instruction = ixn::authorize(
-        &stake,
-        &staker1,
-        &Pubkey::new_unique(),
-        StakeAuthorize::Staker,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(AuthorizeWithAuthorityConfig {
+        stake: (&stake, &stake_account),
+        authority: &staker1,
+        new_authority: &Pubkey::new_unique(),
+        stake_authorize: StakeAuthorize::Staker,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Old withdrawer authority no longer works
-    let instruction = ixn::authorize(
-        &stake,
-        &withdrawer1,
-        &Pubkey::new_unique(),
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(AuthorizeWithAuthorityConfig {
+        stake: (&stake, &stake_account),
+        authority: &withdrawer1,
+        new_authority: &Pubkey::new_unique(),
+        stake_authorize: StakeAuthorize::Withdrawer,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Change staker authority again with new authority
-    let instruction = ixn::authorize(&stake, &staker2, &staker3, StakeAuthorize::Staker, None);
-    let accounts = vec![(stake, stake_account.clone())];
-
     // Test that removing any signer causes failure, then verify success
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(AuthorizeWithAuthorityConfig {
+            stake: (&stake, &stake_account),
+            authority: &staker2,
+            new_authority: &staker3,
+            stake_authorize: StakeAuthorize::Staker,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -183,29 +154,24 @@ fn test_authorize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let (meta, _, _) = parse_stake_account(&stake_account);
     assert_eq!(meta.authorized.staker, staker3);
 
     // Change withdrawer authority again with new authority
-    let instruction = ixn::authorize(
-        &stake,
-        &withdrawer2,
-        &withdrawer3,
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-
     // Test that removing any signer causes failure, then verify success
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(AuthorizeWithAuthorityConfig {
+            stake: (&stake, &stake_account),
+            authority: &withdrawer2,
+            new_authority: &withdrawer3,
+            stake_authorize: StakeAuthorize::Withdrawer,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -213,40 +179,34 @@ fn test_authorize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let (meta, _, _) = parse_stake_account(&stake_account);
     assert_eq!(meta.authorized.withdrawer, withdrawer3);
 
     // Changing withdrawer using staker fails
-    let instruction = ixn::authorize(
-        &stake,
-        &staker3,
-        &Pubkey::new_unique(),
-        StakeAuthorize::Withdrawer,
-        None,
-    );
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(AuthorizeWithAuthorityConfig {
+        stake: (&stake, &stake_account),
+        authority: &staker3,
+        new_authority: &Pubkey::new_unique(),
+        stake_authorize: StakeAuthorize::Withdrawer,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Changing staker using withdrawer is fine
-    let instruction = ixn::authorize(&stake, &withdrawer3, &staker1, StakeAuthorize::Staker, None);
-    let accounts = vec![(stake, stake_account.clone())];
-
     // Test that removing any signer causes failure, then verify success
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(AuthorizeWithAuthorityConfig {
+            stake: (&stake, &stake_account),
+            authority: &withdrawer3,
+            new_authority: &staker1,
+            stake_authorize: StakeAuthorize::Staker,
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -254,8 +214,9 @@ fn test_authorize() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let (meta, _, _) = parse_stake_account(&stake_account);
@@ -264,17 +225,13 @@ fn test_authorize() {
     // Withdraw using staker fails - test all three stakers to ensure none can withdraw
     for staker in [staker1, staker2, staker3] {
         let recipient = Pubkey::new_unique();
-        let instruction = ixn::withdraw(&stake, &staker, &recipient, ctx.rent_exempt_reserve, None);
-        let accounts = vec![
-            (stake, stake_account.clone()),
-            (recipient, AccountSharedData::default()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(ProgramError::MissingRequiredSignature)],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&stake, &stake_account),
+            signer: &staker,
+            recipient: (&recipient, &AccountSharedData::default()),
+            amount: ctx.rent_exempt_reserve,
+        })
+        .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+        .execute();
     }
 }

@@ -3,13 +3,13 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, StakeLifecycle, StakeTestContext},
+    helpers::{StakeLifecycle, StakeTestContext, WithdrawConfig, WithdrawWithSignerConfig},
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
-    solana_stake_interface::{instruction as ixn, state::StakeStateV2},
+    solana_stake_interface::state::StakeStateV2,
     solana_stake_program::id,
     test_case::test_case,
 };
@@ -51,20 +51,6 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         1
     };
 
-    let instruction = ixn::withdraw(
-        &withdraw_source,
-        &signer,
-        &recipient,
-        staked_amount + rent_spillover,
-        None,
-    );
-    let accounts = vec![
-        (withdraw_source, withdraw_source_account.clone()),
-        (recipient, recipient_account.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-
     // For initialized/delegated accounts, the program itself checks and fails with InsufficientFunds
     // For uninitialized/closed accounts, the program succeeds but leaves accounts below rent exemption
     if withdraw_source_type == StakeLifecycle::Uninitialized
@@ -72,11 +58,14 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     {
         // Expect program success but rent check should fail - catch the panic
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            ctx.mollusk.process_and_validate_instruction(
-                &instruction,
-                &accounts,
-                &[Check::success(), Check::all_rent_exempt()],
-            )
+            ctx.process_with(WithdrawWithSignerConfig {
+                stake: (&withdraw_source, &withdraw_source_account),
+                signer: &signer,
+                recipient: (&recipient, &recipient_account),
+                amount: staked_amount + rent_spillover,
+            })
+            .checks(&[Check::success(), Check::all_rent_exempt()])
+            .execute()
         }));
         // The rent exemption check should panic
         assert!(
@@ -85,27 +74,26 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         );
     } else {
         // Program fails with InsufficientFunds
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&withdraw_source, &withdraw_source_account),
+            signer: &signer,
+            recipient: (&recipient, &recipient_account),
+            amount: staked_amount + rent_spillover,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
     }
 
     if withdraw_source_type.withdraw_minimum_enforced() {
         // Withdraw active or activating stake fails
-        let instruction = ixn::withdraw(&withdraw_source, &signer, &recipient, staked_amount, None);
-        let accounts = vec![
-            (withdraw_source, withdraw_source_account.clone()),
-            (recipient, recipient_account.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&withdraw_source, &withdraw_source_account),
+            signer: &signer,
+            recipient: (&recipient, &recipient_account),
+            amount: staked_amount,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
 
         // Grant rewards
         let reward_amount = 10;
@@ -114,62 +102,47 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             .unwrap();
 
         // Withdraw in excess of rewards is not allowed
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signer,
-            &recipient,
-            reward_amount + 1,
-            None,
-        );
-        let accounts = vec![
-            (withdraw_source, withdraw_source_account.clone()),
-            (recipient, recipient_account.clone()),
-        ];
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        ctx.mollusk.process_and_validate_instruction(
-            &instruction,
-            &accounts,
-            &[Check::err(ProgramError::InsufficientFunds)],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&withdraw_source, &withdraw_source_account),
+            signer: &signer,
+            recipient: (&recipient, &recipient_account),
+            amount: reward_amount + 1,
+        })
+        .checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .execute();
 
         // Withdraw rewards is allowed
-        let instruction = ixn::withdraw(&withdraw_source, &signer, &recipient, reward_amount, None);
-        let accounts = vec![
-            (withdraw_source, withdraw_source_account.clone()),
-            (recipient, recipient_account.clone()),
-        ];
-
-        helpers::process_instruction_after_testing_missing_signers(
-            &ctx.mollusk,
-            &instruction,
-            &accounts,
-            &[
-                Check::success(),
-                Check::account(&recipient)
-                    .lamports(reward_amount + wallet_rent_exempt_reserve)
-                    .build(),
-            ],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&withdraw_source, &withdraw_source_account),
+            signer: &signer,
+            recipient: (&recipient, &recipient_account),
+            amount: reward_amount,
+        })
+        .checks(&[
+            Check::success(),
+            Check::account(&recipient)
+                .lamports(reward_amount + wallet_rent_exempt_reserve)
+                .build(),
+        ])
+        .test_missing_signers(true)
+        .execute();
     } else {
         // Withdraw that leaves rent behind is allowed
-        let instruction = ixn::withdraw(&withdraw_source, &signer, &recipient, staked_amount, None);
-        let accounts = vec![
-            (withdraw_source, withdraw_source_account.clone()),
-            (recipient, recipient_account.clone()),
-        ];
-
-        let result = helpers::process_instruction_after_testing_missing_signers(
-            &ctx.mollusk,
-            &instruction,
-            &accounts,
-            &[
+        let result = ctx
+            .process_with(WithdrawWithSignerConfig {
+                stake: (&withdraw_source, &withdraw_source_account),
+                signer: &signer,
+                recipient: (&recipient, &recipient_account),
+                amount: staked_amount,
+            })
+            .checks(&[
                 Check::success(),
                 Check::account(&recipient)
                     .lamports(staked_amount + wallet_rent_exempt_reserve)
                     .build(),
-            ],
-        );
+            ])
+            .test_missing_signers(true)
+            .execute();
 
         withdraw_source_account = result.resulting_accounts[0].1.clone().into();
 
@@ -182,29 +155,20 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         let mut recipient2_account = AccountSharedData::default();
         recipient2_account.set_lamports(wallet_rent_exempt_reserve);
 
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signer,
-            &recipient2,
-            staked_amount + ctx.rent_exempt_reserve,
-            None,
-        );
-        let accounts = vec![
-            (withdraw_source, withdraw_source_account),
-            (recipient2, recipient2_account),
-        ];
-
-        helpers::process_instruction_after_testing_missing_signers(
-            &ctx.mollusk,
-            &instruction,
-            &accounts,
-            &[
-                Check::success(),
-                Check::account(&recipient2)
-                    .lamports(staked_amount + ctx.rent_exempt_reserve + wallet_rent_exempt_reserve)
-                    .build(),
-            ],
-        );
+        ctx.process_with(WithdrawWithSignerConfig {
+            stake: (&withdraw_source, &withdraw_source_account),
+            signer: &signer,
+            recipient: (&recipient2, &recipient2_account),
+            amount: staked_amount + ctx.rent_exempt_reserve,
+        })
+        .checks(&[
+            Check::success(),
+            Check::account(&recipient2)
+                .lamports(staked_amount + ctx.rent_exempt_reserve + wallet_rent_exempt_reserve)
+                .build(),
+        ])
+        .test_missing_signers(true)
+        .execute();
     }
 }
 
@@ -226,22 +190,11 @@ fn test_withdraw_from_rewards_pool() {
     let recipient = Pubkey::new_unique();
     let recipient_account = AccountSharedData::default();
 
-    let instruction = ixn::withdraw(
-        &rewards_pool_address,
-        &ctx.withdrawer,
-        &recipient,
-        staked_amount,
-        None,
-    );
-    let accounts = vec![
-        (rewards_pool_address, rewards_pool_data),
-        (recipient, recipient_account),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(WithdrawConfig {
+        stake: (&rewards_pool_address, &rewards_pool_data),
+        recipient: (&recipient, &recipient_account),
+        amount: staked_amount,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }

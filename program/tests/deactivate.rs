@@ -3,10 +3,7 @@
 mod helpers;
 
 use {
-    crate::helpers::add_sysvars,
-    helpers::{
-        parse_stake_account, process_instruction_after_testing_missing_signers, StakeTestContext,
-    },
+    helpers::{parse_stake_account, DeactivateConfig, DelegateConfig, StakeTestContext},
     mollusk_svm::result::Check,
     solana_program_error::ProgramError,
     solana_stake_interface::{error::StakeError, instruction as ixn, state::StakeStateV2},
@@ -23,27 +20,19 @@ fn test_deactivate(activate: bool) {
         ctx.create_stake_account(helpers::StakeLifecycle::Initialized, ctx.minimum_delegation);
 
     // Deactivating an undelegated account fails
-    let instruction = ixn::deactivate_stake(&stake, &ctx.staker);
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(DeactivateConfig {
+        stake: (&stake, &stake_account),
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 
     // Delegate
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &ctx.vote_account);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    let result =
-        ctx.mollusk
-            .process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+    let result = ctx
+        .process_with(DelegateConfig {
+            stake: (&stake, &stake_account),
+            vote: (&ctx.vote_account, &ctx.vote_account_data),
+        })
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     if activate {
@@ -56,8 +45,7 @@ fn test_deactivate(activate: bool) {
     // Deactivate with withdrawer fails
     let instruction = ixn::deactivate_stake(&stake, &ctx.withdrawer);
     let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    let accounts = helpers::add_sysvars(&ctx.mollusk, &instruction, accounts);
     ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
@@ -65,14 +53,11 @@ fn test_deactivate(activate: bool) {
     );
 
     // Deactivate succeeds
-    let instruction = ixn::deactivate_stake(&stake, &ctx.staker);
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let result = process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(DeactivateConfig {
+            stake: (&stake, &stake_account),
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -80,8 +65,9 @@ fn test_deactivate(activate: bool) {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     let clock = ctx.mollusk.sysvars.clock.clone();
@@ -92,15 +78,11 @@ fn test_deactivate(activate: bool) {
     );
 
     // Deactivate again fails
-    let instruction = ixn::deactivate_stake(&stake, &ctx.staker);
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::AlreadyDeactivated.into())],
-    );
+    ctx.process_with(DeactivateConfig {
+        stake: (&stake, &stake_account),
+    })
+    .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
+    .execute();
 
     // Advance epoch
     let current_slot = ctx.mollusk.sysvars.clock.slot;
@@ -108,13 +90,10 @@ fn test_deactivate(activate: bool) {
     ctx.mollusk.warp_to_slot(current_slot + slots_per_epoch);
 
     // Deactivate again still fails
-    let instruction = ixn::deactivate_stake(&stake, &ctx.staker);
-    let accounts = vec![(stake, stake_account)];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::AlreadyDeactivated.into())],
-    );
+    ctx.process_with(DeactivateConfig {
+        stake: (&stake, &stake_account),
+    })
+    .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
+    .test_missing_signers(true)
+    .execute();
 }

@@ -3,7 +3,7 @@
 mod helpers;
 
 use {
-    crate::helpers::add_sysvars,
+    crate::helpers::{MoveLamportsConfig, MoveLamportsFullConfig},
     helpers::{
         get_effective_stake, parse_stake_account, true_up_transient_stake_epoch, StakeLifecycle,
         StakeTestContext,
@@ -11,7 +11,7 @@ use {
     mollusk_svm::result::Check,
     solana_account::WritableAccount,
     solana_program_error::ProgramError,
-    solana_stake_interface::{error::StakeError, instruction as ixn, state::Lockup},
+    solana_stake_interface::{error::StakeError, state::Lockup},
     test_case::test_matrix,
 };
 
@@ -109,63 +109,61 @@ fn test_move_lamports(
         || move_source_type == StakeLifecycle::Deactivating
         || move_dest_type == StakeLifecycle::Deactivating
     {
-        let instruction = ixn::move_lamports(&move_source, &move_dest, &ctx.staker, source_excess);
-
-        let mut accounts = vec![
-            (move_source, move_source_account),
-            (move_dest, move_dest_account),
-            (ctx.vote_account, ctx.vote_account_data.clone()),
-        ];
-        if different_votes {
-            accounts.push((dest_vote_account, dest_vote_account_data.clone()));
-        }
-
-        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-        let result = ctx.mollusk.process_instruction(&instruction, &accounts);
+        let result = ctx
+            .process_with(MoveLamportsFullConfig {
+                source: (&move_source, &move_source_account),
+                destination: (&move_dest, &move_dest_account),
+                signer: &ctx.staker,
+                amount: source_excess,
+                source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+                dest_vote: if different_votes {
+                    Some((&dest_vote_account, &dest_vote_account_data))
+                } else {
+                    None
+                },
+            })
+            .checks(&[])
+            .execute();
         assert!(result.program_result.is_err());
         return;
     }
 
     // Overshoot and fail for underfunded source
-    let instruction = ixn::move_lamports(&move_source, &move_dest, &ctx.staker, source_excess + 1);
-
-    let mut accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-    if different_votes {
-        accounts.push((dest_vote_account, dest_vote_account_data.clone()));
-    }
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidArgument)],
-    );
+    ctx.process_with(MoveLamportsFullConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        signer: &ctx.staker,
+        amount: source_excess + 1,
+        source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+        dest_vote: if different_votes {
+            Some((&dest_vote_account, &dest_vote_account_data))
+        } else {
+            None
+        },
+    })
+    .checks(&[Check::err(ProgramError::InvalidArgument)])
+    .execute();
 
     let before_source_lamports = parse_stake_account(&move_source_account).2;
     let before_dest_lamports = parse_stake_account(&move_dest_account).2;
 
     // Now properly move the full excess
-    let instruction = ixn::move_lamports(&move_source, &move_dest, &ctx.staker, source_excess);
-
-    let mut accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data),
-    ];
-    if different_votes {
-        accounts.push((dest_vote_account, dest_vote_account_data));
-    }
-
-    let result = helpers::process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[Check::success()],
-    );
+    let result = ctx
+        .process_with(MoveLamportsFullConfig {
+            source: (&move_source, &move_source_account),
+            destination: (&move_dest, &move_dest_account),
+            signer: &ctx.staker,
+            amount: source_excess,
+            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            dest_vote: if different_votes {
+                Some((&dest_vote_account, &dest_vote_account_data))
+            } else {
+                None
+            },
+        })
+        .checks(&[Check::success()])
+        .test_missing_signers(true)
+        .execute();
 
     move_source_account = result.resulting_accounts[0].1.clone().into();
     move_dest_account = result.resulting_accounts[1].1.clone().into();
@@ -223,25 +221,16 @@ fn test_move_lamports_uninitialized_fail(move_types: (StakeLifecycle, StakeLifec
         ctx.staker
     };
 
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest,
-        &source_signer,
-        ctx.minimum_delegation,
-    );
-
-    let accounts = vec![
-        (move_source, move_source_account),
-        (move_dest, move_dest_account),
-        (ctx.vote_account, ctx.vote_account_data),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(MoveLamportsFullConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        signer: &source_signer,
+        amount: ctx.minimum_delegation,
+        source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+        dest_vote: None,
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }
 
 #[test_matrix(
@@ -264,23 +253,13 @@ fn test_move_lamports_general_fail(
         .unwrap();
 
     // Self-move fails
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_source,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidInstructionData)],
-    );
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_source, &move_source_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(ProgramError::InvalidInstructionData)])
+    .execute();
 
     // Zero move fails
     let (move_dest, mut move_dest_account) =
@@ -295,39 +274,25 @@ fn test_move_lamports_general_fail(
         move_dest_type,
     );
 
-    let instruction = ixn::move_lamports(&move_source, &move_dest, &ctx.staker, 0);
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidArgument)],
-    );
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        amount: 0,
+    })
+    .checks(&[Check::err(ProgramError::InvalidArgument)])
+    .execute();
 
     // Sign with withdrawer fails
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest,
-        &ctx.withdrawer,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest, move_dest_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(MoveLamportsFullConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest, &move_dest_account),
+        signer: &ctx.withdrawer,
+        amount: ctx.minimum_delegation,
+        source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+        dest_vote: None,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Source lockup fails
     let (move_locked_source, mut move_locked_source_account) = ctx
@@ -339,24 +304,13 @@ fn test_move_lamports_general_fail(
     let (move_dest2, move_dest2_account) =
         ctx.create_stake_account(move_dest_type, ctx.minimum_delegation);
 
-    let instruction = ixn::move_lamports(
-        &move_locked_source,
-        &move_dest2,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_locked_source, move_locked_source_account),
-        (move_dest2, move_dest2_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_locked_source, &move_locked_source_account),
+        destination: (&move_dest2, &move_dest2_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
     // Staker mismatch fails
     let throwaway_staker = solana_pubkey::Pubkey::new_unique();
@@ -368,44 +322,24 @@ fn test_move_lamports_general_fail(
         &withdrawer,
     );
 
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest3,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest3, move_dest3_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest3, &move_dest3_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    // Authority mismatch always returns MergeMismatch
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
-
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest3,
-        &throwaway_staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest3, move_dest3_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(MoveLamportsFullConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest3, &move_dest3_account),
+        signer: &throwaway_staker,
+        amount: ctx.minimum_delegation,
+        source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+        dest_vote: None,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Withdrawer mismatch fails
     let throwaway_withdrawer = solana_pubkey::Pubkey::new_unique();
@@ -417,44 +351,24 @@ fn test_move_lamports_general_fail(
         &throwaway_withdrawer,
     );
 
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest4,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest4, move_dest4_account.clone()),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest4, &move_dest4_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    // Authority mismatch always returns MergeMismatch
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
-
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest4,
-        &throwaway_withdrawer,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account.clone()),
-        (move_dest4, move_dest4_account),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(MoveLamportsFullConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest4, &move_dest4_account),
+        signer: &throwaway_withdrawer,
+        amount: ctx.minimum_delegation,
+        source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+        dest_vote: None,
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Dest lockup fails
     let (move_dest5, move_dest5_account) = ctx.create_stake_account_with_lockup(
@@ -463,23 +377,11 @@ fn test_move_lamports_general_fail(
         &in_force_lockup,
     );
 
-    let instruction = ixn::move_lamports(
-        &move_source,
-        &move_dest5,
-        &ctx.staker,
-        ctx.minimum_delegation,
-    );
-    let accounts = vec![
-        (move_source, move_source_account),
-        (move_dest5, move_dest5_account),
-        (ctx.vote_account, ctx.vote_account_data),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    // Lockup mismatch always returns MergeMismatch
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::MergeMismatch.into())],
-    );
+    ctx.process_with(MoveLamportsConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest5, &move_dest5_account),
+        amount: ctx.minimum_delegation,
+    })
+    .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
 }

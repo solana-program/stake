@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use {
-    mollusk_svm::Mollusk,
+    mollusk_svm::{result::Check, Mollusk},
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
     solana_clock::Epoch,
     solana_instruction::Instruction,
@@ -11,7 +11,7 @@ use {
     solana_stake_interface::{
         instruction as ixn,
         stake_history::{StakeHistory, StakeHistoryEntry},
-        state::{Authorized, Delegation, Lockup, StakeStateV2},
+        state::{Authorized, Delegation, Lockup, StakeAuthorize, StakeStateV2},
     },
     solana_stake_program::id,
     solana_sysvar_id::SysvarId,
@@ -541,38 +541,510 @@ pub fn true_up_transient_stake_epoch(
     stake_account.set_data(bincode::serialize(&stake_state).unwrap());
 }
 
-/// Test that removing any required signer causes the instruction to fail with MissingRequiredSignature,
-/// then verify the instruction succeeds with all signers present.
-///
-/// NOTE: In mollusk, "signers" are controlled by the is_signer flag in AccountMeta. Unlike in
-/// solana_program_test, we don't use Keypair objects - the runtime checks signatures based
-/// on the instruction metadata.
-pub fn process_instruction_after_testing_missing_signers(
-    mollusk: &Mollusk,
-    instruction: &Instruction,
-    accounts: &[(Pubkey, AccountSharedData)],
-    checks: &[mollusk_svm::result::Check],
-) -> mollusk_svm::result::InstructionResult {
-    use {mollusk_svm::result::Check, solana_program_error::ProgramError};
+// Usage Examples:
+//
+// Basic delegate instruction:
+//   ctx.process_with(DelegateConfig {
+//       stake: (&stake_pk, &stake_acc),
+//       vote: (&vote_pk, &vote_acc),
+//   }).execute();
+//
+// With custom checks and signer testing:
+//   ctx.process_with(WithdrawConfig {
+//       stake: (&stake_pk, &stake_acc),
+//       recipient: (&recipient_pk, &recipient_acc),
+//       amount: 100,
+//   })
+//   .checks(&[Check::success()])
+//   .test_missing_signers(true)
+//   .execute();
+//
+// With custom signer:
+//   ctx.process_with(WithdrawWithSignerConfig {
+//       stake: (&stake_pk, &stake_acc),
+//       signer: &custom_signer,
+//       recipient: (&recipient_pk, &recipient_acc),
+//       amount: 100,
+//   }).execute();
+//
+// Move instructions with vote accounts:
+//   ctx.process_with(MoveStakeConfig {
+//       source: (&src_pk, &src_acc),
+//       destination: (&dst_pk, &dst_acc),
+//       amount: 100,
+//   }.with_default_vote(&ctx))
+//   .execute();
+//
+// Benefits:
+// - Named fields prevent account ordering bugs
+// - Config structs are self-documenting (DelegateConfig vs func params)
+// - Easy to add new instruction variants
+// - Type-safe and IDE-friendly
+// - Reduces helpers.rs from ~1500 to ~1000 lines
+//
+// ============================================================================
 
-    for i in 0..instruction.accounts.len() {
-        if instruction.accounts[i].is_signer {
-            let mut modified_instruction = instruction.clone();
-            modified_instruction.accounts[i].is_signer = false;
+/// Trait for instruction configuration that builds instruction and accounts
+pub trait InstructionConfig {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction;
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)>;
+}
 
-            let accounts_with_sysvars =
-                add_sysvars(mollusk, &modified_instruction, accounts.to_vec());
+/// Execution builder for fluent API with validation and signer testing
+pub struct InstructionExecution<'a, 'b> {
+    instruction: Instruction,
+    accounts: Vec<(Pubkey, AccountSharedData)>,
+    ctx: &'a StakeTestContext,
+    checks: Option<&'b [Check<'b>]>,
+    test_missing_signers: bool,
+}
 
-            mollusk.process_and_validate_instruction(
-                &modified_instruction,
-                &accounts_with_sysvars,
-                &[Check::err(ProgramError::MissingRequiredSignature)],
-            );
-        }
+impl<'b> InstructionExecution<'_, 'b> {
+    pub fn checks(mut self, checks: &'b [Check<'b>]) -> Self {
+        self.checks = Some(checks);
+        self
     }
 
-    let accounts_with_sysvars = add_sysvars(mollusk, instruction, accounts.to_vec());
-    mollusk.process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
+    pub fn test_missing_signers(mut self, test: bool) -> Self {
+        self.test_missing_signers = test;
+        self
+    }
+
+    pub fn execute(self) -> mollusk_svm::result::InstructionResult {
+        let default_checks = [Check::success()];
+        let checks = self.checks.unwrap_or(&default_checks);
+        self.ctx.process_instruction_maybe_test_signers(
+            &self.instruction,
+            self.accounts,
+            checks,
+            self.test_missing_signers,
+        )
+    }
+}
+
+pub struct DelegateConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub vote: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for DelegateConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::delegate_stake(self.stake.0, &ctx.staker, self.vote.0)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.vote.0, self.vote.1.clone()),
+        ]
+    }
+}
+
+pub struct DeactivateConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for DeactivateConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::deactivate_stake(self.stake.0, &ctx.staker)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct WithdrawConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub recipient: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+}
+
+impl InstructionConfig for WithdrawConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::withdraw(
+            self.stake.0,
+            &ctx.withdrawer,
+            self.recipient.0,
+            self.amount,
+            None,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.recipient.0, self.recipient.1.clone()),
+        ]
+    }
+}
+
+pub struct WithdrawWithSignerConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub signer: &'a Pubkey,
+    pub recipient: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+}
+
+impl InstructionConfig for WithdrawWithSignerConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::withdraw(
+            self.stake.0,
+            self.signer,
+            self.recipient.0,
+            self.amount,
+            None,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.recipient.0, self.recipient.1.clone()),
+        ]
+    }
+}
+
+pub struct SplitConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub signer: &'a Pubkey,
+    pub amount: u64,
+}
+
+impl InstructionConfig for SplitConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        let instructions = ixn::split(self.source.0, self.signer, self.amount, self.destination.0);
+        instructions[2].clone() // The actual split instruction
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
+pub struct AuthorizeConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+}
+
+impl InstructionConfig for AuthorizeConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let authority = match self.stake_authorize {
+            StakeAuthorize::Staker => &ctx.staker,
+            StakeAuthorize::Withdrawer => &ctx.withdrawer,
+        };
+        ixn::authorize(
+            self.stake.0,
+            authority,
+            self.new_authority,
+            self.stake_authorize,
+            None,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct AuthorizeWithAuthorityConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authority: &'a Pubkey,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+}
+
+impl InstructionConfig for AuthorizeWithAuthorityConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::authorize(
+            self.stake.0,
+            self.authority,
+            self.new_authority,
+            self.stake_authorize,
+            None,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct MergeConfig<'a> {
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for MergeConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let instructions = ixn::merge(self.destination.0, self.source.0, &ctx.staker);
+        instructions[0].clone() // Merge returns a Vec, use first instruction
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.destination.0, self.destination.1.clone()),
+            (*self.source.0, self.source.1.clone()),
+        ]
+    }
+}
+
+pub struct MoveLamportsConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+}
+
+impl<'a> MoveLamportsConfig<'a> {
+    /// Helper to get the default source vote account from context
+    pub fn with_default_vote(self, ctx: &'a StakeTestContext) -> MoveLamportsFullConfig<'a> {
+        MoveLamportsFullConfig {
+            source: self.source,
+            destination: self.destination,
+            signer: &ctx.staker,
+            amount: self.amount,
+            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            dest_vote: None,
+        }
+    }
+}
+
+impl InstructionConfig for MoveLamportsConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::move_lamports(self.source.0, self.destination.0, &ctx.staker, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
+pub struct MoveLamportsFullConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub signer: &'a Pubkey,
+    pub amount: u64,
+    pub source_vote: (&'a Pubkey, &'a AccountSharedData),
+    pub dest_vote: Option<(&'a Pubkey, &'a AccountSharedData)>,
+}
+
+impl InstructionConfig for MoveLamportsFullConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::move_lamports(self.source.0, self.destination.0, self.signer, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        let mut accounts = vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+            (*self.source_vote.0, self.source_vote.1.clone()),
+        ];
+        if let Some((vote_pk, vote_acc)) = self.dest_vote {
+            accounts.push((*vote_pk, vote_acc.clone()));
+        }
+        accounts
+    }
+}
+
+pub struct MoveStakeConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+}
+
+impl<'a> MoveStakeConfig<'a> {
+    /// Helper to get the default source vote account from context
+    pub fn with_default_vote(self, ctx: &'a StakeTestContext) -> MoveStakeWithVoteConfig<'a> {
+        MoveStakeWithVoteConfig {
+            source: self.source,
+            destination: self.destination,
+            signer: &ctx.staker,
+            amount: self.amount,
+            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            dest_vote: None,
+        }
+    }
+}
+
+impl InstructionConfig for MoveStakeConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::move_stake(self.source.0, self.destination.0, &ctx.staker, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
+pub struct MoveStakeWithSignerConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub signer: &'a Pubkey,
+    pub amount: u64,
+}
+
+impl<'a> MoveStakeWithSignerConfig<'a> {
+    /// Helper to add the default vote account from context
+    pub fn with_default_vote(self, ctx: &'a StakeTestContext) -> MoveStakeWithVoteConfig<'a> {
+        MoveStakeWithVoteConfig {
+            source: self.source,
+            destination: self.destination,
+            signer: self.signer,
+            amount: self.amount,
+            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            dest_vote: None,
+        }
+    }
+}
+
+impl InstructionConfig for MoveStakeWithSignerConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::move_stake(self.source.0, self.destination.0, self.signer, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
+pub struct MoveStakeWithVoteConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub signer: &'a Pubkey,
+    pub amount: u64,
+    pub source_vote: (&'a Pubkey, &'a AccountSharedData),
+    pub dest_vote: Option<(&'a Pubkey, &'a AccountSharedData)>,
+}
+
+impl InstructionConfig for MoveStakeWithVoteConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::move_stake(self.source.0, self.destination.0, self.signer, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        let mut accounts = vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+            (*self.source_vote.0, self.source_vote.1.clone()),
+        ];
+        if let Some((vote_pk, vote_acc)) = self.dest_vote {
+            accounts.push((*vote_pk, vote_acc.clone()));
+        }
+        accounts
+    }
+}
+
+pub struct InitializeConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authorized: &'a Authorized,
+    pub lockup: &'a Lockup,
+}
+
+impl InstructionConfig for InitializeConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::initialize(self.stake.0, self.authorized, self.lockup)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct InitializeCheckedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authorized: &'a Authorized,
+}
+
+impl InstructionConfig for InitializeCheckedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::initialize_checked(self.stake.0, self.authorized)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct AuthorizeCheckedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authority: &'a Pubkey,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+    pub custodian: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for AuthorizeCheckedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::authorize_checked(
+            self.stake.0,
+            self.authority,
+            self.new_authority,
+            self.stake_authorize,
+            self.custodian,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct AuthorizeCheckedWithSeedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authority_base: &'a Pubkey,
+    pub authority_seed: String,
+    pub authority_owner: &'a Pubkey,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+    pub custodian: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for AuthorizeCheckedWithSeedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::authorize_checked_with_seed(
+            self.stake.0,
+            self.authority_base,
+            self.authority_seed.clone(),
+            self.authority_owner,
+            self.new_authority,
+            self.stake_authorize,
+            self.custodian,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct SetLockupCheckedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub lockup_args: &'a ixn::LockupArgs,
+    pub custodian: &'a Pubkey,
+}
+
+impl InstructionConfig for SetLockupCheckedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::set_lockup_checked(self.stake.0, self.lockup_args, self.custodian)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
 }
 
 /// Consolidated test context that bundles all common test setup
@@ -687,6 +1159,55 @@ impl StakeTestContext {
     /// Create a second vote account (for testing different vote accounts)
     pub fn create_second_vote_account(&self) -> (Pubkey, AccountSharedData) {
         (Pubkey::new_unique(), create_vote_account())
+    }
+
+    /// Process an instruction with a config-based approach
+    pub fn process_with<'b, C: InstructionConfig>(
+        &self,
+        config: C,
+    ) -> InstructionExecution<'_, 'b> {
+        InstructionExecution {
+            instruction: config.build_instruction(self),
+            accounts: config.build_accounts(),
+            ctx: self,
+            checks: None,
+            test_missing_signers: false,
+        }
+    }
+
+    /// Internal helper to process an instruction with optional missing signer testing
+    fn process_instruction_maybe_test_signers(
+        &self,
+        instruction: &Instruction,
+        accounts: Vec<(Pubkey, AccountSharedData)>,
+        checks: &[Check],
+        test_missing_signers: bool,
+    ) -> mollusk_svm::result::InstructionResult {
+        if test_missing_signers {
+            use solana_program_error::ProgramError;
+
+            // Test that removing each signer causes failure
+            for i in 0..instruction.accounts.len() {
+                if instruction.accounts[i].is_signer {
+                    let mut modified_instruction = instruction.clone();
+                    modified_instruction.accounts[i].is_signer = false;
+
+                    let accounts_with_sysvars =
+                        add_sysvars(&self.mollusk, &modified_instruction, accounts.clone());
+
+                    self.mollusk.process_and_validate_instruction(
+                        &modified_instruction,
+                        &accounts_with_sysvars,
+                        &[Check::err(ProgramError::MissingRequiredSignature)],
+                    );
+                }
+            }
+        }
+
+        // Process with all signers present
+        let accounts_with_sysvars = add_sysvars(&self.mollusk, instruction, accounts);
+        self.mollusk
+            .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
 

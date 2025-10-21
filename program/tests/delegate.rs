@@ -4,8 +4,8 @@ mod helpers;
 
 use {
     helpers::{
-        add_sysvars, create_vote_account, increment_vote_account_credits, initialize_stake_account,
-        parse_stake_account, MolluskStakeExt, StakeTestContext,
+        create_vote_account, increment_vote_account_credits, initialize_stake_account,
+        parse_stake_account, DeactivateConfig, DelegateConfig, MolluskStakeExt, StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
@@ -13,7 +13,6 @@ use {
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         error::StakeError,
-        instruction as ixn,
         state::{Authorized, Delegation, Lockup, Stake, StakeStateV2},
     },
     solana_stake_program::id,
@@ -40,17 +39,12 @@ fn test_delegate() {
     );
 
     // Delegate stake
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &ctx.vote_account);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (ctx.vote_account, vote_account_data.clone()),
-    ];
-
-    let result = helpers::process_instruction_after_testing_missing_signers(
-        &ctx.mollusk,
-        &instruction,
-        &accounts,
-        &[
+    let result = ctx
+        .process_with(DelegateConfig {
+            stake: (&stake, &stake_account),
+            vote: (&ctx.vote_account, &vote_account_data),
+        })
+        .checks(&[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
@@ -58,8 +52,9 @@ fn test_delegate() {
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
-        ],
-    );
+        ])
+        .test_missing_signers(true)
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     // Verify that delegate() looks right
@@ -97,57 +92,39 @@ fn test_delegate() {
     );
 
     // Verify that delegate fails as stake is active and not deactivating
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &ctx.vote_account);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (ctx.vote_account, vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::TooSoonToRedelegate.into())],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&stake, &stake_account),
+        vote: (&ctx.vote_account, &ctx.vote_account_data),
+    })
+    .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .execute();
 
     // Deactivate
-    let instruction = ixn::deactivate_stake(&stake, &ctx.staker);
-    let accounts = vec![(stake, stake_account.clone())];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    let result =
-        ctx.mollusk
-            .process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+    let result = ctx
+        .process_with(DeactivateConfig {
+            stake: (&stake, &stake_account),
+        })
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     // Create second vote account
     let (vote_account2, vote_account2_data) = ctx.create_second_vote_account();
 
     // Verify that delegate to a different vote account fails during deactivation
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &vote_account2);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (vote_account2, vote_account2_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::TooSoonToRedelegate.into())],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&stake, &stake_account),
+        vote: (&vote_account2, &vote_account2_data),
+    })
+    .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .execute();
 
     // Verify that delegate succeeds to same vote account when stake is deactivating
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &ctx.vote_account);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (ctx.vote_account, vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    let result =
-        ctx.mollusk
-            .process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+    let result = ctx
+        .process_with(DelegateConfig {
+            stake: (&stake, &stake_account),
+            vote: (&ctx.vote_account, &ctx.vote_account_data),
+        })
+        .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
     // Verify that deactivation has been cleared
@@ -155,18 +132,12 @@ fn test_delegate() {
     assert_eq!(stake_data.unwrap().delegation.deactivation_epoch, u64::MAX);
 
     // Verify that delegate to a different vote account fails if stake is still active
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &vote_account2);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (vote_account2, vote_account2_data),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::TooSoonToRedelegate.into())],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&stake, &stake_account),
+        vote: (&vote_account2, &vote_account2_data),
+    })
+    .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .execute();
 
     // Advance epoch again using tracker
     let current_slot = ctx.mollusk.sysvars.clock.slot;
@@ -180,18 +151,12 @@ fn test_delegate() {
     // Delegate still fails after stake is fully activated; redelegate is not supported
     let (vote_account2, vote_account2_data) = ctx.create_second_vote_account();
 
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &vote_account2);
-    let accounts = vec![
-        (stake, stake_account.clone()),
-        (vote_account2, vote_account2_data),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(StakeError::TooSoonToRedelegate.into())],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&stake, &stake_account),
+        vote: (&vote_account2, &vote_account2_data),
+    })
+    .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .execute();
 }
 
 #[test]
@@ -216,15 +181,12 @@ fn test_delegate_fake_vote_account() {
     );
 
     // Try to delegate to fake vote account
-    let instruction = ixn::delegate_stake(&stake, &ctx.staker, &fake_vote_account);
-    let accounts = vec![(stake, stake_account), (fake_vote_account, fake_vote_data)];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::IncorrectProgramId)],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&stake, &stake_account),
+        vote: (&fake_vote_account, &fake_vote_data),
+    })
+    .checks(&[Check::err(ProgramError::IncorrectProgramId)])
+    .execute();
 }
 
 #[test]
@@ -241,16 +203,10 @@ fn test_delegate_non_stake_account() {
     )
     .unwrap();
 
-    let instruction = ixn::delegate_stake(&rewards_pool, &ctx.staker, &ctx.vote_account);
-    let accounts = vec![
-        (rewards_pool, rewards_pool_data),
-        (ctx.vote_account, ctx.vote_account_data.clone()),
-    ];
-
-    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::InvalidAccountData)],
-    );
+    ctx.process_with(DelegateConfig {
+        stake: (&rewards_pool, &rewards_pool_data),
+        vote: (&ctx.vote_account, &ctx.vote_account_data),
+    })
+    .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .execute();
 }
