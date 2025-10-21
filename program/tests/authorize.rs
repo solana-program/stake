@@ -4,8 +4,8 @@ mod helpers;
 
 use {
     helpers::{
-        initialize_stake_account, parse_stake_account, AuthorizeWithAuthorityConfig,
-        StakeTestContext, WithdrawWithSignerConfig,
+        initialize_stake_account, parse_stake_account, AuthorizeConfig, StakeTestContext,
+        WithdrawConfig,
     },
     mollusk_svm::result::Check,
     solana_account::AccountSharedData,
@@ -37,9 +37,9 @@ fn test_authorize() {
     .unwrap();
 
     // Authorize uninitialized fails for staker
-    ctx.process_with(AuthorizeWithAuthorityConfig {
+    ctx.process_with(AuthorizeConfig {
         stake: (&stake, &stake_account),
-        authority: &stake,
+        override_authority: Some(&stake),
         new_authority: &staker1,
         stake_authorize: StakeAuthorize::Staker,
     })
@@ -47,9 +47,9 @@ fn test_authorize() {
     .execute();
 
     // Authorize uninitialized fails for withdrawer
-    ctx.process_with(AuthorizeWithAuthorityConfig {
+    ctx.process_with(AuthorizeConfig {
         stake: (&stake, &stake_account),
-        authority: &stake,
+        override_authority: Some(&stake),
         new_authority: &withdrawer1,
         stake_authorize: StakeAuthorize::Withdrawer,
     })
@@ -70,9 +70,9 @@ fn test_authorize() {
     // Change staker authority
     // Test that removing any signer causes failure, then verify success
     let result = ctx
-        .process_with(AuthorizeWithAuthorityConfig {
+        .process_with(AuthorizeConfig {
             stake: (&stake, &stake_account),
-            authority: &staker1,
+            override_authority: Some(&staker1),
             new_authority: &staker2,
             stake_authorize: StakeAuthorize::Staker,
         })
@@ -95,9 +95,9 @@ fn test_authorize() {
     // Change withdrawer authority
     // Test that removing any signer causes failure, then verify success
     let result = ctx
-        .process_with(AuthorizeWithAuthorityConfig {
+        .process_with(AuthorizeConfig {
             stake: (&stake, &stake_account),
-            authority: &withdrawer1,
+            override_authority: Some(&withdrawer1),
             new_authority: &withdrawer2,
             stake_authorize: StakeAuthorize::Withdrawer,
         })
@@ -118,9 +118,9 @@ fn test_authorize() {
     assert_eq!(meta.authorized.withdrawer, withdrawer2);
 
     // Old staker authority no longer works
-    ctx.process_with(AuthorizeWithAuthorityConfig {
+    ctx.process_with(AuthorizeConfig {
         stake: (&stake, &stake_account),
-        authority: &staker1,
+        override_authority: Some(&staker1),
         new_authority: &Pubkey::new_unique(),
         stake_authorize: StakeAuthorize::Staker,
     })
@@ -128,9 +128,9 @@ fn test_authorize() {
     .execute();
 
     // Old withdrawer authority no longer works
-    ctx.process_with(AuthorizeWithAuthorityConfig {
+    ctx.process_with(AuthorizeConfig {
         stake: (&stake, &stake_account),
-        authority: &withdrawer1,
+        override_authority: Some(&withdrawer1),
         new_authority: &Pubkey::new_unique(),
         stake_authorize: StakeAuthorize::Withdrawer,
     })
@@ -140,9 +140,9 @@ fn test_authorize() {
     // Change staker authority again with new authority
     // Test that removing any signer causes failure, then verify success
     let result = ctx
-        .process_with(AuthorizeWithAuthorityConfig {
+        .process_with(AuthorizeConfig {
             stake: (&stake, &stake_account),
-            authority: &staker2,
+            override_authority: Some(&staker2),
             new_authority: &staker3,
             stake_authorize: StakeAuthorize::Staker,
         })
@@ -165,9 +165,9 @@ fn test_authorize() {
     // Change withdrawer authority again with new authority
     // Test that removing any signer causes failure, then verify success
     let result = ctx
-        .process_with(AuthorizeWithAuthorityConfig {
+        .process_with(AuthorizeConfig {
             stake: (&stake, &stake_account),
-            authority: &withdrawer2,
+            override_authority: Some(&withdrawer2),
             new_authority: &withdrawer3,
             stake_authorize: StakeAuthorize::Withdrawer,
         })
@@ -188,9 +188,9 @@ fn test_authorize() {
     assert_eq!(meta.authorized.withdrawer, withdrawer3);
 
     // Changing withdrawer using staker fails
-    ctx.process_with(AuthorizeWithAuthorityConfig {
+    ctx.process_with(AuthorizeConfig {
         stake: (&stake, &stake_account),
-        authority: &staker3,
+        override_authority: Some(&staker3),
         new_authority: &Pubkey::new_unique(),
         stake_authorize: StakeAuthorize::Withdrawer,
     })
@@ -200,9 +200,9 @@ fn test_authorize() {
     // Changing staker using withdrawer is fine
     // Test that removing any signer causes failure, then verify success
     let result = ctx
-        .process_with(AuthorizeWithAuthorityConfig {
+        .process_with(AuthorizeConfig {
             stake: (&stake, &stake_account),
-            authority: &withdrawer3,
+            override_authority: Some(&withdrawer3),
             new_authority: &staker1,
             stake_authorize: StakeAuthorize::Staker,
         })
@@ -225,9 +225,9 @@ fn test_authorize() {
     // Withdraw using staker fails - test all three stakers to ensure none can withdraw
     for staker in [staker1, staker2, staker3] {
         let recipient = Pubkey::new_unique();
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&stake, &stake_account),
-            signer: &staker,
+            override_signer: Some(&staker),
             recipient: (&recipient, &AccountSharedData::default()),
             amount: ctx.rent_exempt_reserve,
         })

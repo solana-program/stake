@@ -103,6 +103,7 @@ fn test_delegate() {
     let result = ctx
         .process_with(DeactivateConfig {
             stake: (&stake, &stake_account),
+            override_signer: None,
         })
         .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();

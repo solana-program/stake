@@ -113,7 +113,7 @@ fn test_move_lamports(
             .process_with(MoveLamportsFullConfig {
                 source: (&move_source, &move_source_account),
                 destination: (&move_dest, &move_dest_account),
-                signer: &ctx.staker,
+                override_signer: Some(&ctx.staker),
                 amount: source_excess,
                 source_vote: (&ctx.vote_account, &ctx.vote_account_data),
                 dest_vote: if different_votes {
@@ -132,7 +132,7 @@ fn test_move_lamports(
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        signer: &ctx.staker,
+        override_signer: Some(&ctx.staker),
         amount: source_excess + 1,
         source_vote: (&ctx.vote_account, &ctx.vote_account_data),
         dest_vote: if different_votes {
@@ -152,7 +152,7 @@ fn test_move_lamports(
         .process_with(MoveLamportsFullConfig {
             source: (&move_source, &move_source_account),
             destination: (&move_dest, &move_dest_account),
-            signer: &ctx.staker,
+            override_signer: Some(&ctx.staker),
             amount: source_excess,
             source_vote: (&ctx.vote_account, &ctx.vote_account_data),
             dest_vote: if different_votes {
@@ -224,7 +224,7 @@ fn test_move_lamports_uninitialized_fail(move_types: (StakeLifecycle, StakeLifec
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        signer: &source_signer,
+        override_signer: Some(&source_signer),
         amount: ctx.minimum_delegation,
         source_vote: (&ctx.vote_account, &ctx.vote_account_data),
         dest_vote: None,
@@ -256,6 +256,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_source, &move_source_account),
+        override_signer: None,
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(ProgramError::InvalidInstructionData)])
@@ -277,6 +278,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
+        override_signer: None,
         amount: 0,
     })
     .checks(&[Check::err(ProgramError::InvalidArgument)])
@@ -286,7 +288,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        signer: &ctx.withdrawer,
+        override_signer: Some(&ctx.withdrawer),
         amount: ctx.minimum_delegation,
         source_vote: (&ctx.vote_account, &ctx.vote_account_data),
         dest_vote: None,
@@ -307,6 +309,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_locked_source, &move_locked_source_account),
         destination: (&move_dest2, &move_dest2_account),
+        override_signer: None,
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -325,6 +328,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest3, &move_dest3_account),
+        override_signer: None,
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -333,7 +337,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest3, &move_dest3_account),
-        signer: &throwaway_staker,
+        override_signer: Some(&throwaway_staker),
         amount: ctx.minimum_delegation,
         source_vote: (&ctx.vote_account, &ctx.vote_account_data),
         dest_vote: None,
@@ -354,6 +358,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest4, &move_dest4_account),
+        override_signer: None,
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -362,7 +367,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest4, &move_dest4_account),
-        signer: &throwaway_withdrawer,
+        override_signer: Some(&throwaway_withdrawer),
         amount: ctx.minimum_delegation,
         source_vote: (&ctx.vote_account, &ctx.vote_account_data),
         dest_vote: None,
@@ -380,6 +385,7 @@ fn test_move_lamports_general_fail(
     ctx.process_with(MoveLamportsConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest5, &move_dest5_account),
+        override_signer: None,
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])

@@ -5,7 +5,7 @@ mod helpers;
 use {
     helpers::{
         get_effective_stake, parse_stake_account, true_up_transient_stake_epoch, MoveStakeConfig,
-        MoveStakeWithSignerConfig, MoveStakeWithVoteConfig, StakeLifecycle, StakeTestContext,
+        MoveStakeWithVoteConfig, StakeLifecycle, StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_account::WritableAccount,
@@ -102,6 +102,7 @@ fn test_move_stake(
                     } else {
                         ctx.minimum_delegation
                     },
+                    override_signer: None,
                 })
                 .checks(&[])
                 .execute();
@@ -118,6 +119,7 @@ fn test_move_stake(
                 source: (&move_source, &move_source_account),
                 destination: (&move_dest, &move_dest_account),
                 amount: ctx.minimum_delegation - 1,
+                override_signer: None,
             })
             .checks(&[Check::err(ProgramError::InvalidArgument)])
             .execute();
@@ -128,6 +130,7 @@ fn test_move_stake(
             source: (&move_source, &move_source_account),
             destination: (&move_dest, &move_dest_account),
             amount: ctx.minimum_delegation + 1,
+            override_signer: None,
         })
         .checks(&[Check::err(ProgramError::InvalidArgument)])
         .execute();
@@ -142,6 +145,7 @@ fn test_move_stake(
             } else {
                 ctx.minimum_delegation
             },
+            override_signer: None,
         })
         .checks(&[Check::success()])
         .test_missing_signers(true)
@@ -225,10 +229,10 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
         ctx.staker
     };
 
-    ctx.process_with(MoveStakeWithSignerConfig {
+    ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        signer: &source_signer,
+        override_signer: Some(&source_signer),
         amount: ctx.minimum_delegation,
     })
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
@@ -262,6 +266,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_source, &move_source_account),
         destination: (&move_source, &move_source_account),
         amount: ctx.minimum_delegation,
+        override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidInstructionData)])
     .execute();
@@ -274,16 +279,17 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
         amount: 0,
+        override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidArgument)])
     .execute();
 
     // Sign with withdrawer fails
-    ctx.process_with(MoveStakeWithSignerConfig {
+    ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        signer: &ctx.withdrawer,
         amount: ctx.minimum_delegation,
+        override_signer: Some(&ctx.withdrawer),
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
     .execute();
@@ -302,6 +308,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_locked_source, &move_locked_source_account),
         destination: (&move_dest2, &move_dest2_account),
         amount: ctx.minimum_delegation,
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
@@ -320,6 +327,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_source, &move_source_account),
         destination: (&move_dest3, &move_dest3_account),
         amount: ctx.minimum_delegation,
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
@@ -338,6 +346,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_source, &move_source_account),
         destination: (&move_dest4, &move_dest4_account),
         amount: ctx.minimum_delegation,
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
@@ -353,6 +362,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         source: (&move_source, &move_source_account),
         destination: (&move_dest5, &move_dest5_account),
         amount: ctx.minimum_delegation,
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
@@ -379,7 +389,7 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         ctx.process_with(MoveStakeWithVoteConfig {
             source: (&move_source2, &move_source2_account),
             destination: (&move_dest6_pubkey, &move_dest6_account),
-            signer: &ctx.staker,
+            override_signer: Some(&ctx.staker),
             amount: ctx.minimum_delegation,
             source_vote: (&ctx.vote_account, &ctx.vote_account_data),
             dest_vote: Some((&dest_vote_account, &dest_vote_account_data)),

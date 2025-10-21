@@ -6,7 +6,7 @@ use {
     helpers::{parse_stake_account, DeactivateConfig, DelegateConfig, StakeTestContext},
     mollusk_svm::result::Check,
     solana_program_error::ProgramError,
-    solana_stake_interface::{error::StakeError, instruction as ixn, state::StakeStateV2},
+    solana_stake_interface::{error::StakeError, state::StakeStateV2},
     solana_stake_program::id,
     test_case::test_case,
 };
@@ -22,6 +22,7 @@ fn test_deactivate(activate: bool) {
     // Deactivating an undelegated account fails
     ctx.process_with(DeactivateConfig {
         stake: (&stake, &stake_account),
+        override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
     .execute();
@@ -43,19 +44,18 @@ fn test_deactivate(activate: bool) {
     }
 
     // Deactivate with withdrawer fails
-    let instruction = ixn::deactivate_stake(&stake, &ctx.withdrawer);
-    let accounts = vec![(stake, stake_account.clone())];
-    let accounts = helpers::add_sysvars(&ctx.mollusk, &instruction, accounts);
-    ctx.mollusk.process_and_validate_instruction(
-        &instruction,
-        &accounts,
-        &[Check::err(ProgramError::MissingRequiredSignature)],
-    );
+    ctx.process_with(DeactivateConfig {
+        stake: (&stake, &stake_account),
+        override_signer: Some(&ctx.withdrawer),
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
 
     // Deactivate succeeds
     let result = ctx
         .process_with(DeactivateConfig {
             stake: (&stake, &stake_account),
+            override_signer: None,
         })
         .checks(&[
             Check::success(),
@@ -80,6 +80,7 @@ fn test_deactivate(activate: bool) {
     // Deactivate again fails
     ctx.process_with(DeactivateConfig {
         stake: (&stake, &stake_account),
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
     .execute();
@@ -92,6 +93,7 @@ fn test_deactivate(activate: bool) {
     // Deactivate again still fails
     ctx.process_with(DeactivateConfig {
         stake: (&stake, &stake_account),
+        override_signer: None,
     })
     .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
     .test_missing_signers(true)

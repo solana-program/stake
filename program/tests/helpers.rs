@@ -336,8 +336,6 @@ impl StakeLifecycle {
             tracker.track_delegation(stake_pubkey, staked_amount, activation_epoch, vote_account);
         }
 
-        // For Activating lifecycle: NO epoch advance (stays transient at current epoch)
-
         // Advance epoch to activate if needed (Active and beyond)
         if self >= StakeLifecycle::Active {
             // With background stake in tracker, just warp 1 epoch
@@ -364,8 +362,6 @@ impl StakeLifecycle {
             let deactivation_epoch = mollusk.sysvars.clock.epoch;
             tracker.track_deactivation(stake_pubkey, deactivation_epoch);
         }
-
-        // For Deactivating lifecycle: NO epoch advance (stays transient at current epoch)
 
         // Advance epoch to fully deactivate if needed (Deactive lifecycle)
         // Matches program_test.rs line 978-983: advance_epoch once to fully deactivate
@@ -480,6 +476,8 @@ pub fn add_sysvars(
 }
 
 /// Initialize a stake account with the given authorities and lockup
+/// This is a convenience wrapper around `InitializeConfig` that creates the
+/// uninitialized account and processes the instruction in one step.
 pub fn initialize_stake_account(
     mollusk: &Mollusk,
     stake_pubkey: &Pubkey,
@@ -495,8 +493,15 @@ pub fn initialize_stake_account(
     )
     .unwrap();
 
+    // Use InitializeConfig to build instruction (consistent with other patterns)
+    let config = InitializeConfig {
+        stake: (stake_pubkey, &stake_account),
+        authorized,
+        lockup,
+    };
+
     let instruction = ixn::initialize(stake_pubkey, authorized, lockup);
-    let accounts = vec![(*stake_pubkey, stake_account)];
+    let accounts = config.build_accounts();
     let accounts_resolved = add_sysvars(mollusk, &instruction, accounts);
     let result = mollusk.process_instruction(&instruction, &accounts_resolved);
 
@@ -599,11 +604,14 @@ impl InstructionConfig for DelegateConfig<'_> {
 
 pub struct DeactivateConfig<'a> {
     pub stake: (&'a Pubkey, &'a AccountSharedData),
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
 }
 
 impl InstructionConfig for DeactivateConfig<'_> {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
-        ixn::deactivate_stake(self.stake.0, &ctx.staker)
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::deactivate_stake(self.stake.0, signer)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
@@ -615,43 +623,14 @@ pub struct WithdrawConfig<'a> {
     pub stake: (&'a Pubkey, &'a AccountSharedData),
     pub recipient: (&'a Pubkey, &'a AccountSharedData),
     pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.withdrawer)
+    pub override_signer: Option<&'a Pubkey>,
 }
 
 impl InstructionConfig for WithdrawConfig<'_> {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
-        ixn::withdraw(
-            self.stake.0,
-            &ctx.withdrawer,
-            self.recipient.0,
-            self.amount,
-            None,
-        )
-    }
-
-    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
-        vec![
-            (*self.stake.0, self.stake.1.clone()),
-            (*self.recipient.0, self.recipient.1.clone()),
-        ]
-    }
-}
-
-pub struct WithdrawWithSignerConfig<'a> {
-    pub stake: (&'a Pubkey, &'a AccountSharedData),
-    pub signer: &'a Pubkey,
-    pub recipient: (&'a Pubkey, &'a AccountSharedData),
-    pub amount: u64,
-}
-
-impl InstructionConfig for WithdrawWithSignerConfig<'_> {
-    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
-        ixn::withdraw(
-            self.stake.0,
-            self.signer,
-            self.recipient.0,
-            self.amount,
-            None,
-        )
+        let signer = self.override_signer.unwrap_or(&ctx.withdrawer);
+        ixn::withdraw(self.stake.0, signer, self.recipient.0, self.amount, None)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
@@ -665,8 +644,8 @@ impl InstructionConfig for WithdrawWithSignerConfig<'_> {
 pub struct SplitConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),
-    pub signer: &'a Pubkey,
     pub amount: u64,
+    pub signer: &'a Pubkey,
 }
 
 impl InstructionConfig for SplitConfig<'_> {
@@ -685,42 +664,22 @@ impl InstructionConfig for SplitConfig<'_> {
 
 pub struct AuthorizeConfig<'a> {
     pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub override_authority: Option<&'a Pubkey>,
     pub new_authority: &'a Pubkey,
     pub stake_authorize: StakeAuthorize,
 }
 
 impl InstructionConfig for AuthorizeConfig<'_> {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
-        let authority = match self.stake_authorize {
-            StakeAuthorize::Staker => &ctx.staker,
-            StakeAuthorize::Withdrawer => &ctx.withdrawer,
-        };
+        let authority = self
+            .override_authority
+            .unwrap_or(match self.stake_authorize {
+                StakeAuthorize::Staker => &ctx.staker,
+                StakeAuthorize::Withdrawer => &ctx.withdrawer,
+            });
         ixn::authorize(
             self.stake.0,
             authority,
-            self.new_authority,
-            self.stake_authorize,
-            None,
-        )
-    }
-
-    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
-        vec![(*self.stake.0, self.stake.1.clone())]
-    }
-}
-
-pub struct AuthorizeWithAuthorityConfig<'a> {
-    pub stake: (&'a Pubkey, &'a AccountSharedData),
-    pub authority: &'a Pubkey,
-    pub new_authority: &'a Pubkey,
-    pub stake_authorize: StakeAuthorize,
-}
-
-impl InstructionConfig for AuthorizeWithAuthorityConfig<'_> {
-    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
-        ixn::authorize(
-            self.stake.0,
-            self.authority,
             self.new_authority,
             self.stake_authorize,
             None,
@@ -755,6 +714,8 @@ pub struct MoveLamportsConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),
     pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
 }
 
 impl<'a> MoveLamportsConfig<'a> {
@@ -763,7 +724,7 @@ impl<'a> MoveLamportsConfig<'a> {
         MoveLamportsFullConfig {
             source: self.source,
             destination: self.destination,
-            signer: &ctx.staker,
+            override_signer: self.override_signer,
             amount: self.amount,
             source_vote: (&ctx.vote_account, &ctx.vote_account_data),
             dest_vote: None,
@@ -773,7 +734,8 @@ impl<'a> MoveLamportsConfig<'a> {
 
 impl InstructionConfig for MoveLamportsConfig<'_> {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
-        ixn::move_lamports(self.source.0, self.destination.0, &ctx.staker, self.amount)
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_lamports(self.source.0, self.destination.0, signer, self.amount)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
@@ -787,15 +749,17 @@ impl InstructionConfig for MoveLamportsConfig<'_> {
 pub struct MoveLamportsFullConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),
-    pub signer: &'a Pubkey,
     pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
     pub source_vote: (&'a Pubkey, &'a AccountSharedData),
     pub dest_vote: Option<(&'a Pubkey, &'a AccountSharedData)>,
 }
 
 impl InstructionConfig for MoveLamportsFullConfig<'_> {
-    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
-        ixn::move_lamports(self.source.0, self.destination.0, self.signer, self.amount)
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_lamports(self.source.0, self.destination.0, signer, self.amount)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
@@ -815,6 +779,8 @@ pub struct MoveStakeConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),
     pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
 }
 
 impl<'a> MoveStakeConfig<'a> {
@@ -823,7 +789,7 @@ impl<'a> MoveStakeConfig<'a> {
         MoveStakeWithVoteConfig {
             source: self.source,
             destination: self.destination,
-            signer: &ctx.staker,
+            override_signer: self.override_signer,
             amount: self.amount,
             source_vote: (&ctx.vote_account, &ctx.vote_account_data),
             dest_vote: None,
@@ -833,41 +799,8 @@ impl<'a> MoveStakeConfig<'a> {
 
 impl InstructionConfig for MoveStakeConfig<'_> {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
-        ixn::move_stake(self.source.0, self.destination.0, &ctx.staker, self.amount)
-    }
-
-    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
-        vec![
-            (*self.source.0, self.source.1.clone()),
-            (*self.destination.0, self.destination.1.clone()),
-        ]
-    }
-}
-
-pub struct MoveStakeWithSignerConfig<'a> {
-    pub source: (&'a Pubkey, &'a AccountSharedData),
-    pub destination: (&'a Pubkey, &'a AccountSharedData),
-    pub signer: &'a Pubkey,
-    pub amount: u64,
-}
-
-impl<'a> MoveStakeWithSignerConfig<'a> {
-    /// Helper to add the default vote account from context
-    pub fn with_default_vote(self, ctx: &'a StakeTestContext) -> MoveStakeWithVoteConfig<'a> {
-        MoveStakeWithVoteConfig {
-            source: self.source,
-            destination: self.destination,
-            signer: self.signer,
-            amount: self.amount,
-            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
-            dest_vote: None,
-        }
-    }
-}
-
-impl InstructionConfig for MoveStakeWithSignerConfig<'_> {
-    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
-        ixn::move_stake(self.source.0, self.destination.0, self.signer, self.amount)
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_stake(self.source.0, self.destination.0, signer, self.amount)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
@@ -881,15 +814,17 @@ impl InstructionConfig for MoveStakeWithSignerConfig<'_> {
 pub struct MoveStakeWithVoteConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),
-    pub signer: &'a Pubkey,
     pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
     pub source_vote: (&'a Pubkey, &'a AccountSharedData),
     pub dest_vote: Option<(&'a Pubkey, &'a AccountSharedData)>,
 }
 
 impl InstructionConfig for MoveStakeWithVoteConfig<'_> {
-    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
-        ixn::move_stake(self.source.0, self.destination.0, self.signer, self.amount)
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_stake(self.source.0, self.destination.0, signer, self.amount)
     }
 
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {

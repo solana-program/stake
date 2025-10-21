@@ -3,7 +3,7 @@
 mod helpers;
 
 use {
-    helpers::{StakeLifecycle, StakeTestContext, WithdrawConfig, WithdrawWithSignerConfig},
+    helpers::{StakeLifecycle, StakeTestContext, WithdrawConfig},
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
@@ -58,9 +58,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     {
         // Expect program success but rent check should fail - catch the panic
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            ctx.process_with(WithdrawWithSignerConfig {
+            ctx.process_with(WithdrawConfig {
                 stake: (&withdraw_source, &withdraw_source_account),
-                signer: &signer,
+                override_signer: Some(&signer),
                 recipient: (&recipient, &recipient_account),
                 amount: staked_amount + rent_spillover,
             })
@@ -74,9 +74,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         );
     } else {
         // Program fails with InsufficientFunds
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&withdraw_source, &withdraw_source_account),
-            signer: &signer,
+            override_signer: Some(&signer),
             recipient: (&recipient, &recipient_account),
             amount: staked_amount + rent_spillover,
         })
@@ -86,9 +86,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
 
     if withdraw_source_type.withdraw_minimum_enforced() {
         // Withdraw active or activating stake fails
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&withdraw_source, &withdraw_source_account),
-            signer: &signer,
+            override_signer: Some(&signer),
             recipient: (&recipient, &recipient_account),
             amount: staked_amount,
         })
@@ -102,9 +102,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             .unwrap();
 
         // Withdraw in excess of rewards is not allowed
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&withdraw_source, &withdraw_source_account),
-            signer: &signer,
+            override_signer: Some(&signer),
             recipient: (&recipient, &recipient_account),
             amount: reward_amount + 1,
         })
@@ -112,9 +112,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         .execute();
 
         // Withdraw rewards is allowed
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&withdraw_source, &withdraw_source_account),
-            signer: &signer,
+            override_signer: Some(&signer),
             recipient: (&recipient, &recipient_account),
             amount: reward_amount,
         })
@@ -129,9 +129,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     } else {
         // Withdraw that leaves rent behind is allowed
         let result = ctx
-            .process_with(WithdrawWithSignerConfig {
+            .process_with(WithdrawConfig {
                 stake: (&withdraw_source, &withdraw_source_account),
-                signer: &signer,
+                override_signer: Some(&signer),
                 recipient: (&recipient, &recipient_account),
                 amount: staked_amount,
             })
@@ -155,9 +155,9 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         let mut recipient2_account = AccountSharedData::default();
         recipient2_account.set_lamports(wallet_rent_exempt_reserve);
 
-        ctx.process_with(WithdrawWithSignerConfig {
+        ctx.process_with(WithdrawConfig {
             stake: (&withdraw_source, &withdraw_source_account),
-            signer: &signer,
+            override_signer: Some(&signer),
             recipient: (&recipient2, &recipient2_account),
             amount: staked_amount + ctx.rent_exempt_reserve,
         })
@@ -194,6 +194,7 @@ fn test_withdraw_from_rewards_pool() {
         stake: (&rewards_pool_address, &rewards_pool_data),
         recipient: (&recipient, &recipient_account),
         amount: staked_amount,
+        override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
     .execute();
