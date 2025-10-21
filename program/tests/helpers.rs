@@ -541,50 +541,7 @@ pub fn true_up_transient_stake_epoch(
     stake_account.set_data(bincode::serialize(&stake_state).unwrap());
 }
 
-// Usage Examples:
-//
-// Basic delegate instruction:
-//   ctx.process_with(DelegateConfig {
-//       stake: (&stake_pk, &stake_acc),
-//       vote: (&vote_pk, &vote_acc),
-//   }).execute();
-//
-// With custom checks and signer testing:
-//   ctx.process_with(WithdrawConfig {
-//       stake: (&stake_pk, &stake_acc),
-//       recipient: (&recipient_pk, &recipient_acc),
-//       amount: 100,
-//   })
-//   .checks(&[Check::success()])
-//   .test_missing_signers(true)
-//   .execute();
-//
-// With custom signer:
-//   ctx.process_with(WithdrawWithSignerConfig {
-//       stake: (&stake_pk, &stake_acc),
-//       signer: &custom_signer,
-//       recipient: (&recipient_pk, &recipient_acc),
-//       amount: 100,
-//   }).execute();
-//
-// Move instructions with vote accounts:
-//   ctx.process_with(MoveStakeConfig {
-//       source: (&src_pk, &src_acc),
-//       destination: (&dst_pk, &dst_acc),
-//       amount: 100,
-//   }.with_default_vote(&ctx))
-//   .execute();
-//
-// Benefits:
-// - Named fields prevent account ordering bugs
-// - Config structs are self-documenting (DelegateConfig vs func params)
-// - Easy to add new instruction variants
-// - Type-safe and IDE-friendly
-// - Reduces helpers.rs from ~1500 to ~1000 lines
-//
-// ============================================================================
-
-/// Trait for instruction configuration that builds instruction and accounts
+// Trait for instruction configuration that builds instruction and accounts
 pub trait InstructionConfig {
     fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction;
     fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)>;
