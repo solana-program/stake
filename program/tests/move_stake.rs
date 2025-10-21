@@ -1,0 +1,605 @@
+#![allow(clippy::arithmetic_side_effects)]
+
+mod helpers;
+
+use {
+    crate::helpers::add_sysvars,
+    helpers::{
+        create_vote_account, get_effective_stake, parse_stake_account,
+        true_up_transient_stake_epoch, StakeLifecycle,
+    },
+    mollusk_svm::{result::Check, Mollusk},
+    solana_account::WritableAccount,
+    solana_program_error::ProgramError,
+    solana_pubkey::Pubkey,
+    solana_stake_interface::{error::StakeError, instruction as ixn, state::Lockup},
+    solana_stake_program::{get_minimum_delegation, id},
+    test_case::test_matrix,
+};
+
+fn mollusk_bpf() -> Mollusk {
+    Mollusk::new(&id(), "solana_stake_program")
+}
+
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
+     StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
+    [false, true],
+    [false, true]
+)]
+fn test_move_stake(
+    move_source_type: StakeLifecycle,
+    move_dest_type: StakeLifecycle,
+    full_move: bool,
+    has_lockup: bool,
+) {
+    let mut mollusk = mollusk_bpf();
+
+    let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
+    let minimum_delegation = get_minimum_delegation();
+
+    // Source has 2x minimum so we can easily test partial moves
+    let source_staked_amount = minimum_delegation * 2;
+
+    // This is the amount of *effective/activated* lamports for test assertions (not delegation amount)
+    // All dests are created with minimum_delegation, but only Active dests have it fully activated
+    let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
+        minimum_delegation
+    } else {
+        0 // Non-Active destinations have 0 effective stake (Activating/Deactivating are transient)
+    };
+
+    // Test with and without lockup
+    let lockup = if has_lockup {
+        let clock = mollusk.sysvars.clock.clone();
+        Lockup {
+            unix_timestamp: 0,
+            epoch: clock.epoch + 100,
+            custodian: Pubkey::new_unique(),
+        }
+    } else {
+        Lockup::default()
+    };
+
+    // Extra lamports in each account to test they don't activate
+    let source_excess = minimum_delegation;
+    let dest_excess = minimum_delegation;
+
+    let vote_account = Pubkey::new_unique();
+    let vote_account_data = create_vote_account();
+    let staker = Pubkey::new_unique();
+    let withdrawer = Pubkey::new_unique();
+
+    // Advance 1 epoch ONLY if we have transient stakes that need historical context
+    if move_source_type == StakeLifecycle::Activating
+        || move_source_type == StakeLifecycle::Deactivating
+        || move_dest_type == StakeLifecycle::Activating
+        || move_dest_type == StakeLifecycle::Deactivating
+    {
+        let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
+        let current_slot = mollusk.sysvars.clock.slot;
+        mollusk.warp_to_slot(current_slot + slots_per_epoch);
+    }
+
+    // Create source stake
+    let move_source = Pubkey::new_unique();
+    let mut move_source_account = move_source_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        source_staked_amount,
+        &staker,
+        &withdrawer,
+        &lockup,
+    );
+
+    // Create dest stake (all dests get minimum_delegation, which becomes excess for inactive)
+    let move_dest = Pubkey::new_unique();
+    let mut move_dest_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &staker,
+        &withdrawer,
+        &lockup,
+    );
+
+    true_up_transient_stake_epoch(
+        &mut mollusk,
+        &mut move_source_account,
+        move_source_type,
+        source_staked_amount,
+        true,
+    );
+
+    true_up_transient_stake_epoch(
+        &mut mollusk,
+        &mut move_dest_account,
+        move_dest_type,
+        minimum_delegation,
+        true,
+    );
+
+    // Add excess lamports
+    move_source_account
+        .checked_add_lamports(source_excess)
+        .unwrap();
+    // Active accounts get additional excess on top of their staked amount
+    // Inactive accounts already have minimum_delegation as excess from creation
+    if move_dest_type == StakeLifecycle::Active {
+        move_dest_account.checked_add_lamports(dest_excess).unwrap();
+    }
+
+    // Check if this state combination is valid for MoveStake
+    match (move_source_type, move_dest_type) {
+        (StakeLifecycle::Active, StakeLifecycle::Initialized)
+        | (StakeLifecycle::Active, StakeLifecycle::Active)
+        | (StakeLifecycle::Active, StakeLifecycle::Deactive) => {
+            // Valid - continue with tests
+        }
+        _ => {
+            // Invalid state combination
+            let instruction = ixn::move_stake(
+                &move_source,
+                &move_dest,
+                &staker,
+                if full_move {
+                    source_staked_amount
+                } else {
+                    minimum_delegation
+                },
+            );
+
+            let accounts = vec![
+                (move_source, move_source_account),
+                (move_dest, move_dest_account),
+                (vote_account, vote_account_data),
+            ];
+
+            let accounts = add_sysvars(&mollusk, &instruction, accounts);
+            let result = mollusk.process_instruction(&instruction, &accounts);
+            assert!(result.program_result.is_err());
+            return;
+        }
+    }
+
+    // The below checks need minimum_delegation > 1
+    if minimum_delegation > 1 {
+        // Undershoot destination for inactive accounts
+        if move_dest_type != StakeLifecycle::Active {
+            let instruction =
+                ixn::move_stake(&move_source, &move_dest, &staker, minimum_delegation - 1);
+
+            let accounts = vec![
+                (move_source, move_source_account.clone()),
+                (move_dest, move_dest_account.clone()),
+                (vote_account, vote_account_data.clone()),
+            ];
+
+            let accounts = add_sysvars(&mollusk, &instruction, accounts);
+            mollusk.process_and_validate_instruction(
+                &instruction,
+                &accounts,
+                &[Check::err(ProgramError::InvalidArgument)],
+            );
+        }
+
+        // Overshoot source (would leave source underfunded)
+        let instruction =
+            ixn::move_stake(&move_source, &move_dest, &staker, minimum_delegation + 1);
+
+        let accounts = vec![
+            (move_source, move_source_account.clone()),
+            (move_dest, move_dest_account.clone()),
+            (vote_account, vote_account_data.clone()),
+        ];
+
+        let accounts = add_sysvars(&mollusk, &instruction, accounts);
+        mollusk.process_and_validate_instruction(
+            &instruction,
+            &accounts,
+            &[Check::err(ProgramError::InvalidArgument)],
+        );
+    }
+
+    // Now do it just right
+    let instruction = ixn::move_stake(
+        &move_source,
+        &move_dest,
+        &staker,
+        if full_move {
+            source_staked_amount
+        } else {
+            minimum_delegation
+        },
+    );
+
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (move_dest, move_dest_account.clone()),
+        (vote_account, vote_account_data),
+    ];
+
+    // Matches program_test line 1713: test that removing any signer causes MissingRequiredSignature, then succeeds
+    let result = helpers::process_instruction_after_testing_missing_signers(
+        &mollusk,
+        &instruction,
+        &accounts,
+        &[Check::success()],
+    );
+
+    move_source_account = result.resulting_accounts[0].1.clone().into();
+    move_dest_account = result.resulting_accounts[1].1.clone().into();
+
+    if full_move {
+        let (_, option_source_stake, source_lamports) = parse_stake_account(&move_source_account);
+
+        // Source is deactivated and rent/excess stay behind
+        assert!(option_source_stake.is_none());
+        assert_eq!(source_lamports, source_excess + rent_exempt_reserve);
+
+        let (_, Some(dest_stake), dest_lamports) = parse_stake_account(&move_dest_account) else {
+            panic!("dest should be active")
+        };
+        let dest_effective_stake = get_effective_stake(&mollusk, &move_dest_account);
+
+        // Dest captured the entire source delegation, kept its rent/excess, didn't activate its excess
+        assert_eq!(
+            dest_stake.delegation.stake,
+            source_staked_amount + dest_staked_amount
+        );
+        assert_eq!(dest_effective_stake, dest_stake.delegation.stake);
+        assert_eq!(
+            dest_lamports,
+            dest_effective_stake + dest_excess + rent_exempt_reserve
+        );
+    } else {
+        let (_, Some(source_stake), source_lamports) = parse_stake_account(&move_source_account)
+        else {
+            panic!("source should be active")
+        };
+        let source_effective_stake = get_effective_stake(&mollusk, &move_source_account);
+
+        // Half of source delegation moved over, excess stayed behind
+        assert_eq!(source_stake.delegation.stake, source_staked_amount / 2);
+        assert_eq!(source_effective_stake, source_stake.delegation.stake);
+        assert_eq!(
+            source_lamports,
+            source_effective_stake + source_excess + rent_exempt_reserve
+        );
+
+        let (_, Some(dest_stake), dest_lamports) = parse_stake_account(&move_dest_account) else {
+            panic!("dest should be active")
+        };
+        let dest_effective_stake = get_effective_stake(&mollusk, &move_dest_account);
+
+        // Dest mirrors our observations
+        assert_eq!(
+            dest_stake.delegation.stake,
+            source_staked_amount / 2 + dest_staked_amount
+        );
+        assert_eq!(dest_effective_stake, dest_stake.delegation.stake);
+        assert_eq!(
+            dest_lamports,
+            dest_effective_stake + dest_excess + rent_exempt_reserve
+        );
+    }
+}
+
+#[test_matrix(
+    [(StakeLifecycle::Active, StakeLifecycle::Uninitialized),
+     (StakeLifecycle::Uninitialized, StakeLifecycle::Initialized),
+     (StakeLifecycle::Uninitialized, StakeLifecycle::Uninitialized)]
+)]
+fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycle)) {
+    let mut mollusk = mollusk_bpf();
+
+    let minimum_delegation = get_minimum_delegation();
+    let source_staked_amount = minimum_delegation * 2;
+
+    let (move_source_type, move_dest_type) = move_types;
+
+    let vote_account = Pubkey::new_unique();
+    let staker = Pubkey::new_unique();
+    let withdrawer = Pubkey::new_unique();
+
+    let move_source = Pubkey::new_unique();
+    let move_source_account = move_source_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        source_staked_amount,
+        &staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+
+    let move_dest = Pubkey::new_unique();
+    let move_dest_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        0,
+        &staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+
+    let source_signer = if move_source_type == StakeLifecycle::Uninitialized {
+        move_source
+    } else {
+        staker
+    };
+
+    let instruction = ixn::move_stake(&move_source, &move_dest, &source_signer, minimum_delegation);
+
+    let accounts = vec![
+        (move_source, move_source_account),
+        (move_dest, move_dest_account),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(ProgramError::InvalidAccountData)],
+    );
+}
+
+#[test_matrix(
+    [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
+    [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactive]
+)]
+fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type: StakeLifecycle) {
+    let mut mollusk = mollusk_bpf();
+
+    let minimum_delegation = get_minimum_delegation();
+    let source_staked_amount = minimum_delegation * 2;
+
+    // Only test valid MoveStake combinations
+    if move_source_type != StakeLifecycle::Active || move_dest_type == StakeLifecycle::Activating {
+        return;
+    }
+
+    let in_force_lockup = {
+        let clock = mollusk.sysvars.clock.clone();
+        Lockup {
+            unix_timestamp: 0,
+            epoch: clock.epoch + 1_000_000,
+            custodian: Pubkey::new_unique(),
+        }
+    };
+
+    let vote_account = Pubkey::new_unique();
+    let vote_account_data = create_vote_account();
+    let staker = Pubkey::new_unique();
+    let withdrawer = Pubkey::new_unique();
+
+    // Create source
+    let move_source = Pubkey::new_unique();
+    let mut move_source_account = move_source_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        source_staked_amount,
+        &staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+    move_source_account
+        .checked_add_lamports(minimum_delegation)
+        .unwrap();
+
+    // Self-move fails
+    let instruction = ixn::move_stake(&move_source, &move_source, &staker, minimum_delegation);
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(ProgramError::InvalidInstructionData)],
+    );
+
+    // Zero move fails
+    let move_dest = Pubkey::new_unique();
+    let move_dest_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+
+    let instruction = ixn::move_stake(&move_source, &move_dest, &staker, 0);
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (move_dest, move_dest_account.clone()),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(ProgramError::InvalidArgument)],
+    );
+
+    // Sign with withdrawer fails
+    let instruction = ixn::move_stake(&move_source, &move_dest, &withdrawer, minimum_delegation);
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (move_dest, move_dest_account),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(ProgramError::MissingRequiredSignature)],
+    );
+
+    // Source lockup fails
+    let move_locked_source = Pubkey::new_unique();
+    let mut move_locked_source_account = move_source_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        source_staked_amount,
+        &staker,
+        &withdrawer,
+        &in_force_lockup,
+    );
+    move_locked_source_account
+        .checked_add_lamports(minimum_delegation)
+        .unwrap();
+
+    let move_dest2 = Pubkey::new_unique();
+    let move_dest2_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+
+    let instruction = ixn::move_stake(
+        &move_locked_source,
+        &move_dest2,
+        &staker,
+        minimum_delegation,
+    );
+    let accounts = vec![
+        (move_locked_source, move_locked_source_account),
+        (move_dest2, move_dest2_account),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(StakeError::MergeMismatch.into())],
+    );
+
+    // Staker mismatch fails
+    let throwaway_staker = Pubkey::new_unique();
+    let move_dest3 = Pubkey::new_unique();
+    let move_dest3_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &throwaway_staker,
+        &withdrawer,
+        &Lockup::default(),
+    );
+
+    let instruction = ixn::move_stake(&move_source, &move_dest3, &staker, minimum_delegation);
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (move_dest3, move_dest3_account),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(StakeError::MergeMismatch.into())],
+    );
+
+    // Withdrawer mismatch fails
+    let throwaway_withdrawer = Pubkey::new_unique();
+    let move_dest4 = Pubkey::new_unique();
+    let move_dest4_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &staker,
+        &throwaway_withdrawer,
+        &Lockup::default(),
+    );
+
+    let instruction = ixn::move_stake(&move_source, &move_dest4, &staker, minimum_delegation);
+    let accounts = vec![
+        (move_source, move_source_account.clone()),
+        (move_dest4, move_dest4_account),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(StakeError::MergeMismatch.into())],
+    );
+
+    // Dest lockup fails
+    let move_dest5 = Pubkey::new_unique();
+    let move_dest5_account = move_dest_type.create_stake_account_fully_specified(
+        &mut mollusk,
+        &vote_account,
+        minimum_delegation,
+        &staker,
+        &withdrawer,
+        &in_force_lockup,
+    );
+
+    let instruction = ixn::move_stake(&move_source, &move_dest5, &staker, minimum_delegation);
+    let accounts = vec![
+        (move_source, move_source_account),
+        (move_dest5, move_dest5_account),
+        (vote_account, vote_account_data.clone()),
+    ];
+
+    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    mollusk.process_and_validate_instruction(
+        &instruction,
+        &accounts,
+        &[Check::err(StakeError::MergeMismatch.into())],
+    );
+
+    // Different vote accounts for active dest
+    if move_dest_type == StakeLifecycle::Active {
+        let dest_vote_account = Pubkey::new_unique();
+        let dest_vote_account_data = create_vote_account();
+
+        let move_dest6 = Pubkey::new_unique();
+        let move_dest6_account = move_dest_type.create_stake_account_fully_specified(
+            &mut mollusk,
+            &dest_vote_account,
+            minimum_delegation,
+            &staker,
+            &withdrawer,
+            &Lockup::default(),
+        );
+
+        let move_source2 = Pubkey::new_unique();
+        let move_source2_account = move_source_type.create_stake_account_fully_specified(
+            &mut mollusk,
+            &vote_account,
+            source_staked_amount,
+            &staker,
+            &withdrawer,
+            &Lockup::default(),
+        );
+
+        let instruction = ixn::move_stake(&move_source2, &move_dest6, &staker, minimum_delegation);
+        let accounts = vec![
+            (move_source2, move_source2_account),
+            (move_dest6, move_dest6_account),
+            (vote_account, vote_account_data),
+            (dest_vote_account, dest_vote_account_data),
+        ];
+
+        let accounts = add_sysvars(&mollusk, &instruction, accounts);
+        mollusk.process_and_validate_instruction(
+            &instruction,
+            &accounts,
+            &[Check::err(StakeError::VoteAddressMismatch.into())],
+        );
+    }
+}
