@@ -3,10 +3,10 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, MergeConfig, StakeLifecycle, StakeTestContext},
+    helpers::{MergeConfig, StakeLifecycle, StakeTestContext},
     mollusk_svm::result::Check,
     solana_account::ReadableAccount,
-    solana_stake_interface::{instruction as ixn, state::StakeStateV2},
+    solana_stake_interface::state::StakeStateV2,
     solana_stake_program::id,
     test_case::test_matrix,
 };
@@ -89,18 +89,13 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
         .execute();
     } else {
         // Various errors can occur for invalid merges, we just check it fails
-        let result = ctx.mollusk.process_instruction(
-            &ixn::merge(&merge_dest, &merge_source, &ctx.staker)[0],
-            &add_sysvars(
-                &ctx.mollusk,
-                &ixn::merge(&merge_dest, &merge_source, &ctx.staker)[0],
-                vec![
-                    (merge_dest, merge_dest_account.clone()),
-                    (merge_source, merge_source_account),
-                    (ctx.vote_account, ctx.vote_account_data.clone()),
-                ],
-            ),
-        );
+        let result = ctx
+            .process_with(MergeConfig {
+                destination: (&merge_dest, &merge_dest_account),
+                source: (&merge_source, &merge_source_account),
+            })
+            .checks(&[]) // Skip Success check
+            .execute();
         assert!(result.program_result.is_err());
     }
 }
