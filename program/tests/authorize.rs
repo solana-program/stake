@@ -5,9 +5,9 @@ mod helpers;
 use {
     helpers::{
         add_sysvars, initialize_stake_account, parse_stake_account,
-        process_instruction_after_testing_missing_signers,
+        process_instruction_after_testing_missing_signers, StakeTestContext,
     },
-    mollusk_svm::{result::Check, Mollusk},
+    mollusk_svm::result::Check,
     solana_account::AccountSharedData,
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
@@ -18,15 +18,9 @@ use {
     solana_stake_program::id,
 };
 
-fn mollusk_bpf() -> Mollusk {
-    Mollusk::new(&id(), "solana_stake_program")
-}
-
 #[test]
 fn test_authorize() {
-    let mollusk = mollusk_bpf();
-
-    let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
+    let ctx = StakeTestContext::new();
 
     let staker1 = Pubkey::new_unique();
     let staker2 = Pubkey::new_unique();
@@ -38,7 +32,7 @@ fn test_authorize() {
 
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
-        rent_exempt_reserve,
+        ctx.rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -48,9 +42,9 @@ fn test_authorize() {
     // Authorize uninitialized fails for staker
     let instruction = ixn::authorize(&stake, &stake, &staker1, StakeAuthorize::Staker, None);
     let accounts = vec![(stake, stake_account.clone())];
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
 
-    mollusk.process_and_validate_instruction(
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InvalidAccountData)],
@@ -65,18 +59,18 @@ fn test_authorize() {
         None,
     );
     let accounts = vec![(stake, stake_account.clone())];
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
 
-    mollusk.process_and_validate_instruction(
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InvalidAccountData)],
     );
 
     let mut stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        rent_exempt_reserve,
+        ctx.rent_exempt_reserve,
         &Authorized {
             staker: staker1,
             withdrawer: withdrawer1,
@@ -90,14 +84,14 @@ fn test_authorize() {
 
     // Test that removing any signer causes failure, then verify success
     let result = process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -120,14 +114,14 @@ fn test_authorize() {
 
     // Test that removing any signer causes failure, then verify success
     let result = process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -148,8 +142,8 @@ fn test_authorize() {
     );
     let accounts = vec![(stake, stake_account.clone())];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::MissingRequiredSignature)],
@@ -165,8 +159,8 @@ fn test_authorize() {
     );
     let accounts = vec![(stake, stake_account.clone())];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::MissingRequiredSignature)],
@@ -178,14 +172,14 @@ fn test_authorize() {
 
     // Test that removing any signer causes failure, then verify success
     let result = process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -208,14 +202,14 @@ fn test_authorize() {
 
     // Test that removing any signer causes failure, then verify success
     let result = process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -236,8 +230,8 @@ fn test_authorize() {
     );
     let accounts = vec![(stake, stake_account.clone())];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::MissingRequiredSignature)],
@@ -249,14 +243,14 @@ fn test_authorize() {
 
     // Test that removing any signer causes failure, then verify success
     let result = process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -270,14 +264,14 @@ fn test_authorize() {
     // Withdraw using staker fails - test all three stakers to ensure none can withdraw
     for staker in [staker1, staker2, staker3] {
         let recipient = Pubkey::new_unique();
-        let instruction = ixn::withdraw(&stake, &staker, &recipient, rent_exempt_reserve, None);
+        let instruction = ixn::withdraw(&stake, &staker, &recipient, ctx.rent_exempt_reserve, None);
         let accounts = vec![
             (stake, stake_account.clone()),
             (recipient, AccountSharedData::default()),
         ];
 
-        let accounts = add_sysvars(&mollusk, &instruction, accounts);
-        mollusk.process_and_validate_instruction(
+        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+        ctx.mollusk.process_and_validate_instruction(
             &instruction,
             &accounts,
             &[Check::err(ProgramError::MissingRequiredSignature)],

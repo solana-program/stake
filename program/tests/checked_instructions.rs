@@ -5,9 +5,8 @@ mod helpers;
 use {
     helpers::{
         initialize_stake_account, process_instruction_after_testing_missing_signers,
-        STAKE_RENT_EXEMPTION,
+        StakeTestContext,
     },
-    mollusk_svm::Mollusk,
     solana_account::AccountSharedData,
     solana_pubkey::Pubkey,
     solana_sdk_ids::system_program,
@@ -18,22 +17,21 @@ use {
     solana_stake_program::id,
 };
 
-fn mollusk_bpf() -> Mollusk {
-    Mollusk::new(&id(), "solana_stake_program")
-}
-
 #[test]
 fn test_initialize_checked() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
-
-    let instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
+    let instruction = ixn::initialize_checked(
+        &stake,
+        &Authorized {
+            staker: ctx.staker,
+            withdrawer: ctx.withdrawer,
+        },
+    );
 
     let stake_account = AccountSharedData::new_data_with_space(
-        STAKE_RENT_EXEMPTION,
+        ctx.rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -43,7 +41,7 @@ fn test_initialize_checked() {
     let accounts = vec![(stake, stake_account)];
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &accounts,
         &[mollusk_svm::result::Check::success()],
@@ -52,32 +50,33 @@ fn test_initialize_checked() {
 
 #[test]
 fn test_authorize_checked_staker() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let new_authority = Pubkey::new_unique();
 
     let initialized_stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        STAKE_RENT_EXEMPTION,
-        &Authorized { staker, withdrawer },
+        ctx.rent_exempt_reserve,
+        &Authorized {
+            staker: ctx.staker,
+            withdrawer: ctx.withdrawer,
+        },
         &Lockup::default(),
     );
 
     // Now test authorize checked
     let instruction = ixn::authorize_checked(
         &stake,
-        &staker,
+        &ctx.staker,
         &new_authority,
         StakeAuthorize::Staker,
         None,
     );
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &[(stake, initialized_stake_account)],
         &[mollusk_svm::result::Check::success()],
@@ -86,32 +85,33 @@ fn test_authorize_checked_staker() {
 
 #[test]
 fn test_authorize_checked_withdrawer() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let new_authority = Pubkey::new_unique();
 
     let initialized_stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        STAKE_RENT_EXEMPTION,
-        &Authorized { staker, withdrawer },
+        ctx.rent_exempt_reserve,
+        &Authorized {
+            staker: ctx.staker,
+            withdrawer: ctx.withdrawer,
+        },
         &Lockup::default(),
     );
 
     // Now test authorize checked
     let instruction = ixn::authorize_checked(
         &stake,
-        &withdrawer,
+        &ctx.withdrawer,
         &new_authority,
         StakeAuthorize::Withdrawer,
         None,
     );
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &[(stake, initialized_stake_account)],
         &[mollusk_svm::result::Check::success()],
@@ -120,7 +120,7 @@ fn test_authorize_checked_withdrawer() {
 
 #[test]
 fn test_authorize_checked_with_seed_staker() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
     let seed_base = Pubkey::new_unique();
@@ -129,9 +129,9 @@ fn test_authorize_checked_with_seed_staker() {
     let new_authority = Pubkey::new_unique();
 
     let initialized_stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        STAKE_RENT_EXEMPTION,
+        ctx.rent_exempt_reserve,
         &Authorized {
             staker: seeded_address,
             withdrawer: seeded_address,
@@ -151,7 +151,7 @@ fn test_authorize_checked_with_seed_staker() {
     );
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &[(stake, initialized_stake_account)],
         &[mollusk_svm::result::Check::success()],
@@ -160,7 +160,7 @@ fn test_authorize_checked_with_seed_staker() {
 
 #[test]
 fn test_authorize_checked_with_seed_withdrawer() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
     let seed_base = Pubkey::new_unique();
@@ -169,9 +169,9 @@ fn test_authorize_checked_with_seed_withdrawer() {
     let new_authority = Pubkey::new_unique();
 
     let initialized_stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        STAKE_RENT_EXEMPTION,
+        ctx.rent_exempt_reserve,
         &Authorized {
             staker: seeded_address,
             withdrawer: seeded_address,
@@ -191,7 +191,7 @@ fn test_authorize_checked_with_seed_withdrawer() {
     );
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &[(stake, initialized_stake_account)],
         &[mollusk_svm::result::Check::success()],
@@ -200,18 +200,19 @@ fn test_authorize_checked_with_seed_withdrawer() {
 
 #[test]
 fn test_set_lockup_checked() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     let stake = Pubkey::new_unique();
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let custodian = Pubkey::new_unique();
 
     let initialized_stake_account = initialize_stake_account(
-        &mollusk,
+        &ctx.mollusk,
         &stake,
-        STAKE_RENT_EXEMPTION,
-        &Authorized { staker, withdrawer },
+        ctx.rent_exempt_reserve,
+        &Authorized {
+            staker: ctx.staker,
+            withdrawer: ctx.withdrawer,
+        },
         &Lockup::default(),
     );
 
@@ -223,11 +224,11 @@ fn test_set_lockup_checked() {
             epoch: Some(1),
             custodian: Some(custodian),
         },
-        &withdrawer,
+        &ctx.withdrawer,
     );
 
     process_instruction_after_testing_missing_signers(
-        &mollusk,
+        &ctx.mollusk,
         &instruction,
         &[(stake, initialized_stake_account)],
         &[mollusk_svm::result::Check::success()],

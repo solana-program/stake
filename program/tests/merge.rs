@@ -3,25 +3,13 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, create_vote_account, StakeLifecycle, StakeTracker},
-    mollusk_svm::{result::Check, Mollusk},
+    helpers::{add_sysvars, StakeLifecycle, StakeTestContext},
+    mollusk_svm::result::Check,
     solana_account::ReadableAccount,
-    solana_pubkey::Pubkey,
-    solana_stake_interface::{
-        instruction as ixn,
-        state::{Lockup, StakeStateV2},
-    },
-    solana_stake_program::{get_minimum_delegation, id},
+    solana_stake_interface::{instruction as ixn, state::StakeStateV2},
+    solana_stake_program::id,
     test_case::test_matrix,
 };
-
-fn mollusk_bpf() -> Mollusk {
-    Mollusk::new(&id(), "solana_stake_program")
-}
-
-fn create_tracker() -> StakeTracker {
-    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
-}
 
 #[test_matrix(
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
@@ -30,18 +18,9 @@ fn create_tracker() -> StakeTracker {
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
 )]
 fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
-    let mut mollusk = mollusk_bpf();
-    let mut tracker = create_tracker();
+    let mut ctx = StakeTestContext::new();
 
-    let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
-    let minimum_delegation = get_minimum_delegation();
-    let staked_amount = minimum_delegation;
-
-    let vote_account = Pubkey::new_unique();
-    let vote_account_data = create_vote_account();
-
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
+    let staked_amount = ctx.minimum_delegation;
 
     // Determine if merge should be allowed based on lifecycle types
     let is_merge_allowed_by_type = match (merge_source_type, merge_dest_type) {
@@ -69,78 +48,47 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
         _ => false,
     };
 
-    // Create source first
-    let merge_source = Pubkey::new_unique();
-    let mut merge_source_account = merge_source_type.create_stake_account_fully_specified(
-        &mut mollusk,
-        &mut tracker,
-        &merge_source,
-        &vote_account,
-        staked_amount,
-        &staker,
-        &withdrawer,
-        &Lockup::default(),
-    );
+    // Create source and dest accounts
+    let (merge_source, mut merge_source_account) =
+        ctx.create_stake_account(merge_source_type, staked_amount);
+    let (merge_dest, merge_dest_account) = ctx.create_stake_account(merge_dest_type, staked_amount);
 
-    // Retrieve source data and potentially modify authorities
+    // Retrieve source data and sync epochs if needed
     let mut source_stake_state: StakeStateV2 =
         bincode::deserialize(merge_source_account.data()).unwrap();
 
-    // Create dest
-    let merge_dest = Pubkey::new_unique();
-    let merge_dest_account = merge_dest_type.create_stake_account_fully_specified(
-        &mut mollusk,
-        &mut tracker,
-        &merge_dest,
-        &vote_account,
-        staked_amount,
-        &staker,
-        &withdrawer,
-        &Lockup::default(),
-    );
-
-    // Update source authorities to match dest and sync epochs if needed
-    let clock = mollusk.sysvars.clock.clone();
-    match &mut source_stake_state {
-        StakeStateV2::Initialized(ref mut meta) => {
-            meta.authorized.staker = staker;
-            meta.authorized.withdrawer = withdrawer;
+    let clock = ctx.mollusk.sysvars.clock.clone();
+    // Sync epochs for transient states
+    if let StakeStateV2::Stake(_, ref mut stake, _) = &mut source_stake_state {
+        match merge_source_type {
+            StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
+            StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
+            _ => (),
         }
-        StakeStateV2::Stake(ref mut meta, ref mut stake, _) => {
-            meta.authorized.staker = staker;
-            meta.authorized.withdrawer = withdrawer;
-
-            match merge_source_type {
-                StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
-                StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
-                _ => (),
-            }
-        }
-        _ => (),
     }
 
     // Store updated source
     merge_source_account.set_data(bincode::serialize(&source_stake_state).unwrap());
 
     // Attempt to merge
-    let instructions = ixn::merge(&merge_dest, &merge_source, &staker);
+    let instructions = ixn::merge(&merge_dest, &merge_source, &ctx.staker);
     let instruction = &instructions[0];
 
     let accounts = vec![
         (merge_dest, merge_dest_account.clone()),
         (merge_source, merge_source_account),
-        (vote_account, vote_account_data),
+        (ctx.vote_account, ctx.vote_account_data.clone()),
     ];
 
     if is_merge_allowed_by_type {
         helpers::process_instruction_after_testing_missing_signers(
-            &mollusk,
+            &ctx.mollusk,
             instruction,
             &accounts,
             &[
                 Check::success(),
                 Check::account(&merge_dest)
-                    .lamports(staked_amount * 2 + rent_exempt_reserve * 2)
+                    .lamports(staked_amount * 2 + ctx.rent_exempt_reserve * 2)
                     .owner(&id())
                     .space(StakeStateV2::size_of())
                     .rent_exempt()
@@ -149,8 +97,10 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
         );
     } else {
         // Various errors can occur for invalid merges, we just check it fails
-        let accounts_with_sysvars = add_sysvars(&mollusk, instruction, accounts);
-        let result = mollusk.process_instruction(instruction, &accounts_with_sysvars);
+        let accounts_with_sysvars = add_sysvars(&ctx.mollusk, instruction, accounts);
+        let result = ctx
+            .mollusk
+            .process_instruction(instruction, &accounts_with_sysvars);
         assert!(result.program_result.is_err());
     }
 }

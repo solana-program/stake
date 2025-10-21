@@ -3,24 +3,16 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, StakeLifecycle, StakeTracker},
-    mollusk_svm::{result::Check, Mollusk},
+    helpers::{add_sysvars, StakeLifecycle, StakeTestContext},
+    mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
     solana_stake_interface::{instruction as ixn, state::StakeStateV2},
-    solana_stake_program::{get_minimum_delegation, id},
+    solana_stake_program::id,
     test_case::test_case,
 };
-
-fn mollusk_bpf() -> Mollusk {
-    Mollusk::new(&id(), "solana_stake_program")
-}
-
-fn create_tracker() -> StakeTracker {
-    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
-}
 
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
@@ -30,31 +22,13 @@ fn create_tracker() -> StakeTracker {
 #[test_case(StakeLifecycle::Deactive; "deactive")]
 #[test_case(StakeLifecycle::Closed; "closed")]
 fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
-    let mut mollusk = mollusk_bpf();
-    let mut tracker = create_tracker();
-
-    let stake_rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
-    let minimum_delegation = get_minimum_delegation();
-    let staked_amount = minimum_delegation;
-
+    let mut ctx = StakeTestContext::new();
+    let staked_amount = ctx.minimum_delegation;
     let wallet_rent_exempt_reserve = Rent::default().minimum_balance(0);
 
-    let vote_account = Pubkey::new_unique();
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
-
     // Create source stake account at the specified lifecycle stage
-    let withdraw_source = Pubkey::new_unique();
-    let mut withdraw_source_account = withdraw_source_type.create_stake_account_fully_specified(
-        &mut mollusk,
-        &mut tracker,
-        &withdraw_source,
-        &vote_account,
-        staked_amount,
-        &staker,
-        &withdrawer,
-        &solana_stake_interface::state::Lockup::default(),
-    );
+    let (withdraw_source, mut withdraw_source_account) =
+        ctx.create_stake_account(withdraw_source_type, staked_amount);
 
     // Create recipient account
     let recipient = Pubkey::new_unique();
@@ -67,12 +41,12 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     {
         withdraw_source // Self-signed for uninitialized/closed
     } else {
-        withdrawer
+        ctx.withdrawer
     };
 
     // Withdraw that would end rent-exemption always fails
     let rent_spillover = if withdraw_source_type == StakeLifecycle::Closed {
-        stake_rent_exempt_reserve - Rent::default().minimum_balance(0) + 1
+        ctx.rent_exempt_reserve - Rent::default().minimum_balance(0) + 1
     } else {
         1
     };
@@ -89,7 +63,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         (recipient, recipient_account.clone()),
     ];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
 
     // For initialized/delegated accounts, the program itself checks and fails with InsufficientFunds
     // For uninitialized/closed accounts, the program succeeds but leaves accounts below rent exemption
@@ -98,7 +72,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     {
         // Expect program success but rent check should fail - catch the panic
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            mollusk.process_and_validate_instruction(
+            ctx.mollusk.process_and_validate_instruction(
                 &instruction,
                 &accounts,
                 &[Check::success(), Check::all_rent_exempt()],
@@ -111,7 +85,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         );
     } else {
         // Program fails with InsufficientFunds
-        mollusk.process_and_validate_instruction(
+        ctx.mollusk.process_and_validate_instruction(
             &instruction,
             &accounts,
             &[Check::err(ProgramError::InsufficientFunds)],
@@ -126,8 +100,8 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             (recipient, recipient_account.clone()),
         ];
 
-        let accounts = add_sysvars(&mollusk, &instruction, accounts);
-        mollusk.process_and_validate_instruction(
+        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+        ctx.mollusk.process_and_validate_instruction(
             &instruction,
             &accounts,
             &[Check::err(ProgramError::InsufficientFunds)],
@@ -152,8 +126,8 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             (recipient, recipient_account.clone()),
         ];
 
-        let accounts = add_sysvars(&mollusk, &instruction, accounts);
-        mollusk.process_and_validate_instruction(
+        let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+        ctx.mollusk.process_and_validate_instruction(
             &instruction,
             &accounts,
             &[Check::err(ProgramError::InsufficientFunds)],
@@ -167,7 +141,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         ];
 
         helpers::process_instruction_after_testing_missing_signers(
-            &mollusk,
+            &ctx.mollusk,
             &instruction,
             &accounts,
             &[
@@ -186,7 +160,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         ];
 
         let result = helpers::process_instruction_after_testing_missing_signers(
-            &mollusk,
+            &ctx.mollusk,
             &instruction,
             &accounts,
             &[
@@ -212,7 +186,7 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
             &withdraw_source,
             &signer,
             &recipient2,
-            staked_amount + stake_rent_exempt_reserve,
+            staked_amount + ctx.rent_exempt_reserve,
             None,
         );
         let accounts = vec![
@@ -221,15 +195,13 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         ];
 
         helpers::process_instruction_after_testing_missing_signers(
-            &mollusk,
+            &ctx.mollusk,
             &instruction,
             &accounts,
             &[
                 Check::success(),
                 Check::account(&recipient2)
-                    .lamports(
-                        staked_amount + stake_rent_exempt_reserve + wallet_rent_exempt_reserve,
-                    )
+                    .lamports(staked_amount + ctx.rent_exempt_reserve + wallet_rent_exempt_reserve)
                     .build(),
             ],
         );
@@ -238,17 +210,13 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
 
 #[test]
 fn test_withdraw_from_rewards_pool() {
-    let mollusk = mollusk_bpf();
-
-    let minimum_delegation = get_minimum_delegation();
-    let staked_amount = minimum_delegation;
-
-    let withdrawer = Pubkey::new_unique();
+    let ctx = StakeTestContext::new();
+    let staked_amount = ctx.minimum_delegation;
 
     // Create a rewards pool account
     let rewards_pool_address = Pubkey::new_unique();
     let rewards_pool_data = AccountSharedData::new_data_with_space(
-        helpers::STAKE_RENT_EXEMPTION + staked_amount,
+        ctx.rent_exempt_reserve + staked_amount,
         &StakeStateV2::RewardsPool,
         StakeStateV2::size_of(),
         &id(),
@@ -260,7 +228,7 @@ fn test_withdraw_from_rewards_pool() {
 
     let instruction = ixn::withdraw(
         &rewards_pool_address,
-        &withdrawer,
+        &ctx.withdrawer,
         &recipient,
         staked_amount,
         None,
@@ -270,8 +238,8 @@ fn test_withdraw_from_rewards_pool() {
         (recipient, recipient_account),
     ];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InvalidAccountData)],

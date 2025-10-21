@@ -4,7 +4,8 @@ mod helpers;
 
 use {
     crate::helpers::add_sysvars,
-    mollusk_svm::{result::Check, Mollusk},
+    helpers::StakeTestContext,
+    mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
@@ -16,21 +17,16 @@ use {
     solana_stake_program::id,
 };
 
-fn mollusk_bpf() -> Mollusk {
-    Mollusk::new(&id(), "solana_stake_program")
-}
-
 #[test]
 fn test_initialize() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
-    let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
-
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let custodian = Pubkey::new_unique();
 
-    let authorized = Authorized { staker, withdrawer };
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
     let lockup = Lockup {
         epoch: 1,
         unix_timestamp: 0,
@@ -39,7 +35,7 @@ fn test_initialize() {
 
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
-        rent_exempt_reserve,
+        ctx.rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -48,17 +44,17 @@ fn test_initialize() {
 
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
     let accounts = vec![(stake, stake_account)];
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
 
     // Should succeed
-    let result = mollusk.process_and_validate_instruction(
+    let result = ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(rent_exempt_reserve)
+                .lamports(ctx.rent_exempt_reserve)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
@@ -72,14 +68,14 @@ fn test_initialize() {
         stake_state,
         StakeStateV2::Initialized(solana_stake_interface::state::Meta {
             authorized,
-            rent_exempt_reserve,
+            rent_exempt_reserve: ctx.rent_exempt_reserve,
             lockup,
         }),
     );
 
     // 2nd time fails, can't move it from anything other than uninit->init
-    let accounts2 = add_sysvars(&mollusk, &instruction, vec![(stake, resulting_account)]);
-    mollusk.process_and_validate_instruction(
+    let accounts2 = add_sysvars(&ctx.mollusk, &instruction, vec![(stake, resulting_account)]);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts2,
         &[Check::err(ProgramError::InvalidAccountData)],
@@ -88,15 +84,13 @@ fn test_initialize() {
 
 #[test]
 fn test_initialize_insufficient_funds() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
-    let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
-
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let custodian = Pubkey::new_unique();
-
-    let authorized = Authorized { staker, withdrawer };
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
     let lockup = Lockup {
         epoch: 1,
         unix_timestamp: 0,
@@ -105,7 +99,7 @@ fn test_initialize_insufficient_funds() {
 
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
-        rent_exempt_reserve / 2, // Not enough lamports
+        ctx.rent_exempt_reserve / 2, // Not enough lamports
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -115,8 +109,8 @@ fn test_initialize_insufficient_funds() {
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
     let accounts = vec![(stake, stake_account)];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InsufficientFunds)],
@@ -125,17 +119,17 @@ fn test_initialize_insufficient_funds() {
 
 #[test]
 fn test_initialize_incorrect_size_larger() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     // Original program_test.rs uses double rent instead of just
     // increasing the size by 1. This behavior remains (makes no difference here).
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of() * 2);
 
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let custodian = Pubkey::new_unique();
-
-    let authorized = Authorized { staker, withdrawer };
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
     let lockup = Lockup {
         epoch: 1,
         unix_timestamp: 0,
@@ -154,8 +148,8 @@ fn test_initialize_incorrect_size_larger() {
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
     let accounts = vec![(stake, stake_account)];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InvalidAccountData)],
@@ -164,17 +158,17 @@ fn test_initialize_incorrect_size_larger() {
 
 #[test]
 fn test_initialize_incorrect_size_smaller() {
-    let mollusk = mollusk_bpf();
+    let ctx = StakeTestContext::new();
 
     // Original program_test.rs uses rent for size instead of
     // rent for size - 1. This behavior remains (makes no difference here).
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
 
-    let staker = Pubkey::new_unique();
-    let withdrawer = Pubkey::new_unique();
     let custodian = Pubkey::new_unique();
-
-    let authorized = Authorized { staker, withdrawer };
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
     let lockup = Lockup {
         epoch: 1,
         unix_timestamp: 0,
@@ -193,8 +187,8 @@ fn test_initialize_incorrect_size_smaller() {
     let instruction = ixn::initialize(&stake, &authorized, &lockup);
     let accounts = vec![(stake, stake_account)];
 
-    let accounts = add_sysvars(&mollusk, &instruction, accounts);
-    mollusk.process_and_validate_instruction(
+    let accounts = add_sysvars(&ctx.mollusk, &instruction, accounts);
+    ctx.mollusk.process_and_validate_instruction(
         &instruction,
         &accounts,
         &[Check::err(ProgramError::InvalidAccountData)],
