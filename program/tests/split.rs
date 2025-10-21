@@ -3,7 +3,9 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, get_effective_stake, parse_stake_account, StakeLifecycle},
+    helpers::{
+        add_sysvars, get_effective_stake, parse_stake_account, StakeLifecycle, StakeTracker,
+    },
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
@@ -17,6 +19,10 @@ fn mollusk_bpf() -> Mollusk {
     Mollusk::new(&id(), "solana_stake_program")
 }
 
+fn create_tracker() -> StakeTracker {
+    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
+}
+
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
@@ -25,6 +31,7 @@ fn mollusk_bpf() -> Mollusk {
 #[test_case(StakeLifecycle::Deactive; "deactive")]
 fn test_split(split_source_type: StakeLifecycle) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
     let minimum_delegation = get_minimum_delegation();
@@ -38,6 +45,8 @@ fn test_split(split_source_type: StakeLifecycle) {
     let split_source = Pubkey::new_unique();
     let mut split_source_account = split_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &split_source,
         &vote_account,
         staked_amount,
         &staker,

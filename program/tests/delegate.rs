@@ -6,7 +6,7 @@ use {
     crate::helpers::add_sysvars,
     helpers::{
         create_vote_account, increment_vote_account_credits, initialize_stake_account,
-        parse_stake_account,
+        parse_stake_account, MolluskStakeExt, StakeTracker,
     },
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, WritableAccount},
@@ -24,9 +24,14 @@ fn mollusk_bpf() -> Mollusk {
     Mollusk::new(&id(), "solana_stake_program")
 }
 
+fn create_tracker() -> StakeTracker {
+    helpers::StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
+}
+
 #[test]
 fn test_delegate() {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let minimum_delegation = get_minimum_delegation();
     let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
@@ -91,7 +96,11 @@ fn test_delegate() {
 
     // Advance epoch to activate the stake
     let activation_epoch = mollusk.sysvars.clock.epoch;
-    helpers::advance_epoch_and_activate_stake(&mut mollusk, minimum_delegation, activation_epoch);
+    tracker.track_delegation(&stake, minimum_delegation, activation_epoch, &vote_account);
+
+    let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
+    let current_slot = mollusk.sysvars.clock.slot;
+    mollusk.warp_to_slot_with_stake_tracking(&tracker, current_slot + slots_per_epoch, Some(0));
 
     // Verify that delegate fails as stake is active and not deactivating
     let instruction = ixn::delegate_stake(&stake, &staker, &vote_account);
@@ -164,42 +173,10 @@ fn test_delegate() {
         &[Check::err(StakeError::TooSoonToRedelegate.into())],
     );
 
-    // Advance epoch again (just warp forward, maintaining history continuity)
-    let current_epoch = mollusk.sysvars.clock.epoch;
+    // Advance epoch again using tracker
     let current_slot = mollusk.sysvars.clock.slot;
     let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
-
-    // Warp to next epoch first
-    mollusk.warp_to_slot(current_slot + slots_per_epoch);
-
-    // Now add history for the now-past epoch (current_epoch)
-    // Carry forward all effective stake, consolidate any activating stake
-    let mut stake_history = mollusk.sysvars.stake_history.clone();
-    let prev_entry = stake_history.get(current_epoch).cloned();
-
-    let total_effective = if let Some(entry) = prev_entry {
-        entry.effective + entry.activating
-    } else {
-        // No entry for previous epoch; look further back
-        if current_epoch > 0 {
-            let earlier_entry = stake_history.get(current_epoch - 1).cloned();
-            earlier_entry
-                .map(|e| e.effective + e.activating)
-                .unwrap_or(0)
-        } else {
-            0
-        }
-    };
-
-    stake_history.add(
-        current_epoch,
-        solana_stake_interface::stake_history::StakeHistoryEntry {
-            effective: total_effective,
-            activating: 0,
-            deactivating: 0,
-        },
-    );
-    mollusk.sysvars.stake_history = stake_history;
+    mollusk.warp_to_slot_with_stake_tracking(&tracker, current_slot + slots_per_epoch, Some(0));
 
     // Delegate still fails after stake is fully activated; redelegate is not supported
     let vote_account2 = Pubkey::new_unique();

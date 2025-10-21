@@ -11,13 +11,172 @@ use {
     solana_stake_interface::{
         instruction as ixn,
         stake_history::{StakeHistory, StakeHistoryEntry},
-        state::{Authorized, Lockup, StakeStateV2},
+        state::{Authorized, Delegation, Lockup, StakeStateV2},
     },
     solana_stake_program::id,
     solana_sysvar_id::SysvarId,
     solana_vote_interface::state::{VoteStateV4, VoteStateVersions},
     std::collections::HashMap,
 };
+
+// Inline the stake tracker instead of a separate module
+// This replicates solana-runtime's Banks behavior where stake history is automatically
+// updated at epoch boundaries by aggregating all stake delegations.
+
+/// Tracks stake delegations for automatic stake history management
+#[derive(Default, Clone)]
+pub struct StakeTracker {
+    /// Map of stake account pubkey to its delegation info
+    pub(crate) delegations: HashMap<Pubkey, TrackedDelegation>,
+}
+
+#[derive(Clone)]
+pub(crate) struct TrackedDelegation {
+    stake: u64,
+    activation_epoch: Epoch,
+    deactivation_epoch: Epoch,
+    voter_pubkey: Pubkey,
+}
+
+impl StakeTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a tracker with background cluster stake (like Banks has)
+    /// This provides the baseline effective stake that enables instant activation/deactivation
+    pub fn with_background_stake(background_stake: u64) -> Self {
+        let mut tracker = Self::new();
+
+        // Add a synthetic background stake that's been active forever (bootstrap stake)
+        // This mimics Banks' cluster-wide effective stake
+        tracker.delegations.insert(
+            Pubkey::new_unique(), // Synthetic background stake pubkey
+            TrackedDelegation {
+                stake: background_stake,
+                activation_epoch: u64::MAX, // Bootstrap = instantly effective
+                deactivation_epoch: u64::MAX,
+                voter_pubkey: Pubkey::new_unique(),
+            },
+        );
+
+        tracker
+    }
+
+    /// Track a new stake delegation (called after delegate instruction)
+    pub fn track_delegation(
+        &mut self,
+        stake_pubkey: &Pubkey,
+        stake_amount: u64,
+        activation_epoch: Epoch,
+        voter_pubkey: &Pubkey,
+    ) {
+        self.delegations.insert(
+            *stake_pubkey,
+            TrackedDelegation {
+                stake: stake_amount,
+                activation_epoch,
+                deactivation_epoch: u64::MAX,
+                voter_pubkey: *voter_pubkey,
+            },
+        );
+    }
+
+    /// Mark a stake as deactivating (called after deactivate instruction)
+    pub fn track_deactivation(&mut self, stake_pubkey: &Pubkey, deactivation_epoch: Epoch) {
+        if let Some(delegation) = self.delegations.get_mut(stake_pubkey) {
+            delegation.deactivation_epoch = deactivation_epoch;
+        }
+    }
+
+    /// Calculate aggregate stake history for an epoch (replicates Stakes::activate_epoch)
+    fn calculate_epoch_entry(
+        &self,
+        epoch: Epoch,
+        stake_history: &StakeHistory,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> StakeHistoryEntry {
+        self.delegations
+            .values()
+            .map(|tracked| {
+                let delegation = Delegation {
+                    voter_pubkey: tracked.voter_pubkey,
+                    stake: tracked.stake,
+                    activation_epoch: tracked.activation_epoch,
+                    deactivation_epoch: tracked.deactivation_epoch,
+                    ..Delegation::default()
+                };
+
+                delegation.stake_activating_and_deactivating(
+                    epoch,
+                    stake_history,
+                    new_rate_activation_epoch,
+                )
+            })
+            .fold(StakeHistoryEntry::default(), |acc, status| {
+                StakeHistoryEntry {
+                    effective: acc.effective + status.effective,
+                    activating: acc.activating + status.activating,
+                    deactivating: acc.deactivating + status.deactivating,
+                }
+            })
+    }
+}
+
+/// Extension trait that adds stake-aware warping to Mollusk
+pub trait MolluskStakeExt {
+    /// Warp to a slot and automatically update stake history at epoch boundaries
+    ///
+    /// This replicates Banks' behavior from solana-runtime:
+    /// - Bank::warp_from_parent() advances slot
+    /// - Stakes::activate_epoch() aggregates delegations
+    /// - Bank::update_stake_history() writes sysvar
+    fn warp_to_slot_with_stake_tracking(
+        &mut self,
+        tracker: &StakeTracker,
+        target_slot: u64,
+        new_rate_activation_epoch: Option<Epoch>,
+    );
+}
+
+impl MolluskStakeExt for Mollusk {
+    fn warp_to_slot_with_stake_tracking(
+        &mut self,
+        tracker: &StakeTracker,
+        target_slot: u64,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) {
+        let current_epoch = self.sysvars.clock.epoch;
+        let current_slot = self.sysvars.clock.slot;
+
+        if target_slot <= current_slot {
+            panic!(
+                "Cannot warp backwards: current_slot={}, target_slot={}",
+                current_slot, target_slot
+            );
+        }
+
+        // Advance the clock (Mollusk's warp_to_slot only updates Clock sysvar)
+        self.warp_to_slot(target_slot);
+
+        let new_epoch = self.sysvars.clock.epoch;
+
+        // If we crossed epoch boundaries, update stake history for EACH epoch
+        // StakeHistorySysvar requires contiguous history with no gaps
+        // This replicates Bank::update_stake_history() + Stakes::activate_epoch()
+        if new_epoch != current_epoch {
+            for epoch in current_epoch..new_epoch {
+                let entry = tracker.calculate_epoch_entry(
+                    epoch,
+                    &self.sysvars.stake_history,
+                    new_rate_activation_epoch,
+                );
+
+                self.sysvars.stake_history.add(epoch, entry);
+            }
+        }
+    }
+}
 
 // Hardcoded for convenience - matches interface.rs
 pub const STAKE_RENT_EXEMPTION: u64 = 2_282_880;
@@ -73,6 +232,8 @@ impl StakeLifecycle {
     pub fn create_stake_account(
         self,
         mollusk: &mut Mollusk,
+        tracker: &mut StakeTracker,
+        stake_pubkey: &Pubkey,
         vote_account: &Pubkey,
         staked_amount: u64,
     ) -> (AccountSharedData, Pubkey, Pubkey) {
@@ -81,6 +242,8 @@ impl StakeLifecycle {
 
         let account = self.create_stake_account_fully_specified(
             mollusk,
+            tracker,
+            stake_pubkey,
             vote_account,
             staked_amount,
             &staker,
@@ -91,10 +254,23 @@ impl StakeLifecycle {
         (account, staker, withdrawer)
     }
 
+    /// Helper to create tracker with appropriate background stake for tests
+    /// Returns a tracker seeded with background cluster stake
+    pub fn create_tracker_for_test(minimum_delegation: u64) -> StakeTracker {
+        // Use a moderate background stake amount
+        // This mimics Banks' cluster-wide effective stake from all validators
+        // Calculation: needs to be >> test stakes to provide stable warmup base
+        let background_stake = minimum_delegation.saturating_mul(100);
+        StakeTracker::with_background_stake(background_stake)
+    }
+
     /// Create a stake account with full specification of authorities and lockup
+    #[allow(clippy::too_many_arguments)]
     pub fn create_stake_account_fully_specified(
         self,
         mollusk: &mut Mollusk,
+        tracker: &mut StakeTracker,
+        stake_pubkey: &Pubkey,
         vote_account: &Pubkey,
         staked_amount: u64,
         staker: &Pubkey,
@@ -143,11 +319,10 @@ impl StakeLifecycle {
 
         // Delegate if needed
         if self >= StakeLifecycle::Activating {
-            let stake_pubkey = Pubkey::new_unique();
-            let instruction = ixn::delegate_stake(&stake_pubkey, staker, vote_account);
+            let instruction = ixn::delegate_stake(stake_pubkey, staker, vote_account);
 
             let accounts = vec![
-                (stake_pubkey, stake_account.clone()),
+                (*stake_pubkey, stake_account.clone()),
                 (*vote_account, create_vote_account()),
             ];
 
@@ -155,108 +330,53 @@ impl StakeLifecycle {
             let accounts_with_sysvars = add_sysvars(mollusk, &instruction, accounts);
             let result = mollusk.process_instruction(&instruction, &accounts_with_sysvars);
             stake_account = result.resulting_accounts[0].1.clone().into();
+
+            // Track delegation in the tracker
+            let activation_epoch = mollusk.sysvars.clock.epoch;
+            tracker.track_delegation(stake_pubkey, staked_amount, activation_epoch, vote_account);
         }
 
         // For Activating lifecycle: NO epoch advance (stays transient at current epoch)
-        // History management is handled by test-specific "true up" logic
 
         // Advance epoch to activate if needed (Active and beyond)
         if self >= StakeLifecycle::Active {
-            // Get the activation_epoch that was set during delegation
-            let stake_state: StakeStateV2 = bincode::deserialize(stake_account.data()).unwrap();
-            let activation_epoch = if let StakeStateV2::Stake(_, stake, _) = &stake_state {
-                stake.delegation.activation_epoch
-            } else {
-                mollusk.sysvars.clock.epoch
-            };
-
-            // Advance 1 epoch to fully activate the stake (matches program_test behavior)
+            // With background stake in tracker, just warp 1 epoch
+            // The background stake provides baseline for instant partial activation
             let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
             let current_slot = mollusk.sysvars.clock.slot;
+            let target_slot = current_slot + slots_per_epoch;
 
-            mollusk.warp_to_slot(current_slot + slots_per_epoch);
-
-            // Add history for the activation epoch showing the stake as activating
-            // Use a large baseline to ensure instant activation (matches program_test behavior)
-            let mut stake_history = mollusk.sysvars.stake_history.clone();
-            let existing = stake_history.get(activation_epoch).cloned();
-            let existing_effective = existing.as_ref().map(|e| e.effective).unwrap_or(0);
-            let existing_activating = existing.as_ref().map(|e| e.activating).unwrap_or(0);
-
-            // Consolidate any prior activating
-            let consolidated = existing_effective + existing_activating;
-
-            // Add baseline for instant activation (13x the stake amount, or use existing if present)
-            let baseline = if consolidated == 0 {
-                staked_amount.saturating_mul(13)
-            } else {
-                consolidated
-            };
-
-            stake_history.add(
-                activation_epoch,
-                StakeHistoryEntry {
-                    effective: baseline,
-                    activating: staked_amount,
-                    deactivating: 0,
-                },
-            );
-
-            mollusk.sysvars.stake_history = stake_history;
+            mollusk.warp_to_slot_with_stake_tracking(tracker, target_slot, Some(0));
         }
 
         // Deactivate if needed
         if self >= StakeLifecycle::Deactivating {
-            let stake_pubkey = Pubkey::new_unique();
-            let instruction = ixn::deactivate_stake(&stake_pubkey, staker);
+            let instruction = ixn::deactivate_stake(stake_pubkey, staker);
 
-            let accounts = vec![(stake_pubkey, stake_account.clone())];
+            let accounts = vec![(*stake_pubkey, stake_account.clone())];
 
             // Use add_sysvars to provide clock account
             let accounts_with_sysvars = add_sysvars(mollusk, &instruction, accounts);
             let result = mollusk.process_instruction(&instruction, &accounts_with_sysvars);
             stake_account = result.resulting_accounts[0].1.clone().into();
+
+            // Track deactivation in the tracker
+            let deactivation_epoch = mollusk.sysvars.clock.epoch;
+            tracker.track_deactivation(stake_pubkey, deactivation_epoch);
         }
 
         // For Deactivating lifecycle: NO epoch advance (stays transient at current epoch)
-        // History management is handled by test-specific "true up" logic
 
-        // Advance epoch to fully deactivate if needed
         // Advance epoch to fully deactivate if needed (Deactive lifecycle)
         // Matches program_test.rs line 978-983: advance_epoch once to fully deactivate
         if self == StakeLifecycle::Deactive {
-            let deactivation_epoch = mollusk.sysvars.clock.epoch;
-
-            // Advance 1 epoch to fully deactivate the stake (matches program_test behavior)
+            // With background stake, advance 1 epoch for deactivation
+            // Background provides the baseline for instant partial deactivation
             let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
             let current_slot = mollusk.sysvars.clock.slot;
+            let target_slot = current_slot + slots_per_epoch;
 
-            mollusk.warp_to_slot(current_slot + slots_per_epoch);
-
-            // Add history for the deactivation epoch showing the stake as deactivating
-            // Use a large baseline to ensure instant deactivation (matches program_test behavior)
-            let mut stake_history = mollusk.sysvars.stake_history.clone();
-            let existing = stake_history.get(deactivation_epoch).cloned();
-            let existing_effective = existing.as_ref().map(|e| e.effective).unwrap_or(0);
-            let existing_deactivating = existing.as_ref().map(|e| e.deactivating).unwrap_or(0);
-
-            // Add baseline for instant deactivation (13x the stake amount, or use existing if present)
-            let baseline = if existing_effective == 0 && existing_deactivating == 0 {
-                staked_amount.saturating_mul(13)
-            } else {
-                existing_effective
-            };
-
-            stake_history.add(
-                deactivation_epoch,
-                StakeHistoryEntry {
-                    effective: baseline,
-                    activating: 0,
-                    deactivating: existing_deactivating + staked_amount,
-                },
-            );
-
-            mollusk.sysvars.stake_history = stake_history;
+            mollusk.warp_to_slot_with_stake_tracking(tracker, target_slot, Some(0));
         }
 
         stake_account
@@ -310,110 +430,6 @@ pub fn parse_stake_account(
         StakeStateV2::Stake(meta, stake, _) => (meta, Some(stake), lamports),
         _ => panic!("Expected initialized or staked account"),
     }
-}
-
-/// Advance to the next epoch and update stake history to show stake activation
-///
-/// This properly sets up stake history entries so that stakes can be seen as active
-/// by the program when it checks via stake.stake() which uses the stake history sysvar.
-///
-/// IMPORTANT: Stake history should only contain entries for PAST epochs (not current).
-/// The StakeHistorySysvar::get_entry assumes newest_historical_epoch = current_epoch - 1.
-/// Add history showing a stake activated in the past WITHOUT advancing time
-/// This allows individual Active stakes to have their own timeline without polluting shared history
-pub fn add_activation_history(
-    mollusk: &mut Mollusk,
-    stake_amount: u64,
-    activation_epoch_in_past: u64,
-) {
-    let mut stake_history = mollusk.sysvars.stake_history.clone();
-
-    // Simply record that this stake amount existed as effective at that past epoch
-    // Don't use any baseline - the stake appears active because it's been 25+ epochs since activation
-    let existing = stake_history.get(activation_epoch_in_past).cloned();
-    let existing_effective = existing.as_ref().map(|e| e.effective).unwrap_or(0);
-
-    stake_history.add(
-        activation_epoch_in_past,
-        StakeHistoryEntry {
-            effective: existing_effective + stake_amount,
-            activating: 0, // Already fully activated (it's been 25 epochs)
-            deactivating: 0,
-        },
-    );
-    mollusk.sysvars.stake_history = stake_history;
-}
-
-/// Add history showing a stake deactivated in the past WITHOUT advancing time
-pub fn add_deactivation_history(mollusk: &mut Mollusk, deactivation_epoch_in_past: u64) {
-    let mut stake_history = mollusk.sysvars.stake_history.clone();
-
-    // Record that deactivation completed at that past epoch
-    // No effective stake remains (it's been 25+ epochs since deactivation)
-    let existing = stake_history.get(deactivation_epoch_in_past).cloned();
-
-    stake_history.add(
-        deactivation_epoch_in_past,
-        StakeHistoryEntry {
-            effective: existing.as_ref().map(|e| e.effective).unwrap_or(0),
-            activating: 0,
-            deactivating: 0, // Already fully deactivated (it's been 25 epochs)
-        },
-    );
-    mollusk.sysvars.stake_history = stake_history;
-}
-
-pub fn advance_epoch_and_activate_stake(
-    mollusk: &mut Mollusk,
-    stake_amount: u64,
-    activation_epoch: u64,
-) {
-    // This function handles activation of a stake that was just delegated.
-    // The stake was delegated at activation_epoch (should equal current_epoch).
-    //
-    // This matches program_test's advance_epoch() behavior: advance 1 epoch and add
-    // minimal stake_history showing the stake as activating. The stake doesn't need
-    // to be fully activated - just needs effective stake > 0 to trigger checks like
-    // TooSoonToRedelegate.
-    //
-    // CRITICAL: Stake history should ONLY contain PAST epochs.
-
-    let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
-    let current_slot = mollusk.sysvars.clock.slot;
-
-    // Advance 1 epoch (matching program_test's advance_epoch)
-    mollusk.warp_to_slot(current_slot + slots_per_epoch);
-
-    // Add history for the activation_epoch (now in the past) showing this stake activating.
-    // The baseline effective stake enables warmup calculation to show some effective stake
-    // after 1 epoch, which is sufficient for delegation checks.
-    let mut stake_history = mollusk.sysvars.stake_history.clone();
-
-    let existing = stake_history.get(activation_epoch).cloned();
-    let existing_effective = existing.as_ref().map(|e| e.effective).unwrap_or(0);
-    let existing_activating = existing.as_ref().map(|e| e.activating).unwrap_or(0);
-
-    // Consolidate any prior activating into effective
-    let consolidated_effective = existing_effective + existing_activating;
-
-    // Add baseline effective stake for warmup calculation (13x is moderate, works for all tests)
-    // This allows the stake to show as partially active after 1 epoch, matching program_test
-    let effective_with_baseline = if consolidated_effective == 0 {
-        stake_amount.saturating_mul(13)
-    } else {
-        consolidated_effective
-    };
-
-    stake_history.add(
-        activation_epoch,
-        StakeHistoryEntry {
-            effective: effective_with_baseline,
-            activating: stake_amount,
-            deactivating: 0,
-        },
-    );
-
-    mollusk.sysvars.stake_history = stake_history;
 }
 
 /// Resolve all accounts for an instruction, including sysvars and instruction accounts
@@ -487,14 +503,14 @@ pub fn initialize_stake_account(
     result.resulting_accounts[0].1.clone().into()
 }
 
-/// True up a transient stake account's epoch to the current epoch
-/// and optionally add stake history for the previous epoch
+/// Synchronize a transient stake's epoch to the current epoch
+/// Updates both the account data and the tracker.
 pub fn true_up_transient_stake_epoch(
     mollusk: &mut Mollusk,
+    tracker: &mut StakeTracker,
+    stake_pubkey: &Pubkey,
     stake_account: &mut AccountSharedData,
     lifecycle: StakeLifecycle,
-    stake_amount: u64,
-    add_history: bool,
 ) {
     if lifecycle != StakeLifecycle::Activating && lifecycle != StakeLifecycle::Deactivating {
         return;
@@ -503,58 +519,26 @@ pub fn true_up_transient_stake_epoch(
     let clock = mollusk.sysvars.clock.clone();
     let mut stake_state: StakeStateV2 = bincode::deserialize(stake_account.data()).unwrap();
 
-    let old_epoch = if let StakeStateV2::Stake(_, ref stake, _) = &stake_state {
-        match lifecycle {
-            StakeLifecycle::Activating => stake.delegation.activation_epoch,
-            StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch,
-            _ => clock.epoch,
-        }
-    } else {
-        clock.epoch
-    };
-
     if let StakeStateV2::Stake(_, ref mut stake, _) = &mut stake_state {
         match lifecycle {
-            StakeLifecycle::Activating => stake.delegation.activation_epoch = clock.epoch,
-            StakeLifecycle::Deactivating => stake.delegation.deactivation_epoch = clock.epoch,
+            StakeLifecycle::Activating => {
+                stake.delegation.activation_epoch = clock.epoch;
+
+                // Update tracker as well
+                if let Some(tracked) = tracker.delegations.get_mut(stake_pubkey) {
+                    tracked.activation_epoch = clock.epoch;
+                }
+            }
+            StakeLifecycle::Deactivating => {
+                stake.delegation.deactivation_epoch = clock.epoch;
+
+                // Update tracker as well
+                tracker.track_deactivation(stake_pubkey, clock.epoch);
+            }
             _ => (),
         }
     }
     stake_account.set_data(bincode::serialize(&stake_state).unwrap());
-
-    if add_history && old_epoch != clock.epoch && old_epoch < clock.epoch {
-        let mut stake_history = mollusk.sysvars.stake_history.clone();
-        let existing = stake_history.get(old_epoch).cloned();
-
-        match lifecycle {
-            StakeLifecycle::Activating => {
-                stake_history.add(
-                    old_epoch,
-                    StakeHistoryEntry {
-                        effective: existing
-                            .as_ref()
-                            .map(|e| e.effective + e.activating)
-                            .unwrap_or(0),
-                        activating: stake_amount,
-                        deactivating: 0,
-                    },
-                );
-            }
-            StakeLifecycle::Deactivating => {
-                stake_history.add(
-                    old_epoch,
-                    StakeHistoryEntry {
-                        effective: existing.as_ref().map(|e| e.effective).unwrap_or(0),
-                        activating: 0,
-                        deactivating: existing.as_ref().map(|e| e.deactivating).unwrap_or(0)
-                            + stake_amount,
-                    },
-                );
-            }
-            _ => (),
-        }
-        mollusk.sysvars.stake_history = stake_history;
-    }
 }
 
 /// Test that removing any required signer causes the instruction to fail with MissingRequiredSignature,

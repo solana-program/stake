@@ -3,7 +3,7 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, create_vote_account, StakeLifecycle},
+    helpers::{add_sysvars, create_vote_account, StakeLifecycle, StakeTracker},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::ReadableAccount,
     solana_pubkey::Pubkey,
@@ -19,6 +19,10 @@ fn mollusk_bpf() -> Mollusk {
     Mollusk::new(&id(), "solana_stake_program")
 }
 
+fn create_tracker() -> StakeTracker {
+    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
+}
+
 #[test_matrix(
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
@@ -27,6 +31,7 @@ fn mollusk_bpf() -> Mollusk {
 )]
 fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
     let minimum_delegation = get_minimum_delegation();
@@ -68,6 +73,8 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
     let merge_source = Pubkey::new_unique();
     let mut merge_source_account = merge_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &merge_source,
         &vote_account,
         staked_amount,
         &staker,
@@ -83,6 +90,8 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
     let merge_dest = Pubkey::new_unique();
     let merge_dest_account = merge_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &merge_dest,
         &vote_account,
         staked_amount,
         &staker,

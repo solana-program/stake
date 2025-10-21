@@ -6,7 +6,7 @@ use {
     crate::helpers::add_sysvars,
     helpers::{
         create_vote_account, get_effective_stake, parse_stake_account,
-        true_up_transient_stake_epoch, StakeLifecycle,
+        true_up_transient_stake_epoch, StakeLifecycle, StakeTracker,
     },
     mollusk_svm::{result::Check, Mollusk},
     solana_account::WritableAccount,
@@ -19,6 +19,10 @@ use {
 
 fn mollusk_bpf() -> Mollusk {
     Mollusk::new(&id(), "solana_stake_program")
+}
+
+fn create_tracker() -> StakeTracker {
+    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
 }
 
 #[test_matrix(
@@ -36,6 +40,7 @@ fn test_move_stake(
     has_lockup: bool,
 ) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
     let minimum_delegation = get_minimum_delegation();
@@ -72,21 +77,12 @@ fn test_move_stake(
     let staker = Pubkey::new_unique();
     let withdrawer = Pubkey::new_unique();
 
-    // Advance 1 epoch ONLY if we have transient stakes that need historical context
-    if move_source_type == StakeLifecycle::Activating
-        || move_source_type == StakeLifecycle::Deactivating
-        || move_dest_type == StakeLifecycle::Activating
-        || move_dest_type == StakeLifecycle::Deactivating
-    {
-        let slots_per_epoch = mollusk.sysvars.epoch_schedule.slots_per_epoch;
-        let current_slot = mollusk.sysvars.clock.slot;
-        mollusk.warp_to_slot(current_slot + slots_per_epoch);
-    }
-
     // Create source stake
     let move_source = Pubkey::new_unique();
     let mut move_source_account = move_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_source,
         &vote_account,
         source_staked_amount,
         &staker,
@@ -98,6 +94,8 @@ fn test_move_stake(
     let move_dest = Pubkey::new_unique();
     let mut move_dest_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest,
         &vote_account,
         minimum_delegation,
         &staker,
@@ -107,18 +105,18 @@ fn test_move_stake(
 
     true_up_transient_stake_epoch(
         &mut mollusk,
+        &mut tracker,
+        &move_source,
         &mut move_source_account,
         move_source_type,
-        source_staked_amount,
-        true,
     );
 
     true_up_transient_stake_epoch(
         &mut mollusk,
+        &mut tracker,
+        &move_dest,
         &mut move_dest_account,
         move_dest_type,
-        minimum_delegation,
-        true,
     );
 
     // Add excess lamports
@@ -294,6 +292,7 @@ fn test_move_stake(
 )]
 fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycle)) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let minimum_delegation = get_minimum_delegation();
     let source_staked_amount = minimum_delegation * 2;
@@ -307,6 +306,8 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
     let move_source = Pubkey::new_unique();
     let move_source_account = move_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_source,
         &vote_account,
         source_staked_amount,
         &staker,
@@ -317,6 +318,8 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
     let move_dest = Pubkey::new_unique();
     let move_dest_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest,
         &vote_account,
         0,
         &staker,
@@ -351,6 +354,7 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
 )]
 fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type: StakeLifecycle) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let minimum_delegation = get_minimum_delegation();
     let source_staked_amount = minimum_delegation * 2;
@@ -378,6 +382,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_source = Pubkey::new_unique();
     let mut move_source_account = move_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_source,
         &vote_account,
         source_staked_amount,
         &staker,
@@ -406,6 +412,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_dest = Pubkey::new_unique();
     let move_dest_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest,
         &vote_account,
         minimum_delegation,
         &staker,
@@ -446,6 +454,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_locked_source = Pubkey::new_unique();
     let mut move_locked_source_account = move_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_locked_source,
         &vote_account,
         source_staked_amount,
         &staker,
@@ -459,6 +469,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_dest2 = Pubkey::new_unique();
     let move_dest2_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest2,
         &vote_account,
         minimum_delegation,
         &staker,
@@ -490,6 +502,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_dest3 = Pubkey::new_unique();
     let move_dest3_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest3,
         &vote_account,
         minimum_delegation,
         &throwaway_staker,
@@ -516,6 +530,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_dest4 = Pubkey::new_unique();
     let move_dest4_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest4,
         &vote_account,
         minimum_delegation,
         &staker,
@@ -541,6 +557,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let move_dest5 = Pubkey::new_unique();
     let move_dest5_account = move_dest_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &move_dest5,
         &vote_account,
         minimum_delegation,
         &staker,
@@ -570,6 +588,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         let move_dest6 = Pubkey::new_unique();
         let move_dest6_account = move_dest_type.create_stake_account_fully_specified(
             &mut mollusk,
+            &mut tracker,
+            &move_dest6,
             &dest_vote_account,
             minimum_delegation,
             &staker,
@@ -580,6 +600,8 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         let move_source2 = Pubkey::new_unique();
         let move_source2_account = move_source_type.create_stake_account_fully_specified(
             &mut mollusk,
+            &mut tracker,
+            &move_source2,
             &vote_account,
             source_staked_amount,
             &staker,

@@ -3,7 +3,7 @@
 mod helpers;
 
 use {
-    helpers::{add_sysvars, StakeLifecycle},
+    helpers::{add_sysvars, StakeLifecycle, StakeTracker},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{AccountSharedData, WritableAccount},
     solana_program_error::ProgramError,
@@ -18,6 +18,10 @@ fn mollusk_bpf() -> Mollusk {
     Mollusk::new(&id(), "solana_stake_program")
 }
 
+fn create_tracker() -> StakeTracker {
+    StakeLifecycle::create_tracker_for_test(get_minimum_delegation())
+}
+
 #[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
 #[test_case(StakeLifecycle::Initialized; "initialized")]
 #[test_case(StakeLifecycle::Activating; "activating")]
@@ -27,6 +31,7 @@ fn mollusk_bpf() -> Mollusk {
 #[test_case(StakeLifecycle::Closed; "closed")]
 fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let mut mollusk = mollusk_bpf();
+    let mut tracker = create_tracker();
 
     let stake_rent_exempt_reserve = helpers::STAKE_RENT_EXEMPTION;
     let minimum_delegation = get_minimum_delegation();
@@ -42,6 +47,8 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let withdraw_source = Pubkey::new_unique();
     let mut withdraw_source_account = withdraw_source_type.create_stake_account_fully_specified(
         &mut mollusk,
+        &mut tracker,
+        &withdraw_source,
         &vote_account,
         staked_amount,
         &staker,
