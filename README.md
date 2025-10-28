@@ -39,8 +39,7 @@ solana-verify get-program-hash -um Stake11111111111111111111111111111111111111
 with:
 
 ```console
-solana-verify build --library-name program
-solana-verify get-executable-hash target/deploy/solana_stake_program.so
+solana-verify build --library-name solana_stake_program
 ```
 
 It is possible for a solana-verify version mismatch to affect the hash; [BPF Stake Program 1.0.0](https://github.com/solana-program/stake/releases/tag/program%40v1.0.0) was built with solana-verify 0.4.6.
