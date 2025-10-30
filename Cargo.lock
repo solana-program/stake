@@ -7206,6 +7206,7 @@ dependencies = [
  "solana-transaction",
  "solana-vote-interface 4.0.3",
  "test-case",
+ "tokio",
 ]
 
 [[package]]

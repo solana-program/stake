@@ -4,8 +4,8 @@ mod helpers;
 
 use {
     helpers::{
-        create_vote_account, increment_vote_account_credits, initialize_stake_account,
-        parse_stake_account, DeactivateConfig, DelegateConfig, MolluskStakeExt, StakeTestContext,
+        create_vote_account, increment_vote_account_credits, parse_stake_account, DeactivateConfig,
+        DelegateConfig, MolluskStakeExt, StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, WritableAccount},
@@ -13,7 +13,7 @@ use {
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         error::StakeError,
-        state::{Authorized, Delegation, Lockup, Stake, StakeStateV2},
+        state::{Delegation, Stake, StakeStateV2},
     },
     solana_stake_program::id,
 };
@@ -26,17 +26,11 @@ fn test_delegate() {
     let vote_state_credits = 100u64;
     increment_vote_account_credits(&mut vote_account_data, 0, vote_state_credits);
 
-    let stake = Pubkey::new_unique();
-    let mut stake_account = initialize_stake_account(
-        &ctx.mollusk,
-        &stake,
-        ctx.rent_exempt_reserve + ctx.minimum_delegation,
-        &Authorized {
-            staker: ctx.staker,
-            withdrawer: ctx.withdrawer,
-        },
-        &Lockup::default(),
-    );
+    let min_delegation = ctx.minimum_delegation;
+    let (stake, mut stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Initialized)
+        .staked_amount(min_delegation)
+        .build();
 
     // Delegate stake
     let result = ctx
@@ -162,24 +156,18 @@ fn test_delegate() {
 
 #[test]
 fn test_delegate_fake_vote_account() {
-    let ctx = StakeTestContext::new();
+    let mut ctx = StakeTestContext::new();
 
     // Create fake vote account (not owned by vote program)
     let fake_vote_account = Pubkey::new_unique();
     let mut fake_vote_data = create_vote_account();
     fake_vote_data.set_owner(Pubkey::new_unique()); // Wrong owner
 
-    let stake = Pubkey::new_unique();
-    let stake_account = initialize_stake_account(
-        &ctx.mollusk,
-        &stake,
-        ctx.rent_exempt_reserve + ctx.minimum_delegation,
-        &Authorized {
-            staker: ctx.staker,
-            withdrawer: ctx.withdrawer,
-        },
-        &Lockup::default(),
-    );
+    let min_delegation = ctx.minimum_delegation;
+    let (stake, stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Initialized)
+        .staked_amount(min_delegation)
+        .build();
 
     // Try to delegate to fake vote account
     ctx.process_with(DelegateConfig {

@@ -351,6 +351,16 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
 
+    // Also verify signing with dest's staker fails (wrong signer for source)
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest3, &move_dest3_account),
+        amount: min_delegation,
+        override_signer: Some(&throwaway_staker),
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .execute();
+
     // Withdrawer mismatch fails
     let throwaway_withdrawer = solana_pubkey::Pubkey::new_unique();
     let staker = ctx.staker;
@@ -368,6 +378,16 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
+    .execute();
+
+    // Also verify signing with dest's withdrawer fails (wrong signer for source)
+    ctx.process_with(MoveStakeConfig {
+        source: (&move_source, &move_source_account),
+        destination: (&move_dest4, &move_dest4_account),
+        amount: min_delegation,
+        override_signer: Some(&throwaway_withdrawer),
+    })
+    .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
     .execute();
 
     // Dest lockup fails

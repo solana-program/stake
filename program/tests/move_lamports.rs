@@ -348,6 +348,7 @@ fn test_move_lamports_general_fail(
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
 
+    // Also verify signing with dest's staker fails (wrong signer for source)
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest3, &move_dest3_account),
@@ -378,6 +379,7 @@ fn test_move_lamports_general_fail(
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
 
+    // Also verify signing with dest's withdrawer fails (wrong signer for source)
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest4, &move_dest4_account),

@@ -3,21 +3,18 @@
 mod helpers;
 
 use {
-    helpers::{
-        initialize_stake_account, parse_stake_account, AuthorizeConfig, StakeTestContext,
-        WithdrawConfig,
-    },
+    helpers::{parse_stake_account, AuthorizeConfig, StakeTestContext, WithdrawConfig},
     mollusk_svm::result::Check,
     solana_account::AccountSharedData,
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
-    solana_stake_interface::state::{Authorized, Lockup, StakeAuthorize, StakeStateV2},
+    solana_stake_interface::state::{StakeAuthorize, StakeStateV2},
     solana_stake_program::id,
 };
 
 #[test]
 fn test_authorize() {
-    let ctx = StakeTestContext::new();
+    let mut ctx = StakeTestContext::new();
 
     let staker1 = Pubkey::new_unique();
     let staker2 = Pubkey::new_unique();
@@ -27,14 +24,9 @@ fn test_authorize() {
     let withdrawer2 = Pubkey::new_unique();
     let withdrawer3 = Pubkey::new_unique();
 
-    let stake = Pubkey::new_unique();
-    let stake_account = AccountSharedData::new_data_with_space(
-        ctx.rent_exempt_reserve,
-        &StakeStateV2::Uninitialized,
-        StakeStateV2::size_of(),
-        &id(),
-    )
-    .unwrap();
+    let (stake, stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Uninitialized)
+        .build();
 
     // Authorize uninitialized fails for staker
     ctx.process_with(AuthorizeConfig {
@@ -56,16 +48,11 @@ fn test_authorize() {
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
     .execute();
 
-    let mut stake_account = initialize_stake_account(
-        &ctx.mollusk,
-        &stake,
-        ctx.rent_exempt_reserve,
-        &Authorized {
-            staker: staker1,
-            withdrawer: withdrawer1,
-        },
-        &Lockup::default(),
-    );
+    let (stake, mut stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Initialized)
+        .stake_authority(&staker1)
+        .withdraw_authority(&withdrawer1)
+        .build();
 
     // Change staker authority
     // Test that removing any signer causes failure, then verify success

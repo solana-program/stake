@@ -15,7 +15,7 @@ use {
 
 #[test]
 fn test_initialize() {
-    let ctx = StakeTestContext::new();
+    let mut ctx = StakeTestContext::new();
 
     let custodian = Pubkey::new_unique();
 
@@ -29,14 +29,9 @@ fn test_initialize() {
         custodian,
     };
 
-    let stake = Pubkey::new_unique();
-    let stake_account = AccountSharedData::new_data_with_space(
-        ctx.rent_exempt_reserve,
-        &StakeStateV2::Uninitialized,
-        StakeStateV2::size_of(),
-        &id(),
-    )
-    .unwrap();
+    let (stake, stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Uninitialized)
+        .build();
 
     let result = ctx
         .process_with(InitializeConfig {
@@ -91,6 +86,7 @@ fn test_initialize_insufficient_funds() {
         custodian,
     };
 
+    // Create account with insufficient lamports (need to manually create since builder adds rent automatically)
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         ctx.rent_exempt_reserve / 2, // Not enough lamports
@@ -128,6 +124,7 @@ fn test_initialize_incorrect_size_larger() {
         custodian,
     };
 
+    // Create account with wrong size (need to manually create since builder enforces correct size)
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         rent_exempt_reserve,
@@ -165,6 +162,7 @@ fn test_initialize_incorrect_size_smaller() {
         custodian,
     };
 
+    // Create account with wrong size (need to manually create since builder enforces correct size)
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         rent_exempt_reserve,

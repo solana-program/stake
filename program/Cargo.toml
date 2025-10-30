@@ -49,6 +49,7 @@ solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-sysvar-id = "3.0.0"
 solana-transaction = "3.0.0"
 test-case = "3.3.1"
+tokio = { version = "1", features = ["full"] }
 
 [lib]
 crate-type = ["cdylib", "lib"]
