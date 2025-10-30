@@ -43,10 +43,12 @@ fn test_split(split_source_type: StakeLifecycle) {
     };
 
     // Fail: split more than available (would violate rent exemption)
-    // For initialized/delegated accounts, the program itself checks and fails with InsufficientFunds
-    // For uninitialized accounts, the program succeeds but leaves accounts below rent exemption
+    // Note: Behavior differs between program-test and Mollusk:
+    // - program-test: Transaction-level rent check returns InsufficientFunds before program runs
+    // - Mollusk: Program succeeds for uninitialized (no program-level check), but violates rent
+    // For initialized+ accounts, the program itself checks and returns InsufficientFunds
     if split_source_type == StakeLifecycle::Uninitialized {
-        // Expect program success but rent check should fail - catch the panic
+        // Mollusk: Program succeeds, but resulting accounts violate rent exemption
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             ctx.process_with(SplitConfig {
                 source: (&split_source, &split_source_account),
@@ -57,13 +59,12 @@ fn test_split(split_source_type: StakeLifecycle) {
             .checks(&[Check::success(), Check::all_rent_exempt()])
             .execute()
         }));
-        // The rent exemption check should panic
         assert!(
             result.is_err(),
             "Expected rent exemption check to fail for uninitialized split"
         );
     } else {
-        // Program fails with InsufficientFunds
+        // Program-level check returns InsufficientFunds for initialized+ accounts
         ctx.process_with(SplitConfig {
             source: (&split_source, &split_source_account),
             destination: (&split_dest, &split_dest_account),
