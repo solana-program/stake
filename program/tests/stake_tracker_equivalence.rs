@@ -749,7 +749,7 @@ async fn test_zero_stake_delegation() {
         withdrawer: Pubkey::new_unique(),
     };
 
-    let mut stake_account = ctx
+    let stake_account = ctx
         .initialize_stake_account(&stake, &authorized, &Lockup::default())
         .await;
 

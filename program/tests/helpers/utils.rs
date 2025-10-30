@@ -137,8 +137,8 @@ pub fn add_sysvars(
 }
 
 /// Initialize a stake account with the given authorities and lockup
-/// This is a convenience wrapper around `InitializeConfig` that creates the
-/// uninitialized account and processes the instruction in one step.
+/// This is a convenience helper that creates the uninitialized account
+/// and processes the instruction in one step.
 pub fn initialize_stake_account(
     mollusk: &Mollusk,
     stake_pubkey: &Pubkey,
@@ -146,8 +146,6 @@ pub fn initialize_stake_account(
     authorized: &Authorized,
     lockup: &Lockup,
 ) -> AccountSharedData {
-    use super::instruction_builders::{InitializeConfig, InstructionConfig};
-
     let stake_account = AccountSharedData::new_data_with_space(
         lamports,
         &StakeStateV2::Uninitialized,
@@ -156,15 +154,8 @@ pub fn initialize_stake_account(
     )
     .unwrap();
 
-    // Use InitializeConfig to build instruction (consistent with other patterns)
-    let config = InitializeConfig {
-        stake: (stake_pubkey, &stake_account),
-        authorized,
-        lockup,
-    };
-
     let instruction = ixn::initialize(stake_pubkey, authorized, lockup);
-    let accounts = config.build_accounts();
+    let accounts = vec![(*stake_pubkey, stake_account)];
     let accounts_resolved = add_sysvars(mollusk, &instruction, accounts);
     let result = mollusk.process_instruction(&instruction, &accounts_resolved);
 
