@@ -137,48 +137,6 @@ impl StakeTestContext {
         }
     }
 
-    /// Create a stake account at the specified lifecycle stage with standard authorities
-    /// DEPRECATED: Use `stake_account()` builder instead
-    pub fn create_stake_account(
-        &mut self,
-        lifecycle: StakeLifecycle,
-        staked_amount: u64,
-    ) -> (Pubkey, AccountSharedData) {
-        self.stake_account(lifecycle)
-            .staked_amount(staked_amount)
-            .build()
-    }
-
-    /// Create a stake account with custom lockup
-    /// DEPRECATED: Use `stake_account()` builder instead
-    pub fn create_stake_account_with_lockup(
-        &mut self,
-        lifecycle: StakeLifecycle,
-        staked_amount: u64,
-        lockup: &Lockup,
-    ) -> (Pubkey, AccountSharedData) {
-        self.stake_account(lifecycle)
-            .staked_amount(staked_amount)
-            .lockup(lockup)
-            .build()
-    }
-
-    /// Create a stake account with custom authorities
-    /// DEPRECATED: Use `stake_account()` builder instead
-    pub fn create_stake_account_with_authorities(
-        &mut self,
-        lifecycle: StakeLifecycle,
-        staked_amount: u64,
-        staker: &Pubkey,
-        withdrawer: &Pubkey,
-    ) -> (Pubkey, AccountSharedData) {
-        self.stake_account(lifecycle)
-            .staked_amount(staked_amount)
-            .stake_authority(staker)
-            .withdraw_authority(withdrawer)
-            .build()
-    }
-
     /// Create a lockup that expires in the future
     pub fn create_future_lockup(&self, epochs_ahead: u64) -> Lockup {
         Lockup {
