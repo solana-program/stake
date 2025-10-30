@@ -27,8 +27,10 @@ fn test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
     let wallet_rent_exempt_reserve = Rent::default().minimum_balance(0);
 
     // Create source stake account at the specified lifecycle stage
-    let (withdraw_source, mut withdraw_source_account) =
-        ctx.create_stake_account(withdraw_source_type, staked_amount);
+    let (withdraw_source, mut withdraw_source_account) = ctx
+        .stake_account(withdraw_source_type)
+        .staked_amount(staked_amount)
+        .build();
 
     // Create recipient account
     let recipient = Pubkey::new_unique();

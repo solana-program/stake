@@ -53,10 +53,17 @@ fn test_move_stake(
     let dest_excess = ctx.minimum_delegation;
 
     // Create source and dest stakes
-    let (move_source, mut move_source_account) =
-        ctx.create_stake_account_with_lockup(move_source_type, source_staked_amount, &lockup);
-    let (move_dest, mut move_dest_account) =
-        ctx.create_stake_account_with_lockup(move_dest_type, ctx.minimum_delegation, &lockup);
+    let min_delegation = ctx.minimum_delegation;
+    let (move_source, mut move_source_account) = ctx
+        .stake_account(move_source_type)
+        .staked_amount(source_staked_amount)
+        .lockup(&lockup)
+        .build();
+    let (move_dest, mut move_dest_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .lockup(&lockup)
+        .build();
 
     true_up_transient_stake_epoch(
         &mut ctx.mollusk,
@@ -219,9 +226,11 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
     let source_staked_amount = ctx.minimum_delegation * 2;
     let (move_source_type, move_dest_type) = move_types;
 
-    let (move_source, move_source_account) =
-        ctx.create_stake_account(move_source_type, source_staked_amount);
-    let (move_dest, move_dest_account) = ctx.create_stake_account(move_dest_type, 0);
+    let (move_source, move_source_account) = ctx
+        .stake_account(move_source_type)
+        .staked_amount(source_staked_amount)
+        .build();
+    let (move_dest, move_dest_account) = ctx.stake_account(move_dest_type).staked_amount(0).build();
 
     let source_signer = if move_source_type == StakeLifecycle::Uninitialized {
         move_source
@@ -246,6 +255,7 @@ fn test_move_stake_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycl
 fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type: StakeLifecycle) {
     let mut ctx = StakeTestContext::new();
     let source_staked_amount = ctx.minimum_delegation * 2;
+    let min_delegation = ctx.minimum_delegation;
 
     // Only test valid MoveStake combinations
     if move_source_type != StakeLifecycle::Active || move_dest_type == StakeLifecycle::Activating {
@@ -255,25 +265,29 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     let in_force_lockup = ctx.create_in_force_lockup();
 
     // Create source
-    let (move_source, mut move_source_account) =
-        ctx.create_stake_account(move_source_type, source_staked_amount);
+    let (move_source, mut move_source_account) = ctx
+        .stake_account(move_source_type)
+        .staked_amount(source_staked_amount)
+        .build();
     move_source_account
-        .checked_add_lamports(ctx.minimum_delegation)
+        .checked_add_lamports(min_delegation)
         .unwrap();
 
     // Self-move fails
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_source, &move_source_account),
-        amount: ctx.minimum_delegation,
+        amount: min_delegation,
         override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidInstructionData)])
     .execute();
 
     // Zero move fails
-    let (move_dest, move_dest_account) =
-        ctx.create_stake_account(move_dest_type, ctx.minimum_delegation);
+    let (move_dest, move_dest_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .build();
 
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
@@ -285,29 +299,35 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     .execute();
 
     // Sign with withdrawer fails
+    let withdrawer = ctx.withdrawer;
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
-        amount: ctx.minimum_delegation,
-        override_signer: Some(&ctx.withdrawer),
+        amount: min_delegation,
+        override_signer: Some(&withdrawer),
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
     .execute();
 
     // Source lockup fails
     let (move_locked_source, mut move_locked_source_account) = ctx
-        .create_stake_account_with_lockup(move_source_type, source_staked_amount, &in_force_lockup);
+        .stake_account(move_source_type)
+        .staked_amount(source_staked_amount)
+        .lockup(&in_force_lockup)
+        .build();
     move_locked_source_account
-        .checked_add_lamports(ctx.minimum_delegation)
+        .checked_add_lamports(min_delegation)
         .unwrap();
 
-    let (move_dest2, move_dest2_account) =
-        ctx.create_stake_account(move_dest_type, ctx.minimum_delegation);
+    let (move_dest2, move_dest2_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .build();
 
     ctx.process_with(MoveStakeConfig {
         source: (&move_locked_source, &move_locked_source_account),
         destination: (&move_dest2, &move_dest2_account),
-        amount: ctx.minimum_delegation,
+        amount: min_delegation,
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -315,18 +335,17 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
 
     // Staker mismatch fails
     let throwaway_staker = solana_pubkey::Pubkey::new_unique();
-    let withdrawer = ctx.withdrawer;
-    let (move_dest3, move_dest3_account) = ctx.create_stake_account_with_authorities(
-        move_dest_type,
-        ctx.minimum_delegation,
-        &throwaway_staker,
-        &withdrawer,
-    );
+    let (move_dest3, move_dest3_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .stake_authority(&throwaway_staker)
+        .withdraw_authority(&withdrawer)
+        .build();
 
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest3, &move_dest3_account),
-        amount: ctx.minimum_delegation,
+        amount: min_delegation,
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -335,33 +354,33 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
     // Withdrawer mismatch fails
     let throwaway_withdrawer = solana_pubkey::Pubkey::new_unique();
     let staker = ctx.staker;
-    let (move_dest4, move_dest4_account) = ctx.create_stake_account_with_authorities(
-        move_dest_type,
-        ctx.minimum_delegation,
-        &staker,
-        &throwaway_withdrawer,
-    );
+    let (move_dest4, move_dest4_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .stake_authority(&staker)
+        .withdraw_authority(&throwaway_withdrawer)
+        .build();
 
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest4, &move_dest4_account),
-        amount: ctx.minimum_delegation,
+        amount: min_delegation,
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
     .execute();
 
     // Dest lockup fails
-    let (move_dest5, move_dest5_account) = ctx.create_stake_account_with_lockup(
-        move_dest_type,
-        ctx.minimum_delegation,
-        &in_force_lockup,
-    );
+    let (move_dest5, move_dest5_account) = ctx
+        .stake_account(move_dest_type)
+        .staked_amount(min_delegation)
+        .lockup(&in_force_lockup)
+        .build();
 
     ctx.process_with(MoveStakeConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest5, &move_dest5_account),
-        amount: ctx.minimum_delegation,
+        amount: min_delegation,
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::MergeMismatch.into())])
@@ -372,26 +391,27 @@ fn test_move_stake_general_fail(move_source_type: StakeLifecycle, move_dest_type
         let (dest_vote_account, dest_vote_account_data) = ctx.create_second_vote_account();
 
         let move_dest6_pubkey = solana_pubkey::Pubkey::new_unique();
-        let move_dest6_account = move_dest_type.create_stake_account_fully_specified(
-            &mut ctx.mollusk,
-            &mut ctx.tracker,
-            &move_dest6_pubkey,
-            &dest_vote_account,
-            ctx.minimum_delegation,
-            &ctx.staker,
-            &ctx.withdrawer,
-            &Lockup::default(),
-        );
+        let (_, move_dest6_account) = ctx
+            .stake_account(move_dest_type)
+            .staked_amount(min_delegation)
+            .vote_account(&dest_vote_account)
+            .stake_pubkey(&move_dest6_pubkey)
+            .build();
 
-        let (move_source2, move_source2_account) =
-            ctx.create_stake_account(move_source_type, source_staked_amount);
+        let (move_source2, move_source2_account) = ctx
+            .stake_account(move_source_type)
+            .staked_amount(source_staked_amount)
+            .build();
 
+        let staker = ctx.staker;
+        let vote_account = ctx.vote_account;
+        let vote_account_data = ctx.vote_account_data.clone();
         ctx.process_with(MoveStakeWithVoteConfig {
             source: (&move_source2, &move_source2_account),
             destination: (&move_dest6_pubkey, &move_dest6_account),
-            override_signer: Some(&ctx.staker),
-            amount: ctx.minimum_delegation,
-            source_vote: (&ctx.vote_account, &ctx.vote_account_data),
+            override_signer: Some(&staker),
+            amount: min_delegation,
+            source_vote: (&vote_account, &vote_account_data),
             dest_vote: Some((&dest_vote_account, &dest_vote_account_data)),
         })
         .checks(&[Check::err(StakeError::VoteAddressMismatch.into())])

@@ -49,9 +49,14 @@ fn test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle
     };
 
     // Create source and dest accounts
-    let (merge_source, mut merge_source_account) =
-        ctx.create_stake_account(merge_source_type, staked_amount);
-    let (merge_dest, merge_dest_account) = ctx.create_stake_account(merge_dest_type, staked_amount);
+    let (merge_source, mut merge_source_account) = ctx
+        .stake_account(merge_source_type)
+        .staked_amount(staked_amount)
+        .build();
+    let (merge_dest, merge_dest_account) = ctx
+        .stake_account(merge_dest_type)
+        .staked_amount(staked_amount)
+        .build();
 
     // Retrieve source data and sync epochs if needed
     let mut source_stake_state: StakeStateV2 =

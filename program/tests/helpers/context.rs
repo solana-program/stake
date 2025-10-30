@@ -13,6 +13,75 @@ use {
     solana_stake_program::id,
 };
 
+/// Builder for creating stake accounts with customizable parameters
+/// Follows the builder pattern for flexibility and readability
+pub struct StakeAccountBuilder<'a> {
+    ctx: &'a mut StakeTestContext,
+    lifecycle: StakeLifecycle,
+    staked_amount: u64,
+    stake_authority: Option<Pubkey>,
+    withdraw_authority: Option<Pubkey>,
+    lockup: Option<Lockup>,
+    vote_account: Option<Pubkey>,
+    stake_pubkey: Option<Pubkey>,
+}
+
+impl<'a> StakeAccountBuilder<'a> {
+    /// Set the staked amount (lamports delegated to validator)
+    pub fn staked_amount(mut self, amount: u64) -> Self {
+        self.staked_amount = amount;
+        self
+    }
+
+    /// Set a custom stake authority (defaults to ctx.staker)
+    pub fn stake_authority(mut self, authority: &Pubkey) -> Self {
+        self.stake_authority = Some(*authority);
+        self
+    }
+
+    /// Set a custom withdraw authority (defaults to ctx.withdrawer)
+    pub fn withdraw_authority(mut self, authority: &Pubkey) -> Self {
+        self.withdraw_authority = Some(*authority);
+        self
+    }
+
+    /// Set a custom lockup (defaults to Lockup::default())
+    pub fn lockup(mut self, lockup: &Lockup) -> Self {
+        self.lockup = Some(*lockup);
+        self
+    }
+
+    /// Set a custom vote account (defaults to ctx.vote_account)
+    pub fn vote_account(mut self, vote_account: &Pubkey) -> Self {
+        self.vote_account = Some(*vote_account);
+        self
+    }
+
+    /// Set a specific stake account pubkey (defaults to Pubkey::new_unique())
+    pub fn stake_pubkey(mut self, pubkey: &Pubkey) -> Self {
+        self.stake_pubkey = Some(*pubkey);
+        self
+    }
+
+    /// Build the stake account and return (pubkey, account_data)
+    pub fn build(self) -> (Pubkey, AccountSharedData) {
+        let stake_pubkey = self.stake_pubkey.unwrap_or_else(Pubkey::new_unique);
+        let account = self.lifecycle.create_stake_account_fully_specified(
+            &mut self.ctx.mollusk,
+            &mut self.ctx.tracker,
+            &stake_pubkey,
+            self.vote_account.as_ref().unwrap_or(&self.ctx.vote_account),
+            self.staked_amount,
+            self.stake_authority.as_ref().unwrap_or(&self.ctx.staker),
+            self.withdraw_authority
+                .as_ref()
+                .unwrap_or(&self.ctx.withdrawer),
+            self.lockup.as_ref().unwrap_or(&Lockup::default()),
+        );
+        (stake_pubkey, account)
+    }
+}
+
 /// Consolidated test context that bundles all common test setup
 /// This eliminates 8-10 lines of boilerplate from every test
 pub struct StakeTestContext {
@@ -45,48 +114,57 @@ impl StakeTestContext {
         }
     }
 
+    /// Create a stake account builder for the specified lifecycle stage
+    /// This is the primary method for creating stake accounts in tests.
+    ///
+    /// Example:
+    /// ```
+    /// let (stake, account) = ctx
+    ///     .stake_account(StakeLifecycle::Active)
+    ///     .staked_amount(1_000_000)
+    ///     .build();
+    /// ```
+    pub fn stake_account(&mut self, lifecycle: StakeLifecycle) -> StakeAccountBuilder {
+        StakeAccountBuilder {
+            ctx: self,
+            lifecycle,
+            staked_amount: 0,
+            stake_authority: None,
+            withdraw_authority: None,
+            lockup: None,
+            vote_account: None,
+            stake_pubkey: None,
+        }
+    }
+
     /// Create a stake account at the specified lifecycle stage with standard authorities
+    /// DEPRECATED: Use `stake_account()` builder instead
     pub fn create_stake_account(
         &mut self,
         lifecycle: StakeLifecycle,
         staked_amount: u64,
     ) -> (Pubkey, AccountSharedData) {
-        let stake_pubkey = Pubkey::new_unique();
-        let account = lifecycle.create_stake_account_fully_specified(
-            &mut self.mollusk,
-            &mut self.tracker,
-            &stake_pubkey,
-            &self.vote_account,
-            staked_amount,
-            &self.staker,
-            &self.withdrawer,
-            &Lockup::default(),
-        );
-        (stake_pubkey, account)
+        self.stake_account(lifecycle)
+            .staked_amount(staked_amount)
+            .build()
     }
 
     /// Create a stake account with custom lockup
+    /// DEPRECATED: Use `stake_account()` builder instead
     pub fn create_stake_account_with_lockup(
         &mut self,
         lifecycle: StakeLifecycle,
         staked_amount: u64,
         lockup: &Lockup,
     ) -> (Pubkey, AccountSharedData) {
-        let stake_pubkey = Pubkey::new_unique();
-        let account = lifecycle.create_stake_account_fully_specified(
-            &mut self.mollusk,
-            &mut self.tracker,
-            &stake_pubkey,
-            &self.vote_account,
-            staked_amount,
-            &self.staker,
-            &self.withdrawer,
-            lockup,
-        );
-        (stake_pubkey, account)
+        self.stake_account(lifecycle)
+            .staked_amount(staked_amount)
+            .lockup(lockup)
+            .build()
     }
 
     /// Create a stake account with custom authorities
+    /// DEPRECATED: Use `stake_account()` builder instead
     pub fn create_stake_account_with_authorities(
         &mut self,
         lifecycle: StakeLifecycle,
@@ -94,18 +172,11 @@ impl StakeTestContext {
         staker: &Pubkey,
         withdrawer: &Pubkey,
     ) -> (Pubkey, AccountSharedData) {
-        let stake_pubkey = Pubkey::new_unique();
-        let account = lifecycle.create_stake_account_fully_specified(
-            &mut self.mollusk,
-            &mut self.tracker,
-            &stake_pubkey,
-            &self.vote_account,
-            staked_amount,
-            staker,
-            withdrawer,
-            &Lockup::default(),
-        );
-        (stake_pubkey, account)
+        self.stake_account(lifecycle)
+            .staked_amount(staked_amount)
+            .stake_authority(staker)
+            .withdraw_authority(withdrawer)
+            .build()
     }
 
     /// Create a lockup that expires in the future

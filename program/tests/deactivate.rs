@@ -15,9 +15,12 @@ use {
 #[test_case(true; "active")]
 fn test_deactivate(activate: bool) {
     let mut ctx = StakeTestContext::new();
+    let min_delegation = ctx.minimum_delegation;
 
-    let (stake, mut stake_account) =
-        ctx.create_stake_account(helpers::StakeLifecycle::Initialized, ctx.minimum_delegation);
+    let (stake, mut stake_account) = ctx
+        .stake_account(helpers::StakeLifecycle::Initialized)
+        .staked_amount(min_delegation)
+        .build();
 
     // Deactivating an undelegated account fails
     ctx.process_with(DeactivateConfig {

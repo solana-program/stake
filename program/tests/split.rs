@@ -26,8 +26,10 @@ fn test_split(split_source_type: StakeLifecycle) {
     let staked_amount = ctx.minimum_delegation * 2;
 
     // Create source stake account at the specified lifecycle stage
-    let (split_source, mut split_source_account) =
-        ctx.create_stake_account(split_source_type, staked_amount);
+    let (split_source, mut split_source_account) = ctx
+        .stake_account(split_source_type)
+        .staked_amount(staked_amount)
+        .build();
 
     // Create destination stake account matching what create_blank_stake_account does:
     // rent-exempt lamports, correct size, stake program owner, uninitialized data
