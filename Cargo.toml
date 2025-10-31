@@ -22,3 +22,6 @@ check-cfg = [
 
 [workspace.metadata.spellcheck]
 config = "scripts/spellcheck.toml"
+
+[patch.crates-io]
+solana-stake-interface = { path = "interface" }

@@ -15,6 +15,7 @@ pubkeys
 redelegate
 redelegated
 redelegation
+representable
 rpc
 staker
 struct

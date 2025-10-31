@@ -3399,7 +3399,7 @@ dependencies = [
  "solana-rent 4.1.0",
  "solana-sdk-ids",
  "solana-slot-hashes",
- "solana-stake-interface 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 3.0.0",
  "solana-svm-callback 4.0.0-beta.1",
  "solana-svm-log-collector 4.0.0-beta.1",
  "solana-svm-timings 4.0.0-beta.1",
@@ -7380,6 +7380,7 @@ dependencies = [
  "codama",
  "codama-macros",
  "num-traits",
+ "proptest",
  "serde",
  "serde_derive",
  "serde_json",
@@ -7403,26 +7404,6 @@ dependencies = [
  "strum 0.28.0",
  "strum_macros 0.27.2",
  "test-case",
-]
-
-[[package]]
-name = "solana-stake-interface"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd714713337a7f5b513e02119f484fb9b7e056c6ce74af30e70505f2e62b64b7"
-dependencies = [
- "borsh",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-clock",
- "solana-cpi",
- "solana-instruction",
- "solana-program-error",
- "solana-pubkey 4.1.0",
- "solana-system-interface 3.1.0",
- "solana-sysvar 4.0.0",
- "solana-sysvar-id",
 ]
 
 [[package]]
@@ -7459,7 +7440,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signature",
  "solana-signer",
- "solana-stake-interface 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-stake-interface 3.0.0",
  "solana-svm-log-collector 4.0.0-beta.1",
  "solana-system-interface 3.1.0",
  "solana-sysvar 4.0.0",
