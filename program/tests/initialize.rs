@@ -3,8 +3,8 @@
 mod helpers;
 
 use {
-    crate::helpers::instruction_builders::InitializeCheckedConfig,
-    helpers::{InitializeConfig, StakeTestContext},
+    helpers::instruction_builders::{InitializeCheckedConfig, InitializeConfig},
+    helpers::StakeTestContext,
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,

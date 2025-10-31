@@ -103,3 +103,38 @@ impl InstructionConfig for InitializeCheckedConfig<'_> {
         vec![(*self.stake.0, self.stake.1.clone())]
     }
 }
+
+pub struct DeactivateConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for DeactivateConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::deactivate_stake(self.stake.0, signer)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct DelegateConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub vote: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for DelegateConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        ixn::delegate_stake(self.stake.0, &ctx.staker, self.vote.0)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.vote.0, self.vote.1.clone()),
+        ]
+    }
+}

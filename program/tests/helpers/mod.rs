@@ -3,8 +3,7 @@
 pub mod context;
 pub mod instruction_builders;
 pub mod lifecycle;
+pub mod stake_tracker;
 pub mod utils;
 
-pub use {
-    context::StakeTestContext, instruction_builders::InitializeConfig, lifecycle::StakeLifecycle,
-};
+pub use {context::StakeTestContext, lifecycle::StakeLifecycle};
