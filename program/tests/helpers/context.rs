@@ -92,6 +92,8 @@ impl StakeAccountBuilder<'_> {
 
 pub struct StakeTestContext {
     pub mollusk: Mollusk,
+    pub tracker: StakeTracker,
+    pub minimum_delegation: u64,
     pub rent_exempt_reserve: u64,
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
@@ -106,6 +108,8 @@ impl StakeTestContext {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
         Self {
             mollusk,
+            tracker,
+            minimum_delegation,
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
             staker: Pubkey::new_unique(),
             withdrawer: Pubkey::new_unique(),
