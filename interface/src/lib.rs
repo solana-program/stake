@@ -13,6 +13,7 @@ pub mod state;
 #[cfg(feature = "sysvar")]
 pub mod sysvar;
 pub mod tools;
+pub mod warmup_cooldown_allowance;
 
 pub mod program {
     solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");
