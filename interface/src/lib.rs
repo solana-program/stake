@@ -13,6 +13,7 @@ pub mod state;
 #[cfg(feature = "sysvar")]
 pub mod sysvar;
 pub mod tools;
+pub mod warmup_cooldown_allowance;
 
 #[cfg(feature = "codama")]
 use codama_macros::codama;

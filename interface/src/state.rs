@@ -14,6 +14,7 @@ use {
         instruction::LockupArgs,
         stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
+        warmup_cooldown_allowance::{calculate_activation_allowance, calculate_cooldown_allowance},
     },
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
@@ -25,10 +26,19 @@ pub type StakeActivationStatus = StakeHistoryEntry;
 
 // Means that no more than RATE of current effective stake may be added or subtracted per
 // epoch.
+#[deprecated(
+    since = "2.0.1",
+    note = "Use PREV_WARMUP_COOLDOWN_RATE_FRACTION instead"
+)]
 pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
+#[deprecated(
+    since = "2.0.1",
+    note = "Use CURR_WARMUP_COOLDOWN_RATE_FRACTION instead"
+)]
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
 
+#[deprecated(since = "2.0.1", note = "Use warmup_cooldown_rate_fraction() instead")]
 pub fn warmup_cooldown_rate(current_epoch: Epoch, new_rate_activation_epoch: Option<Epoch>) -> f64 {
     if current_epoch < new_rate_activation_epoch.unwrap_or(u64::MAX) {
         DEFAULT_WARMUP_COOLDOWN_RATE
@@ -478,23 +488,19 @@ pub struct Delegation {
     pub activation_epoch: Epoch,
     /// epoch the stake was deactivated, `std::u64::MAX` if not deactivated
     pub deactivation_epoch: Epoch,
-    /// how much stake we can activate per-epoch as a fraction of currently effective stake
-    #[deprecated(
-        since = "1.16.7",
-        note = "Please use `solana_sdk::stake::state::warmup_cooldown_rate()` instead"
-    )]
-    pub warmup_cooldown_rate: f64,
+    /// Formerly the `warmup_cooldown_rate: f64`, but floats are not eBPF-compatible.
+    /// It is unused, but this field is now reserved to maintain layout compatibility.
+    pub _reserved: [u8; 8],
 }
 
 impl Default for Delegation {
     fn default() -> Self {
-        #[allow(deprecated)]
         Self {
             voter_pubkey: Pubkey::default(),
             stake: 0,
             activation_epoch: 0,
             deactivation_epoch: u64::MAX,
-            warmup_cooldown_rate: DEFAULT_WARMUP_COOLDOWN_RATE,
+            _reserved: [0; 8],
         }
     }
 }
@@ -558,11 +564,13 @@ impl Delegation {
             })
         {
             // target_epoch > self.deactivation_epoch
+            //
+            // We advance epoch-by-epoch from just after the deactivation epoch up to the target_epoch,
+            // removing (cooling down) the account's share of effective stake each epoch,
+            // potentially rate-limited by cluster history.
 
-            // loop from my deactivation epoch until the target epoch
-            // current effective stake is updated using its previous epoch's cluster stake
             let mut current_epoch;
-            let mut current_effective_stake = effective_stake;
+            let mut remaining_deactivating_stake = effective_stake;
             loop {
                 current_epoch = prev_epoch + 1;
                 // if there is no deactivating stake at prev epoch, we should have been
@@ -571,38 +579,38 @@ impl Delegation {
                     break;
                 }
 
-                // I'm trying to get to zero, how much of the deactivation in stake
-                //   this account is entitled to take
-                let weight =
-                    current_effective_stake as f64 / prev_cluster_stake.deactivating as f64;
-                let warmup_cooldown_rate =
-                    warmup_cooldown_rate(current_epoch, new_rate_activation_epoch);
+                // Compute how much of this account's stake cools down in `current_epoch`
+                let newly_deactivated_stake = calculate_cooldown_allowance(
+                    current_epoch,
+                    remaining_deactivating_stake,
+                    &prev_cluster_stake,
+                    new_rate_activation_epoch,
+                );
+                remaining_deactivating_stake =
+                    remaining_deactivating_stake.saturating_sub(newly_deactivated_stake.max(1));
 
-                // portion of newly not-effective cluster stake I'm entitled to at current epoch
-                let newly_not_effective_cluster_stake =
-                    prev_cluster_stake.effective as f64 * warmup_cooldown_rate;
-                let newly_not_effective_stake =
-                    ((weight * newly_not_effective_cluster_stake) as u64).max(1);
-
-                current_effective_stake =
-                    current_effective_stake.saturating_sub(newly_not_effective_stake);
-                if current_effective_stake == 0 {
+                // Stop if we've fully cooled down this account
+                if remaining_deactivating_stake == 0 {
                     break;
                 }
 
+                // Stop when we've reached the time bound for this query
                 if current_epoch >= target_epoch {
                     break;
                 }
+
+                // Advance to the next epoch if we have history, otherwise we can't model further cooldown
                 if let Some(current_cluster_stake) = history.get_entry(current_epoch) {
                     prev_epoch = current_epoch;
                     prev_cluster_stake = current_cluster_stake;
                 } else {
+                    // No more history data, return the best-effort state as of the last known epoch
                     break;
                 }
             }
 
-            // deactivating stake should equal to all of currently remaining effective stake
-            StakeActivationStatus::with_deactivating(current_effective_stake)
+            // Report how much stake remains in cooldown at `target_epoch`
+            StakeActivationStatus::with_deactivating(remaining_deactivating_stake)
         } else {
             // no history or I've dropped out of history, so assume fully deactivated
             StakeActivationStatus::default()
@@ -642,11 +650,13 @@ impl Delegation {
             })
         {
             // target_epoch > self.activation_epoch
+            //
+            // We advance epoch-by-epoch from just after the activation epoch up to the target_epoch,
+            // accumulating (warming up) the account's share of effective stake each epoch,
+            // potentially rate-limited by cluster history.
 
-            // loop from my activation epoch until the target epoch summing up my entitlement
-            // current effective stake is updated using its previous epoch's cluster stake
             let mut current_epoch;
-            let mut current_effective_stake = 0;
+            let mut activated_stake_amount = 0;
             loop {
                 current_epoch = prev_epoch + 1;
                 // if there is no activating stake at prev epoch, we should have been
@@ -655,40 +665,43 @@ impl Delegation {
                     break;
                 }
 
-                // how much of the growth in stake this account is
-                //  entitled to take
-                let remaining_activating_stake = delegated_stake - current_effective_stake;
-                let weight =
-                    remaining_activating_stake as f64 / prev_cluster_stake.activating as f64;
-                let warmup_cooldown_rate =
-                    warmup_cooldown_rate(current_epoch, new_rate_activation_epoch);
+                // Calculate how much of this account's remaining stake becomes effective in `current_epoch`.
+                let remaining_activating_stake = delegated_stake - activated_stake_amount;
+                let newly_effective_stake = calculate_activation_allowance(
+                    current_epoch,
+                    remaining_activating_stake,
+                    &prev_cluster_stake,
+                    new_rate_activation_epoch,
+                );
 
-                // portion of newly effective cluster stake I'm entitled to at current epoch
-                let newly_effective_cluster_stake =
-                    prev_cluster_stake.effective as f64 * warmup_cooldown_rate;
-                let newly_effective_stake =
-                    ((weight * newly_effective_cluster_stake) as u64).max(1);
+                // Add the newly effective stake, ensuring at least one lamport activates to prevent getting stuck.
+                activated_stake_amount += newly_effective_stake.max(1);
 
-                current_effective_stake += newly_effective_stake;
-                if current_effective_stake >= delegated_stake {
-                    current_effective_stake = delegated_stake;
+                // Stop if we've fully warmed up this account's stake.
+                if activated_stake_amount >= delegated_stake {
+                    activated_stake_amount = delegated_stake;
                     break;
                 }
 
+                // Stop when we've reached the time bound for this query
                 if current_epoch >= target_epoch || current_epoch >= self.deactivation_epoch {
                     break;
                 }
+
+                // Advance to the next epoch if we have history, otherwise we can't model further warmup
                 if let Some(current_cluster_stake) = history.get_entry(current_epoch) {
                     prev_epoch = current_epoch;
                     prev_cluster_stake = current_cluster_stake;
                 } else {
+                    // No more history data, return the best-effort state as of the last known epoch
                     break;
                 }
             }
 
+            // Return the portion that has become effective and the portion still activating
             (
-                current_effective_stake,
-                delegated_stake - current_effective_stake,
+                activated_stake_amount,
+                delegated_stake - activated_stake_amount,
             )
         } else {
             // no history or I've dropped out of history, so assume fully effective
@@ -760,7 +773,9 @@ impl Stake {
 mod tests {
     use {
         super::*,
-        crate::stake_history::StakeHistory,
+        crate::{
+            stake_history::StakeHistory, warmup_cooldown_allowance::warmup_cooldown_rate_fraction,
+        },
         assert_matches::assert_matches,
         bincode::serialize,
         solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
@@ -989,7 +1004,8 @@ mod tests {
         };
 
         // save this off so stake.config.warmup_rate changes don't break this test
-        let increment = (1_000_f64 * warmup_cooldown_rate(0, None)) as u64;
+        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
+        let increment = ((1_000u128 * rate_num) / rate_den) as u64;
 
         let mut stake_history = StakeHistory::default();
         // assert that this stake follows step function if there's no history
@@ -1358,6 +1374,7 @@ mod tests {
         let mut effective = base_stake;
         let other_activation = 100;
         let mut other_activations = vec![0];
+        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
 
         // Build a stake history where the test staker always consumes all of the available warm
         // up and cool down stake. However, simulate other stakers beginning to activate during
@@ -1380,7 +1397,7 @@ mod tests {
                 },
             );
 
-            let effective_rate_limited = (effective as f64 * warmup_cooldown_rate(0, None)) as u64;
+            let effective_rate_limited = ((effective as u128) * rate_num / rate_den) as u64;
             if epoch < stake.deactivation_epoch {
                 effective += effective_rate_limited.min(activating);
                 other_activations.push(0);
@@ -1423,7 +1440,8 @@ mod tests {
         let epochs = 7;
         // make bootstrap stake smaller than warmup so warmup/cooldownn
         //  increment is always smaller than 1
-        let bootstrap = (warmup_cooldown_rate(0, None) * 100.0 / 2.0) as u64;
+        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
+        let bootstrap = ((100u128 * rate_num) / (2u128 * rate_den)) as u64;
         let stake_history =
             create_stake_history_from_delegations(Some(bootstrap), 0..epochs, &delegations, None);
         let mut max_stake = 0;
@@ -1525,13 +1543,10 @@ mod tests {
             // (0..(total_effective_stake as usize / (delegations.len() * 5))).for_each(|_| eprint("#"));
             // eprintln();
 
-            assert!(
-                delta
-                    <= ((prev_total_effective_stake as f64
-                        * warmup_cooldown_rate(epoch, new_rate_activation_epoch))
-                        as u64)
-                        .max(1)
-            );
+            let (rate_num, rate_den) =
+                warmup_cooldown_rate_fraction(epoch, new_rate_activation_epoch);
+            let max_delta = ((prev_total_effective_stake as u128) * rate_num / rate_den) as u64;
+            assert!(delta <= max_delta.max(1));
 
             prev_total_effective_stake = total_effective_stake;
         }
@@ -1724,7 +1739,7 @@ mod tests {
                         stake: u64::MAX,
                         activation_epoch: Epoch::MAX,
                         deactivation_epoch: Epoch::MAX,
-                        warmup_cooldown_rate: f64::MAX,
+                        _reserved: [0; 8],
                     },
                     credits_observed: 1,
                 },
@@ -1746,7 +1761,10 @@ mod tests {
     }
 
     mod deprecated {
-        use super::*;
+        use {
+            super::*,
+            static_assertions::{assert_eq_align, assert_eq_size},
+        };
 
         fn check_borsh_deserialization(stake: StakeState) {
             let serialized = serialize(&stake).unwrap();
@@ -1792,7 +1810,7 @@ mod tests {
                         stake: u64::MAX,
                         activation_epoch: Epoch::MAX,
                         deactivation_epoch: Epoch::MAX,
-                        warmup_cooldown_rate: f64::MAX,
+                        _reserved: [0; 8],
                     },
                     credits_observed: 1,
                 },
@@ -1826,7 +1844,7 @@ mod tests {
                         stake: u64::MAX,
                         activation_epoch: Epoch::MAX,
                         deactivation_epoch: Epoch::MAX,
-                        warmup_cooldown_rate: f64::MAX,
+                        _reserved: [0; 8],
                     },
                     credits_observed: 1,
                 },
@@ -1855,6 +1873,62 @@ mod tests {
                     rent_exempt_reserve: 2282880,
                     ..
                 })
+            );
+        }
+
+        /// Contains legacy struct definitions to verify memory layout compatibility.
+        mod legacy {
+            use super::*;
+
+            #[derive(borsh::BorshSerialize, borsh::BorshDeserialize)]
+            #[borsh(crate = "borsh")]
+            pub struct Delegation {
+                pub voter_pubkey: Pubkey,
+                pub stake: u64,
+                pub activation_epoch: Epoch,
+                pub deactivation_epoch: Epoch,
+                pub warmup_cooldown_rate: f64,
+            }
+        }
+
+        #[test]
+        fn test_delegation_struct_layout_compatibility() {
+            assert_eq_size!(Delegation, legacy::Delegation);
+            assert_eq_align!(Delegation, legacy::Delegation);
+        }
+
+        #[test]
+        #[allow(clippy::used_underscore_binding)]
+        fn test_delegation_deserialization_from_legacy_format() {
+            let legacy_delegation = legacy::Delegation {
+                voter_pubkey: Pubkey::new_unique(),
+                stake: 12345,
+                activation_epoch: 10,
+                deactivation_epoch: 20,
+                warmup_cooldown_rate: NEW_WARMUP_COOLDOWN_RATE,
+            };
+
+            let serialized_data = borsh::to_vec(&legacy_delegation).unwrap();
+
+            // Deserialize into the NEW Delegation struct
+            let new_delegation = Delegation::try_from_slice(&serialized_data).unwrap();
+
+            // Assert that the fields are identical
+            assert_eq!(new_delegation.voter_pubkey, legacy_delegation.voter_pubkey);
+            assert_eq!(new_delegation.stake, legacy_delegation.stake);
+            assert_eq!(
+                new_delegation.activation_epoch,
+                legacy_delegation.activation_epoch
+            );
+            assert_eq!(
+                new_delegation.deactivation_epoch,
+                legacy_delegation.deactivation_epoch
+            );
+
+            // Assert that the `reserved` bytes now contain the raw bits of the old f64
+            assert_eq!(
+                new_delegation._reserved,
+                NEW_WARMUP_COOLDOWN_RATE.to_le_bytes()
             );
         }
     }
