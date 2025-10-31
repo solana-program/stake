@@ -7205,6 +7205,7 @@ dependencies = [
  "codama",
  "codama-macros",
  "num-traits",
+ "proptest",
  "serde",
  "serde_derive",
  "serde_json",

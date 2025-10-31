@@ -17,9 +17,9 @@ use {
         instruction::{self, LockupArgs},
         stake_flags::StakeFlags,
         stake_history::StakeHistory,
-        state::{
-            warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
-            StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
+        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+        warmup_cooldown_allowance::{
+            warmup_cooldown_rate_bps, BASIS_POINTS_PER_UNIT, TOWER_WARMUP_COOLDOWN_RATE_BPS,
         },
     },
     solana_stake_interface_v2::stake_history::StakeHistoryEntry as MolluskStakeHistoryEntry,
@@ -105,7 +105,10 @@ const CUSTODIAN_RIGHT: Pubkey =
 const PERSISTENT_ACTIVE_STAKE: u64 = 100 * LAMPORTS_PER_SOL;
 #[test]
 fn assert_warmup_cooldown_rate() {
-    assert_eq!(warmup_cooldown_rate(0, Some(0)), NEW_WARMUP_COOLDOWN_RATE);
+    assert_eq!(
+        warmup_cooldown_rate_bps(0, Some(0)),
+        TOWER_WARMUP_COOLDOWN_RATE_BPS
+    );
 }
 
 // this mirrors the false const for `Meta.rent_exempt_reserve` in the stake program
@@ -163,7 +166,7 @@ impl Env {
 
         // backfill stake history
         let stake_delta_amount =
-            (PERSISTENT_ACTIVE_STAKE as f64 * NEW_WARMUP_COOLDOWN_RATE).floor() as u64;
+            PERSISTENT_ACTIVE_STAKE * TOWER_WARMUP_COOLDOWN_RATE_BPS / BASIS_POINTS_PER_UNIT;
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
