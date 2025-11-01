@@ -1,6 +1,8 @@
 use {
-    super::stake_tracker::MolluskStakeExt,
-    super::utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
+    super::{
+        stake_tracker::MolluskStakeExt,
+        utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
+    },
     crate::helpers::stake_tracker::StakeTracker,
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, WritableAccount},
