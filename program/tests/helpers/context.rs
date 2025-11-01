@@ -85,6 +85,7 @@ impl StakeAccountBuilder<'_> {
     }
 }
 
+#[allow(dead_code)] // can be removed once later tests are in
 pub struct StakeTestContext {
     pub mollusk: Mollusk,
     pub rent_exempt_reserve: u64,
@@ -95,6 +96,7 @@ pub struct StakeTestContext {
     pub vote_account_data: Option<AccountSharedData>,
 }
 
+#[allow(dead_code)] // can be removed once later tests are in
 impl StakeTestContext {
     pub fn minimal() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
@@ -216,6 +218,7 @@ impl StakeTestContext {
             .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
+
 impl Default for StakeTestContext {
     fn default() -> Self {
         Self::new()
