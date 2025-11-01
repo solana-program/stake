@@ -95,6 +95,7 @@ fn test_delegate() {
         vote: (&vote_account, ctx.vote_account_data.as_ref().unwrap()),
     })
     .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .test_missing_signers(false)
     .execute();
 
     // Deactivate
@@ -115,6 +116,7 @@ fn test_delegate() {
         vote: (&vote_account2, &vote_account2_data),
     })
     .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .test_missing_signers(false)
     .execute();
 
     // Verify that delegate succeeds to same vote account when stake is deactivating
@@ -136,6 +138,7 @@ fn test_delegate() {
         vote: (&vote_account2, &vote_account2_data),
     })
     .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .test_missing_signers(false)
     .execute();
 
     // Advance epoch again using tracker
@@ -155,6 +158,7 @@ fn test_delegate() {
         vote: (&vote_account2, &vote_account2_data),
     })
     .checks(&[Check::err(StakeError::TooSoonToRedelegate.into())])
+    .test_missing_signers(false)
     .execute();
 }
 
