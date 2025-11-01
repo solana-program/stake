@@ -133,11 +133,7 @@ impl StakeTestContext {
     }
 
     pub fn new() -> Self {
-<<<<<<< HEAD
         Self::with_delegation()
-=======
-        Self::full()
->>>>>>> adc6de6 (use named StakeTestContext constructors)
     }
 
     /// Create a stake account builder for the specified lifecycle stage
