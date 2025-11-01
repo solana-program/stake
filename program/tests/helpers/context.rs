@@ -26,6 +26,7 @@ pub struct StakeAccountBuilder<'a> {
     stake_pubkey: Option<Pubkey>,
 }
 
+#[allow(dead_code)] // can be removed once later tests are in
 impl<'a> StakeAccountBuilder<'a> {
     /// Set the staked amount (lamports delegated to validator)
     pub fn staked_amount(mut self, amount: u64) -> Self {
@@ -90,6 +91,7 @@ impl<'a> StakeAccountBuilder<'a> {
     }
 }
 
+#[allow(dead_code)] // can be removed once later tests are in
 pub struct StakeTestContext {
     pub mollusk: Mollusk,
     pub rent_exempt_reserve: u64,
@@ -101,6 +103,7 @@ pub struct StakeTestContext {
     pub tracker: Option<StakeTracker>,
 }
 
+#[allow(dead_code)] // can be removed once later tests are in
 impl StakeTestContext {
     pub fn minimal() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
@@ -119,22 +122,7 @@ impl StakeTestContext {
     pub fn with_delegation() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
         let minimum_delegation = solana_stake_program::get_minimum_delegation();
-        Self {
-            mollusk,
-            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
-            staker: Pubkey::new_unique(),
-            withdrawer: Pubkey::new_unique(),
-            minimum_delegation: Some(minimum_delegation),
-            vote_account: Some(Pubkey::new_unique()),
-            vote_account_data: Some(create_vote_account()),
-            tracker: None,
-        }
-    }
-
-    pub fn full() -> Self {
-        let mollusk = Mollusk::new(&id(), "solana_stake_program");
-        let minimum_delegation = solana_stake_program::get_minimum_delegation();
-        let tracker = StakeLifecycle::create_tracker_for_test(minimum_delegation);
+        let tracker: StakeTracker = StakeLifecycle::create_tracker_for_test(minimum_delegation);
         Self {
             mollusk,
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
@@ -148,7 +136,7 @@ impl StakeTestContext {
     }
 
     pub fn new() -> Self {
-        Self::full()
+        Self::with_delegation()
     }
 
     /// Create a stake account builder for the specified lifecycle stage
@@ -240,6 +228,7 @@ impl StakeTestContext {
             .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
+
 impl Default for StakeTestContext {
     fn default() -> Self {
         Self::new()
