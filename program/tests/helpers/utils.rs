@@ -1,6 +1,7 @@
 use {
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
+    solana_clock::Epoch,
     solana_instruction::Instruction,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
@@ -91,4 +92,19 @@ pub fn parse_stake_account(
         StakeStateV2::Stake(meta, stake, _) => (meta, Some(stake), lamports),
         _ => panic!("Expected initialized or staked account"),
     }
+}
+
+/// Increment vote account credits
+pub fn increment_vote_account_credits(
+    vote_account: &mut AccountSharedData,
+    epoch: Epoch,
+    credits: u64,
+) {
+    let mut vote_state: VoteStateVersions = bincode::deserialize(vote_account.data()).unwrap();
+
+    if let VoteStateVersions::V4(ref mut v4) = vote_state {
+        v4.epoch_credits.push((epoch, credits, 0));
+    }
+
+    vote_account.set_data(bincode::serialize(&vote_state).unwrap());
 }
