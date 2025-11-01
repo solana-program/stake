@@ -27,6 +27,7 @@ pub struct StakeAccountBuilder<'a> {
 }
 
 #[allow(dead_code)]
+#[allow(clippy::needless_lifetimes)] // we'll need the lifetime later
 impl<'a> StakeAccountBuilder<'a> {
     /// Set the staked amount (lamports delegated to validator)
     pub fn staked_amount(mut self, amount: u64) -> Self {
