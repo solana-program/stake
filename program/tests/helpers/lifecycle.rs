@@ -4,7 +4,7 @@ use {
 };
 
 /// Lifecycle states for stake accounts in tests
-#[allow(dead_code)]
+#[allow(dead_code)] // TODO: remove once tests include all lifecycles
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StakeLifecycle {
     Uninitialized = 0,
