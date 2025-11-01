@@ -104,7 +104,6 @@ pub struct StakeTestContext {
 impl StakeTestContext {
     pub fn minimal() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
-
         Self {
             mollusk,
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
@@ -226,7 +225,6 @@ impl StakeTestContext {
             .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
-
 impl Default for StakeTestContext {
     fn default() -> Self {
         Self::new()
