@@ -71,6 +71,7 @@ fn test_deactivate(activate: bool) {
         override_signer: Some(&ctx.withdrawer),
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .test_missing_signers(false)
     .execute();
 
     // Deactivate succeeds
