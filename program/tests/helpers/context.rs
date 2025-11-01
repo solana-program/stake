@@ -2,7 +2,6 @@ use {
     super::{
         instruction_builders::{InstructionConfig, InstructionExecution},
         lifecycle::StakeLifecycle,
-        stake_tracker::StakeTracker,
         utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
     },
     mollusk_svm::{result::Check, Mollusk},
@@ -68,10 +67,6 @@ impl StakeAccountBuilder<'_> {
         let stake_pubkey = self.stake_pubkey.unwrap_or_else(Pubkey::new_unique);
         let account = self.lifecycle.create_stake_account_fully_specified(
             &mut self.ctx.mollusk,
-            self.ctx
-                .tracker
-                .as_mut()
-                .expect("tracker required for stake account builder"),
             &stake_pubkey,
             self.vote_account.as_ref().unwrap_or(
                 self.ctx
@@ -98,7 +93,6 @@ pub struct StakeTestContext {
     pub minimum_delegation: Option<u64>,
     pub vote_account: Option<Pubkey>,
     pub vote_account_data: Option<AccountSharedData>,
-    pub tracker: Option<StakeTracker>,
 }
 
 impl StakeTestContext {
@@ -112,14 +106,12 @@ impl StakeTestContext {
             minimum_delegation: None,
             vote_account: None,
             vote_account_data: None,
-            tracker: None,
         }
     }
 
     pub fn with_delegation() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
         let minimum_delegation = solana_stake_program::get_minimum_delegation();
-        let tracker: StakeTracker = StakeLifecycle::create_tracker_for_test(minimum_delegation);
         Self {
             mollusk,
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
@@ -128,7 +120,6 @@ impl StakeTestContext {
             minimum_delegation: Some(minimum_delegation),
             vote_account: Some(Pubkey::new_unique()),
             vote_account_data: Some(create_vote_account()),
-            tracker: Some(tracker),
         }
     }
 
