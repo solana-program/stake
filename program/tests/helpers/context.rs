@@ -26,8 +26,6 @@ pub struct StakeAccountBuilder<'a> {
     stake_pubkey: Option<Pubkey>,
 }
 
-#[allow(dead_code)]
-#[allow(clippy::needless_lifetimes)] // we'll need the lifetime later
 impl<'a> StakeAccountBuilder<'a> {
     /// Set the staked amount (lamports delegated to validator)
     pub fn staked_amount(mut self, amount: u64) -> Self {
@@ -70,9 +68,17 @@ impl<'a> StakeAccountBuilder<'a> {
         let stake_pubkey = self.stake_pubkey.unwrap_or_else(Pubkey::new_unique);
         let account = self.lifecycle.create_stake_account_fully_specified(
             &mut self.ctx.mollusk,
-            &mut self.ctx.tracker,
+            self.ctx
+                .tracker
+                .as_mut()
+                .expect("tracker required for stake account builder"),
             &stake_pubkey,
-            self.vote_account.as_ref().unwrap_or(&self.ctx.vote_account),
+            self.vote_account.as_ref().unwrap_or(
+                self.ctx
+                    .vote_account
+                    .as_ref()
+                    .expect("vote_account required for this lifecycle"),
+            ),
             self.staked_amount,
             self.stake_authority.as_ref().unwrap_or(&self.ctx.staker),
             self.withdraw_authority
@@ -84,36 +90,65 @@ impl<'a> StakeAccountBuilder<'a> {
     }
 }
 
-/// Consolidated test context that bundles all common test setup
-#[allow(dead_code)]
 pub struct StakeTestContext {
     pub mollusk: Mollusk,
-    pub tracker: StakeTracker,
-    pub minimum_delegation: u64,
     pub rent_exempt_reserve: u64,
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
-    pub vote_account: Pubkey,
-    pub vote_account_data: AccountSharedData,
+    pub minimum_delegation: Option<u64>,
+    pub vote_account: Option<Pubkey>,
+    pub vote_account_data: Option<AccountSharedData>,
+    pub tracker: Option<StakeTracker>,
 }
 
 impl StakeTestContext {
-    /// Create a new test context with all standard setup
-    pub fn new() -> Self {
+    pub fn minimal() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
-        let minimum_delegation = solana_stake_program::get_minimum_delegation();
-        let tracker = StakeLifecycle::create_tracker_for_test(minimum_delegation);
-
         Self {
             mollusk,
-            tracker,
-            minimum_delegation,
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
             staker: Pubkey::new_unique(),
             withdrawer: Pubkey::new_unique(),
-            vote_account: Pubkey::new_unique(),
-            vote_account_data: create_vote_account(),
+            minimum_delegation: None,
+            vote_account: None,
+            vote_account_data: None,
+            tracker: None,
         }
+    }
+
+    pub fn with_delegation() -> Self {
+        let mollusk = Mollusk::new(&id(), "solana_stake_program");
+        let minimum_delegation = solana_stake_program::get_minimum_delegation();
+        Self {
+            mollusk,
+            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+            staker: Pubkey::new_unique(),
+            withdrawer: Pubkey::new_unique(),
+            minimum_delegation: Some(minimum_delegation),
+            vote_account: Some(Pubkey::new_unique()),
+            vote_account_data: Some(create_vote_account()),
+            tracker: None,
+        }
+    }
+
+    pub fn full() -> Self {
+        let mollusk = Mollusk::new(&id(), "solana_stake_program");
+        let minimum_delegation = solana_stake_program::get_minimum_delegation();
+        let tracker = StakeLifecycle::create_tracker_for_test(minimum_delegation);
+        Self {
+            mollusk,
+            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+            staker: Pubkey::new_unique(),
+            withdrawer: Pubkey::new_unique(),
+            minimum_delegation: Some(minimum_delegation),
+            vote_account: Some(Pubkey::new_unique()),
+            vote_account_data: Some(create_vote_account()),
+            tracker: Some(tracker),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self::full()
     }
 
     /// Create a stake account builder for the specified lifecycle stage
@@ -137,6 +172,25 @@ impl StakeTestContext {
             vote_account: None,
             stake_pubkey: None,
         }
+    }
+
+    /// Create a lockup that expires in the future
+    pub fn create_future_lockup(&self, epochs_ahead: u64) -> Lockup {
+        Lockup {
+            unix_timestamp: 0,
+            epoch: self.mollusk.sysvars.clock.epoch + epochs_ahead,
+            custodian: Pubkey::new_unique(),
+        }
+    }
+
+    /// Create a lockup that's currently in force (far future)
+    pub fn create_in_force_lockup(&self) -> Lockup {
+        self.create_future_lockup(1_000_000)
+    }
+
+    /// Create a second vote account (for testing different vote accounts)
+    pub fn create_second_vote_account(&self) -> (Pubkey, AccountSharedData) {
+        (Pubkey::new_unique(), create_vote_account())
     }
 
     /// Process an instruction with a config-based approach
@@ -186,7 +240,6 @@ impl StakeTestContext {
             .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
-
 impl Default for StakeTestContext {
     fn default() -> Self {
         Self::new()

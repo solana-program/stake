@@ -4,9 +4,10 @@ mod helpers;
 
 use {
     helpers::{
+        context::StakeTestContext,
         instruction_builders::{DeactivateConfig, DelegateConfig},
+        lifecycle::StakeLifecycle,
         utils::parse_stake_account,
-        StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_program_error::ProgramError,
@@ -18,11 +19,11 @@ use {
 #[test_case(false; "activating")]
 #[test_case(true; "active")]
 fn test_deactivate(activate: bool) {
-    let mut ctx = StakeTestContext::new();
-    let min_delegation = ctx.minimum_delegation;
+    let mut ctx = StakeTestContext::with_delegation();
+    let min_delegation = ctx.minimum_delegation.unwrap();
 
     let (stake, mut stake_account) = ctx
-        .stake_account(helpers::StakeLifecycle::Initialized)
+        .stake_account(StakeLifecycle::Initialized)
         .staked_amount(min_delegation)
         .build();
 
@@ -39,7 +40,10 @@ fn test_deactivate(activate: bool) {
     let result = ctx
         .process_with(DelegateConfig {
             stake: (&stake, &stake_account),
-            vote: (&ctx.vote_account, &ctx.vote_account_data),
+            vote: (
+                ctx.vote_account.as_ref().unwrap(),
+                ctx.vote_account_data.as_ref().unwrap(),
+            ),
         })
         .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
@@ -57,7 +61,6 @@ fn test_deactivate(activate: bool) {
         override_signer: Some(&ctx.withdrawer),
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
-    .test_missing_signers(false)
     .execute();
 
     // Deactivate succeeds
@@ -70,7 +73,7 @@ fn test_deactivate(activate: bool) {
             Check::success(),
             Check::all_rent_exempt(),
             Check::account(&stake)
-                .lamports(ctx.rent_exempt_reserve + ctx.minimum_delegation)
+                .lamports(ctx.rent_exempt_reserve + min_delegation)
                 .owner(&id())
                 .space(StakeStateV2::size_of())
                 .build(),
