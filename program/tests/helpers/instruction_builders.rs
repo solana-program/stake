@@ -22,7 +22,7 @@ pub struct InstructionExecution<'a, 'b> {
     accounts: Vec<(Pubkey, AccountSharedData)>,
     ctx: &'a StakeTestContext,
     checks: Option<&'b [Check<'b>]>,
-    test_missing_signers: bool,
+    test_missing_signers: Option<bool>, // `None` runs if `Check::success`
 }
 
 impl<'b> InstructionExecution<'_, 'b> {
@@ -31,19 +31,28 @@ impl<'b> InstructionExecution<'_, 'b> {
         self
     }
 
-    pub fn test_missing_signers(mut self) -> Self {
-        self.test_missing_signers = true;
+    pub fn test_missing_signers(mut self, test: bool) -> Self {
+        self.test_missing_signers = Some(test);
         self
     }
 
+    /// Executes the instruction. If `checks` is `None` or empty, uses `Check::success()`.
+    /// Fail-safe default: when `test_missing_signers` is `None`, runs the missing-signers
+    /// test (`true`). Callers must explicitly opt out with `.test_missing_signers(false)`.
     pub fn execute(self) -> mollusk_svm::result::InstructionResult {
         let default_checks = [Check::success()];
-        let checks = self.checks.unwrap_or(&default_checks);
+        let checks = match self.checks {
+            Some(c) if !c.is_empty() => c,
+            _ => &default_checks,
+        };
+
+        let test_missing_signers = self.test_missing_signers.unwrap_or(true);
+
         self.ctx.process_instruction_maybe_test_signers(
             &self.instruction,
             self.accounts,
             checks,
-            self.test_missing_signers,
+            test_missing_signers,
         )
     }
 }
@@ -59,7 +68,7 @@ impl<'a> InstructionExecution<'a, '_> {
             accounts,
             ctx,
             checks: None,
-            test_missing_signers: false,
+            test_missing_signers: None,
         }
     }
 }

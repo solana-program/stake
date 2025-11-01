@@ -65,7 +65,7 @@ fn test_initialize(variant: InitializeVariant) {
                     .space(StakeStateV2::size_of())
                     .build(),
             ])
-            .test_missing_signers()
+            .test_missing_signers(true)
             .execute(),
         InitializeVariant::InitializeChecked => ctx
             .process_with(InitializeCheckedConfig {
@@ -81,7 +81,7 @@ fn test_initialize(variant: InitializeVariant) {
                     .space(StakeStateV2::size_of())
                     .build(),
             ])
-            .test_missing_signers()
+            .test_missing_signers(true)
             .execute(),
     };
 
@@ -106,6 +106,7 @@ fn test_initialize(variant: InitializeVariant) {
                 lockup: &lockup,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
         InitializeVariant::InitializeChecked => ctx
             .process_with(InitializeCheckedConfig {
@@ -113,6 +114,7 @@ fn test_initialize(variant: InitializeVariant) {
                 authorized: &authorized,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
     };
 }
@@ -154,6 +156,7 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
                 lockup: &lockup,
             })
             .checks(&[Check::err(ProgramError::InsufficientFunds)])
+            .test_missing_signers(false)
             .execute(),
         InitializeVariant::InitializeChecked => ctx
             .process_with(InitializeCheckedConfig {
@@ -161,6 +164,7 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
                 authorized: &authorized,
             })
             .checks(&[Check::err(ProgramError::InsufficientFunds)])
+            .test_missing_signers(false)
             .execute(),
     };
 }
@@ -206,6 +210,7 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
                 lockup: &lockup,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
         InitializeVariant::InitializeChecked => ctx
             .process_with(InitializeCheckedConfig {
@@ -213,6 +218,7 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
                 authorized: &authorized,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
     };
 }
@@ -258,6 +264,7 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
                 lockup: &lockup,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
         InitializeVariant::InitializeChecked => ctx
             .process_with(InitializeCheckedConfig {
@@ -265,6 +272,7 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
                 authorized: &authorized,
             })
             .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
             .execute(),
     };
 }
