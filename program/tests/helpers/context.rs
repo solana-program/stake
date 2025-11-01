@@ -27,7 +27,7 @@ pub struct StakeAccountBuilder<'a> {
 }
 
 #[allow(dead_code)] // can be removed once later tests are in
-impl<'a> StakeAccountBuilder<'a> {
+impl StakeAccountBuilder<'_> {
     /// Set the staked amount (lamports delegated to validator)
     pub fn staked_amount(mut self, amount: u64) -> Self {
         self.staked_amount = amount;
