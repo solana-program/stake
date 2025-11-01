@@ -76,7 +76,6 @@ pub fn create_vote_account() -> AccountSharedData {
 }
 
 /// Parse a stake account into (Meta, Option<Stake>, lamports)
-#[allow(dead_code)]
 pub fn parse_stake_account(
     stake_account: &AccountSharedData,
 ) -> (
