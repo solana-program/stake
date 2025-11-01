@@ -17,7 +17,7 @@ use {
         instruction::{self as ixn, LockupArgs},
         program::id,
         stake_history::StakeHistory,
-        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+        state::{Authorized, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
     },
     solana_system_interface::instruction as system_instruction,
     solana_transaction::{Signers, Transaction, TransactionError},
