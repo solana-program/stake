@@ -3,8 +3,10 @@
 mod helpers;
 
 use {
-    helpers::instruction_builders::{InitializeCheckedConfig, InitializeConfig},
-    helpers::StakeTestContext,
+    helpers::{
+        instruction_builders::{InitializeCheckedConfig, InitializeConfig},
+        StakeTestContext,
+    },
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,

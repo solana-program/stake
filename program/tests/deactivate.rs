@@ -32,6 +32,7 @@ fn test_deactivate(activate: bool) {
         override_signer: None,
     })
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
+    .test_missing_signers(false)
     .execute();
 
     // Delegate
@@ -56,6 +57,7 @@ fn test_deactivate(activate: bool) {
         override_signer: Some(&ctx.withdrawer),
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
+    .test_missing_signers(false)
     .execute();
 
     // Deactivate succeeds
@@ -73,7 +75,7 @@ fn test_deactivate(activate: bool) {
                 .space(StakeStateV2::size_of())
                 .build(),
         ])
-        .test_missing_signers()
+        .test_missing_signers(true)
         .execute();
     stake_account = result.resulting_accounts[0].1.clone().into();
 
@@ -90,6 +92,7 @@ fn test_deactivate(activate: bool) {
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
+    .test_missing_signers(false)
     .execute();
 
     // Advance epoch
@@ -103,6 +106,6 @@ fn test_deactivate(activate: bool) {
         override_signer: None,
     })
     .checks(&[Check::err(StakeError::AlreadyDeactivated.into())])
-    .test_missing_signers()
+    .test_missing_signers(false)
     .execute();
 }
