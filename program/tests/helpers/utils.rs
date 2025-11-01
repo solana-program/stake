@@ -1,20 +1,13 @@
 use {
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
-<<<<<<< HEAD
     solana_clock::Epoch,
-=======
->>>>>>> 970a8b5 (migrate Deactivate tests to mollusk, including StakeTracker)
     solana_instruction::Instruction,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
     solana_stake_interface::{stake_history::StakeHistory, state::StakeStateV2},
     solana_sysvar_id::SysvarId,
-<<<<<<< HEAD
     solana_vote_interface::state::{VoteStateV4, VoteStateVersions, MAX_EPOCH_CREDITS_HISTORY},
-=======
-    solana_vote_interface::state::{VoteStateV4, VoteStateVersions},
->>>>>>> 970a8b5 (migrate Deactivate tests to mollusk, including StakeTracker)
     std::collections::HashMap,
 };
 
@@ -84,10 +77,6 @@ pub fn create_vote_account() -> AccountSharedData {
 }
 
 /// Parse a stake account into (Meta, Option<Stake>, lamports)
-<<<<<<< HEAD
-=======
-#[allow(dead_code)]
->>>>>>> 970a8b5 (migrate Deactivate tests to mollusk, including StakeTracker)
 pub fn parse_stake_account(
     stake_account: &AccountSharedData,
 ) -> (
