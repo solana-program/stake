@@ -216,7 +216,6 @@ impl StakeTestContext {
             .process_and_validate_instruction(instruction, &accounts_with_sysvars, checks)
     }
 }
-
 impl Default for StakeTestContext {
     fn default() -> Self {
         Self::new()
