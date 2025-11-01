@@ -26,7 +26,6 @@ pub struct StakeAccountBuilder<'a> {
     stake_pubkey: Option<Pubkey>,
 }
 
-#[allow(dead_code)] // can be removed once later tests are in
 impl StakeAccountBuilder<'_> {
     /// Set the staked amount (lamports delegated to validator)
     pub fn staked_amount(mut self, amount: u64) -> Self {
@@ -91,7 +90,6 @@ impl StakeAccountBuilder<'_> {
     }
 }
 
-#[allow(dead_code)] // can be removed once later tests are in
 pub struct StakeTestContext {
     pub mollusk: Mollusk,
     pub rent_exempt_reserve: u64,
@@ -103,7 +101,6 @@ pub struct StakeTestContext {
     pub tracker: Option<StakeTracker>,
 }
 
-#[allow(dead_code)] // can be removed once later tests are in
 impl StakeTestContext {
     pub fn minimal() -> Self {
         let mollusk = Mollusk::new(&id(), "solana_stake_program");
