@@ -15,7 +15,6 @@ use {
 };
 
 /// Lifecycle states for stake accounts in tests
-#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StakeLifecycle {
     Uninitialized = 0,
@@ -27,7 +26,6 @@ pub enum StakeLifecycle {
     Closed,
 }
 
-#[allow(dead_code)]
 impl StakeLifecycle {
     /// Helper to create tracker with appropriate background stake for tests
     /// Returns a tracker seeded with background cluster stake
