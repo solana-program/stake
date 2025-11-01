@@ -3,8 +3,11 @@
 mod helpers;
 
 use {
-    crate::helpers::instruction_builders::InitializeCheckedConfig,
-    helpers::{InitializeConfig, StakeTestContext},
+    helpers::{
+        context::StakeTestContext,
+        instruction_builders::{InitializeCheckedConfig, InitializeConfig},
+        lifecycle::StakeLifecycle,
+    },
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,
@@ -44,9 +47,7 @@ fn test_initialize(variant: InitializeVariant) {
     };
 
     // Create an uninitialized stake account
-    let (stake, stake_account) = ctx
-        .stake_account(helpers::StakeLifecycle::Uninitialized)
-        .build();
+    let (stake, stake_account) = ctx.stake_account(StakeLifecycle::Uninitialized).build();
 
     // Process the Initialize instruction, including testing missing signers
     let result = match variant {
