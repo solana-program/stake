@@ -31,16 +31,17 @@ fn test_move_lamports(
     has_lockup: bool,
 ) {
     let mut ctx = StakeTestContext::new();
+    let min_delegation = ctx.minimum_delegation.unwrap();
 
     // Put minimum in both accounts if they're active
     let source_staked_amount = if move_source_type == StakeLifecycle::Active {
-        ctx.minimum_delegation.unwrap()
+        min_delegation
     } else {
         0
     };
 
     let dest_staked_amount = if move_dest_type == StakeLifecycle::Active {
-        ctx.minimum_delegation.unwrap()
+        min_delegation
     } else {
         0
     };
@@ -53,21 +54,20 @@ fn test_move_lamports(
     };
 
     // We put an extra minimum in every account, unstaked, to test moving them
-    let source_excess = ctx.minimum_delegation.unwrap();
-    let dest_excess = ctx.minimum_delegation.unwrap();
+    let source_excess = min_delegation;
+    let dest_excess = min_delegation;
+
+    let source_vote_account = ctx.vote_account.unwrap();
+    let source_vote_account_data = ctx.vote_account_data.as_ref().unwrap().clone();
 
     // Dest vote account (possibly different)
     let (dest_vote_account, dest_vote_account_data) = if different_votes {
         ctx.create_second_vote_account()
     } else {
-        (
-            ctx.vote_account.unwrap(),
-            ctx.vote_account_data.as_ref().unwrap().clone(),
-        )
+        (source_vote_account, source_vote_account_data.clone())
     };
 
     // Create source and dest stakes
-    let min_delegation = ctx.minimum_delegation.unwrap();
     let (move_source, mut move_source_account) = ctx
         .stake_account(move_source_type)
         .staked_amount(min_delegation)
@@ -108,9 +108,6 @@ fn test_move_lamports(
         move_dest_account.checked_add_lamports(dest_excess).unwrap();
     }
 
-    let source_vote_account_data = ctx.vote_account_data.as_ref().unwrap();
-    let source_vote_account = ctx.vote_account.unwrap();
-
     // Clear out state failures (activating/deactivating not allowed)
     if move_source_type == StakeLifecycle::Activating
         || move_source_type == StakeLifecycle::Deactivating
@@ -122,7 +119,7 @@ fn test_move_lamports(
                 destination: (&move_dest, &move_dest_account),
                 override_signer: Some(&ctx.staker),
                 amount: source_excess,
-                source_vote: (&source_vote_account, source_vote_account_data),
+                source_vote: (&source_vote_account, &source_vote_account_data),
                 dest_vote: if different_votes {
                     Some((&dest_vote_account, &dest_vote_account_data))
                 } else {
@@ -142,7 +139,7 @@ fn test_move_lamports(
         destination: (&move_dest, &move_dest_account),
         override_signer: Some(&ctx.staker),
         amount: source_excess + 1,
-        source_vote: (&source_vote_account, source_vote_account_data),
+        source_vote: (&source_vote_account, &source_vote_account_data),
         dest_vote: if different_votes {
             Some((&dest_vote_account, &dest_vote_account_data))
         } else {
@@ -163,7 +160,7 @@ fn test_move_lamports(
             destination: (&move_dest, &move_dest_account),
             override_signer: Some(&ctx.staker),
             amount: source_excess,
-            source_vote: (&source_vote_account, source_vote_account_data),
+            source_vote: (&source_vote_account, &source_vote_account_data),
             dest_vote: if different_votes {
                 Some((&dest_vote_account, &dest_vote_account_data))
             } else {
@@ -186,7 +183,7 @@ fn test_move_lamports(
     // Source lamports are right
     assert_eq!(
         after_source_lamports,
-        before_source_lamports - ctx.minimum_delegation.unwrap()
+        before_source_lamports - min_delegation
     );
     assert_eq!(
         after_source_lamports,
@@ -200,10 +197,7 @@ fn test_move_lamports(
     assert_eq!(dest_effective_stake, dest_staked_amount);
 
     // Dest lamports are right
-    assert_eq!(
-        after_dest_lamports,
-        before_dest_lamports + ctx.minimum_delegation.unwrap()
-    );
+    assert_eq!(after_dest_lamports, before_dest_lamports + min_delegation);
     assert_eq!(
         after_dest_lamports,
         dest_effective_stake + ctx.rent_exempt_reserve + source_excess + dest_excess
@@ -217,7 +211,8 @@ fn test_move_lamports(
 )]
 fn test_move_lamports_uninitialized_fail(move_types: (StakeLifecycle, StakeLifecycle)) {
     let mut ctx = StakeTestContext::new();
-    let source_staked_amount = ctx.minimum_delegation.unwrap() * 2;
+    let min_delegation = ctx.minimum_delegation.unwrap();
+    let source_staked_amount = min_delegation * 2;
     let (move_source_type, move_dest_type) = move_types;
 
     let (move_source, move_source_account) = ctx
@@ -232,15 +227,15 @@ fn test_move_lamports_uninitialized_fail(move_types: (StakeLifecycle, StakeLifec
         ctx.staker
     };
 
+    let vote_account = ctx.vote_account.unwrap();
+    let vote_account_data = ctx.vote_account_data.as_ref().unwrap().clone();
+
     ctx.process_with(MoveLamportsFullConfig {
         source: (&move_source, &move_source_account),
         destination: (&move_dest, &move_dest_account),
         override_signer: Some(&source_signer),
-        amount: ctx.minimum_delegation.unwrap(),
-        source_vote: (
-            &ctx.vote_account.unwrap(),
-            ctx.vote_account_data.as_ref().unwrap(),
-        ),
+        amount: min_delegation,
+        source_vote: (&vote_account, &vote_account_data),
         dest_vote: None,
     })
     .checks(&[Check::err(ProgramError::InvalidAccountData)])
@@ -257,8 +252,10 @@ fn test_move_lamports_general_fail(
     move_dest_type: StakeLifecycle,
 ) {
     let mut ctx = StakeTestContext::new();
-    let source_staked_amount = ctx.minimum_delegation.unwrap() * 2;
     let min_delegation = ctx.minimum_delegation.unwrap();
+    let source_staked_amount = min_delegation * 2;
+    let vote_account = ctx.vote_account.unwrap();
+    let vote_account_data = ctx.vote_account_data.as_ref().unwrap().clone();
     let in_force_lockup = ctx.create_in_force_lockup();
 
     // Create source
@@ -313,10 +310,7 @@ fn test_move_lamports_general_fail(
         destination: (&move_dest, &move_dest_account),
         override_signer: Some(&withdrawer),
         amount: min_delegation,
-        source_vote: (
-            &ctx.vote_account.unwrap(),
-            ctx.vote_account_data.as_ref().unwrap(),
-        ),
+        source_vote: (&vote_account, &vote_account_data),
         dest_vote: None,
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
@@ -373,10 +367,7 @@ fn test_move_lamports_general_fail(
         destination: (&move_dest3, &move_dest3_account),
         override_signer: Some(&throwaway_staker),
         amount: min_delegation,
-        source_vote: (
-            &ctx.vote_account.unwrap(),
-            ctx.vote_account_data.as_ref().unwrap(),
-        ),
+        source_vote: (&vote_account, &vote_account_data),
         dest_vote: None,
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
@@ -409,10 +400,7 @@ fn test_move_lamports_general_fail(
         destination: (&move_dest4, &move_dest4_account),
         override_signer: Some(&throwaway_withdrawer),
         amount: min_delegation,
-        source_vote: (
-            &ctx.vote_account.unwrap(),
-            ctx.vote_account_data.as_ref().unwrap(),
-        ),
+        source_vote: (&vote_account, &vote_account_data),
         dest_vote: None,
     })
     .checks(&[Check::err(ProgramError::MissingRequiredSignature)])
