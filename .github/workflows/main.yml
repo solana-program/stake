@@ -2,7 +2,7 @@ name: Main
 
 on:
   push:
-    branches: [main,mollusk-tests-2-deactivate]
+    branches: [main,mollusk-tests-3-delegate]
   pull_request:
 
 env:
