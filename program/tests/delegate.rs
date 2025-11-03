@@ -111,6 +111,13 @@ fn test_delegate() {
         .execute();
     let deactivated_stake_account = result.resulting_accounts[0].1.clone().into();
 
+    // Track the deactivation so stake history is properly updated
+    let deactivation_epoch = ctx.mollusk.sysvars.clock.epoch;
+    ctx.tracker
+        .as_mut()
+        .unwrap()
+        .track_deactivation(&stake, deactivation_epoch);
+
     // Create second vote account
     let (vote_account2, vote_account2_data) = ctx.create_second_vote_account();
 
@@ -145,10 +152,54 @@ fn test_delegate() {
     .test_missing_signers(false)
     .execute();
 
-    // Note: The original test_stake_delegate also tests redelegating to a different vote account
-    // after the old deactivated account completes cooldown. However, this requires passing
-    // stale account state with updated sysvars, which is an edge case. The core delegate
-    // functionality is fully covered by the tests above.
+    // Advance epoch again - without stake history, cooldown is instantaneous
+    let current_slot = ctx.mollusk.sysvars.clock.slot;
+    let slots_per_epoch = ctx.mollusk.sysvars.epoch_schedule.slots_per_epoch;
+    ctx.mollusk.warp_to_slot_with_stake_tracking(
+        ctx.tracker.as_ref().unwrap(),
+        current_slot + slots_per_epoch,
+        Some(0),
+    );
+
+    // Now verify that delegate CAN be called to new vote account using the OLD deactivated account
+    // deactivated_stake_account is in a deactivated state, and now enough epochs
+    // have passed that cooldown is complete. This should allow redelegation to a different vote account.
+    let (vote_account3, mut vote_account3_data) = ctx.create_second_vote_account();
+    increment_vote_account_credits(&mut vote_account3_data, 0, vote_state_credits);
+
+    let result = ctx
+        .process_with(DelegateConfig {
+            stake: (&stake, &deactivated_stake_account),
+            vote: (&vote_account3, &vote_account3_data),
+        })
+        .checks(&[
+            Check::success(),
+            Check::account(&stake)
+                .lamports(ctx.rent_exempt_reserve + min_delegation)
+                .owner(&id())
+                .space(StakeStateV2::size_of())
+                .build(),
+        ])
+        .test_missing_signers(false)
+        .execute();
+
+    // Verify that delegation to new vote account looks correct
+    let final_stake_account = result.resulting_accounts[0].1.clone().into();
+    let clock = ctx.mollusk.sysvars.clock.clone();
+    let (_, stake_data, _) = parse_stake_account(&final_stake_account);
+    assert_eq!(
+        stake_data.unwrap(),
+        Stake {
+            delegation: Delegation {
+                voter_pubkey: vote_account3,
+                stake: min_delegation,
+                activation_epoch: clock.epoch,
+                deactivation_epoch: u64::MAX,
+                ..Delegation::default()
+            },
+            credits_observed: vote_state_credits,
+        }
+    );
 }
 
 #[test]
@@ -202,6 +253,18 @@ fn test_delegate_non_stake_account() {
     .execute();
 }
 
+/// Ensure that `delegate()` respects the minimum delegation requirements
+/// - Assert 1: delegating an amount equal-to the minimum succeeds
+/// - Assert 2: delegating an amount less-than the minimum fails
+///
+/// Also test both asserts above over both StakeStateV2::{Initialized and Stake}, since the logic
+/// is slightly different for the variants.
+///
+/// NOTE: Even though new stake accounts must have a minimum balance that is at least
+/// the minimum delegation (plus rent exempt reserve), the old behavior allowed
+/// withdrawing below the minimum delegation, then re-delegating successfully (see
+/// `test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation()` for
+/// more information.)
 #[test]
 fn test_delegate_minimum_stake_delegation() {
     use solana_stake_interface::{
