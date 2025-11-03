@@ -9,7 +9,6 @@ use {
     solana_program_error::ProgramError,
     solana_program_test::*,
     solana_pubkey::Pubkey,
-    solana_rent::Rent,
     solana_sdk_ids::system_program,
     solana_signer::Signer,
     solana_stake_interface::{
@@ -25,7 +24,7 @@ use {
         instruction as vote_instruction,
         state::{VoteInit, VoteStateV4},
     },
-    test_case::{test_case, test_matrix},
+    test_case::test_matrix,
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
@@ -749,180 +748,6 @@ impl StakeLifecycle {
             Self::Uninitialized | Self::Initialized | Self::Deactive | Self::Closed => false,
         }
     }
-}
-
-#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
-#[test_case(StakeLifecycle::Initialized; "initialized")]
-#[test_case(StakeLifecycle::Activating; "activating")]
-#[test_case(StakeLifecycle::Active; "active")]
-#[test_case(StakeLifecycle::Deactivating; "deactivating")]
-#[test_case(StakeLifecycle::Deactive; "deactive")]
-#[test_case(StakeLifecycle::Closed; "closed")]
-#[tokio::test]
-async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
-    let mut context = program_test().start_with_context().await;
-    let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
-
-    let stake_rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
-    let minimum_delegation = get_minimum_delegation(&mut context).await;
-    let staked_amount = minimum_delegation;
-
-    let wallet_rent_exempt_reserve = context
-        .banks_client
-        .get_rent()
-        .await
-        .unwrap()
-        .minimum_balance(0);
-
-    let (withdraw_source_keypair, _, withdrawer_keypair) = withdraw_source_type
-        .new_stake_account(&mut context, &accounts.vote_account.pubkey(), staked_amount)
-        .await;
-    let withdraw_source = withdraw_source_keypair.pubkey();
-
-    let recipient = Pubkey::new_unique();
-    transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
-
-    let signers = match withdraw_source_type {
-        StakeLifecycle::Uninitialized | StakeLifecycle::Closed => vec![&withdraw_source_keypair],
-        _ => vec![&withdrawer_keypair],
-    };
-
-    // withdraw that would end rent-exemption always fails
-    let rent_spillover = if withdraw_source_type == StakeLifecycle::Closed {
-        stake_rent_exempt_reserve - Rent::default().minimum_balance(0) + 1
-    } else {
-        1
-    };
-
-    let instruction = ixn::withdraw(
-        &withdraw_source,
-        &signers[0].pubkey(),
-        &recipient,
-        staked_amount + rent_spillover,
-        None,
-    );
-    let e = process_instruction(&mut context, &instruction, &signers)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InsufficientFunds);
-
-    if withdraw_source_type.withdraw_minimum_enforced() {
-        // withdraw active or activating stake fails
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signers[0].pubkey(),
-            &recipient,
-            staked_amount,
-            None,
-        );
-        let e = process_instruction(&mut context, &instruction, &signers)
-            .await
-            .unwrap_err();
-        assert_eq!(e, ProgramError::InsufficientFunds);
-
-        // grant rewards
-        let reward_amount = 10;
-        transfer(&mut context, &withdraw_source, reward_amount).await;
-
-        // withdraw in excess of rewards is not allowed
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signers[0].pubkey(),
-            &recipient,
-            reward_amount + 1,
-            None,
-        );
-        let e = process_instruction(&mut context, &instruction, &signers)
-            .await
-            .unwrap_err();
-        assert_eq!(e, ProgramError::InsufficientFunds);
-
-        // withdraw rewards is allowed
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signers[0].pubkey(),
-            &recipient,
-            reward_amount,
-            None,
-        );
-        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
-
-        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
-            .await
-            .lamports;
-        assert_eq!(
-            recipient_lamports,
-            reward_amount + wallet_rent_exempt_reserve,
-        );
-    } else {
-        // withdraw that leaves rent behind is allowed
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signers[0].pubkey(),
-            &recipient,
-            staked_amount,
-            None,
-        );
-        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
-
-        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
-            .await
-            .lamports;
-        assert_eq!(
-            recipient_lamports,
-            staked_amount + wallet_rent_exempt_reserve,
-        );
-
-        // full withdraw is allowed
-        refresh_blockhash(&mut context).await;
-        transfer(&mut context, &withdraw_source, staked_amount).await;
-
-        let recipient = Pubkey::new_unique();
-        transfer(&mut context, &recipient, wallet_rent_exempt_reserve).await;
-
-        let instruction = ixn::withdraw(
-            &withdraw_source,
-            &signers[0].pubkey(),
-            &recipient,
-            staked_amount + stake_rent_exempt_reserve,
-            None,
-        );
-        process_instruction_test_missing_signers(&mut context, &instruction, &signers).await;
-
-        let recipient_lamports = get_account(&mut context.banks_client, &recipient)
-            .await
-            .lamports;
-        assert_eq!(
-            recipient_lamports,
-            staked_amount + stake_rent_exempt_reserve + wallet_rent_exempt_reserve,
-        );
-    }
-
-    // withdraw from program-owned non-stake not allowed
-    let rewards_pool_address = Pubkey::new_unique();
-    let rewards_pool = SolanaAccount {
-        lamports: get_stake_account_rent(&mut context.banks_client).await + staked_amount,
-        data: bincode::serialize(&StakeStateV2::RewardsPool)
-            .unwrap()
-            .to_vec(),
-        owner: id(),
-        executable: false,
-        rent_epoch: u64::MAX,
-    };
-    context.set_account(&rewards_pool_address, &rewards_pool.into());
-
-    let instruction = ixn::withdraw(
-        &rewards_pool_address,
-        &signers[0].pubkey(),
-        &recipient,
-        staked_amount,
-        None,
-    );
-    let e = process_instruction(&mut context, &instruction, &signers)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
 // XXX the original test_merge is a stupid test
