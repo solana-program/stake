@@ -6,7 +6,7 @@ use {
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         instruction as ixn,
-        state::{Authorized, Lockup},
+        state::{Authorized, Lockup, StakeAuthorize},
     },
 };
 
@@ -339,5 +339,102 @@ impl InstructionConfig for MoveStakeWithVoteConfig<'_> {
             accounts.push((*vote_pk, vote_acc.clone()));
         }
         accounts
+    }
+}
+
+pub struct AuthorizeConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub override_authority: Option<&'a Pubkey>,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+}
+
+impl InstructionConfig for AuthorizeConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let authority = self
+            .override_authority
+            .unwrap_or(match self.stake_authorize {
+                StakeAuthorize::Staker => &ctx.staker,
+                StakeAuthorize::Withdrawer => &ctx.withdrawer,
+            });
+        ixn::authorize(
+            self.stake.0,
+            authority,
+            self.new_authority,
+            self.stake_authorize,
+            None,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct AuthorizeCheckedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authority: &'a Pubkey,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+    pub custodian: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for AuthorizeCheckedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::authorize_checked(
+            self.stake.0,
+            self.authority,
+            self.new_authority,
+            self.stake_authorize,
+            self.custodian,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct AuthorizeCheckedWithSeedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub authority_base: &'a Pubkey,
+    pub authority_seed: String,
+    pub authority_owner: &'a Pubkey,
+    pub new_authority: &'a Pubkey,
+    pub stake_authorize: StakeAuthorize,
+    pub custodian: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for AuthorizeCheckedWithSeedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::authorize_checked_with_seed(
+            self.stake.0,
+            self.authority_base,
+            self.authority_seed.clone(),
+            self.authority_owner,
+            self.new_authority,
+            self.stake_authorize,
+            self.custodian,
+        )
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
+    }
+}
+
+pub struct SetLockupCheckedConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub lockup_args: &'a ixn::LockupArgs,
+    pub custodian: &'a Pubkey,
+}
+
+impl InstructionConfig for SetLockupCheckedConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::set_lockup_checked(self.stake.0, self.lockup_args, self.custodian)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![(*self.stake.0, self.stake.1.clone())]
     }
 }

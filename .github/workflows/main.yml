@@ -2,7 +2,7 @@ name: Main
 
 on:
   push:
-    branches: [main,mollusk-tests-8-move-stake]
+    branches: [main,mollusk-tests-9-authorize]
   pull_request:
 
 env:
