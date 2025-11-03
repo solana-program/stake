@@ -2,7 +2,7 @@ name: Main
 
 on:
   push:
-    branches: [main,mollusk-tests-3-delegate]
+    branches: [main,mollusk-tests-4-split]
   pull_request:
 
 env:
