@@ -144,22 +144,29 @@ fn test_deactivate_delinquent() {
     let vote_address = Pubkey::new_unique();
     let stake_address = Pubkey::new_unique();
 
+    let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
+    let stake_lamports = rent_exempt_reserve + 1;
+
     let initial_stake_state = StakeStateV2::Stake(
-        Meta::default(),
+        Meta {
+            rent_exempt_reserve,
+            ..Meta::default()
+        },
         new_stake(1, &vote_address, &VoteStateV4::default(), 1),
         StakeFlags::empty(),
     );
 
     let stake_account = AccountSharedData::new_data_with_space(
-        1,
+        stake_lamports,
         &initial_stake_state,
         StakeStateV2::size_of(),
         &id(),
     )
     .unwrap();
 
+    let vote_rent_exempt = Rent::default().minimum_balance(VoteStateV4::size_of());
     let mut vote_account = AccountSharedData::new_data_with_space(
-        1,
+        vote_rent_exempt,
         &VoteStateVersions::new_v4(VoteStateV4::default()),
         VoteStateV4::size_of(),
         &solana_sdk_ids::vote::id(),
@@ -167,7 +174,7 @@ fn test_deactivate_delinquent() {
     .unwrap();
 
     let mut reference_vote_account = AccountSharedData::new_data_with_space(
-        1,
+        vote_rent_exempt,
         &VoteStateVersions::new_v4(VoteStateV4::default()),
         VoteStateV4::size_of(),
         &solana_sdk_ids::vote::id(),
@@ -246,7 +253,15 @@ fn test_deactivate_delinquent() {
             vote: (&vote_address, &vote_account),
             reference_vote: (&reference_vote_address, &reference_vote_account),
         })
-        .checks(&[Check::success()])
+        .checks(&[
+            Check::success(),
+            Check::all_rent_exempt(),
+            Check::account(&stake_address)
+                .lamports(stake_lamports)
+                .owner(&id())
+                .space(StakeStateV2::size_of())
+                .build(),
+        ])
         .test_missing_signers(true)
         .execute();
 
@@ -271,7 +286,15 @@ fn test_deactivate_delinquent() {
             vote: (&vote_address, &vote_account),
             reference_vote: (&reference_vote_address, &reference_vote_account),
         })
-        .checks(&[Check::success()])
+        .checks(&[
+            Check::success(),
+            Check::all_rent_exempt(),
+            Check::account(&stake_address)
+                .lamports(stake_lamports)
+                .owner(&id())
+                .space(StakeStateV2::size_of())
+                .build(),
+        ])
         .test_missing_signers(true)
         .execute();
 
@@ -317,7 +340,15 @@ fn test_deactivate_delinquent() {
         vote: (&vote_address, &vote_account),
         reference_vote: (&reference_vote_address, &reference_vote_account),
     })
-    .checks(&[Check::success()])
+    .checks(&[
+        Check::success(),
+        Check::all_rent_exempt(),
+        Check::account(&stake_address)
+            .lamports(stake_lamports)
+            .owner(&id())
+            .space(StakeStateV2::size_of())
+            .build(),
+    ])
     .test_missing_signers(true)
     .execute();
 
@@ -350,14 +381,20 @@ fn test_deactivate_delinquent_incorrect_vote_owner() {
     let vote_address = Pubkey::new_unique();
     let stake_address = Pubkey::new_unique();
 
+    let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
+    let stake_lamports = rent_exempt_reserve + 1;
+
     let initial_stake_state = StakeStateV2::Stake(
-        Meta::default(),
+        Meta {
+            rent_exempt_reserve,
+            ..Meta::default()
+        },
         new_stake(1, &vote_address, &VoteStateV4::default(), 1),
         StakeFlags::empty(),
     );
 
     let stake_account = AccountSharedData::new_data_with_space(
-        1,
+        stake_lamports,
         &initial_stake_state,
         StakeStateV2::size_of(),
         &id(),
@@ -432,14 +469,20 @@ fn test_deactivate_delinquent_deserialize_vote_state(
     let vote_address = Pubkey::new_unique();
     let stake_address = Pubkey::new_unique();
 
+    let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
+    let stake_lamports = rent_exempt_reserve + 1;
+
     let initial_stake_state = StakeStateV2::Stake(
-        Meta::default(),
+        Meta {
+            rent_exempt_reserve,
+            ..Meta::default()
+        },
         new_stake(1, &vote_address, &VoteStateV4::default(), 1),
         StakeFlags::empty(),
     );
 
     let stake_account = AccountSharedData::new_data_with_space(
-        1,
+        stake_lamports,
         &initial_stake_state,
         StakeStateV2::size_of(),
         &id(),
@@ -471,8 +514,20 @@ fn test_deactivate_delinquent_deserialize_vote_state(
     ctx.mollusk
         .warp_to_slot(current_epoch * ctx.mollusk.sysvars.epoch_schedule.slots_per_epoch);
 
+    let stake_program_id = id();
     let (checks, test_missing_signers) = match expected_result {
-        Ok(()) => (vec![Check::success()], true),
+        Ok(()) => (
+            vec![
+                Check::success(),
+                Check::all_rent_exempt(),
+                Check::account(&stake_address)
+                    .lamports(stake_lamports)
+                    .owner(&stake_program_id)
+                    .space(StakeStateV2::size_of())
+                    .build(),
+            ],
+            true,
+        ),
         Err(e) => (vec![Check::err(e)], false),
     };
 
