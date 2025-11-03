@@ -36,14 +36,15 @@ impl<'b> InstructionExecution<'_, 'b> {
         self
     }
 
-    /// Executes the instruction. If `checks` is `None` or empty, uses `Check::success()`.
+    /// Executes the instruction. If `checks` is `None`, uses `Check::success()`.
+    /// If `checks` is `Some(&[])` (explicitly empty), performs no checks.
     /// Fail-safe default: when `test_missing_signers` is `None`, runs the missing-signers
     /// test (`true`). Callers must explicitly opt out with `.test_missing_signers(false)`.
     pub fn execute(self) -> mollusk_svm::result::InstructionResult {
         let default_checks = [Check::success()];
         let checks = match self.checks {
-            Some(c) if !c.is_empty() => c,
-            _ => &default_checks,
+            Some(c) => c,
+            None => &default_checks,
         };
 
         let test_missing_signers = self.test_missing_signers.unwrap_or(true);
@@ -178,6 +179,25 @@ impl InstructionConfig for WithdrawConfig<'_> {
         vec![
             (*self.stake.0, self.stake.1.clone()),
             (*self.recipient.0, self.recipient.1.clone()),
+        ]
+    }
+}
+
+pub struct MergeConfig<'a> {
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for MergeConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let instructions = ixn::merge(self.destination.0, self.source.0, &ctx.staker);
+        instructions[0].clone() // Merge returns a Vec, use first instruction
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.destination.0, self.destination.1.clone()),
+            (*self.source.0, self.source.1.clone()),
         ]
     }
 }

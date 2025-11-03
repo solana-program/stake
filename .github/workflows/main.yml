@@ -2,7 +2,7 @@ name: Main
 
 on:
   push:
-    branches: [main,mollusk-tests-5-withdraw]
+    branches: [main,mollusk-tests-6-merge]
   pull_request:
 
 env:
