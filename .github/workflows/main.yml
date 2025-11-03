@@ -2,7 +2,7 @@ name: Main
 
 on:
   push:
-    branches: [main,mollusk-tests-6-merge]
+    branches: [main,mollusk-tests-7-move-lamports]
   pull_request:
 
 env:
