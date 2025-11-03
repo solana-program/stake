@@ -158,3 +158,25 @@ impl InstructionConfig for DeactivateDelinquentConfig<'_> {
         ]
     }
 }
+
+pub struct WithdrawConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub recipient: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.withdrawer)
+    pub override_signer: Option<&'a Pubkey>,
+}
+
+impl InstructionConfig for WithdrawConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.withdrawer);
+        ixn::withdraw(self.stake.0, signer, self.recipient.0, self.amount, None)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.recipient.0, self.recipient.1.clone()),
+        ]
+    }
+}

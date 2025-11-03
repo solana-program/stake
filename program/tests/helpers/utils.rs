@@ -121,6 +121,9 @@ pub fn increment_credits(vote_state: &mut VoteStateV4, epoch: Epoch, credits: u6
 }
 
 /// Increment vote account credits
+///
+/// This is a convenience wrapper around `increment_credits` that handles
+/// deserialization/serialization of the account data.
 pub fn increment_vote_account_credits(
     vote_account: &mut AccountSharedData,
     epoch: Epoch,
@@ -129,7 +132,7 @@ pub fn increment_vote_account_credits(
     let mut vote_state: VoteStateVersions = bincode::deserialize(vote_account.data()).unwrap();
 
     if let VoteStateVersions::V4(ref mut v4) = vote_state {
-        v4.epoch_credits.push((epoch, credits, 0));
+        increment_credits(v4, epoch, credits);
     }
 
     vote_account.set_data(bincode::serialize(&vote_state).unwrap());
