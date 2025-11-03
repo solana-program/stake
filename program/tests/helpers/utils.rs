@@ -108,3 +108,21 @@ pub fn increment_vote_account_credits(
 
     vote_account.set_data(bincode::serialize(&vote_state).unwrap());
 }
+
+/// Get the effective stake for an account
+pub fn get_effective_stake(mollusk: &Mollusk, stake_account: &AccountSharedData) -> u64 {
+    let stake_state: StakeStateV2 = bincode::deserialize(stake_account.data()).unwrap();
+
+    if let StakeStateV2::Stake(_, stake, _) = stake_state {
+        stake
+            .delegation
+            .stake_activating_and_deactivating(
+                mollusk.sysvars.clock.epoch,
+                &mollusk.sysvars.stake_history,
+                Some(0),
+            )
+            .effective
+    } else {
+        0
+    }
+}
