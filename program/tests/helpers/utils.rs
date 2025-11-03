@@ -1,12 +1,13 @@
 use {
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
+    solana_clock::Epoch,
     solana_instruction::Instruction,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
     solana_stake_interface::{stake_history::StakeHistory, state::StakeStateV2},
     solana_sysvar_id::SysvarId,
-    solana_vote_interface::state::{VoteStateV4, VoteStateVersions},
+    solana_vote_interface::state::{VoteStateV4, VoteStateVersions, MAX_EPOCH_CREDITS_HISTORY},
     std::collections::HashMap,
 };
 
@@ -91,4 +92,30 @@ pub fn parse_stake_account(
         StakeStateV2::Stake(meta, stake, _) => (meta, Some(stake), lamports),
         _ => panic!("Expected initialized or staked account"),
     }
+}
+
+/// Increment vote credits for an epoch in a vote state
+pub fn increment_credits(vote_state: &mut VoteStateV4, epoch: Epoch, credits: u64) {
+    if vote_state.epoch_credits.is_empty() {
+        vote_state.epoch_credits.push((epoch, 0, 0));
+    } else if epoch != vote_state.epoch_credits.last().unwrap().0 {
+        let (_, credits, prev_credits) = *vote_state.epoch_credits.last().unwrap();
+
+        if credits != prev_credits {
+            vote_state.epoch_credits.push((epoch, credits, credits));
+        } else {
+            vote_state.epoch_credits.last_mut().unwrap().0 = epoch;
+        }
+
+        if vote_state.epoch_credits.len() > MAX_EPOCH_CREDITS_HISTORY {
+            vote_state.epoch_credits.remove(0);
+        }
+    }
+
+    vote_state.epoch_credits.last_mut().unwrap().1 = vote_state
+        .epoch_credits
+        .last()
+        .unwrap()
+        .1
+        .saturating_add(credits);
 }

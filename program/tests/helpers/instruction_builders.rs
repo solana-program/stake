@@ -138,3 +138,23 @@ impl InstructionConfig for DelegateConfig<'_> {
         ]
     }
 }
+
+pub struct DeactivateDelinquentConfig<'a> {
+    pub stake: (&'a Pubkey, &'a AccountSharedData),
+    pub vote: (&'a Pubkey, &'a AccountSharedData),
+    pub reference_vote: (&'a Pubkey, &'a AccountSharedData),
+}
+
+impl InstructionConfig for DeactivateDelinquentConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        ixn::deactivate_delinquent_stake(self.stake.0, self.vote.0, self.reference_vote.0)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.stake.0, self.stake.1.clone()),
+            (*self.vote.0, self.vote.1.clone()),
+            (*self.reference_vote.0, self.reference_vote.1.clone()),
+        ]
+    }
+}
