@@ -7,13 +7,17 @@ use {
         context::StakeTestContext,
         instruction_builders::{InitializeCheckedConfig, InitializeConfig},
         lifecycle::StakeLifecycle,
+        utils::add_sysvars,
     },
     mollusk_svm::result::Check,
-    solana_account::{AccountSharedData, ReadableAccount},
+    solana_account::{create_account_shared_data_for_test, AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
-    solana_rent::Rent,
-    solana_stake_interface::state::{Authorized, Lockup, StakeStateV2},
+    solana_rent::{sysvar, Rent},
+    solana_stake_interface::{
+        instruction as ixn,
+        state::{Authorized, Lockup, StakeStateV2},
+    },
     solana_stake_program::id,
     test_case::test_case,
 };
@@ -276,4 +280,128 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
             .test_missing_signers(false)
             .execute(),
     };
+}
+
+/// Ensure that `initialize()` respects the minimum balance requirements
+/// - Assert 1: accounts with a balance equal-to the rent exemption initialize OK
+/// - Assert 2: accounts with a balance less-than the rent exemption do not initialize
+#[test_case(InitializeVariant::Initialize; "initialize")]
+#[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
+fn test_initialize_minimum_balance(variant: InitializeVariant) {
+    let ctx = StakeTestContext::new();
+
+    let custodian = Pubkey::new_unique();
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
+    let lockup = match variant {
+        InitializeVariant::Initialize => Lockup {
+            epoch: 1,
+            unix_timestamp: 0,
+            custodian,
+        },
+        InitializeVariant::InitializeChecked => Lockup::default(),
+    };
+
+    // Test exact rent boundary: success at rent_exempt_reserve, failure at rent_exempt_reserve - 1
+    for (lamports, expected_result) in [
+        (ctx.rent_exempt_reserve, Ok(())),
+        (
+            ctx.rent_exempt_reserve - 1,
+            Err(ProgramError::InsufficientFunds),
+        ),
+    ] {
+        let stake = Pubkey::new_unique();
+        let stake_account = AccountSharedData::new_data_with_space(
+            lamports,
+            &StakeStateV2::Uninitialized,
+            StakeStateV2::size_of(),
+            &id(),
+        )
+        .unwrap();
+
+        let check = match expected_result {
+            Ok(()) => Check::success(),
+            Err(e) => Check::err(e),
+        };
+
+        match variant {
+            InitializeVariant::Initialize => ctx
+                .process_with(InitializeConfig {
+                    stake: (&stake, &stake_account),
+                    authorized: &authorized,
+                    lockup: &lockup,
+                })
+                .checks(&[check])
+                .test_missing_signers(false)
+                .execute(),
+            InitializeVariant::InitializeChecked => ctx
+                .process_with(InitializeCheckedConfig {
+                    stake: (&stake, &stake_account),
+                    authorized: &authorized,
+                })
+                .checks(&[check])
+                .test_missing_signers(false)
+                .execute(),
+        };
+    }
+}
+
+#[test_case(InitializeVariant::Initialize; "initialize")]
+#[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
+fn test_initialize_rent_change(variant: InitializeVariant) {
+    let ctx = StakeTestContext::new();
+
+    let custodian = Pubkey::new_unique();
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
+    let lockup = match variant {
+        InitializeVariant::Initialize => Lockup {
+            epoch: 1,
+            unix_timestamp: 0,
+            custodian,
+        },
+        InitializeVariant::InitializeChecked => Lockup::default(),
+    };
+
+    // Create account with sufficient lamports based on default rent
+    let stake = Pubkey::new_unique();
+    let stake_account = AccountSharedData::new_data_with_space(
+        ctx.rent_exempt_reserve,
+        &StakeStateV2::Uninitialized,
+        StakeStateV2::size_of(),
+        &id(),
+    )
+    .unwrap();
+
+    // Build instruction
+    let instruction = match variant {
+        InitializeVariant::Initialize => ixn::initialize(&stake, &authorized, &lockup),
+        InitializeVariant::InitializeChecked => ixn::initialize_checked(&stake, &authorized),
+    };
+
+    // Create modified rent with increased lamports_per_byte_year
+    // This simulates rent increasing between account creation and initialization
+    let default_rent = Rent::default();
+    let modified_rent = Rent {
+        lamports_per_byte_year: default_rent.lamports_per_byte_year + 1,
+        ..default_rent
+    };
+
+    // Create rent sysvar account with modified rent
+    let rent_account = create_account_shared_data_for_test(&modified_rent);
+
+    // Include the modified rent account in the accounts list
+    // add_sysvars will use this instead of the default when it sees rent::id() in instruction
+    let accounts = vec![(stake, stake_account), (sysvar::id(), rent_account)];
+
+    // Test that initialization fails with insufficient funds due to rent increase
+    ctx.mollusk.process_and_validate_instruction(
+        &instruction,
+        &add_sysvars(&ctx.mollusk, &instruction, accounts),
+        &[Check::err(ProgramError::InsufficientFunds)],
+    );
 }
