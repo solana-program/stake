@@ -1,5 +1,9 @@
 use {
-    super::utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
+    super::{
+        stake_tracker::MolluskStakeExt,
+        utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
+    },
+    crate::helpers::stake_tracker::StakeTracker,
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, WritableAccount},
     solana_pubkey::Pubkey,
@@ -23,12 +27,22 @@ pub enum StakeLifecycle {
 }
 
 impl StakeLifecycle {
+    /// Helper to create tracker with appropriate background stake for tests
+    /// Returns a tracker seeded with background cluster stake
+    pub fn create_tracker_for_test(minimum_delegation: u64) -> StakeTracker {
+        // Use a moderate background stake amount
+        // This mimics Banks' cluster-wide effective stake from all validators
+        // Calculation: needs to be >> test stakes to provide stable warmup base
+        let background_stake = minimum_delegation.saturating_mul(100);
+        StakeTracker::with_background_stake(background_stake)
+    }
+
     /// Create a stake account with full specification of authorities and lockup
     #[allow(clippy::too_many_arguments)]
     pub fn create_stake_account_fully_specified(
         self,
         mollusk: &mut Mollusk,
-        // tracker: &mut StakeTracker, // added in subsequent PR
+        tracker: &mut StakeTracker,
         stake_pubkey: &Pubkey,
         vote_account: &Pubkey,
         staked_amount: u64,
@@ -91,9 +105,8 @@ impl StakeLifecycle {
             stake_account = result.resulting_accounts[0].1.clone().into();
 
             // Track delegation in the tracker
-            // let activation_epoch = mollusk.sysvars.clock.epoch;
-            // TODO: uncomment in subsequent PR (add `tracker.track_delegation` here)
-            // tracker.track_delegation(stake_pubkey, staked_amount, activation_epoch, vote_account);
+            let activation_epoch = mollusk.sysvars.clock.epoch;
+            tracker.track_delegation(stake_pubkey, staked_amount, activation_epoch, vote_account);
         }
 
         // Advance epoch to activate if needed (Active and beyond)
@@ -104,8 +117,7 @@ impl StakeLifecycle {
             let current_slot = mollusk.sysvars.clock.slot;
             let target_slot = current_slot + slots_per_epoch;
 
-            // TODO: use `warp_to_slot_with_stake_tracking` here (in subsequent PR)
-            mollusk.warp_to_slot(target_slot);
+            mollusk.warp_to_slot_with_stake_tracking(tracker, target_slot, Some(0));
         }
 
         // Deactivate if needed
@@ -120,9 +132,8 @@ impl StakeLifecycle {
             stake_account = result.resulting_accounts[0].1.clone().into();
 
             // Track deactivation in the tracker
-            // let deactivation_epoch = mollusk.sysvars.clock.epoch;
-            // TODO: uncomment in subsequent PR
-            // tracker.track_deactivation(stake_pubkey, deactivation_epoch);
+            let deactivation_epoch = mollusk.sysvars.clock.epoch;
+            tracker.track_deactivation(stake_pubkey, deactivation_epoch);
         }
 
         // Advance epoch to fully deactivate if needed (Deactive lifecycle)
@@ -134,8 +145,7 @@ impl StakeLifecycle {
             let current_slot = mollusk.sysvars.clock.slot;
             let target_slot = current_slot + slots_per_epoch;
 
-            // TODO: use `warp_to_slot_with_stake_tracking` here (in subsequent PR)
-            mollusk.warp_to_slot(target_slot);
+            mollusk.warp_to_slot_with_stake_tracking(tracker, target_slot, Some(0));
         }
 
         stake_account
