@@ -159,6 +159,76 @@ impl InstructionConfig for MergeConfig<'_> {
     }
 }
 
+pub struct MoveLamportsConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
+}
+
+impl<'a> MoveLamportsConfig<'a> {
+    /// Helper to get the default source vote account from context
+    pub fn with_default_vote(self, ctx: &'a StakeTestContext) -> MoveLamportsFullConfig<'a> {
+        MoveLamportsFullConfig {
+            source: self.source,
+            destination: self.destination,
+            override_signer: self.override_signer,
+            amount: self.amount,
+            source_vote: (
+                ctx.vote_account.as_ref().expect("vote_account required"),
+                ctx.vote_account_data
+                    .as_ref()
+                    .expect("vote_account_data required"),
+            ),
+            dest_vote: None,
+        }
+    }
+}
+
+impl InstructionConfig for MoveLamportsConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_lamports(self.source.0, self.destination.0, signer, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
+pub struct MoveLamportsFullConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+    /// Override signer for testing wrong signer scenarios (defaults to ctx.staker)
+    pub override_signer: Option<&'a Pubkey>,
+    pub source_vote: (&'a Pubkey, &'a AccountSharedData),
+    pub dest_vote: Option<(&'a Pubkey, &'a AccountSharedData)>,
+}
+
+impl InstructionConfig for MoveLamportsFullConfig<'_> {
+    fn build_instruction(&self, ctx: &StakeTestContext) -> Instruction {
+        let signer = self.override_signer.unwrap_or(&ctx.staker);
+        ixn::move_lamports(self.source.0, self.destination.0, signer, self.amount)
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        let mut accounts = vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+            (*self.source_vote.0, self.source_vote.1.clone()),
+        ];
+        if let Some((vote_pk, vote_acc)) = self.dest_vote {
+            accounts.push((*vote_pk, vote_acc.clone()));
+        }
+        accounts
+    }
+}
+
 pub struct SplitConfig<'a> {
     pub source: (&'a Pubkey, &'a AccountSharedData),
     pub destination: (&'a Pubkey, &'a AccountSharedData),

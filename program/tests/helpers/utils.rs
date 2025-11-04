@@ -1,4 +1,5 @@
 use {
+    crate::helpers::{lifecycle::StakeLifecycle, stake_tracker::StakeTracker},
     mollusk_svm::Mollusk,
     solana_account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
     solana_clock::Epoch,
@@ -125,4 +126,42 @@ pub fn get_effective_stake(mollusk: &Mollusk, stake_account: &AccountSharedData)
     } else {
         0
     }
+}
+
+/// Synchronize a transient stake's epoch to the current epoch
+/// Updates both the account data and the tracker.
+pub fn true_up_transient_stake_epoch(
+    mollusk: &mut Mollusk,
+    tracker: &mut StakeTracker,
+    stake_pubkey: &Pubkey,
+    stake_account: &mut AccountSharedData,
+    lifecycle: StakeLifecycle,
+) {
+    if lifecycle != StakeLifecycle::Activating && lifecycle != StakeLifecycle::Deactivating {
+        return;
+    }
+
+    let clock = mollusk.sysvars.clock.clone();
+    let mut stake_state: StakeStateV2 = bincode::deserialize(stake_account.data()).unwrap();
+
+    if let StakeStateV2::Stake(_, ref mut stake, _) = &mut stake_state {
+        match lifecycle {
+            StakeLifecycle::Activating => {
+                stake.delegation.activation_epoch = clock.epoch;
+
+                // Update tracker as well
+                if let Some(tracked) = tracker.delegations.get_mut(stake_pubkey) {
+                    tracked.activation_epoch = clock.epoch;
+                }
+            }
+            StakeLifecycle::Deactivating => {
+                stake.delegation.deactivation_epoch = clock.epoch;
+
+                // Update tracker as well
+                tracker.track_deactivation(stake_pubkey, clock.epoch);
+            }
+            _ => (),
+        }
+    }
+    stake_account.set_data(bincode::serialize(&stake_state).unwrap());
 }
