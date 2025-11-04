@@ -4,9 +4,10 @@ mod helpers;
 
 use {
     helpers::{
+        context::StakeTestContext,
         instruction_builders::{DeactivateConfig, DelegateConfig},
+        lifecycle::StakeLifecycle,
         utils::parse_stake_account,
-        StakeTestContext,
     },
     mollusk_svm::result::Check,
     solana_program_error::ProgramError,
@@ -22,7 +23,7 @@ fn test_deactivate(activate: bool) {
     let min_delegation = ctx.minimum_delegation;
 
     let (stake, mut stake_account) = ctx
-        .stake_account(helpers::StakeLifecycle::Initialized)
+        .stake_account(StakeLifecycle::Initialized)
         .staked_amount(min_delegation)
         .build();
 
