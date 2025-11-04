@@ -46,7 +46,6 @@ fn test_initialize(variant: InitializeVariant) {
         InitializeVariant::InitializeChecked => Lockup::default(),
     };
 
-    // Create an uninitialized stake account
     let (stake, stake_account) = ctx.stake_account(StakeLifecycle::Uninitialized).build();
 
     // Process the Initialize instruction, including testing missing signers
@@ -130,7 +129,7 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
         InitializeVariant::InitializeChecked => Lockup::default(),
     };
 
-    // Create account with insufficient lamports (need to manually create since builder adds rent automatically)
+    // Create account with insufficient lamports (manually since builder adds rent automatically)
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         ctx.rent_exempt_reserve / 2, // Not enough lamports
@@ -163,8 +162,6 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
 fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
     let ctx = StakeTestContext::new();
 
-    // Original program_test.rs uses double rent instead of just
-    // increasing the size by 1. This behavior remains (makes no difference here).
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of() * 2);
 
     let custodian = Pubkey::new_unique();
@@ -214,8 +211,6 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
 fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
     let ctx = StakeTestContext::new();
 
-    // Original program_test.rs uses rent for size instead of
-    // rent for size - 1. This behavior remains (makes no difference here).
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
 
     let custodian = Pubkey::new_unique();
