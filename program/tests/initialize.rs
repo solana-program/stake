@@ -13,8 +13,8 @@ use {
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
+    solana_sdk_ids::{stake::id, system_program::id as system_program_id},
     solana_stake_interface::state::{Authorized, Lockup, StakeStateV2},
-    solana_stake_program::id,
     test_case::test_case,
 };
 
@@ -24,31 +24,30 @@ enum InitializeVariant {
     InitializeChecked,
 }
 
-#[test_case(InitializeVariant::Initialize; "initialize")]
-#[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
-fn test_initialize(variant: InitializeVariant) {
-    let mut ctx = StakeTestContext::new();
-
-    let custodian = Pubkey::new_unique();
-
-    let authorized = Authorized {
-        staker: ctx.staker,
-        withdrawer: ctx.withdrawer,
-    };
-
-    // InitializeChecked always uses default lockup
-    let lockup = match variant {
+fn lockup_for(variant: InitializeVariant, custodian: Pubkey) -> Lockup {
+    match variant {
         InitializeVariant::Initialize => Lockup {
             epoch: 1,
             unix_timestamp: 0,
             custodian,
         },
         InitializeVariant::InitializeChecked => Lockup::default(),
+    }
+}
+
+#[test_case(InitializeVariant::Initialize; "initialize")]
+#[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
+fn test_initialize(variant: InitializeVariant) {
+    let mut ctx = StakeTestContext::new();
+
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
     };
+    let lockup = lockup_for(variant, Pubkey::new_unique());
 
     let (stake, stake_account) = ctx.stake_account(StakeLifecycle::Uninitialized).build();
 
-    // Process the Initialize instruction, including testing missing signers
     let result = {
         let program_id = id();
         let checks = [
@@ -79,7 +78,6 @@ fn test_initialize(variant: InitializeVariant) {
             .execute()
     };
 
-    // Check that we see what we expect
     let resulting_account: AccountSharedData = result.resulting_accounts[0].1.clone().into();
     let stake_state: StakeStateV2 = bincode::deserialize(resulting_account.data()).unwrap();
     assert_eq!(
@@ -91,7 +89,7 @@ fn test_initialize(variant: InitializeVariant) {
         }),
     );
 
-    // Attempting to initialize an already initialized stake account should fail
+    // Re-initialize should fail
     let processor = match variant {
         InitializeVariant::Initialize => ctx.process_with(InitializeConfig {
             stake: (&stake, &resulting_account),
@@ -115,24 +113,16 @@ fn test_initialize(variant: InitializeVariant) {
 fn test_initialize_insufficient_funds(variant: InitializeVariant) {
     let ctx = StakeTestContext::new();
 
-    let custodian = Pubkey::new_unique();
     let authorized = Authorized {
         staker: ctx.staker,
         withdrawer: ctx.withdrawer,
     };
-    let lockup = match variant {
-        InitializeVariant::Initialize => Lockup {
-            epoch: 1,
-            unix_timestamp: 0,
-            custodian,
-        },
-        InitializeVariant::InitializeChecked => Lockup::default(),
-    };
+    let lockup = lockup_for(variant, Pubkey::new_unique());
 
-    // Create account with insufficient lamports (manually since builder adds rent automatically)
+    // Account has insufficient lamports
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
-        ctx.rent_exempt_reserve / 2, // Not enough lamports
+        ctx.rent_exempt_reserve / 2,
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -164,26 +154,18 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
 
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of() * 2);
 
-    let custodian = Pubkey::new_unique();
     let authorized = Authorized {
         staker: ctx.staker,
         withdrawer: ctx.withdrawer,
     };
-    let lockup = match variant {
-        InitializeVariant::Initialize => Lockup {
-            epoch: 1,
-            unix_timestamp: 0,
-            custodian,
-        },
-        InitializeVariant::InitializeChecked => Lockup::default(),
-    };
+    let lockup = lockup_for(variant, Pubkey::new_unique());
 
-    // Create account with wrong size (need to manually create since builder enforces correct size)
+    // Account data length too large
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
-        StakeStateV2::size_of() + 1, // Too large
+        StakeStateV2::size_of() + 1,
         &id(),
     )
     .unwrap();
@@ -213,26 +195,18 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
 
     let rent_exempt_reserve = Rent::default().minimum_balance(StakeStateV2::size_of());
 
-    let custodian = Pubkey::new_unique();
     let authorized = Authorized {
         staker: ctx.staker,
         withdrawer: ctx.withdrawer,
     };
-    let lockup = match variant {
-        InitializeVariant::Initialize => Lockup {
-            epoch: 1,
-            unix_timestamp: 0,
-            custodian,
-        },
-        InitializeVariant::InitializeChecked => Lockup::default(),
-    };
+    let lockup = lockup_for(variant, Pubkey::new_unique());
 
-    // Create account with wrong size (need to manually create since builder enforces correct size)
+    // Account data length too small
     let stake = Pubkey::new_unique();
     let stake_account = AccountSharedData::new_data_with_space(
         rent_exempt_reserve,
         &StakeStateV2::Uninitialized,
-        StakeStateV2::size_of() - 1, // Too small
+        StakeStateV2::size_of() - 1,
         &id(),
     )
     .unwrap();
@@ -251,6 +225,45 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
 
     processor
         .checks(&[Check::err(ProgramError::InvalidAccountData)])
+        .test_missing_signers(false)
+        .execute();
+}
+
+#[test_case(InitializeVariant::Initialize; "initialize")]
+#[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
+fn test_initialize_wrong_owner(variant: InitializeVariant) {
+    let ctx = StakeTestContext::new();
+
+    let authorized = Authorized {
+        staker: ctx.staker,
+        withdrawer: ctx.withdrawer,
+    };
+    let lockup = lockup_for(variant, Pubkey::new_unique());
+
+    // Owner is not the stake program
+    let stake = Pubkey::new_unique();
+    let stake_account = AccountSharedData::new_data_with_space(
+        Rent::default().minimum_balance(StakeStateV2::size_of()),
+        &StakeStateV2::Uninitialized,
+        StakeStateV2::size_of(),
+        &system_program_id(),
+    )
+    .unwrap();
+
+    let processor = match variant {
+        InitializeVariant::Initialize => ctx.process_with(InitializeConfig {
+            stake: (&stake, &stake_account),
+            authorized: &authorized,
+            lockup: &lockup,
+        }),
+        InitializeVariant::InitializeChecked => ctx.process_with(InitializeCheckedConfig {
+            stake: (&stake, &stake_account),
+            authorized: &authorized,
+        }),
+    };
+
+    processor
+        .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
         .test_missing_signers(false)
         .execute();
 }
