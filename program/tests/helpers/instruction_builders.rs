@@ -159,6 +159,27 @@ impl InstructionConfig for DeactivateDelinquentConfig<'_> {
     }
 }
 
+pub struct SplitConfig<'a> {
+    pub source: (&'a Pubkey, &'a AccountSharedData),
+    pub destination: (&'a Pubkey, &'a AccountSharedData),
+    pub amount: u64,
+    pub signer: &'a Pubkey,
+}
+
+impl InstructionConfig for SplitConfig<'_> {
+    fn build_instruction(&self, _ctx: &StakeTestContext) -> Instruction {
+        let instructions = ixn::split(self.source.0, self.signer, self.amount, self.destination.0);
+        instructions[2].clone() // The actual split instruction
+    }
+
+    fn build_accounts(&self) -> Vec<(Pubkey, AccountSharedData)> {
+        vec![
+            (*self.source.0, self.source.1.clone()),
+            (*self.destination.0, self.destination.1.clone()),
+        ]
+    }
+}
+
 pub struct WithdrawConfig<'a> {
     pub stake: (&'a Pubkey, &'a AccountSharedData),
     pub recipient: (&'a Pubkey, &'a AccountSharedData),
