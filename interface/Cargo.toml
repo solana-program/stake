@@ -22,7 +22,7 @@ num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
 serde_derive = { version = "1.0.210", optional = true }
 solana-clock = "3.0.0"
-solana-cpi = { version = "3.0.0", optional = true }
+solana-cpi = { version = "3.1.0", optional = true }
 solana-frozen-abi = { version = "3.0.1", features = ["frozen-abi"], optional = true }
 solana-frozen-abi-macro = { version = "3.0.1", features = ["frozen-abi"], optional = true }
 solana-instruction = "3.0.0"
