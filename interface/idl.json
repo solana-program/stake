@@ -1,1078 +1,1618 @@
 {
-  "version": "0.1.0",
-  "name": "solana_stake_interface",
-  "instructions": [
-    {
-      "name": "Initialize",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Uninitialized stake account"
-          ]
-        },
-        {
-          "name": "rentSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Rent sysvar"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "arg0",
-          "type": {
-            "defined": "Authorized"
-          }
-        },
-        {
-          "name": "arg1",
-          "type": {
-            "defined": "Lockup"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 0
-      }
-    },
-    {
-      "name": "Authorize",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account to be updated"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "lockupAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "arg0",
-          "type": "publicKey"
-        },
-        {
-          "name": "arg1",
-          "type": {
-            "defined": "StakeAuthorize"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 1
-      }
-    },
-    {
-      "name": "DelegateStake",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Initialized stake account to be delegated"
-          ]
-        },
-        {
-          "name": "vote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Vote account to which this stake will be delegated"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Stake history sysvar"
-          ]
-        },
-        {
-          "name": "unused",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Unused account, formerly the stake config"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 2
-      }
-    },
-    {
-      "name": "Split",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account to be split"
-          ]
-        },
-        {
-          "name": "splitStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Uninitialized stake account"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": "u64"
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 3
-      }
-    },
-    {
-      "name": "Withdraw",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account from which to withdraw"
-          ]
-        },
-        {
-          "name": "recipient",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Recipient account"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Stake history sysvar"
-          ]
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Withdraw authority"
-          ]
-        },
-        {
-          "name": "lockupAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": "u64"
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 4
-      }
-    },
-    {
-      "name": "Deactivate",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Delegated stake account"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 5
-      }
-    },
-    {
-      "name": "SetLockup",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Initialized stake account"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Lockup authority or withdraw authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "lockupArgs",
-          "type": {
-            "defined": "LockupArgs"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 6
-      }
-    },
-    {
-      "name": "Merge",
-      "accounts": [
-        {
-          "name": "destinationStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Destination stake account"
-          ]
-        },
-        {
-          "name": "sourceStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Source stake account"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Stake history sysvar"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 7
-      }
-    },
-    {
-      "name": "AuthorizeWithSeed",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account to be updated"
-          ]
-        },
-        {
-          "name": "base",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Base key of stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "lockupAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "authorizeWithSeedArgs",
-          "type": {
-            "defined": "AuthorizeWithSeedArgs"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 8
-      }
-    },
-    {
-      "name": "InitializeChecked",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Uninitialized stake account"
-          ]
-        },
-        {
-          "name": "rentSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Rent sysvar"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "The stake authority"
-          ]
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "The withdraw authority"
-          ]
-        }
-      ],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 9
-      }
-    },
-    {
-      "name": "AuthorizeChecked",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account to be updated"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "The stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "newAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "The new stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "lockupAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "stakeAuthorize",
-          "type": {
-            "defined": "StakeAuthorize"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 10
-      }
-    },
-    {
-      "name": "AuthorizeCheckedWithSeed",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Stake account to be updated"
-          ]
-        },
-        {
-          "name": "base",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Base key of stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "clockSysvar",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Clock sysvar"
-          ]
-        },
-        {
-          "name": "newAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "The new stake or withdraw authority"
-          ]
-        },
-        {
-          "name": "lockupAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "Lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "authorizeCheckedWithSeedArgs",
-          "type": {
-            "defined": "AuthorizeCheckedWithSeedArgs"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 11
-      }
-    },
-    {
-      "name": "SetLockupChecked",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Initialized stake account"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Lockup authority or withdraw authority"
-          ]
-        },
-        {
-          "name": "newAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "isOptional": true,
-          "docs": [
-            "New lockup authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "lockupCheckedArgs",
-          "type": {
-            "defined": "LockupCheckedArgs"
-          }
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 12
-      }
-    },
-    {
-      "name": "GetMinimumDelegation",
-      "accounts": [],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 13
-      }
-    },
-    {
-      "name": "DeactivateDelinquent",
-      "accounts": [
-        {
-          "name": "stake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Delegated stake account"
-          ]
-        },
-        {
-          "name": "delinquentVote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Delinquent vote account"
-          ]
-        },
-        {
-          "name": "referenceVote",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "Reference vote account"
-          ]
-        }
-      ],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 14
-      }
-    },
-    {
-      "name": "Redelegate",
-      "accounts": [],
-      "args": [],
-      "discriminant": {
-        "type": "u32",
-        "value": 15
-      }
-    },
-    {
-      "name": "MoveStake",
-      "accounts": [
-        {
-          "name": "sourceStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Active source stake account"
-          ]
-        },
-        {
-          "name": "destinationStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Active or inactive destination stake account"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": "u64"
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 16
-      }
-    },
-    {
-      "name": "MoveLamports",
-      "accounts": [
-        {
-          "name": "sourceStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Active or inactive source stake account"
-          ]
-        },
-        {
-          "name": "destinationStake",
-          "isMut": true,
-          "isSigner": false,
-          "docs": [
-            "Mergeable destination stake account"
-          ]
-        },
-        {
-          "name": "stakeAuthority",
-          "isMut": false,
-          "isSigner": true,
-          "docs": [
-            "Stake authority"
-          ]
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": "u64"
-        }
-      ],
-      "discriminant": {
-        "type": "u32",
-        "value": 17
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "LockupArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "unixTimestamp",
-            "type": {
-              "option": {
-                "defined": "UnixTimestamp"
+  "additionalPrograms": [],
+  "kind": "rootNode",
+  "program": {
+    "accounts": [],
+    "definedTypes": [
+      {
+        "kind": "definedTypeNode",
+        "name": "lockupArgs",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "unixTimestamp",
+              "type": {
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "unixTimestamp"
+                },
+                "kind": "optionTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "epoch",
+              "type": {
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "epoch"
+                },
+                "kind": "optionTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "custodian",
+              "type": {
+                "item": {
+                  "kind": "publicKeyTypeNode"
+                },
+                "kind": "optionTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                }
               }
             }
-          },
-          {
-            "name": "epoch",
-            "type": {
-              "option": {
-                "defined": "Epoch"
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "lockupCheckedArgs",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "unixTimestamp",
+              "type": {
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "unixTimestamp"
+                },
+                "kind": "optionTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "epoch",
+              "type": {
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "epoch"
+                },
+                "kind": "optionTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                }
               }
             }
-          },
-          {
-            "name": "custodian",
-            "type": {
-              "option": "publicKey"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockupCheckedArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "unixTimestamp",
-            "type": {
-              "option": {
-                "defined": "UnixTimestamp"
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "authorizeWithSeedArgs",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "newAuthorizedPubkey",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "stakeAuthorize",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "stakeAuthorize"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authoritySeed",
+              "type": {
+                "kind": "sizePrefixTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u32",
+                  "kind": "numberTypeNode"
+                },
+                "type": {
+                  "encoding": "utf8",
+                  "kind": "stringTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authorityOwner",
+              "type": {
+                "kind": "publicKeyTypeNode"
               }
             }
-          },
-          {
-            "name": "epoch",
-            "type": {
-              "option": {
-                "defined": "Epoch"
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "authorizeCheckedWithSeedArgs",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "stakeAuthorize",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "stakeAuthorize"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authoritySeed",
+              "type": {
+                "kind": "sizePrefixTypeNode",
+                "prefix": {
+                  "endian": "le",
+                  "format": "u32",
+                  "kind": "numberTypeNode"
+                },
+                "type": {
+                  "encoding": "utf8",
+                  "kind": "stringTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authorityOwner",
+              "type": {
+                "kind": "publicKeyTypeNode"
               }
             }
-          }
-        ]
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "stakeFlags",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "bits",
+              "type": {
+                "endian": "le",
+                "format": "u8",
+                "kind": "numberTypeNode"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "stakeState",
+        "type": {
+          "kind": "enumTypeNode",
+          "size": {
+            "endian": "le",
+            "format": "u8",
+            "kind": "numberTypeNode"
+          },
+          "variants": [
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "uninitialized"
+            },
+            {
+              "kind": "enumTupleVariantTypeNode",
+              "name": "initialized",
+              "tuple": {
+                "items": [
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "meta"
+                  }
+                ],
+                "kind": "tupleTypeNode"
+              }
+            },
+            {
+              "kind": "enumTupleVariantTypeNode",
+              "name": "stake",
+              "tuple": {
+                "items": [
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "meta"
+                  },
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "stake"
+                  }
+                ],
+                "kind": "tupleTypeNode"
+              }
+            },
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "rewardsPool"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "stakeStateV2",
+        "type": {
+          "kind": "enumTypeNode",
+          "size": {
+            "endian": "le",
+            "format": "u8",
+            "kind": "numberTypeNode"
+          },
+          "variants": [
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "uninitialized"
+            },
+            {
+              "kind": "enumTupleVariantTypeNode",
+              "name": "initialized",
+              "tuple": {
+                "items": [
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "meta"
+                  }
+                ],
+                "kind": "tupleTypeNode"
+              }
+            },
+            {
+              "kind": "enumTupleVariantTypeNode",
+              "name": "stake",
+              "tuple": {
+                "items": [
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "meta"
+                  },
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "stake"
+                  },
+                  {
+                    "kind": "definedTypeLinkNode",
+                    "name": "stakeFlags"
+                  }
+                ],
+                "kind": "tupleTypeNode"
+              }
+            },
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "rewardsPool"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "stakeAuthorize",
+        "type": {
+          "kind": "enumTypeNode",
+          "size": {
+            "endian": "le",
+            "format": "u8",
+            "kind": "numberTypeNode"
+          },
+          "variants": [
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "staker"
+            },
+            {
+              "kind": "enumEmptyVariantTypeNode",
+              "name": "withdrawer"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "lockup",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "unixTimestamp",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "unixTimestamp"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "epoch",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "epoch"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "custodian",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "authorized",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "staker",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "withdrawer",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "meta",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "rentExemptReserve",
+              "type": {
+                "endian": "le",
+                "format": "u64",
+                "kind": "numberTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authorized",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "authorized"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "lockup",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "lockup"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "delegation",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "voterPubkey",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "stake",
+              "type": {
+                "endian": "le",
+                "format": "u64",
+                "kind": "numberTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "activationEpoch",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "epoch"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "deactivationEpoch",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "epoch"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "warmupCooldownRate",
+              "type": {
+                "endian": "le",
+                "format": "f64",
+                "kind": "numberTypeNode"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "stake",
+        "type": {
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "delegation",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "delegation"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "creditsObserved",
+              "type": {
+                "endian": "le",
+                "format": "u64",
+                "kind": "numberTypeNode"
+              }
+            }
+          ],
+          "kind": "structTypeNode"
+        }
       }
-    },
-    {
-      "name": "AuthorizeWithSeedArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
+    ],
+    "errors": [
+      {
+        "code": 0,
+        "kind": "errorNode",
+        "message": "Not enough credits to redeem",
+        "name": "noCreditsToRedeem"
+      },
+      {
+        "code": 1,
+        "kind": "errorNode",
+        "message": "Lockup has not yet expired",
+        "name": "lockupInForce"
+      },
+      {
+        "code": 2,
+        "kind": "errorNode",
+        "message": "Stake already deactivated",
+        "name": "alreadyDeactivated"
+      },
+      {
+        "code": 3,
+        "kind": "errorNode",
+        "message": "One re-delegation permitted per epoch",
+        "name": "tooSoonToRedelegate"
+      },
+      {
+        "code": 4,
+        "kind": "errorNode",
+        "message": "Split amount is more than is staked",
+        "name": "insufficientStake"
+      },
+      {
+        "code": 5,
+        "kind": "errorNode",
+        "message": "Stake account with transient stake cannot be merged",
+        "name": "mergeTransientStake"
+      },
+      {
+        "code": 6,
+        "kind": "errorNode",
+        "message": "Stake account merge failed due to different authority, lockups or state",
+        "name": "mergeMismatch"
+      },
+      {
+        "code": 7,
+        "kind": "errorNode",
+        "message": "Custodian address not present",
+        "name": "custodianMissing"
+      },
+      {
+        "code": 8,
+        "kind": "errorNode",
+        "message": "Custodian signature not present",
+        "name": "custodianSignatureMissing"
+      },
+      {
+        "code": 9,
+        "kind": "errorNode",
+        "message": "Insufficient voting activity in the reference vote account",
+        "name": "insufficientReferenceVotes"
+      },
+      {
+        "code": 10,
+        "kind": "errorNode",
+        "message": "Stake account is not delegated to the provided vote account",
+        "name": "voteAddressMismatch"
+      },
+      {
+        "code": 11,
+        "kind": "errorNode",
+        "message": "Stake account has not been delinquent for the minimum epochs required for deactivation",
+        "name": "minimumDelinquentEpochsForDeactivationNotMet"
+      },
+      {
+        "code": 12,
+        "kind": "errorNode",
+        "message": "Delegation amount is less than the minimum",
+        "name": "insufficientDelegation"
+      },
+      {
+        "code": 13,
+        "kind": "errorNode",
+        "message": "Stake account with transient or inactive stake cannot be redelegated",
+        "name": "redelegateTransientOrInactiveStake"
+      },
+      {
+        "code": 14,
+        "kind": "errorNode",
+        "message": "Stake redelegation to the same vote account is not permitted",
+        "name": "redelegateToSameVoteAccount"
+      },
+      {
+        "code": 15,
+        "kind": "errorNode",
+        "message": "Redelegated stake must be fully activated before deactivation",
+        "name": "redelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted"
+      },
+      {
+        "code": 16,
+        "kind": "errorNode",
+        "message": "Stake action is not permitted while the epoch rewards period is active",
+        "name": "epochRewardsActive"
+      }
+    ],
+    "instructions": [
+      {
+        "accounts": [
           {
-            "name": "newAuthorizedPubkey",
-            "type": "publicKey"
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
           },
           {
-            "name": "stakeAuthorize",
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "rentSysvar"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
             "type": {
-              "defined": "StakeAuthorize"
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
             }
           },
           {
-            "name": "authoritySeed",
-            "type": "string"
-          },
-          {
-            "name": "authorityOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AuthorizeCheckedWithSeedArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stakeAuthorize",
-            "type": {
-              "defined": "StakeAuthorize"
-            }
-          },
-          {
-            "name": "authoritySeed",
-            "type": "string"
-          },
-          {
-            "name": "authorityOwner",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "StakeFlags",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bits",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Lockup",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "unixTimestamp",
-            "type": {
-              "defined": "UnixTimestamp"
-            }
-          },
-          {
-            "name": "epoch",
-            "type": {
-              "defined": "Epoch"
-            }
-          },
-          {
-            "name": "custodian",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Authorized",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "staker",
-            "type": "publicKey"
-          },
-          {
-            "name": "withdrawer",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Meta",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "rentExemptReserve",
-            "type": "u64"
-          },
-          {
+            "kind": "instructionArgumentNode",
             "name": "authorized",
             "type": {
-              "defined": "Authorized"
+              "kind": "definedTypeLinkNode",
+              "name": "authorized"
             }
           },
           {
+            "kind": "instructionArgumentNode",
             "name": "lockup",
             "type": {
-              "defined": "Lockup"
+              "kind": "definedTypeLinkNode",
+              "name": "lockup"
             }
           }
-        ]
-      }
-    },
-    {
-      "name": "Delegation",
-      "type": {
-        "kind": "struct",
-        "fields": [
+        ],
+        "discriminators": [
           {
-            "name": "voterPubkey",
-            "type": "publicKey"
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "initialize"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
           },
           {
-            "name": "stake",
-            "type": "u64"
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
           },
           {
-            "name": "activationEpoch",
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authority"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
             "type": {
-              "defined": "Epoch"
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
             }
           },
           {
-            "name": "deactivationEpoch",
+            "kind": "instructionArgumentNode",
+            "name": "pubkey",
             "type": {
-              "defined": "Epoch"
+              "kind": "publicKeyTypeNode"
             }
           },
           {
-            "name": "warmupCooldownRate",
+            "kind": "instructionArgumentNode",
+            "name": "stakeAuthorize",
             "type": {
-              "defined": "f64"
+              "kind": "definedTypeLinkNode",
+              "name": "stakeAuthorize"
             }
           }
-        ]
-      }
-    },
-    {
-      "name": "Stake",
-      "type": {
-        "kind": "struct",
-        "fields": [
+        ],
+        "discriminators": [
           {
-            "name": "delegation",
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "authorize"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "vote"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeHistorySysvar"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "config"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 2
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
             "type": {
-              "defined": "Delegation"
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "delegateStake"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "splitStake"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 3
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
             }
           },
           {
-            "name": "creditsObserved",
-            "type": "u64"
+            "kind": "instructionArgumentNode",
+            "name": "lamports",
+            "type": {
+              "endian": "le",
+              "format": "u64",
+              "kind": "numberTypeNode"
+            }
           }
-        ]
-      }
-    },
-    {
-      "name": "StakeState",
-      "type": {
-        "kind": "enum",
-        "variants": [
+        ],
+        "discriminators": [
           {
-            "name": "Uninitialized"
-          },
-          {
-            "name": "Initialized",
-            "fields": [
-              {
-                "defined": "Meta"
-              }
-            ]
-          },
-          {
-            "name": "Stake",
-            "fields": [
-              {
-                "defined": "Meta"
-              },
-              {
-                "defined": "Stake"
-              }
-            ]
-          },
-          {
-            "name": "RewardsPool"
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
           }
-        ]
-      }
-    },
-    {
-      "name": "StakeStateV2",
-      "type": {
-        "kind": "enum",
-        "variants": [
+        ],
+        "kind": "instructionNode",
+        "name": "split"
+      },
+      {
+        "accounts": [
           {
-            "name": "Uninitialized"
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
           },
           {
-            "name": "Initialized",
-            "fields": [
-              {
-                "defined": "Meta"
-              }
-            ]
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "recipient"
           },
           {
-            "name": "Stake",
-            "fields": [
-              {
-                "defined": "Meta"
-              },
-              {
-                "defined": "Stake"
-              },
-              {
-                "defined": "StakeFlags"
-              }
-            ]
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
           },
           {
-            "name": "RewardsPool"
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeHistorySysvar"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "withdrawAuthority"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority"
           }
-        ]
-      }
-    },
-    {
-      "name": "StakeAuthorize",
-      "type": {
-        "kind": "enum",
-        "variants": [
+        ],
+        "arguments": [
           {
-            "name": "Staker"
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 4
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
           },
           {
-            "name": "Withdrawer"
+            "kind": "instructionArgumentNode",
+            "name": "lamports",
+            "type": {
+              "endian": "le",
+              "format": "u64",
+              "kind": "numberTypeNode"
+            }
           }
-        ]
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "withdraw"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 5
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "deactivate"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 6
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "lockup",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "lockupArgs"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "setLockup"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "destination"
+          },
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "source"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeHistorySysvar"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 7
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "merge"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authorityBase"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 8
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "authorizeWithSeedArgs"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "authorizeWithSeed"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "rentSysvar"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "withdrawAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 9
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "initializeChecked"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authority"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "newAuthority"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 10
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "stakeAuthorize",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "stakeAuthorize"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "authorizeChecked"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authorityBase"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "newAuthority"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 11
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "authorizeCheckedWithSeedArgs"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "authorizeCheckedWithSeed"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "authority"
+          },
+          {
+            "isOptional": true,
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "newLockupAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 12
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "lockup",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "lockupCheckedArgs"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "setLockupChecked"
+      },
+      {
+        "accounts": [],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 13
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "getMinimumDelegation"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "stake"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "delinquentVote"
+          },
+          {
+            "isSigner": false,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "referenceVote"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 14
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "deactivateDelinquent"
+      },
+      {
+        "accounts": [],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 15
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "redelegate"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "source"
+          },
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "destination"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 16
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "lamports",
+            "type": {
+              "endian": "le",
+              "format": "u64",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "moveStake"
+      },
+      {
+        "accounts": [
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "source"
+          },
+          {
+            "isSigner": false,
+            "isWritable": true,
+            "kind": "instructionAccountNode",
+            "name": "destination"
+          },
+          {
+            "isSigner": true,
+            "isWritable": false,
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority"
+          }
+        ],
+        "arguments": [
+          {
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 17
+            },
+            "defaultValueStrategy": "omitted",
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "type": {
+              "endian": "le",
+              "format": "u8",
+              "kind": "numberTypeNode"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "lamports",
+            "type": {
+              "endian": "le",
+              "format": "u64",
+              "kind": "numberTypeNode"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "kind": "instructionNode",
+        "name": "moveLamports"
       }
-    }
-  ],
-  "metadata": {
-    "origin": "shank",
-    "address": "Stake11111111111111111111111111111111111111",
-    "binaryVersion": "0.4.2",
-    "libVersion": "0.4.2"
-  }
+    ],
+    "kind": "programNode",
+    "name": "solanaStakeInterface",
+    "pdas": [],
+    "publicKey": "Stake11111111111111111111111111111111111111",
+    "version": "2.0.1"
+  },
+  "standard": "codama",
+  "version": "1.0.0"
 }

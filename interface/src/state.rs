@@ -7,6 +7,7 @@
 #[cfg(feature = "borsh")]
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
 use {
+    codama_macros::{codama, CodamaType},
     crate::{
         error::StakeError,
         instruction::LockupArgs,
@@ -79,17 +80,18 @@ macro_rules! impl_borsh_stake_state {
         }
     };
 }
+#[derive(CodamaType, Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 #[deprecated(
     since = "1.17.0",
     note = "Please use `StakeStateV2` instead, and match the third `StakeFlags` field when matching `StakeStateV2::Stake` to resolve any breakage. For example, `if let StakeState::Stake(meta, stake)` becomes `if let StakeStateV2::Stake(meta, stake, _stake_flags)`."
 )]
+#[codama(enum_discriminator(size = number(u32)))]
 pub enum StakeState {
     #[default]
     Uninitialized,
@@ -140,13 +142,14 @@ impl StakeState {
     }
 }
 
+#[derive(CodamaType, Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
+#[codama(enum_discriminator(size = number(u32)))]
 pub enum StakeStateV2 {
     #[default]
     Uninitialized,
@@ -259,17 +262,18 @@ impl StakeStateV2 {
     }
 }
 
+#[derive(CodamaType, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,
 }
 
+#[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -280,7 +284,6 @@ pub enum StakeAuthorize {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Lockup {
     /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
@@ -301,6 +304,7 @@ impl Lockup {
     }
 }
 
+#[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -311,7 +315,6 @@ impl Lockup {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Authorized {
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
@@ -383,6 +386,7 @@ impl Authorized {
     }
 }
 
+#[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -393,7 +397,6 @@ impl Authorized {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Meta {
     pub rent_exempt_reserve: u64,
     pub authorized: Authorized,
@@ -437,6 +440,7 @@ impl Meta {
     }
 }
 
+#[derive(CodamaType, Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -447,7 +451,6 @@ impl Meta {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Delegation {
     /// to whom the stake is delegated
     pub voter_pubkey: Pubkey,
@@ -676,6 +679,7 @@ impl Delegation {
     }
 }
 
+#[derive(CodamaType, Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -686,7 +690,6 @@ impl Delegation {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Stake {
     pub delegation: Delegation,
     /// credits observed is credits from vote account state when delegated or redeemed

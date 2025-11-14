@@ -18,6 +18,8 @@ program-id = "Stake11111111111111111111111111111111111111"
 
 [dependencies]
 borsh = { version = "1.5.1", features = ["derive", "unstable__schema"], optional = true }
+codama = "0.6.2"
+codama-macros = "0.6.2"
 num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
 serde_derive = { version = "1.0.210", optional = true }
@@ -31,6 +33,10 @@ solana-pubkey = { version = "3.0.0", default-features = false }
 solana-system-interface = "2.0.0"
 solana-sysvar = { version = "3.0.0", optional = true }
 solana-sysvar-id = { version = "3.0.0", optional = true }
+
+[build-dependencies]
+codama = "0.6.2"
+serde_json = "1.0"
 
 [dev-dependencies]
 anyhow = "1"

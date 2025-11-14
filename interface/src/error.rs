@@ -1,70 +1,88 @@
 use {
+    codama_macros::CodamaErrors,
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program_error::ProgramError,
 };
 
 /// Reasons the Stake might have had an error.
+#[derive(CodamaErrors, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(strum_macros::FromRepr, strum_macros::EnumIter))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StakeError {
     // 0
     /// Not enough credits to redeem.
+    #[codama(error(code = 0, message = "Not enough credits to redeem"))]
     NoCreditsToRedeem,
 
     /// Lockup has not yet expired.
+    #[codama(error(code = 1, message = "Lockup has not yet expired"))]
     LockupInForce,
 
     /// Stake already deactivated.
+    #[codama(error(code = 2, message = "Stake already deactivated"))]
     AlreadyDeactivated,
 
     /// One re-delegation permitted per epoch.
+    #[codama(error(code = 3, message = "One re-delegation permitted per epoch"))]
     TooSoonToRedelegate,
 
     /// Split amount is more than is staked.
+    #[codama(error(code = 4, message = "Split amount is more than is staked"))]
     InsufficientStake,
 
     // 5
     /// Stake account with transient stake cannot be merged.
+    #[codama(error(code = 5, message = "Stake account with transient stake cannot be merged"))]
     MergeTransientStake,
 
     /// Stake account merge failed due to different authority, lockups or state.
+    #[codama(error(code = 6, message = "Stake account merge failed due to different authority, lockups or state"))]
     MergeMismatch,
 
     /// Custodian address not present.
+    #[codama(error(code = 7, message = "Custodian address not present"))]
     CustodianMissing,
 
     /// Custodian signature not present.
+    #[codama(error(code = 8, message = "Custodian signature not present"))]
     CustodianSignatureMissing,
 
     /// Insufficient voting activity in the reference vote account.
+    #[codama(error(code = 9, message = "Insufficient voting activity in the reference vote account"))]
     InsufficientReferenceVotes,
 
     // 10
     /// Stake account is not delegated to the provided vote account.
+    #[codama(error(code = 10, message = "Stake account is not delegated to the provided vote account"))]
     VoteAddressMismatch,
 
     /// Stake account has not been delinquent for the minimum epochs required
     /// for deactivation.
+    #[codama(error(code = 11, message = "Stake account has not been delinquent for the minimum epochs required for deactivation"))]
     MinimumDelinquentEpochsForDeactivationNotMet,
 
     /// Delegation amount is less than the minimum.
+    #[codama(error(code = 12, message = "Delegation amount is less than the minimum"))]
     InsufficientDelegation,
 
     /// Stake account with transient or inactive stake cannot be redelegated.
+    #[codama(error(code = 13, message = "Stake account with transient or inactive stake cannot be redelegated"))]
     RedelegateTransientOrInactiveStake,
 
     /// Stake redelegation to the same vote account is not permitted.
+    #[codama(error(code = 14, message = "Stake redelegation to the same vote account is not permitted"))]
     RedelegateToSameVoteAccount,
 
     // 15
     /// Redelegated stake must be fully activated before deactivation.
+    #[codama(error(code = 15, message = "Redelegated stake must be fully activated before deactivation"))]
     RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
 
     /// Stake action is not permitted while the epoch rewards period is active.
+    #[codama(error(code = 16, message = "Stake action is not permitted while the epoch rewards period is active"))]
     EpochRewardsActive,
 }
 
