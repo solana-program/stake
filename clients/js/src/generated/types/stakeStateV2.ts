@@ -14,6 +14,8 @@ import {
   getStructEncoder,
   getTupleDecoder,
   getTupleEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getUnitDecoder,
   getUnitEncoder,
   type Codec,
@@ -50,51 +52,57 @@ export type StakeStateV2Args =
   | { __kind: 'RewardsPool' };
 
 export function getStakeStateV2Encoder(): Encoder<StakeStateV2Args> {
-  return getDiscriminatedUnionEncoder([
-    ['Uninitialized', getUnitEncoder()],
+  return getDiscriminatedUnionEncoder(
     [
-      'Initialized',
-      getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]]),
+      ['Uninitialized', getUnitEncoder()],
+      [
+        'Initialized',
+        getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]]),
+      ],
+      [
+        'Stake',
+        getStructEncoder([
+          [
+            'fields',
+            getTupleEncoder([
+              getMetaEncoder(),
+              getStakeEncoder(),
+              getStakeFlagsEncoder(),
+            ]),
+          ],
+        ]),
+      ],
+      ['RewardsPool', getUnitEncoder()],
     ],
-    [
-      'Stake',
-      getStructEncoder([
-        [
-          'fields',
-          getTupleEncoder([
-            getMetaEncoder(),
-            getStakeEncoder(),
-            getStakeFlagsEncoder(),
-          ]),
-        ],
-      ]),
-    ],
-    ['RewardsPool', getUnitEncoder()],
-  ]);
+    { size: getU32Encoder() }
+  );
 }
 
 export function getStakeStateV2Decoder(): Decoder<StakeStateV2> {
-  return getDiscriminatedUnionDecoder([
-    ['Uninitialized', getUnitDecoder()],
+  return getDiscriminatedUnionDecoder(
     [
-      'Initialized',
-      getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]]),
+      ['Uninitialized', getUnitDecoder()],
+      [
+        'Initialized',
+        getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]]),
+      ],
+      [
+        'Stake',
+        getStructDecoder([
+          [
+            'fields',
+            getTupleDecoder([
+              getMetaDecoder(),
+              getStakeDecoder(),
+              getStakeFlagsDecoder(),
+            ]),
+          ],
+        ]),
+      ],
+      ['RewardsPool', getUnitDecoder()],
     ],
-    [
-      'Stake',
-      getStructDecoder([
-        [
-          'fields',
-          getTupleDecoder([
-            getMetaDecoder(),
-            getStakeDecoder(),
-            getStakeFlagsDecoder(),
-          ]),
-        ],
-      ]),
-    ],
-    ['RewardsPool', getUnitDecoder()],
-  ]);
+    { size: getU32Decoder() }
+  );
 }
 
 export function getStakeStateV2Codec(): Codec<StakeStateV2Args, StakeStateV2> {

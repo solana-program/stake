@@ -89,6 +89,28 @@ codama.update(
         return { ...node, optionalAccountStrategy: 'omitted' };
       },
     },
+    {
+      // enum discriminator -> u32
+      select: '[definedTypeNode]stakeState.[enumTypeNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'enumTypeNode');
+        return {
+          ...node,
+          size: c.numberTypeNode('u32'),
+        };
+      },
+    },
+    {
+      // enum discriminator -> u32
+      select: '[definedTypeNode]stakeStateV2.[enumTypeNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'enumTypeNode');
+        return {
+          ...node,
+          size: c.numberTypeNode('u32'),
+        };
+      },
+    },
   ])
 );
 
