@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -35,7 +35,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MOVE_LAMPORTS_DISCRIMINATOR = 17;
 
 export function getMoveLamportsDiscriminatorBytes() {
-  return getU8Encoder().encode(MOVE_LAMPORTS_DISCRIMINATOR);
+  return getU32Encoder().encode(MOVE_LAMPORTS_DISCRIMINATOR);
 }
 
 export type MoveLamportsInstruction<
@@ -72,7 +72,7 @@ export type MoveLamportsInstructionDataArgs = { lamports: number | bigint };
 export function getMoveLamportsInstructionDataEncoder(): FixedSizeEncoder<MoveLamportsInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: MOVE_LAMPORTS_DISCRIMINATOR })
@@ -81,7 +81,7 @@ export function getMoveLamportsInstructionDataEncoder(): FixedSizeEncoder<MoveLa
 
 export function getMoveLamportsInstructionDataDecoder(): FixedSizeDecoder<MoveLamportsInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['lamports', getU64Decoder()],
   ]);
 }

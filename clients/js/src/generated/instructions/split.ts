@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -35,7 +35,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const SPLIT_DISCRIMINATOR = 3;
 
 export function getSplitDiscriminatorBytes() {
-  return getU8Encoder().encode(SPLIT_DISCRIMINATOR);
+  return getU32Encoder().encode(SPLIT_DISCRIMINATOR);
 }
 
 export type SplitInstruction<
@@ -69,7 +69,7 @@ export type SplitInstructionDataArgs = { lamports: number | bigint };
 export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: SPLIT_DISCRIMINATOR })
@@ -78,7 +78,7 @@ export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstruct
 
 export function getSplitInstructionDataDecoder(): FixedSizeDecoder<SplitInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['lamports', getU64Decoder()],
   ]);
 }

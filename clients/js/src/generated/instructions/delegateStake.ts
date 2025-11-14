@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -34,7 +34,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const DELEGATE_STAKE_DISCRIMINATOR = 2;
 
 export function getDelegateStakeDiscriminatorBytes() {
-  return getU8Encoder().encode(DELEGATE_STAKE_DISCRIMINATOR);
+  return getU32Encoder().encode(DELEGATE_STAKE_DISCRIMINATOR);
 }
 
 export type DelegateStakeInstruction<
@@ -79,13 +79,13 @@ export type DelegateStakeInstructionDataArgs = {};
 
 export function getDelegateStakeInstructionDataEncoder(): FixedSizeEncoder<DelegateStakeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: DELEGATE_STAKE_DISCRIMINATOR })
   );
 }
 
 export function getDelegateStakeInstructionDataDecoder(): FixedSizeDecoder<DelegateStakeInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getDelegateStakeInstructionDataCodec(): FixedSizeCodec<

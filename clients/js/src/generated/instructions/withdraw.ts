@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -36,7 +36,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const WITHDRAW_DISCRIMINATOR = 4;
 
 export function getWithdrawDiscriminatorBytes() {
-  return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR);
+  return getU32Encoder().encode(WITHDRAW_DISCRIMINATOR);
 }
 
 export type WithdrawInstruction<
@@ -93,7 +93,7 @@ export type WithdrawInstructionDataArgs = { lamports: number | bigint };
 export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: WITHDRAW_DISCRIMINATOR })
@@ -102,7 +102,7 @@ export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawIn
 
 export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<WithdrawInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['lamports', getU64Decoder()],
   ]);
 }

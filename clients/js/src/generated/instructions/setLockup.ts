@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -39,7 +39,7 @@ import {
 export const SET_LOCKUP_DISCRIMINATOR = 6;
 
 export function getSetLockupDiscriminatorBytes() {
-  return getU8Encoder().encode(SET_LOCKUP_DISCRIMINATOR);
+  return getU32Encoder().encode(SET_LOCKUP_DISCRIMINATOR);
 }
 
 export type SetLockupInstruction<
@@ -72,7 +72,7 @@ export type SetLockupInstructionDataArgs = { lockup: LockupParamsArgs };
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['lockup', getLockupParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
@@ -81,7 +81,7 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['lockup', getLockupParamsDecoder()],
   ]);
 }

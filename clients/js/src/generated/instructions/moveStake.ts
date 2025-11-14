@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -35,7 +35,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MOVE_STAKE_DISCRIMINATOR = 16;
 
 export function getMoveStakeDiscriminatorBytes() {
-  return getU8Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
+  return getU32Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
 }
 
 export type MoveStakeInstruction<
@@ -72,7 +72,7 @@ export type MoveStakeInstructionDataArgs = { lamports: number | bigint };
 export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStakeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: MOVE_STAKE_DISCRIMINATOR })
@@ -81,7 +81,7 @@ export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStake
 
 export function getMoveStakeInstructionDataDecoder(): FixedSizeDecoder<MoveStakeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['lamports', getU64Decoder()],
   ]);
 }

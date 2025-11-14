@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -40,7 +40,7 @@ import {
 export const AUTHORIZE_WITH_SEED_DISCRIMINATOR = 8;
 
 export function getAuthorizeWithSeedDiscriminatorBytes() {
-  return getU8Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
+  return getU32Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
 }
 
 export type AuthorizeWithSeedInstruction<
@@ -91,7 +91,7 @@ export type AuthorizeWithSeedInstructionDataArgs = {
 export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['args', getAuthorizeWithSeedParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_WITH_SEED_DISCRIMINATOR })
@@ -100,7 +100,7 @@ export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeW
 
 export function getAuthorizeWithSeedInstructionDataDecoder(): Decoder<AuthorizeWithSeedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['args', getAuthorizeWithSeedParamsDecoder()],
   ]);
 }

@@ -82,11 +82,19 @@ codama.update(
       },
     },
     {
-      // Use omitted optional account strategy for all instructions
+      // instruction: use omitted optional accounts + fix discriminator u8 -> u32
       select: '[instructionNode]',
       transform: (node) => {
         c.assertIsNode(node, 'instructionNode');
-        return { ...node, optionalAccountStrategy: 'omitted' };
+        return {
+          ...node,
+          optionalAccountStrategy: 'omitted',
+          arguments: node.arguments.map((arg) =>
+            arg.name === 'discriminator'
+              ? { ...arg, type: c.numberTypeNode('u32') }
+              : arg
+          ),
+        };
       },
     },
     {

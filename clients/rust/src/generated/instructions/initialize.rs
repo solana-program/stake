@@ -55,7 +55,7 @@ impl Initialize {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeInstructionData {
-    discriminator: u8,
+    discriminator: u32,
 }
 
 impl InitializeInstructionData {

@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -28,7 +28,7 @@ import { STAKE_PROGRAM_ADDRESS } from '../programs';
 export const REDELEGATE_DISCRIMINATOR = 15;
 
 export function getRedelegateDiscriminatorBytes() {
-  return getU8Encoder().encode(REDELEGATE_DISCRIMINATOR);
+  return getU32Encoder().encode(REDELEGATE_DISCRIMINATOR);
 }
 
 export type RedelegateInstruction<
@@ -44,13 +44,13 @@ export type RedelegateInstructionDataArgs = {};
 
 export function getRedelegateInstructionDataEncoder(): FixedSizeEncoder<RedelegateInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: REDELEGATE_DISCRIMINATOR })
   );
 }
 
 export function getRedelegateInstructionDataDecoder(): FixedSizeDecoder<RedelegateInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getRedelegateInstructionDataCodec(): FixedSizeCodec<

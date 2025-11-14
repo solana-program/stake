@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -40,7 +40,7 @@ import {
 export const AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR = 11;
 
 export function getAuthorizeCheckedWithSeedDiscriminatorBytes() {
-  return getU8Encoder().encode(AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR);
+  return getU32Encoder().encode(AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR);
 }
 
 export type AuthorizeCheckedWithSeedInstruction<
@@ -96,7 +96,7 @@ export type AuthorizeCheckedWithSeedInstructionDataArgs = {
 export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<AuthorizeCheckedWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['args', getAuthorizeCheckedWithSeedParamsEncoder()],
     ]),
     (value) => ({
@@ -108,7 +108,7 @@ export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<Aut
 
 export function getAuthorizeCheckedWithSeedInstructionDataDecoder(): Decoder<AuthorizeCheckedWithSeedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['args', getAuthorizeCheckedWithSeedParamsDecoder()],
   ]);
 }

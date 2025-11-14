@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -41,7 +41,7 @@ import {
 export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes() {
-  return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
+  return getU32Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 
 export type InitializeInstruction<
@@ -77,7 +77,7 @@ export type InitializeInstructionDataArgs = {
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU8Encoder()],
+      ['discriminator', getU32Encoder()],
       ['authorized', getAuthorizedEncoder()],
       ['lockup', getLockupEncoder()],
     ]),
@@ -87,7 +87,7 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU8Decoder()],
+    ['discriminator', getU32Decoder()],
     ['authorized', getAuthorizedDecoder()],
     ['lockup', getLockupDecoder()],
   ]);

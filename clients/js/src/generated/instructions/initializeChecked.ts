@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
+  getU32Decoder,
+  getU32Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -34,7 +34,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const INITIALIZE_CHECKED_DISCRIMINATOR = 9;
 
 export function getInitializeCheckedDiscriminatorBytes() {
-  return getU8Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
+  return getU32Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
 }
 
 export type InitializeCheckedInstruction<
@@ -71,13 +71,13 @@ export type InitializeCheckedInstructionDataArgs = {};
 
 export function getInitializeCheckedInstructionDataEncoder(): FixedSizeEncoder<InitializeCheckedInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU8Encoder()]]),
+    getStructEncoder([['discriminator', getU32Encoder()]]),
     (value) => ({ ...value, discriminator: INITIALIZE_CHECKED_DISCRIMINATOR })
   );
 }
 
 export function getInitializeCheckedInstructionDataDecoder(): FixedSizeDecoder<InitializeCheckedInstructionData> {
-  return getStructDecoder([['discriminator', getU8Decoder()]]);
+  return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getInitializeCheckedInstructionDataCodec(): FixedSizeCodec<
