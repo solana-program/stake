@@ -26,7 +26,6 @@ import {
   type ParsedMergeInstruction,
   type ParsedMoveLamportsInstruction,
   type ParsedMoveStakeInstruction,
-  type ParsedRedelegateInstruction,
   type ParsedSetLockupCheckedInstruction,
   type ParsedSetLockupInstruction,
   type ParsedSplitInstruction,
@@ -56,7 +55,6 @@ export enum StakeInstruction {
   SetLockupChecked,
   GetMinimumDelegation,
   DeactivateDelinquent,
-  Redelegate,
   MoveStake,
   MoveLamports,
 }
@@ -109,9 +107,6 @@ export function identifyStakeInstruction(
   }
   if (containsBytes(data, getU32Encoder().encode(14), 0)) {
     return StakeInstruction.DeactivateDelinquent;
-  }
-  if (containsBytes(data, getU32Encoder().encode(15), 0)) {
-    return StakeInstruction.Redelegate;
   }
   if (containsBytes(data, getU32Encoder().encode(16), 0)) {
     return StakeInstruction.MoveStake;
@@ -172,9 +167,6 @@ export type ParsedStakeInstruction<
   | ({
       instructionType: StakeInstruction.DeactivateDelinquent;
     } & ParsedDeactivateDelinquentInstruction<TProgram>)
-  | ({
-      instructionType: StakeInstruction.Redelegate;
-    } & ParsedRedelegateInstruction<TProgram>)
   | ({
       instructionType: StakeInstruction.MoveStake;
     } & ParsedMoveStakeInstruction<TProgram>)

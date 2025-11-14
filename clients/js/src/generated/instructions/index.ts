@@ -19,7 +19,6 @@ export * from './initializeChecked';
 export * from './merge';
 export * from './moveLamports';
 export * from './moveStake';
-export * from './redelegate';
 export * from './setLockup';
 export * from './setLockupChecked';
 export * from './split';

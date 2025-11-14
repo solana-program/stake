@@ -18,6 +18,13 @@ codama.update(
   })
 );
 
+// Delete deprecated/disabled instructions
+codama.update(
+  c.updateInstructionsVisitor({
+    redelegate: { delete: true },
+  })
+);
+
 // Rename instruction argument types to avoid collisions with encoder arg types
 codama.update(
   c.updateDefinedTypesVisitor({
