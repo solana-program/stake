@@ -30,10 +30,10 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getLockupCheckedArgsDecoder,
-  getLockupCheckedArgsEncoder,
-  type LockupCheckedArgs,
-  type LockupCheckedArgsArgs,
+  getLockupCheckedParamsDecoder,
+  getLockupCheckedParamsEncoder,
+  type LockupCheckedParams,
+  type LockupCheckedParamsArgs,
 } from '../types';
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
@@ -76,18 +76,18 @@ export type SetLockupCheckedInstruction<
 
 export type SetLockupCheckedInstructionData = {
   discriminator: number;
-  lockup: LockupCheckedArgs;
+  lockup: LockupCheckedParams;
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  lockup: LockupCheckedArgsArgs;
+  lockup: LockupCheckedParamsArgs;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
-      ['lockup', getLockupCheckedArgsEncoder()],
+      ['lockup', getLockupCheckedParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_CHECKED_DISCRIMINATOR })
   );
@@ -96,7 +96,7 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
-    ['lockup', getLockupCheckedArgsDecoder()],
+    ['lockup', getLockupCheckedParamsDecoder()],
   ]);
 }
 

@@ -13,7 +13,12 @@ use {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct AuthorizeCheckedWithSeedArgs {
+pub struct AuthorizeWithSeedParams {
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
+    pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
     pub authority_seed: String,
     #[cfg_attr(

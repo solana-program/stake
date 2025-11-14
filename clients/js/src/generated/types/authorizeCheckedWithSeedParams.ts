@@ -30,44 +30,40 @@ import {
   type StakeAuthorizeArgs,
 } from '.';
 
-export type AuthorizeWithSeedArgs = {
-  newAuthorizedPubkey: Address;
+export type AuthorizeCheckedWithSeedParams = {
   stakeAuthorize: StakeAuthorize;
   authoritySeed: string;
   authorityOwner: Address;
 };
 
-export type AuthorizeWithSeedArgsArgs = {
-  newAuthorizedPubkey: Address;
+export type AuthorizeCheckedWithSeedParamsArgs = {
   stakeAuthorize: StakeAuthorizeArgs;
   authoritySeed: string;
   authorityOwner: Address;
 };
 
-export function getAuthorizeWithSeedArgsEncoder(): Encoder<AuthorizeWithSeedArgsArgs> {
+export function getAuthorizeCheckedWithSeedParamsEncoder(): Encoder<AuthorizeCheckedWithSeedParamsArgs> {
   return getStructEncoder([
-    ['newAuthorizedPubkey', getAddressEncoder()],
     ['stakeAuthorize', getStakeAuthorizeEncoder()],
     ['authoritySeed', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
     ['authorityOwner', getAddressEncoder()],
   ]);
 }
 
-export function getAuthorizeWithSeedArgsDecoder(): Decoder<AuthorizeWithSeedArgs> {
+export function getAuthorizeCheckedWithSeedParamsDecoder(): Decoder<AuthorizeCheckedWithSeedParams> {
   return getStructDecoder([
-    ['newAuthorizedPubkey', getAddressDecoder()],
     ['stakeAuthorize', getStakeAuthorizeDecoder()],
     ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ['authorityOwner', getAddressDecoder()],
   ]);
 }
 
-export function getAuthorizeWithSeedArgsCodec(): Codec<
-  AuthorizeWithSeedArgsArgs,
-  AuthorizeWithSeedArgs
+export function getAuthorizeCheckedWithSeedParamsCodec(): Codec<
+  AuthorizeCheckedWithSeedParamsArgs,
+  AuthorizeCheckedWithSeedParams
 > {
   return combineCodec(
-    getAuthorizeWithSeedArgsEncoder(),
-    getAuthorizeWithSeedArgsDecoder()
+    getAuthorizeCheckedWithSeedParamsEncoder(),
+    getAuthorizeCheckedWithSeedParamsDecoder()
   );
 }

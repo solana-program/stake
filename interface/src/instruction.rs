@@ -355,6 +355,7 @@ pub enum StakeInstruction {
 }
 
 #[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[codama(name = "lockupParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -366,6 +367,7 @@ pub struct LockupArgs {
 }
 
 #[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[codama(name = "lockupCheckedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -376,6 +378,7 @@ pub struct LockupCheckedArgs {
 }
 
 #[derive(CodamaType, Debug, PartialEq, Eq, Clone)]
+#[codama(name = "authorizeWithSeedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -388,6 +391,7 @@ pub struct AuthorizeWithSeedArgs {
 }
 
 #[derive(CodamaType, Debug, PartialEq, Eq, Clone)]
+#[codama(name = "authorizeCheckedWithSeedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)

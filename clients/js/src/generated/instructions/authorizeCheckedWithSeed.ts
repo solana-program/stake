@@ -31,10 +31,10 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getAuthorizeCheckedWithSeedArgsDecoder,
-  getAuthorizeCheckedWithSeedArgsEncoder,
-  type AuthorizeCheckedWithSeedArgs,
-  type AuthorizeCheckedWithSeedArgsArgs,
+  getAuthorizeCheckedWithSeedParamsDecoder,
+  getAuthorizeCheckedWithSeedParamsEncoder,
+  type AuthorizeCheckedWithSeedParams,
+  type AuthorizeCheckedWithSeedParamsArgs,
 } from '../types';
 
 export const AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR = 11;
@@ -86,18 +86,18 @@ export type AuthorizeCheckedWithSeedInstruction<
 
 export type AuthorizeCheckedWithSeedInstructionData = {
   discriminator: number;
-  args: AuthorizeCheckedWithSeedArgs;
+  args: AuthorizeCheckedWithSeedParams;
 };
 
 export type AuthorizeCheckedWithSeedInstructionDataArgs = {
-  args: AuthorizeCheckedWithSeedArgsArgs;
+  args: AuthorizeCheckedWithSeedParamsArgs;
 };
 
 export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<AuthorizeCheckedWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
-      ['args', getAuthorizeCheckedWithSeedArgsEncoder()],
+      ['args', getAuthorizeCheckedWithSeedParamsEncoder()],
     ]),
     (value) => ({
       ...value,
@@ -109,7 +109,7 @@ export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<Aut
 export function getAuthorizeCheckedWithSeedInstructionDataDecoder(): Decoder<AuthorizeCheckedWithSeedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
-    ['args', getAuthorizeCheckedWithSeedArgsDecoder()],
+    ['args', getAuthorizeCheckedWithSeedParamsDecoder()],
   ]);
 }
 

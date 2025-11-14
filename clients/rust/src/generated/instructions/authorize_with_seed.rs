@@ -6,7 +6,7 @@
 //!
 
 use {
-    crate::generated::types::AuthorizeWithSeedArgs,
+    crate::generated::types::AuthorizeWithSeedParams,
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
@@ -87,7 +87,7 @@ impl Default for AuthorizeWithSeedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeWithSeedInstructionArgs {
-    pub args: AuthorizeWithSeedArgs,
+    pub args: AuthorizeWithSeedParams,
 }
 
 /// Instruction builder for `AuthorizeWithSeed`.
@@ -104,7 +104,7 @@ pub struct AuthorizeWithSeedBuilder {
     authority_base: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    args: Option<AuthorizeWithSeedArgs>,
+    args: Option<AuthorizeWithSeedParams>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -137,7 +137,7 @@ impl AuthorizeWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeWithSeedArgs) -> &mut Self {
+    pub fn args(&mut self, args: AuthorizeWithSeedParams) -> &mut Self {
         self.args = Some(args);
         self
     }
@@ -362,7 +362,7 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeWithSeedArgs) -> &mut Self {
+    pub fn args(&mut self, args: AuthorizeWithSeedParams) -> &mut Self {
         self.instruction.args = Some(args);
         self
     }
@@ -442,7 +442,7 @@ struct AuthorizeWithSeedCpiBuilderInstruction<'a, 'b> {
     authority_base: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    args: Option<AuthorizeWithSeedArgs>,
+    args: Option<AuthorizeWithSeedParams>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

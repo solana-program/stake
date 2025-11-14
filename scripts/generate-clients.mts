@@ -18,6 +18,16 @@ codama.update(
   })
 );
 
+// Rename instruction argument types to avoid collisions with encoder arg types
+codama.update(
+  c.updateDefinedTypesVisitor({
+    lockupArgs: { name: 'lockupParams' },
+    lockupCheckedArgs: { name: 'lockupCheckedParams' },
+    authorizeWithSeedArgs: { name: 'authorizeWithSeedParams' },
+    authorizeCheckedWithSeedArgs: { name: 'authorizeCheckedWithSeedParams' },
+  })
+);
+
 // Add type aliases for semantic external types
 codama.update(
   c.bottomUpTransformerVisitor([

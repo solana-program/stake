@@ -8,10 +8,13 @@
 
 import {
   combineCodec,
+  getAddressDecoder,
+  getAddressEncoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
+  type Address,
   type Codec,
   type Decoder,
   type Encoder,
@@ -29,36 +32,34 @@ import {
   type UnixTimestampArgs,
 } from '.';
 
-export type LockupCheckedArgs = {
+export type LockupParams = {
   unixTimestamp: Option<UnixTimestamp>;
   epoch: Option<Epoch>;
+  custodian: Option<Address>;
 };
 
-export type LockupCheckedArgsArgs = {
+export type LockupParamsArgs = {
   unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
   epoch: OptionOrNullable<EpochArgs>;
+  custodian: OptionOrNullable<Address>;
 };
 
-export function getLockupCheckedArgsEncoder(): Encoder<LockupCheckedArgsArgs> {
+export function getLockupParamsEncoder(): Encoder<LockupParamsArgs> {
   return getStructEncoder([
     ['unixTimestamp', getOptionEncoder(getUnixTimestampEncoder())],
     ['epoch', getOptionEncoder(getEpochEncoder())],
+    ['custodian', getOptionEncoder(getAddressEncoder())],
   ]);
 }
 
-export function getLockupCheckedArgsDecoder(): Decoder<LockupCheckedArgs> {
+export function getLockupParamsDecoder(): Decoder<LockupParams> {
   return getStructDecoder([
     ['unixTimestamp', getOptionDecoder(getUnixTimestampDecoder())],
     ['epoch', getOptionDecoder(getEpochDecoder())],
+    ['custodian', getOptionDecoder(getAddressDecoder())],
   ]);
 }
 
-export function getLockupCheckedArgsCodec(): Codec<
-  LockupCheckedArgsArgs,
-  LockupCheckedArgs
-> {
-  return combineCodec(
-    getLockupCheckedArgsEncoder(),
-    getLockupCheckedArgsDecoder()
-  );
+export function getLockupParamsCodec(): Codec<LockupParamsArgs, LockupParams> {
+  return combineCodec(getLockupParamsEncoder(), getLockupParamsDecoder());
 }

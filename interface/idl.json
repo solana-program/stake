@@ -6,7 +6,7 @@
     "definedTypes": [
       {
         "kind": "definedTypeNode",
-        "name": "lockupArgs",
+        "name": "lockupParams",
         "type": {
           "fields": [
             {
@@ -62,7 +62,7 @@
       },
       {
         "kind": "definedTypeNode",
-        "name": "lockupCheckedArgs",
+        "name": "lockupCheckedParams",
         "type": {
           "fields": [
             {
@@ -103,7 +103,7 @@
       },
       {
         "kind": "definedTypeNode",
-        "name": "authorizeWithSeedArgs",
+        "name": "authorizeWithSeedParams",
         "type": {
           "fields": [
             {
@@ -150,7 +150,7 @@
       },
       {
         "kind": "definedTypeNode",
-        "name": "authorizeCheckedWithSeedArgs",
+        "name": "authorizeCheckedWithSeedParams",
         "type": {
           "fields": [
             {

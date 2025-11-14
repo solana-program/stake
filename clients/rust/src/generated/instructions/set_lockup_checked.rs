@@ -6,7 +6,7 @@
 //!
 
 use {
-    crate::generated::types::LockupCheckedArgs,
+    crate::generated::types::LockupCheckedParams,
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
@@ -81,7 +81,7 @@ impl Default for SetLockupCheckedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionArgs {
-    pub lockup: LockupCheckedArgs,
+    pub lockup: LockupCheckedParams,
 }
 
 /// Instruction builder for `SetLockupChecked`.
@@ -96,7 +96,7 @@ pub struct SetLockupCheckedBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     authority: Option<solana_program::pubkey::Pubkey>,
     new_lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    lockup: Option<LockupCheckedArgs>,
+    lockup: Option<LockupCheckedParams>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -124,7 +124,7 @@ impl SetLockupCheckedBuilder {
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: LockupCheckedArgs) -> &mut Self {
+    pub fn lockup(&mut self, lockup: LockupCheckedParams) -> &mut Self {
         self.lockup = Some(lockup);
         self
     }
@@ -328,7 +328,7 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: LockupCheckedArgs) -> &mut Self {
+    pub fn lockup(&mut self, lockup: LockupCheckedParams) -> &mut Self {
         self.instruction.lockup = Some(lockup);
         self
     }
@@ -399,7 +399,7 @@ struct SetLockupCheckedCpiBuilderInstruction<'a, 'b> {
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     new_lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    lockup: Option<LockupCheckedArgs>,
+    lockup: Option<LockupCheckedParams>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

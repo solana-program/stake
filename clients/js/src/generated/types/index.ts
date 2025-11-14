@@ -6,14 +6,14 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './authorizeCheckedWithSeedArgs';
+export * from './authorizeCheckedWithSeedParams';
 export * from './authorized';
-export * from './authorizeWithSeedArgs';
+export * from './authorizeWithSeedParams';
 export * from './delegation';
 export * from './epoch';
 export * from './lockup';
-export * from './lockupArgs';
-export * from './lockupCheckedArgs';
+export * from './lockupCheckedParams';
+export * from './lockupParams';
 export * from './meta';
 export * from './stake';
 export * from './stakeAuthorize';

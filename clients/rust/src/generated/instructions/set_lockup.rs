@@ -6,7 +6,7 @@
 //!
 
 use {
-    crate::generated::types::LockupArgs,
+    crate::generated::types::LockupParams,
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
@@ -73,7 +73,7 @@ impl Default for SetLockupInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupInstructionArgs {
-    pub lockup: LockupArgs,
+    pub lockup: LockupParams,
 }
 
 /// Instruction builder for `SetLockup`.
@@ -86,7 +86,7 @@ pub struct SetLockupInstructionArgs {
 pub struct SetLockupBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     authority: Option<solana_program::pubkey::Pubkey>,
-    lockup: Option<LockupArgs>,
+    lockup: Option<LockupParams>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -105,7 +105,7 @@ impl SetLockupBuilder {
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: LockupArgs) -> &mut Self {
+    pub fn lockup(&mut self, lockup: LockupParams) -> &mut Self {
         self.lockup = Some(lockup);
         self
     }
@@ -283,7 +283,7 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: LockupArgs) -> &mut Self {
+    pub fn lockup(&mut self, lockup: LockupParams) -> &mut Self {
         self.instruction.lockup = Some(lockup);
         self
     }
@@ -351,7 +351,7 @@ struct SetLockupCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    lockup: Option<LockupArgs>,
+    lockup: Option<LockupParams>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

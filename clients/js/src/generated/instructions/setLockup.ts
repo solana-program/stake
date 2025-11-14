@@ -30,10 +30,10 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getLockupArgsDecoder,
-  getLockupArgsEncoder,
-  type LockupArgs,
-  type LockupArgsArgs,
+  getLockupParamsDecoder,
+  getLockupParamsEncoder,
+  type LockupParams,
+  type LockupParamsArgs,
 } from '../types';
 
 export const SET_LOCKUP_DISCRIMINATOR = 6;
@@ -64,16 +64,16 @@ export type SetLockupInstruction<
 
 export type SetLockupInstructionData = {
   discriminator: number;
-  lockup: LockupArgs;
+  lockup: LockupParams;
 };
 
-export type SetLockupInstructionDataArgs = { lockup: LockupArgsArgs };
+export type SetLockupInstructionDataArgs = { lockup: LockupParamsArgs };
 
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU8Encoder()],
-      ['lockup', getLockupArgsEncoder()],
+      ['lockup', getLockupParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
   );
@@ -82,7 +82,7 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
     ['discriminator', getU8Decoder()],
-    ['lockup', getLockupArgsDecoder()],
+    ['lockup', getLockupParamsDecoder()],
   ]);
 }
 

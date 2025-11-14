@@ -6,7 +6,7 @@
 //!
 
 use {
-    crate::generated::types::AuthorizeCheckedWithSeedArgs,
+    crate::generated::types::AuthorizeCheckedWithSeedParams,
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
@@ -93,7 +93,7 @@ impl Default for AuthorizeCheckedWithSeedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeCheckedWithSeedInstructionArgs {
-    pub args: AuthorizeCheckedWithSeedArgs,
+    pub args: AuthorizeCheckedWithSeedParams,
 }
 
 /// Instruction builder for `AuthorizeCheckedWithSeed`.
@@ -112,7 +112,7 @@ pub struct AuthorizeCheckedWithSeedBuilder {
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     new_authority: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    args: Option<AuthorizeCheckedWithSeedArgs>,
+    args: Option<AuthorizeCheckedWithSeedParams>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -150,7 +150,7 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeCheckedWithSeedArgs) -> &mut Self {
+    pub fn args(&mut self, args: AuthorizeCheckedWithSeedParams) -> &mut Self {
         self.args = Some(args);
         self
     }
@@ -396,7 +396,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeCheckedWithSeedArgs) -> &mut Self {
+    pub fn args(&mut self, args: AuthorizeCheckedWithSeedParams) -> &mut Self {
         self.instruction.args = Some(args);
         self
     }
@@ -482,7 +482,7 @@ struct AuthorizeCheckedWithSeedCpiBuilderInstruction<'a, 'b> {
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    args: Option<AuthorizeCheckedWithSeedArgs>,
+    args: Option<AuthorizeCheckedWithSeedParams>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,
