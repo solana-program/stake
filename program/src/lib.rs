@@ -3,7 +3,6 @@ use solana_native_token::LAMPORTS_PER_SOL;
 pub mod helpers;
 pub mod processor;
 
-#[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint;
 
 solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");

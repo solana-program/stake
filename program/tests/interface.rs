@@ -22,6 +22,7 @@ use {
         },
     },
     solana_stake_program::{get_minimum_delegation, id},
+    solana_svm_log_collector::LogCollector,
     solana_sysvar_id::SysvarId,
     solana_vote_interface::{
         program as vote_program,
@@ -50,8 +51,7 @@ use {
 
 // NOTE ideas for future tests:
 // * fail with different vote accounts on operations that require them to match
-// * fail with different authorities on operations that require them to match
-// * adding/changing lockups to ensure we always fail when violating lockup
+// * fail with different authorities/lockups on operations that require metas to match
 
 // arbitrary, gives us room to set up activations/deactivations
 const EXECUTION_EPOCH: u64 = 8;
@@ -60,11 +60,15 @@ const EXECUTION_EPOCH: u64 = 8;
 const PAYER: Pubkey = Pubkey::from_str_const("PAYER11111111111111111111111111111111111111");
 const PAYER_BALANCE: u64 = 1_000_000 * LAMPORTS_PER_SOL;
 
-// two vote accounts with no credits, fine for all stake tests except DeactivateDelinquent
+// two vote accounts with no credits
 const VOTE_ACCOUNT_RED: Pubkey =
     Pubkey::from_str_const("RED1111111111111111111111111111111111111111");
 const VOTE_ACCOUNT_BLUE: Pubkey =
     Pubkey::from_str_const("BLUE111111111111111111111111111111111111111");
+
+// reference vote account for DeactivateDelinquent
+const VOTE_ACCOUNT_GOLD: Pubkey =
+    Pubkey::from_str_const("GXLD111111111111111111111111111111111111111");
 
 // two blank stake accounts that can be serialized into for tests
 const STAKE_ACCOUNT_BLACK: Pubkey =
@@ -162,7 +166,7 @@ impl Env {
             Account::new_rent_epoch(PAYER_BALANCE, 0, &system_program::id(), u64::MAX);
         base_accounts.insert(PAYER, payer_account);
 
-        // create two vote accounts
+        // create two blank vote accounts
         let vote_rent_exemption = Rent::default().minimum_balance(VoteStateV4::size_of());
         let vote_state_versions = VoteStateVersions::new_v4(VoteStateV4::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
@@ -175,6 +179,24 @@ impl Env {
         );
         base_accounts.insert(VOTE_ACCOUNT_RED, vote_account.clone());
         base_accounts.insert(VOTE_ACCOUNT_BLUE, vote_account);
+
+        // create a reference vote account
+        let mut reference_vote_state = VoteStateV4::default();
+        for epoch in 0..=EXECUTION_EPOCH {
+            reference_vote_state
+                .epoch_credits
+                .push((epoch, epoch, epoch.saturating_sub(1)));
+        }
+        let vote_state_versions = VoteStateVersions::new_v4(reference_vote_state);
+        let vote_data = bincode::serialize(&vote_state_versions).unwrap();
+        let vote_account = Account::create(
+            vote_rent_exemption,
+            vote_data,
+            vote_program::id(),
+            false,
+            u64::MAX,
+        );
+        base_accounts.insert(VOTE_ACCOUNT_GOLD, vote_account);
 
         // create two blank stake accounts
         let stake_account = Account::create(
@@ -277,8 +299,6 @@ impl Env {
 // NOTE we skip:
 // * redelegate: will never be enabled
 // * minimum delegation: cannot fail in any nontrivial way
-// * deactivate delinquent: requires no signers, and our only failure test is missing signers
-// the first two need never be added but the third should be when we have more tests
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Arbitrary)]
 enum StakeInterface {
     Initialize {
@@ -328,6 +348,9 @@ enum StakeInterface {
     Deactivate {
         lockup_state: LockupState,
     },
+    DeactivateDelinquent {
+        lockup_state: LockupState,
+    },
 }
 
 impl StakeInterface {
@@ -335,6 +358,32 @@ impl StakeInterface {
     // we substantially overshoot to avoid mistakes
     fn max_size() -> usize {
         128
+    }
+
+    // state of any existing lockup on the stake accounts
+    fn lockup_state(self) -> LockupState {
+        match self {
+            Self::Initialize { .. }
+            | Self::InitializeChecked
+            | Self::Withdraw {
+                source_status: WithdrawStatus::Uninitialized,
+                ..
+            } => LockupState::None,
+            Self::Authorize { lockup_state, .. }
+            | Self::AuthorizeWithSeed { lockup_state, .. }
+            | Self::SetLockup {
+                existing_lockup_state: lockup_state,
+                ..
+            }
+            | Self::DelegateStake { lockup_state, .. }
+            | Self::Split { lockup_state, .. }
+            | Self::Merge { lockup_state, .. }
+            | Self::MoveStake { lockup_state, .. }
+            | Self::MoveLamports { lockup_state, .. }
+            | Self::Withdraw { lockup_state, .. }
+            | Self::Deactivate { lockup_state, .. }
+            | Self::DeactivateDelinquent { lockup_state, .. } => lockup_state,
+        }
     }
 
     // creates an instruction with the given combination of settings that is guaranteed to succeed
@@ -699,6 +748,26 @@ impl StakeInterface {
 
                 instruction::deactivate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK)
             }
+            Self::DeactivateDelinquent { lockup_state } => {
+                env.update_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &fully_configurable_stake(
+                        VOTE_ACCOUNT_RED,
+                        STAKE_ACCOUNT_BLACK,
+                        minimum_delegation,
+                        StakeStatus::Active,
+                        false,
+                        lockup_state.to_lockup(CUSTODIAN_LEFT),
+                    ),
+                    minimum_delegation,
+                );
+
+                instruction::deactivate_delinquent_stake(
+                    &STAKE_ACCOUNT_BLACK,
+                    &VOTE_ACCOUNT_RED,
+                    &VOTE_ACCOUNT_GOLD,
+                )
+            }
         }
     }
 }
@@ -932,6 +1001,68 @@ fn test_no_signer_bypass() {
     }
 }
 
+// operations that require a custodian fail without it
+#[test]
+fn test_no_custodian_bypass() {
+    let mut env = Env::init();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        // skip if no lockup
+        if declaration.lockup_state() != LockupState::Active {
+            continue;
+        }
+
+        // changing staker does not require custodian
+        match declaration {
+            StakeInterface::Authorize {
+                authority_type: AuthorityType::Staker,
+                ..
+            }
+            | StakeInterface::AuthorizeWithSeed {
+                authority_type: AuthorityType::Staker,
+                ..
+            } => {
+                continue;
+            }
+            _ => (),
+        }
+
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        // skip if successful instruction requires no custodian
+        if !instruction
+            .accounts
+            .iter()
+            .any(|account| account.pubkey == CUSTODIAN_LEFT)
+        {
+            continue;
+        }
+
+        // remove the custodian
+        // active custodian is always Left. we only use Right as a new lockup target
+        // the only instruction that takes Right as account data is SetLockupChecked
+        // and we must remove it too because it comes after Left in the accounts list
+        instruction.accounts.retain(|account| {
+            account.pubkey != CUSTODIAN_LEFT && account.pubkey != CUSTODIAN_RIGHT
+        });
+
+        env.process_fail(&instruction);
+        env.reset();
+
+        let mut instruction = declaration.to_instruction(&mut env);
+
+        // change to the wrong custodian
+        instruction.accounts.iter_mut().for_each(|account| {
+            if account.pubkey == CUSTODIAN_LEFT {
+                account.pubkey = CUSTODIAN_RIGHT
+            }
+        });
+
+        env.process_fail(&instruction);
+        env.reset();
+    }
+}
+
 // the stake program cannot be used during the epoch rewards period
 // the only exception to this is GetMinimumDelegation
 #[test]
@@ -991,5 +1122,91 @@ fn test_no_use_dealloc() {
                 env.reset();
             }
         }
+    }
+}
+
+// this prints ballpark compute unit costs suitable for insertion in README.md
+// run with `cargo test --test interface show_compute_usage -- --nocapture --ignored`
+#[test]
+#[ignore]
+fn show_compute_usage() {
+    let mut env = Env::init();
+    solana_logger::setup_with("");
+    env.mollusk.logger = Some(LogCollector::new_ref());
+    let mut compute_tracker = ComputeTracker::new();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
+        env.process_success(&instruction);
+
+        let logs = env
+            .mollusk
+            .logger
+            .as_ref()
+            .unwrap()
+            .replace(LogCollector::default())
+            .into_messages();
+
+        compute_tracker.add(&logs);
+        env.reset();
+    }
+
+    compute_tracker.show();
+}
+
+struct ComputeTracker(HashMap<String, u64>);
+impl ComputeTracker {
+    fn new() -> Self {
+        Self(HashMap::from([("GetMinimumDelegation".to_string(), 0)]))
+    }
+
+    fn add(&mut self, logs: &[String]) {
+        const IX_PREFIX: &str = "Program log: Instruction: ";
+        const CU_PREFIX: &str = "Program Stake11111111111111111111111111111111111111 consumed ";
+
+        let instruction = logs
+            .iter()
+            .find_map(|line| {
+                line.strip_prefix(IX_PREFIX)
+                    .map(|rest| rest.split_whitespace().next().unwrap().to_string())
+            })
+            .unwrap();
+
+        let compute_units = logs
+            .iter()
+            .find_map(|line| {
+                line.strip_prefix(CU_PREFIX).map(|rest| {
+                    rest.split_whitespace()
+                        .next()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+            })
+            .unwrap();
+
+        self.0
+            .entry(instruction)
+            .and_modify(|v| *v = std::cmp::max(compute_units, *v))
+            .or_insert(compute_units);
+    }
+
+    fn show(&self) {
+        let mut instructions = self.0.keys().collect::<Vec<_>>();
+        instructions.sort();
+
+        println!("\n| Instruction | Estimated Cost |");
+        println!("| --- | --- |");
+
+        for instruction in instructions.into_iter() {
+            let compute_units = match self.0[instruction] {
+                n if n < 100 => "(negligible)".to_string(),
+                n => ((n + 50) / 100 * 100).to_string(),
+            };
+
+            println!("| `{}` | {} |", instruction, compute_units);
+        }
+
+        println!();
     }
 }
