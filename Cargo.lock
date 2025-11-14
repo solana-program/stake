@@ -7208,6 +7208,7 @@ dependencies = [
  "solana-signature",
  "solana-signer",
  "solana-stake-interface 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-svm-log-collector",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.0.0",
  "solana-sysvar-id 3.0.0",

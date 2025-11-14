@@ -54,24 +54,24 @@ Previously, the Stake Program was essentially free, costing 1500 Compute Units i
 
 For the initial 1.0.0 release, we followed the existing Agave code as closely as possible, to minimize the possibility of introducing any bugs or changing any behaviors in the port because of the total rewrite of the calling interface the port necessitated. This means the existing program is expected to be non-optimal. With the ability to test more thoroughly against this 1.0.0 version, we expect to be able to optimize these costs in the future.
 
-Based on the sample invocations in `program/tests/interface.rs`, approximate costs as of 2025-07-28 are as follows. These should be treated as baselines and are rounded to thousands; instructions may do less or more work depending on arguments and account states.
+Based on the sample invocations in `program/tests/interface.rs`, approximate costs as of 2025-11-14 are as follows. These should be treated as baselines and are rounded to hundreds; instructions may do less or more work depending on arguments and account states.
 
 | Instruction | Estimated Cost |
 | --- | --- |
-| `Initialize` | 9000 |
-| `Authorize` | 12000 |
-| `DelegateStake` | 15000 |
-| `Split` | 20000 |
-| `Withdraw` | 8000 |
-| `Deactivate` | 13000 |
-| `SetLockup` | 11000 |
-| `Merge` | 21000 |
-| `AuthorizeWithSeed` | 14000 |
-| `InitializeChecked` | 6000 |
-| `AuthorizeChecked` | 12000 |
-| `AuthorizeCheckedWithSeed` | 14000 |
-| `SetLockupChecked` | 11000 |
+| `Authorize` | 10500 |
+| `AuthorizeChecked` | 10200 |
+| `AuthorizeCheckedWithSeed` | 11500 |
+| `AuthorizeWithSeed` | 11700 |
+| `Deactivate` | 10600 |
+| `DeactivateDelinquent` | 11400 |
+| `DelegateStake` | 10800 |
 | `GetMinimumDelegation` | (negligible) |
-| `DeactivateDelinquent` | 18000 |
-| `MoveStake` | 25000 |
-| `MoveLamports` | 15000 |
+| `Initialize` | 7500 |
+| `InitializeChecked` | 5200 |
+| `Merge` | 17600 |
+| `MoveLamports` | 12500 |
+| `MoveStake` | 21700 |
+| `SetLockup` | 9300 |
+| `SetLockupChecked` | 9100 |
+| `Split` | 16900 |
+| `Withdraw` | 7300 |
