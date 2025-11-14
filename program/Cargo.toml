@@ -42,7 +42,7 @@ solana-sdk-ids = "3.0.0"
 solana-signature = "3.0.0"
 solana-signer = "3.0.0"
 solana-svm-log-collector = "3.0.0"
-solana-system-interface = { version = "2.0.0", features = ["bincode"] }
+solana-system-interface = { version = "3.0.0", features = ["bincode"] }
 solana-sysvar-id = "3.0.0"
 solana-transaction = "3.0.0"
 test-case = "3.3.1"
