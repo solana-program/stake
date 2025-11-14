@@ -1125,7 +1125,7 @@ fn test_no_use_dealloc() {
     }
 }
 
-// this prints ballpack compute unit costs suitable for insertion in README.md
+// this prints ballpark compute unit costs suitable for insertion in README.md
 // run with `cargo test --test interface show_compute_usage -- --nocapture --ignored`
 #[test]
 #[ignore]
