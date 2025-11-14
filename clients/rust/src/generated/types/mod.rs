@@ -5,17 +5,25 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
+pub(crate) mod r#authorize_checked_with_seed_args;
+pub(crate) mod r#authorize_with_seed_args;
 pub(crate) mod r#authorized;
 pub(crate) mod r#delegation;
+pub(crate) mod r#epoch;
 pub(crate) mod r#lockup;
+pub(crate) mod r#lockup_args;
+pub(crate) mod r#lockup_checked_args;
 pub(crate) mod r#meta;
 pub(crate) mod r#stake;
 pub(crate) mod r#stake_authorize;
 pub(crate) mod r#stake_flags;
 pub(crate) mod r#stake_state;
 pub(crate) mod r#stake_state_v2;
+pub(crate) mod r#unix_timestamp;
 
 pub use self::{
-    r#authorized::*, r#delegation::*, r#lockup::*, r#meta::*, r#stake::*, r#stake_authorize::*,
-    r#stake_flags::*, r#stake_state::*, r#stake_state_v2::*,
+    r#authorize_checked_with_seed_args::*, r#authorize_with_seed_args::*, r#authorized::*,
+    r#delegation::*, r#epoch::*, r#lockup::*, r#lockup_args::*, r#lockup_checked_args::*,
+    r#meta::*, r#stake::*, r#stake_authorize::*, r#stake_flags::*, r#stake_state::*,
+    r#stake_state_v2::*, r#unix_timestamp::*,
 };

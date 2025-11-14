@@ -14,8 +14,6 @@ import {
   getStructEncoder,
   getTupleDecoder,
   getTupleEncoder,
-  getU32Decoder,
-  getU32Encoder,
   getUnitDecoder,
   getUnitEncoder,
   type Codec,
@@ -48,43 +46,37 @@ export type StakeStateArgs =
   | { __kind: 'RewardsPool' };
 
 export function getStakeStateEncoder(): Encoder<StakeStateArgs> {
-  return getDiscriminatedUnionEncoder(
+  return getDiscriminatedUnionEncoder([
+    ['Uninitialized', getUnitEncoder()],
     [
-      ['Uninitialized', getUnitEncoder()],
-      [
-        'Initialized',
-        getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]]),
-      ],
-      [
-        'Stake',
-        getStructEncoder([
-          ['fields', getTupleEncoder([getMetaEncoder(), getStakeEncoder()])],
-        ]),
-      ],
-      ['RewardsPool', getUnitEncoder()],
+      'Initialized',
+      getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]]),
     ],
-    { size: getU32Encoder() }
-  );
+    [
+      'Stake',
+      getStructEncoder([
+        ['fields', getTupleEncoder([getMetaEncoder(), getStakeEncoder()])],
+      ]),
+    ],
+    ['RewardsPool', getUnitEncoder()],
+  ]);
 }
 
 export function getStakeStateDecoder(): Decoder<StakeState> {
-  return getDiscriminatedUnionDecoder(
+  return getDiscriminatedUnionDecoder([
+    ['Uninitialized', getUnitDecoder()],
     [
-      ['Uninitialized', getUnitDecoder()],
-      [
-        'Initialized',
-        getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]]),
-      ],
-      [
-        'Stake',
-        getStructDecoder([
-          ['fields', getTupleDecoder([getMetaDecoder(), getStakeDecoder()])],
-        ]),
-      ],
-      ['RewardsPool', getUnitDecoder()],
+      'Initialized',
+      getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]]),
     ],
-    { size: getU32Decoder() }
-  );
+    [
+      'Stake',
+      getStructDecoder([
+        ['fields', getTupleDecoder([getMetaDecoder(), getStakeDecoder()])],
+      ]),
+    ],
+    ['RewardsPool', getUnitDecoder()],
+  ]);
 }
 
 export function getStakeStateCodec(): Codec<StakeStateArgs, StakeState> {

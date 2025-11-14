@@ -10,11 +10,10 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct MoveStake {
-    /// Active source stake account
-    pub source_stake: solana_program::pubkey::Pubkey,
-    /// Active or inactive destination stake account
-    pub destination_stake: solana_program::pubkey::Pubkey,
-    /// Stake authority
+    pub source: solana_program::pubkey::Pubkey,
+
+    pub destination: solana_program::pubkey::Pubkey,
+
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -33,11 +32,11 @@ impl MoveStake {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.source_stake,
+            self.source,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.destination_stake,
+            self.destination,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -60,7 +59,7 @@ impl MoveStake {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionData {
-    discriminator: u32,
+    discriminator: u8,
 }
 
 impl MoveStakeInstructionData {
@@ -78,22 +77,22 @@ impl Default for MoveStakeInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionArgs {
-    pub args: u64,
+    pub lamports: u64,
 }
 
 /// Instruction builder for `MoveStake`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` source_stake
-///   1. `[writable]` destination_stake
+///   0. `[writable]` source
+///   1. `[writable]` destination
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MoveStakeBuilder {
-    source_stake: Option<solana_program::pubkey::Pubkey>,
-    destination_stake: Option<solana_program::pubkey::Pubkey>,
+    source: Option<solana_program::pubkey::Pubkey>,
+    destination: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
-    args: Option<u64>,
+    lamports: Option<u64>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -101,22 +100,16 @@ impl MoveStakeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Active source stake account
     #[inline(always)]
-    pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.source_stake = Some(source_stake);
+    pub fn source(&mut self, source: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.source = Some(source);
         self
     }
-    /// Active or inactive destination stake account
     #[inline(always)]
-    pub fn destination_stake(
-        &mut self,
-        destination_stake: solana_program::pubkey::Pubkey,
-    ) -> &mut Self {
-        self.destination_stake = Some(destination_stake);
+    pub fn destination(&mut self, destination: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.destination = Some(destination);
         self
     }
-    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -126,8 +119,8 @@ impl MoveStakeBuilder {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: u64) -> &mut Self {
-        self.args = Some(args);
+    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
+        self.lamports = Some(lamports);
         self
     }
     /// Add an additional account to the instruction.
@@ -151,14 +144,12 @@ impl MoveStakeBuilder {
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = MoveStake {
-            source_stake: self.source_stake.expect("source_stake is not set"),
-            destination_stake: self
-                .destination_stake
-                .expect("destination_stake is not set"),
+            source: self.source.expect("source is not set"),
+            destination: self.destination.expect("destination is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
         let args = MoveStakeInstructionArgs {
-            args: self.args.clone().expect("args is not set"),
+            lamports: self.lamports.clone().expect("lamports is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -167,11 +158,10 @@ impl MoveStakeBuilder {
 
 /// `move_stake` CPI accounts.
 pub struct MoveStakeCpiAccounts<'a, 'b> {
-    /// Active source stake account
-    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Active or inactive destination stake account
-    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
+    pub source: &'b solana_program::account_info::AccountInfo<'a>,
+
+    pub destination: &'b solana_program::account_info::AccountInfo<'a>,
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -179,11 +169,11 @@ pub struct MoveStakeCpiAccounts<'a, 'b> {
 pub struct MoveStakeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Active source stake account
-    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Active or inactive destination stake account
-    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
+
+    pub source: &'b solana_program::account_info::AccountInfo<'a>,
+
+    pub destination: &'b solana_program::account_info::AccountInfo<'a>,
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: MoveStakeInstructionArgs,
@@ -197,8 +187,8 @@ impl<'a, 'b> MoveStakeCpi<'a, 'b> {
     ) -> Self {
         Self {
             __program: program,
-            source_stake: accounts.source_stake,
-            destination_stake: accounts.destination_stake,
+            source: accounts.source,
+            destination: accounts.destination,
             stake_authority: accounts.stake_authority,
             __args: args,
         }
@@ -238,11 +228,11 @@ impl<'a, 'b> MoveStakeCpi<'a, 'b> {
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.source_stake.key,
+            *self.source.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.destination_stake.key,
+            *self.destination.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -267,8 +257,8 @@ impl<'a, 'b> MoveStakeCpi<'a, 'b> {
         };
         let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.source_stake.clone());
-        account_infos.push(self.destination_stake.clone());
+        account_infos.push(self.source.clone());
+        account_infos.push(self.destination.clone());
         account_infos.push(self.stake_authority.clone());
         remaining_accounts
             .iter()
@@ -286,8 +276,8 @@ impl<'a, 'b> MoveStakeCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` source_stake
-///   1. `[writable]` destination_stake
+///   0. `[writable]` source
+///   1. `[writable]` destination
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug)]
 pub struct MoveStakeCpiBuilder<'a, 'b> {
@@ -298,33 +288,30 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(MoveStakeCpiBuilderInstruction {
             __program: program,
-            source_stake: None,
-            destination_stake: None,
+            source: None,
+            destination: None,
             stake_authority: None,
-            args: None,
+            lamports: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// Active source stake account
     #[inline(always)]
-    pub fn source_stake(
+    pub fn source(
         &mut self,
-        source_stake: &'b solana_program::account_info::AccountInfo<'a>,
+        source: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.source_stake = Some(source_stake);
+        self.instruction.source = Some(source);
         self
     }
-    /// Active or inactive destination stake account
     #[inline(always)]
-    pub fn destination_stake(
+    pub fn destination(
         &mut self,
-        destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
+        destination: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.destination_stake = Some(destination_stake);
+        self.instruction.destination = Some(destination);
         self
     }
-    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -334,8 +321,8 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: u64) -> &mut Self {
-        self.instruction.args = Some(args);
+    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
+        self.instruction.lamports = Some(lamports);
         self
     }
     /// Add an additional account to the instruction.
@@ -380,20 +367,21 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = MoveStakeInstructionArgs {
-            args: self.instruction.args.clone().expect("args is not set"),
+            lamports: self
+                .instruction
+                .lamports
+                .clone()
+                .expect("lamports is not set"),
         };
         let instruction = MoveStakeCpi {
             __program: self.instruction.__program,
 
-            source_stake: self
-                .instruction
-                .source_stake
-                .expect("source_stake is not set"),
+            source: self.instruction.source.expect("source is not set"),
 
-            destination_stake: self
+            destination: self
                 .instruction
-                .destination_stake
-                .expect("destination_stake is not set"),
+                .destination
+                .expect("destination is not set"),
 
             stake_authority: self
                 .instruction
@@ -411,10 +399,10 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
 #[derive(Clone, Debug)]
 struct MoveStakeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    source_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    destination_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    source: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    destination: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    args: Option<u64>,
+    lamports: Option<u64>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

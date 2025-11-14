@@ -6,12 +6,18 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './authorizeCheckedWithSeedArgs';
 export * from './authorized';
+export * from './authorizeWithSeedArgs';
 export * from './delegation';
+export * from './epoch';
 export * from './lockup';
+export * from './lockupArgs';
+export * from './lockupCheckedArgs';
 export * from './meta';
 export * from './stake';
 export * from './stakeAuthorize';
 export * from './stakeFlags';
 export * from './stakeState';
 export * from './stakeStateV2';
+export * from './unixTimestamp';

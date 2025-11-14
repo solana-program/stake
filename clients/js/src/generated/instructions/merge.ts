@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -34,35 +34,33 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MERGE_DISCRIMINATOR = 7;
 
 export function getMergeDiscriminatorBytes() {
-  return getU32Encoder().encode(MERGE_DISCRIMINATOR);
+  return getU8Encoder().encode(MERGE_DISCRIMINATOR);
 }
 
 export type MergeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountDestinationStake extends string | AccountMeta<string> = string,
-  TAccountSourceStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountDestination extends string | AccountMeta<string> = string,
+  TAccountSource extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
+  TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountDestinationStake extends string
-        ? WritableAccount<TAccountDestinationStake>
-        : TAccountDestinationStake,
-      TAccountSourceStake extends string
-        ? WritableAccount<TAccountSourceStake>
-        : TAccountSourceStake,
+      TAccountDestination extends string
+        ? WritableAccount<TAccountDestination>
+        : TAccountDestination,
+      TAccountSource extends string
+        ? WritableAccount<TAccountSource>
+        : TAccountSource,
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
-      TAccountStakeHistory extends string
-        ? ReadonlyAccount<TAccountStakeHistory>
-        : TAccountStakeHistory,
+      TAccountStakeHistorySysvar extends string
+        ? ReadonlyAccount<TAccountStakeHistorySysvar>
+        : TAccountStakeHistorySysvar,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
             AccountSignerMeta<TAccountStakeAuthority>
@@ -77,13 +75,13 @@ export type MergeInstructionDataArgs = {};
 
 export function getMergeInstructionDataEncoder(): FixedSizeEncoder<MergeInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU32Encoder()]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({ ...value, discriminator: MERGE_DISCRIMINATOR })
   );
 }
 
 export function getMergeInstructionDataDecoder(): FixedSizeDecoder<MergeInstructionData> {
-  return getStructDecoder([['discriminator', getU32Decoder()]]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getMergeInstructionDataCodec(): FixedSizeCodec<
@@ -97,46 +95,41 @@ export function getMergeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MergeInput<
-  TAccountDestinationStake extends string = string,
-  TAccountSourceStake extends string = string,
+  TAccountDestination extends string = string,
+  TAccountSource extends string = string,
   TAccountClockSysvar extends string = string,
-  TAccountStakeHistory extends string = string,
+  TAccountStakeHistorySysvar extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Destination stake account */
-  destinationStake: Address<TAccountDestinationStake>;
-  /** Source stake account */
-  sourceStake: Address<TAccountSourceStake>;
-  /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
-  stakeHistory: Address<TAccountStakeHistory>;
-  /** Stake authority */
+  destination: Address<TAccountDestination>;
+  source: Address<TAccountSource>;
+  clockSysvar: Address<TAccountClockSysvar>;
+  stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
 export function getMergeInstruction<
-  TAccountDestinationStake extends string,
-  TAccountSourceStake extends string,
+  TAccountDestination extends string,
+  TAccountSource extends string,
   TAccountClockSysvar extends string,
-  TAccountStakeHistory extends string,
+  TAccountStakeHistorySysvar extends string,
   TAccountStakeAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: MergeInput<
-    TAccountDestinationStake,
-    TAccountSourceStake,
+    TAccountDestination,
+    TAccountSource,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountStakeAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): MergeInstruction<
   TProgramAddress,
-  TAccountDestinationStake,
-  TAccountSourceStake,
+  TAccountDestination,
+  TAccountSource,
   TAccountClockSysvar,
-  TAccountStakeHistory,
+  TAccountStakeHistorySysvar,
   TAccountStakeAuthority
 > {
   // Program address.
@@ -144,13 +137,13 @@ export function getMergeInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    destinationStake: {
-      value: input.destinationStake ?? null,
-      isWritable: true,
-    },
-    sourceStake: { value: input.sourceStake ?? null, isWritable: true },
+    destination: { value: input.destination ?? null, isWritable: true },
+    source: { value: input.source ?? null, isWritable: true },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-    stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
+    stakeHistorySysvar: {
+      value: input.stakeHistorySysvar ?? null,
+      isWritable: false,
+    },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -158,29 +151,23 @@ export function getMergeInstruction<
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.destinationStake),
-      getAccountMeta(accounts.sourceStake),
+      getAccountMeta(accounts.destination),
+      getAccountMeta(accounts.source),
       getAccountMeta(accounts.clockSysvar),
-      getAccountMeta(accounts.stakeHistory),
+      getAccountMeta(accounts.stakeHistorySysvar),
       getAccountMeta(accounts.stakeAuthority),
     ],
     data: getMergeInstructionDataEncoder().encode({}),
     programAddress,
   } as MergeInstruction<
     TProgramAddress,
-    TAccountDestinationStake,
-    TAccountSourceStake,
+    TAccountDestination,
+    TAccountSource,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountStakeAuthority
   >);
 }
@@ -191,15 +178,10 @@ export type ParsedMergeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Destination stake account */
-    destinationStake: TAccountMetas[0];
-    /** Source stake account */
-    sourceStake: TAccountMetas[1];
-    /** Clock sysvar */
+    destination: TAccountMetas[0];
+    source: TAccountMetas[1];
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
-    stakeHistory: TAccountMetas[3];
-    /** Stake authority */
+    stakeHistorySysvar: TAccountMetas[3];
     stakeAuthority: TAccountMetas[4];
   };
   data: MergeInstructionData;
@@ -226,10 +208,10 @@ export function parseMergeInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      destinationStake: getNextAccount(),
-      sourceStake: getNextAccount(),
+      destination: getNextAccount(),
+      source: getNextAccount(),
       clockSysvar: getNextAccount(),
-      stakeHistory: getNextAccount(),
+      stakeHistorySysvar: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },
     data: getMergeInstructionDataDecoder().decode(instruction.data),

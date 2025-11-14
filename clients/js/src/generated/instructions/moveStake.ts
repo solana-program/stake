@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -35,25 +35,25 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const MOVE_STAKE_DISCRIMINATOR = 16;
 
 export function getMoveStakeDiscriminatorBytes() {
-  return getU32Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
+  return getU8Encoder().encode(MOVE_STAKE_DISCRIMINATOR);
 }
 
 export type MoveStakeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TAccountSourceStake extends string | AccountMeta<string> = string,
-  TAccountDestinationStake extends string | AccountMeta<string> = string,
+  TAccountSource extends string | AccountMeta<string> = string,
+  TAccountDestination extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountSourceStake extends string
-        ? WritableAccount<TAccountSourceStake>
-        : TAccountSourceStake,
-      TAccountDestinationStake extends string
-        ? WritableAccount<TAccountDestinationStake>
-        : TAccountDestinationStake,
+      TAccountSource extends string
+        ? WritableAccount<TAccountSource>
+        : TAccountSource,
+      TAccountDestination extends string
+        ? WritableAccount<TAccountDestination>
+        : TAccountDestination,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
             AccountSignerMeta<TAccountStakeAuthority>
@@ -62,15 +62,18 @@ export type MoveStakeInstruction<
     ]
   >;
 
-export type MoveStakeInstructionData = { discriminator: number; args: bigint };
+export type MoveStakeInstructionData = {
+  discriminator: number;
+  lamports: bigint;
+};
 
-export type MoveStakeInstructionDataArgs = { args: number | bigint };
+export type MoveStakeInstructionDataArgs = { lamports: number | bigint };
 
 export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStakeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['args', getU64Encoder()],
+      ['discriminator', getU8Encoder()],
+      ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: MOVE_STAKE_DISCRIMINATOR })
   );
@@ -78,8 +81,8 @@ export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStake
 
 export function getMoveStakeInstructionDataDecoder(): FixedSizeDecoder<MoveStakeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['args', getU64Decoder()],
+    ['discriminator', getU8Decoder()],
+    ['lamports', getU64Decoder()],
   ]);
 }
 
@@ -94,35 +97,32 @@ export function getMoveStakeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MoveStakeInput<
-  TAccountSourceStake extends string = string,
-  TAccountDestinationStake extends string = string,
+  TAccountSource extends string = string,
+  TAccountDestination extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Active source stake account */
-  sourceStake: Address<TAccountSourceStake>;
-  /** Active or inactive destination stake account */
-  destinationStake: Address<TAccountDestinationStake>;
-  /** Stake authority */
+  source: Address<TAccountSource>;
+  destination: Address<TAccountDestination>;
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
-  args: MoveStakeInstructionDataArgs['args'];
+  lamports: MoveStakeInstructionDataArgs['lamports'];
 };
 
 export function getMoveStakeInstruction<
-  TAccountSourceStake extends string,
-  TAccountDestinationStake extends string,
+  TAccountSource extends string,
+  TAccountDestination extends string,
   TAccountStakeAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: MoveStakeInput<
-    TAccountSourceStake,
-    TAccountDestinationStake,
+    TAccountSource,
+    TAccountDestination,
     TAccountStakeAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): MoveStakeInstruction<
   TProgramAddress,
-  TAccountSourceStake,
-  TAccountDestinationStake,
+  TAccountSource,
+  TAccountDestination,
   TAccountStakeAuthority
 > {
   // Program address.
@@ -130,11 +130,8 @@ export function getMoveStakeInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    sourceStake: { value: input.sourceStake ?? null, isWritable: true },
-    destinationStake: {
-      value: input.destinationStake ?? null,
-      isWritable: true,
-    },
+    source: { value: input.source ?? null, isWritable: true },
+    destination: { value: input.destination ?? null, isWritable: true },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -148,8 +145,8 @@ export function getMoveStakeInstruction<
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.sourceStake),
-      getAccountMeta(accounts.destinationStake),
+      getAccountMeta(accounts.source),
+      getAccountMeta(accounts.destination),
       getAccountMeta(accounts.stakeAuthority),
     ],
     data: getMoveStakeInstructionDataEncoder().encode(
@@ -158,8 +155,8 @@ export function getMoveStakeInstruction<
     programAddress,
   } as MoveStakeInstruction<
     TProgramAddress,
-    TAccountSourceStake,
-    TAccountDestinationStake,
+    TAccountSource,
+    TAccountDestination,
     TAccountStakeAuthority
   >);
 }
@@ -170,11 +167,8 @@ export type ParsedMoveStakeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Active source stake account */
-    sourceStake: TAccountMetas[0];
-    /** Active or inactive destination stake account */
-    destinationStake: TAccountMetas[1];
-    /** Stake authority */
+    source: TAccountMetas[0];
+    destination: TAccountMetas[1];
     stakeAuthority: TAccountMetas[2];
   };
   data: MoveStakeInstructionData;
@@ -201,8 +195,8 @@ export function parseMoveStakeInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      sourceStake: getNextAccount(),
-      destinationStake: getNextAccount(),
+      source: getNextAccount(),
+      destination: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },
     data: getMoveStakeInstructionDataDecoder().decode(instruction.data),

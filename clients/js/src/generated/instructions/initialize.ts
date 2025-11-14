@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -41,15 +41,13 @@ import {
 export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes() {
-  return getU32Encoder().encode(INITIALIZE_DISCRIMINATOR);
+  return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 
 export type InitializeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountRentSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountRentSysvar extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -67,21 +65,21 @@ export type InitializeInstruction<
 
 export type InitializeInstructionData = {
   discriminator: number;
-  arg0: Authorized;
-  arg1: Lockup;
+  authorized: Authorized;
+  lockup: Lockup;
 };
 
 export type InitializeInstructionDataArgs = {
-  arg0: AuthorizedArgs;
-  arg1: LockupArgs;
+  authorized: AuthorizedArgs;
+  lockup: LockupArgs;
 };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['arg0', getAuthorizedEncoder()],
-      ['arg1', getLockupEncoder()],
+      ['discriminator', getU8Encoder()],
+      ['authorized', getAuthorizedEncoder()],
+      ['lockup', getLockupEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR })
   );
@@ -89,9 +87,9 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['arg0', getAuthorizedDecoder()],
-    ['arg1', getLockupDecoder()],
+    ['discriminator', getU8Decoder()],
+    ['authorized', getAuthorizedDecoder()],
+    ['lockup', getLockupDecoder()],
   ]);
 }
 
@@ -109,12 +107,10 @@ export type InitializeInput<
   TAccountStake extends string = string,
   TAccountRentSysvar extends string = string,
 > = {
-  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
-  /** Rent sysvar */
-  rentSysvar?: Address<TAccountRentSysvar>;
-  arg0: InitializeInstructionDataArgs['arg0'];
-  arg1: InitializeInstructionDataArgs['arg1'];
+  rentSysvar: Address<TAccountRentSysvar>;
+  authorized: InitializeInstructionDataArgs['authorized'];
+  lockup: InitializeInstructionDataArgs['lockup'];
 };
 
 export function getInitializeInstruction<
@@ -141,12 +137,6 @@ export function getInitializeInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.rentSysvar.value) {
-    accounts.rentSysvar.value =
-      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -170,9 +160,7 @@ export type ParsedInitializeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Uninitialized stake account */
     stake: TAccountMetas[0];
-    /** Rent sysvar */
     rentSysvar: TAccountMetas[1];
   };
   data: InitializeInstructionData;

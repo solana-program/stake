@@ -6,21 +6,19 @@
 //!
 
 use {
-    crate::generated::types::Epoch,
+    crate::generated::types::StakeAuthorize,
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::pubkey::Pubkey,
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Delegation {
+pub struct AuthorizeCheckedWithSeedArgs {
+    pub stake_authorize: StakeAuthorize,
+    pub authority_seed: String,
     #[cfg_attr(
         feature = "serde",
         serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
     )]
-    pub voter_pubkey: Pubkey,
-    pub stake: u64,
-    pub activation_epoch: Epoch,
-    pub deactivation_epoch: Epoch,
-    pub warmup_cooldown_rate: f64,
+    pub authority_owner: Pubkey,
 }

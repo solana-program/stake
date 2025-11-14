@@ -7,17 +7,11 @@
  */
 
 import {
-  addDecoderSizePrefix,
-  addEncoderSizePrefix,
   combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
-  getUtf8Decoder,
-  getUtf8Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -37,25 +31,23 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getStakeAuthorizeDecoder,
-  getStakeAuthorizeEncoder,
-  type StakeAuthorize,
-  type StakeAuthorizeArgs,
+  getAuthorizeCheckedWithSeedArgsDecoder,
+  getAuthorizeCheckedWithSeedArgsEncoder,
+  type AuthorizeCheckedWithSeedArgs,
+  type AuthorizeCheckedWithSeedArgsArgs,
 } from '../types';
 
 export const AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR = 11;
 
 export function getAuthorizeCheckedWithSeedDiscriminatorBytes() {
-  return getU32Encoder().encode(AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR);
+  return getU8Encoder().encode(AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR);
 }
 
 export type AuthorizeCheckedWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountBase extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountAuthorityBase extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -69,9 +61,10 @@ export type AuthorizeCheckedWithSeedInstruction<
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
-      TAccountBase extends string
-        ? ReadonlySignerAccount<TAccountBase> & AccountSignerMeta<TAccountBase>
-        : TAccountBase,
+      TAccountAuthorityBase extends string
+        ? ReadonlySignerAccount<TAccountAuthorityBase> &
+            AccountSignerMeta<TAccountAuthorityBase>
+        : TAccountAuthorityBase,
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
@@ -93,27 +86,18 @@ export type AuthorizeCheckedWithSeedInstruction<
 
 export type AuthorizeCheckedWithSeedInstructionData = {
   discriminator: number;
-  stakeAuthorize: StakeAuthorize;
-  authoritySeed: string;
-  authorityOwner: Address;
+  args: AuthorizeCheckedWithSeedArgs;
 };
 
 export type AuthorizeCheckedWithSeedInstructionDataArgs = {
-  stakeAuthorize: StakeAuthorizeArgs;
-  authoritySeed: string;
-  authorityOwner: Address;
+  args: AuthorizeCheckedWithSeedArgsArgs;
 };
 
 export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<AuthorizeCheckedWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['stakeAuthorize', getStakeAuthorizeEncoder()],
-      [
-        'authoritySeed',
-        addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder()),
-      ],
-      ['authorityOwner', getAddressEncoder()],
+      ['discriminator', getU8Encoder()],
+      ['args', getAuthorizeCheckedWithSeedArgsEncoder()],
     ]),
     (value) => ({
       ...value,
@@ -124,10 +108,8 @@ export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<Aut
 
 export function getAuthorizeCheckedWithSeedInstructionDataDecoder(): Decoder<AuthorizeCheckedWithSeedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['stakeAuthorize', getStakeAuthorizeDecoder()],
-    ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ['authorityOwner', getAddressDecoder()],
+    ['discriminator', getU8Decoder()],
+    ['args', getAuthorizeCheckedWithSeedArgsDecoder()],
   ]);
 }
 
@@ -143,29 +125,22 @@ export function getAuthorizeCheckedWithSeedInstructionDataCodec(): Codec<
 
 export type AuthorizeCheckedWithSeedInput<
   TAccountStake extends string = string,
-  TAccountBase extends string = string,
+  TAccountAuthorityBase extends string = string,
   TAccountClockSysvar extends string = string,
   TAccountNewAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
-  /** Stake account to be updated */
   stake: Address<TAccountStake>;
-  /** Base key of stake or withdraw authority */
-  base: TransactionSigner<TAccountBase>;
-  /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** The new stake or withdraw authority */
+  authorityBase: TransactionSigner<TAccountAuthorityBase>;
+  clockSysvar: Address<TAccountClockSysvar>;
   newAuthority: TransactionSigner<TAccountNewAuthority>;
-  /** Lockup authority */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  stakeAuthorize: AuthorizeCheckedWithSeedInstructionDataArgs['stakeAuthorize'];
-  authoritySeed: AuthorizeCheckedWithSeedInstructionDataArgs['authoritySeed'];
-  authorityOwner: AuthorizeCheckedWithSeedInstructionDataArgs['authorityOwner'];
+  args: AuthorizeCheckedWithSeedInstructionDataArgs['args'];
 };
 
 export function getAuthorizeCheckedWithSeedInstruction<
   TAccountStake extends string,
-  TAccountBase extends string,
+  TAccountAuthorityBase extends string,
   TAccountClockSysvar extends string,
   TAccountNewAuthority extends string,
   TAccountLockupAuthority extends string,
@@ -173,7 +148,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
 >(
   input: AuthorizeCheckedWithSeedInput<
     TAccountStake,
-    TAccountBase,
+    TAccountAuthorityBase,
     TAccountClockSysvar,
     TAccountNewAuthority,
     TAccountLockupAuthority
@@ -182,7 +157,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
 ): AuthorizeCheckedWithSeedInstruction<
   TProgramAddress,
   TAccountStake,
-  TAccountBase,
+  TAccountAuthorityBase,
   TAccountClockSysvar,
   TAccountNewAuthority,
   TAccountLockupAuthority
@@ -193,7 +168,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
   // Original accounts.
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
-    base: { value: input.base ?? null, isWritable: false },
+    authorityBase: { value: input.authorityBase ?? null, isWritable: false },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
     newAuthority: { value: input.newAuthority ?? null, isWritable: false },
     lockupAuthority: {
@@ -209,17 +184,11 @@ export function getAuthorizeCheckedWithSeedInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.stake),
-      getAccountMeta(accounts.base),
+      getAccountMeta(accounts.authorityBase),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.newAuthority),
       getAccountMeta(accounts.lockupAuthority),
@@ -231,7 +200,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
   } as AuthorizeCheckedWithSeedInstruction<
     TProgramAddress,
     TAccountStake,
-    TAccountBase,
+    TAccountAuthorityBase,
     TAccountClockSysvar,
     TAccountNewAuthority,
     TAccountLockupAuthority
@@ -244,15 +213,10 @@ export type ParsedAuthorizeCheckedWithSeedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Stake account to be updated */
     stake: TAccountMetas[0];
-    /** Base key of stake or withdraw authority */
-    base: TAccountMetas[1];
-    /** Clock sysvar */
+    authorityBase: TAccountMetas[1];
     clockSysvar: TAccountMetas[2];
-    /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
-    /** Lockup authority */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedWithSeedInstructionData;
@@ -286,7 +250,7 @@ export function parseAuthorizeCheckedWithSeedInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       stake: getNextAccount(),
-      base: getNextAccount(),
+      authorityBase: getNextAccount(),
       clockSysvar: getNextAccount(),
       newAuthority: getNextAccount(),
       lockupAuthority: getNextOptionalAccount(),

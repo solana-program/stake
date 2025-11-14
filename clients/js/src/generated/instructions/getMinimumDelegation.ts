@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -28,7 +28,7 @@ import { STAKE_PROGRAM_ADDRESS } from '../programs';
 export const GET_MINIMUM_DELEGATION_DISCRIMINATOR = 13;
 
 export function getGetMinimumDelegationDiscriminatorBytes() {
-  return getU32Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
+  return getU8Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
 }
 
 export type GetMinimumDelegationInstruction<
@@ -44,7 +44,7 @@ export type GetMinimumDelegationInstructionDataArgs = {};
 
 export function getGetMinimumDelegationInstructionDataEncoder(): FixedSizeEncoder<GetMinimumDelegationInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU32Encoder()]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({
       ...value,
       discriminator: GET_MINIMUM_DELEGATION_DISCRIMINATOR,
@@ -53,7 +53,7 @@ export function getGetMinimumDelegationInstructionDataEncoder(): FixedSizeEncode
 }
 
 export function getGetMinimumDelegationInstructionDataDecoder(): FixedSizeDecoder<GetMinimumDelegationInstructionData> {
-  return getStructDecoder([['discriminator', getU32Decoder()]]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getGetMinimumDelegationInstructionDataCodec(): FixedSizeCodec<

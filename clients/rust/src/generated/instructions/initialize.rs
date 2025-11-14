@@ -13,9 +13,8 @@ use {
 /// Accounts.
 #[derive(Debug)]
 pub struct Initialize {
-    /// Uninitialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-    /// Rent sysvar
+
     pub rent_sysvar: solana_program::pubkey::Pubkey,
 }
 
@@ -56,7 +55,7 @@ impl Initialize {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeInstructionData {
-    discriminator: u32,
+    discriminator: u8,
 }
 
 impl InitializeInstructionData {
@@ -74,8 +73,8 @@ impl Default for InitializeInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeInstructionArgs {
-    pub arg0: Authorized,
-    pub arg1: Lockup,
+    pub authorized: Authorized,
+    pub lockup: Lockup,
 }
 
 /// Instruction builder for `Initialize`.
@@ -83,13 +82,13 @@ pub struct InitializeInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
+///   1. `[]` rent_sysvar
 #[derive(Clone, Debug, Default)]
 pub struct InitializeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     rent_sysvar: Option<solana_program::pubkey::Pubkey>,
-    arg0: Option<Authorized>,
-    arg1: Option<Lockup>,
+    authorized: Option<Authorized>,
+    lockup: Option<Lockup>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -97,27 +96,24 @@ impl InitializeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
-    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.rent_sysvar = Some(rent_sysvar);
         self
     }
     #[inline(always)]
-    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
-        self.arg0 = Some(arg0);
+    pub fn authorized(&mut self, authorized: Authorized) -> &mut Self {
+        self.authorized = Some(authorized);
         self
     }
     #[inline(always)]
-    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
-        self.arg1 = Some(arg1);
+    pub fn lockup(&mut self, lockup: Lockup) -> &mut Self {
+        self.lockup = Some(lockup);
         self
     }
     /// Add an additional account to the instruction.
@@ -142,13 +138,11 @@ impl InitializeBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Initialize {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarRent111111111111111111111111111111111"
-            )),
+            rent_sysvar: self.rent_sysvar.expect("rent_sysvar is not set"),
         };
         let args = InitializeInstructionArgs {
-            arg0: self.arg0.clone().expect("arg0 is not set"),
-            arg1: self.arg1.clone().expect("arg1 is not set"),
+            authorized: self.authorized.clone().expect("authorized is not set"),
+            lockup: self.lockup.clone().expect("lockup is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -157,9 +151,8 @@ impl InitializeBuilder {
 
 /// `initialize` CPI accounts.
 pub struct InitializeCpiAccounts<'a, 'b> {
-    /// Uninitialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -167,9 +160,9 @@ pub struct InitializeCpiAccounts<'a, 'b> {
 pub struct InitializeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account
+
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: InitializeInstructionArgs,
@@ -279,19 +272,17 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             rent_sysvar: None,
-            arg0: None,
-            arg1: None,
+            authorized: None,
+            lockup: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(
         &mut self,
@@ -301,13 +292,13 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
-        self.instruction.arg0 = Some(arg0);
+    pub fn authorized(&mut self, authorized: Authorized) -> &mut Self {
+        self.instruction.authorized = Some(authorized);
         self
     }
     #[inline(always)]
-    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
-        self.instruction.arg1 = Some(arg1);
+    pub fn lockup(&mut self, lockup: Lockup) -> &mut Self {
+        self.instruction.lockup = Some(lockup);
         self
     }
     /// Add an additional account to the instruction.
@@ -352,8 +343,12 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = InitializeInstructionArgs {
-            arg0: self.instruction.arg0.clone().expect("arg0 is not set"),
-            arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
+            authorized: self
+                .instruction
+                .authorized
+                .clone()
+                .expect("authorized is not set"),
+            lockup: self.instruction.lockup.clone().expect("lockup is not set"),
         };
         let instruction = InitializeCpi {
             __program: self.instruction.__program,
@@ -378,8 +373,8 @@ struct InitializeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     rent_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    arg0: Option<Authorized>,
-    arg1: Option<Lockup>,
+    authorized: Option<Authorized>,
+    lockup: Option<Lockup>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

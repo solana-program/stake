@@ -10,10 +10,10 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -35,7 +35,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const SPLIT_DISCRIMINATOR = 3;
 
 export function getSplitDiscriminatorBytes() {
-  return getU32Encoder().encode(SPLIT_DISCRIMINATOR);
+  return getU8Encoder().encode(SPLIT_DISCRIMINATOR);
 }
 
 export type SplitInstruction<
@@ -62,15 +62,15 @@ export type SplitInstruction<
     ]
   >;
 
-export type SplitInstructionData = { discriminator: number; args: bigint };
+export type SplitInstructionData = { discriminator: number; lamports: bigint };
 
-export type SplitInstructionDataArgs = { args: number | bigint };
+export type SplitInstructionDataArgs = { lamports: number | bigint };
 
 export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['args', getU64Encoder()],
+      ['discriminator', getU8Encoder()],
+      ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: SPLIT_DISCRIMINATOR })
   );
@@ -78,8 +78,8 @@ export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstruct
 
 export function getSplitInstructionDataDecoder(): FixedSizeDecoder<SplitInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['args', getU64Decoder()],
+    ['discriminator', getU8Decoder()],
+    ['lamports', getU64Decoder()],
   ]);
 }
 
@@ -98,13 +98,10 @@ export type SplitInput<
   TAccountSplitStake extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Stake account to be split */
   stake: Address<TAccountStake>;
-  /** Uninitialized stake account */
   splitStake: Address<TAccountSplitStake>;
-  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
-  args: SplitInstructionDataArgs['args'];
+  lamports: SplitInstructionDataArgs['lamports'];
 };
 
 export function getSplitInstruction<
@@ -163,11 +160,8 @@ export type ParsedSplitInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Stake account to be split */
     stake: TAccountMetas[0];
-    /** Uninitialized stake account */
     splitStake: TAccountMetas[1];
-    /** Stake authority */
     stakeAuthority: TAccountMetas[2];
   };
   data: SplitInstructionData;

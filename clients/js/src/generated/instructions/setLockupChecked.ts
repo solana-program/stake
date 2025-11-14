@@ -8,16 +8,10 @@
 
 import {
   combineCodec,
-  getI64Decoder,
-  getI64Encoder,
-  getOptionDecoder,
-  getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
-  getU64Decoder,
-  getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -28,8 +22,6 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
-  type Option,
-  type OptionOrNullable,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
@@ -37,18 +29,24 @@ import {
 } from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  getLockupCheckedArgsDecoder,
+  getLockupCheckedArgsEncoder,
+  type LockupCheckedArgs,
+  type LockupCheckedArgsArgs,
+} from '../types';
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
 
 export function getSetLockupCheckedDiscriminatorBytes() {
-  return getU32Encoder().encode(SET_LOCKUP_CHECKED_DISCRIMINATOR);
+  return getU8Encoder().encode(SET_LOCKUP_CHECKED_DISCRIMINATOR);
 }
 
 export type SetLockupCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountNewAuthority extends
+  TAccountNewLockupAuthority extends
     | string
     | AccountMeta<string>
     | undefined = undefined,
@@ -64,13 +62,13 @@ export type SetLockupCheckedInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      ...(TAccountNewAuthority extends undefined
+      ...(TAccountNewLockupAuthority extends undefined
         ? []
         : [
-            TAccountNewAuthority extends string
-              ? ReadonlySignerAccount<TAccountNewAuthority> &
-                  AccountSignerMeta<TAccountNewAuthority>
-              : TAccountNewAuthority,
+            TAccountNewLockupAuthority extends string
+              ? ReadonlySignerAccount<TAccountNewLockupAuthority> &
+                  AccountSignerMeta<TAccountNewLockupAuthority>
+              : TAccountNewLockupAuthority,
           ]),
       ...TRemainingAccounts,
     ]
@@ -78,21 +76,18 @@ export type SetLockupCheckedInstruction<
 
 export type SetLockupCheckedInstructionData = {
   discriminator: number;
-  unixTimestamp: Option<bigint>;
-  epoch: Option<bigint>;
+  lockup: LockupCheckedArgs;
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<number | bigint>;
-  epoch: OptionOrNullable<number | bigint>;
+  lockup: LockupCheckedArgsArgs;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['unixTimestamp', getOptionEncoder(getI64Encoder())],
-      ['epoch', getOptionEncoder(getU64Encoder())],
+      ['discriminator', getU8Encoder()],
+      ['lockup', getLockupCheckedArgsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_CHECKED_DISCRIMINATOR })
   );
@@ -100,9 +95,8 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['unixTimestamp', getOptionDecoder(getI64Decoder())],
-    ['epoch', getOptionDecoder(getU64Decoder())],
+    ['discriminator', getU8Decoder()],
+    ['lockup', getLockupCheckedArgsDecoder()],
   ]);
 }
 
@@ -119,35 +113,31 @@ export function getSetLockupCheckedInstructionDataCodec(): Codec<
 export type SetLockupCheckedInput<
   TAccountStake extends string = string,
   TAccountAuthority extends string = string,
-  TAccountNewAuthority extends string = string,
+  TAccountNewLockupAuthority extends string = string,
 > = {
-  /** Initialized stake account */
   stake: Address<TAccountStake>;
-  /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  /** New lockup authority */
-  newAuthority?: TransactionSigner<TAccountNewAuthority>;
-  unixTimestamp: SetLockupCheckedInstructionDataArgs['unixTimestamp'];
-  epoch: SetLockupCheckedInstructionDataArgs['epoch'];
+  newLockupAuthority?: TransactionSigner<TAccountNewLockupAuthority>;
+  lockup: SetLockupCheckedInstructionDataArgs['lockup'];
 };
 
 export function getSetLockupCheckedInstruction<
   TAccountStake extends string,
   TAccountAuthority extends string,
-  TAccountNewAuthority extends string,
+  TAccountNewLockupAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: SetLockupCheckedInput<
     TAccountStake,
     TAccountAuthority,
-    TAccountNewAuthority
+    TAccountNewLockupAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): SetLockupCheckedInstruction<
   TProgramAddress,
   TAccountStake,
   TAccountAuthority,
-  TAccountNewAuthority
+  TAccountNewLockupAuthority
 > {
   // Program address.
   const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
@@ -156,7 +146,10 @@ export function getSetLockupCheckedInstruction<
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: false },
-    newAuthority: { value: input.newAuthority ?? null, isWritable: false },
+    newLockupAuthority: {
+      value: input.newLockupAuthority ?? null,
+      isWritable: false,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -171,7 +164,7 @@ export function getSetLockupCheckedInstruction<
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.newAuthority),
+      getAccountMeta(accounts.newLockupAuthority),
     ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     data: getSetLockupCheckedInstructionDataEncoder().encode(
       args as SetLockupCheckedInstructionDataArgs
@@ -181,7 +174,7 @@ export function getSetLockupCheckedInstruction<
     TProgramAddress,
     TAccountStake,
     TAccountAuthority,
-    TAccountNewAuthority
+    TAccountNewLockupAuthority
   >);
 }
 
@@ -191,12 +184,9 @@ export type ParsedSetLockupCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Initialized stake account */
     stake: TAccountMetas[0];
-    /** Lockup authority or withdraw authority */
     authority: TAccountMetas[1];
-    /** New lockup authority */
-    newAuthority?: TAccountMetas[2] | undefined;
+    newLockupAuthority?: TAccountMetas[2] | undefined;
   };
   data: SetLockupCheckedInstructionData;
 };
@@ -230,7 +220,7 @@ export function parseSetLockupCheckedInstruction<
     accounts: {
       stake: getNextAccount(),
       authority: getNextAccount(),
-      newAuthority: getNextOptionalAccount(),
+      newLockupAuthority: getNextOptionalAccount(),
     },
     data: getSetLockupCheckedInstructionDataDecoder().decode(instruction.data),
   };

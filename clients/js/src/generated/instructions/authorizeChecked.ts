@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -40,15 +40,13 @@ import {
 export const AUTHORIZE_CHECKED_DISCRIMINATOR = 10;
 
 export function getAuthorizeCheckedDiscriminatorBytes() {
-  return getU32Encoder().encode(AUTHORIZE_CHECKED_DISCRIMINATOR);
+  return getU8Encoder().encode(AUTHORIZE_CHECKED_DISCRIMINATOR);
 }
 
 export type AuthorizeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
@@ -98,7 +96,7 @@ export type AuthorizeCheckedInstructionDataArgs = {
 export function getAuthorizeCheckedInstructionDataEncoder(): FixedSizeEncoder<AuthorizeCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
+      ['discriminator', getU8Encoder()],
       ['stakeAuthorize', getStakeAuthorizeEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_CHECKED_DISCRIMINATOR })
@@ -107,7 +105,7 @@ export function getAuthorizeCheckedInstructionDataEncoder(): FixedSizeEncoder<Au
 
 export function getAuthorizeCheckedInstructionDataDecoder(): FixedSizeDecoder<AuthorizeCheckedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
+    ['discriminator', getU8Decoder()],
     ['stakeAuthorize', getStakeAuthorizeDecoder()],
   ]);
 }
@@ -129,15 +127,10 @@ export type AuthorizeCheckedInput<
   TAccountNewAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
-  /** Stake account to be updated */
   stake: Address<TAccountStake>;
-  /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** The stake or withdraw authority */
+  clockSysvar: Address<TAccountClockSysvar>;
   authority: TransactionSigner<TAccountAuthority>;
-  /** The new stake or withdraw authority */
   newAuthority: TransactionSigner<TAccountNewAuthority>;
-  /** Lockup authority */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   stakeAuthorize: AuthorizeCheckedInstructionDataArgs['stakeAuthorize'];
 };
@@ -188,12 +181,6 @@ export function getAuthorizeCheckedInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -223,15 +210,10 @@ export type ParsedAuthorizeCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Stake account to be updated */
     stake: TAccountMetas[0];
-    /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
-    /** The stake or withdraw authority */
     authority: TAccountMetas[2];
-    /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
-    /** Lockup authority */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedInstructionData;

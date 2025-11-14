@@ -10,11 +10,10 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct Deactivate {
-    /// Delegated stake account
     pub stake: solana_program::pubkey::Pubkey,
-    /// Clock sysvar
+
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake authority
+
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -53,7 +52,7 @@ impl Deactivate {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeactivateInstructionData {
-    discriminator: u32,
+    discriminator: u8,
 }
 
 impl DeactivateInstructionData {
@@ -73,7 +72,7 @@ impl Default for DeactivateInstructionData {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   1. `[]` clock_sysvar
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DeactivateBuilder {
@@ -87,20 +86,16 @@ impl DeactivateBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Delegated stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
-    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -131,9 +126,7 @@ impl DeactivateBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Deactivate {
             stake: self.stake.expect("stake is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarC1ock11111111111111111111111111111111"
-            )),
+            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
 
@@ -143,11 +136,10 @@ impl DeactivateBuilder {
 
 /// `deactivate` CPI accounts.
 pub struct DeactivateCpiAccounts<'a, 'b> {
-    /// Delegated stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Clock sysvar
+
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -155,11 +147,11 @@ pub struct DeactivateCpiAccounts<'a, 'b> {
 pub struct DeactivateCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Delegated stake account
+
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Clock sysvar
+
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -275,13 +267,11 @@ impl<'a, 'b> DeactivateCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
-    /// Delegated stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,
@@ -290,7 +280,6 @@ impl<'a, 'b> DeactivateCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,

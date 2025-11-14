@@ -9,9 +9,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 #[derive(Debug)]
-pub struct GetMinimumDelegation {}
+pub struct Redelegate {}
 
-impl GetMinimumDelegation {
+impl Redelegate {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(&[])
     }
@@ -22,7 +22,7 @@ impl GetMinimumDelegation {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(remaining_accounts.len());
         accounts.extend_from_slice(remaining_accounts);
-        let data = borsh::to_vec(&GetMinimumDelegationInstructionData::new()).unwrap();
+        let data = borsh::to_vec(&RedelegateInstructionData::new()).unwrap();
 
         solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -34,32 +34,32 @@ impl GetMinimumDelegation {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GetMinimumDelegationInstructionData {
+pub struct RedelegateInstructionData {
     discriminator: u8,
 }
 
-impl GetMinimumDelegationInstructionData {
+impl RedelegateInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 13 }
+        Self { discriminator: 15 }
     }
 }
 
-impl Default for GetMinimumDelegationInstructionData {
+impl Default for RedelegateInstructionData {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Instruction builder for `GetMinimumDelegation`.
+/// Instruction builder for `Redelegate`.
 ///
 /// ### Accounts:
 ///
 #[derive(Clone, Debug, Default)]
-pub struct GetMinimumDelegationBuilder {
+pub struct RedelegateBuilder {
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
-impl GetMinimumDelegationBuilder {
+impl RedelegateBuilder {
     pub fn new() -> Self {
         Self::default()
     }
@@ -83,19 +83,19 @@ impl GetMinimumDelegationBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
-        let accounts = GetMinimumDelegation {};
+        let accounts = Redelegate {};
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
     }
 }
 
-/// `get_minimum_delegation` CPI instruction.
-pub struct GetMinimumDelegationCpi<'a, 'b> {
+/// `redelegate` CPI instruction.
+pub struct RedelegateCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
-impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
+impl<'a, 'b> RedelegateCpi<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         Self { __program: program }
     }
@@ -140,7 +140,7 @@ impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = borsh::to_vec(&GetMinimumDelegationInstructionData::new()).unwrap();
+        let data = borsh::to_vec(&RedelegateInstructionData::new()).unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: crate::STAKE_ID,
@@ -161,18 +161,18 @@ impl<'a, 'b> GetMinimumDelegationCpi<'a, 'b> {
     }
 }
 
-/// Instruction builder for `GetMinimumDelegation` via CPI.
+/// Instruction builder for `Redelegate` via CPI.
 ///
 /// ### Accounts:
 ///
 #[derive(Clone, Debug)]
-pub struct GetMinimumDelegationCpiBuilder<'a, 'b> {
-    instruction: Box<GetMinimumDelegationCpiBuilderInstruction<'a, 'b>>,
+pub struct RedelegateCpiBuilder<'a, 'b> {
+    instruction: Box<RedelegateCpiBuilderInstruction<'a, 'b>>,
 }
 
-impl<'a, 'b> GetMinimumDelegationCpiBuilder<'a, 'b> {
+impl<'a, 'b> RedelegateCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(GetMinimumDelegationCpiBuilderInstruction {
+        let instruction = Box::new(RedelegateCpiBuilderInstruction {
             __program: program,
             __remaining_accounts: Vec::new(),
         });
@@ -219,7 +219,7 @@ impl<'a, 'b> GetMinimumDelegationCpiBuilder<'a, 'b> {
         &self,
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
-        let instruction = GetMinimumDelegationCpi {
+        let instruction = RedelegateCpi {
             __program: self.instruction.__program,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -230,7 +230,7 @@ impl<'a, 'b> GetMinimumDelegationCpiBuilder<'a, 'b> {
 }
 
 #[derive(Clone, Debug)]
-struct GetMinimumDelegationCpiBuilderInstruction<'a, 'b> {
+struct RedelegateCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(

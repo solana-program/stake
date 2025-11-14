@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type Address,
@@ -31,7 +31,7 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const DEACTIVATE_DELINQUENT_DISCRIMINATOR = 14;
 
 export function getDeactivateDelinquentDiscriminatorBytes() {
-  return getU32Encoder().encode(DEACTIVATE_DELINQUENT_DISCRIMINATOR);
+  return getU8Encoder().encode(DEACTIVATE_DELINQUENT_DISCRIMINATOR);
 }
 
 export type DeactivateDelinquentInstruction<
@@ -63,7 +63,7 @@ export type DeactivateDelinquentInstructionDataArgs = {};
 
 export function getDeactivateDelinquentInstructionDataEncoder(): FixedSizeEncoder<DeactivateDelinquentInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU32Encoder()]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({
       ...value,
       discriminator: DEACTIVATE_DELINQUENT_DISCRIMINATOR,
@@ -72,7 +72,7 @@ export function getDeactivateDelinquentInstructionDataEncoder(): FixedSizeEncode
 }
 
 export function getDeactivateDelinquentInstructionDataDecoder(): FixedSizeDecoder<DeactivateDelinquentInstructionData> {
-  return getStructDecoder([['discriminator', getU32Decoder()]]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getDeactivateDelinquentInstructionDataCodec(): FixedSizeCodec<
@@ -90,11 +90,8 @@ export type DeactivateDelinquentInput<
   TAccountDelinquentVote extends string = string,
   TAccountReferenceVote extends string = string,
 > = {
-  /** Delegated stake account */
   stake: Address<TAccountStake>;
-  /** Delinquent vote account */
   delinquentVote: Address<TAccountDelinquentVote>;
-  /** Reference vote account */
   referenceVote: Address<TAccountReferenceVote>;
 };
 
@@ -153,11 +150,8 @@ export type ParsedDeactivateDelinquentInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Delegated stake account */
     stake: TAccountMetas[0];
-    /** Delinquent vote account */
     delinquentVote: TAccountMetas[1];
-    /** Reference vote account */
     referenceVote: TAccountMetas[2];
   };
   data: DeactivateDelinquentInstructionData;

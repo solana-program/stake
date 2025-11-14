@@ -10,13 +10,12 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct InitializeChecked {
-    /// Uninitialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-    /// Rent sysvar
+
     pub rent_sysvar: solana_program::pubkey::Pubkey,
-    /// The stake authority
+
     pub stake_authority: solana_program::pubkey::Pubkey,
-    /// The withdraw authority
+
     pub withdraw_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -59,7 +58,7 @@ impl InitializeChecked {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeCheckedInstructionData {
-    discriminator: u32,
+    discriminator: u8,
 }
 
 impl InitializeCheckedInstructionData {
@@ -79,7 +78,7 @@ impl Default for InitializeCheckedInstructionData {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
+///   1. `[]` rent_sysvar
 ///   2. `[]` stake_authority
 ///   3. `[signer]` withdraw_authority
 #[derive(Clone, Debug, Default)]
@@ -95,20 +94,16 @@ impl InitializeCheckedBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
-    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.rent_sysvar = Some(rent_sysvar);
         self
     }
-    /// The stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -117,7 +112,6 @@ impl InitializeCheckedBuilder {
         self.stake_authority = Some(stake_authority);
         self
     }
-    /// The withdraw authority
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
@@ -148,9 +142,7 @@ impl InitializeCheckedBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = InitializeChecked {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarRent111111111111111111111111111111111"
-            )),
+            rent_sysvar: self.rent_sysvar.expect("rent_sysvar is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
             withdraw_authority: self
                 .withdraw_authority
@@ -163,13 +155,12 @@ impl InitializeCheckedBuilder {
 
 /// `initialize_checked` CPI accounts.
 pub struct InitializeCheckedCpiAccounts<'a, 'b> {
-    /// Uninitialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake authority
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The withdraw authority
+
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -177,13 +168,13 @@ pub struct InitializeCheckedCpiAccounts<'a, 'b> {
 pub struct InitializeCheckedCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account
+
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Rent sysvar
+
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The stake authority
+
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The withdraw authority
+
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -307,13 +298,11 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
-    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(
         &mut self,
@@ -322,7 +311,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
         self.instruction.rent_sysvar = Some(rent_sysvar);
         self
     }
-    /// The stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -331,7 +319,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
         self.instruction.stake_authority = Some(stake_authority);
         self
     }
-    /// The withdraw authority
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,

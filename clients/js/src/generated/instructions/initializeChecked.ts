@@ -10,8 +10,8 @@ import {
   combineCodec,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -34,15 +34,13 @@ import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 export const INITIALIZE_CHECKED_DISCRIMINATOR = 9;
 
 export function getInitializeCheckedDiscriminatorBytes() {
-  return getU32Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
+  return getU8Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
 }
 
 export type InitializeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountRentSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountRentSysvar extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -73,13 +71,13 @@ export type InitializeCheckedInstructionDataArgs = {};
 
 export function getInitializeCheckedInstructionDataEncoder(): FixedSizeEncoder<InitializeCheckedInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([['discriminator', getU32Encoder()]]),
+    getStructEncoder([['discriminator', getU8Encoder()]]),
     (value) => ({ ...value, discriminator: INITIALIZE_CHECKED_DISCRIMINATOR })
   );
 }
 
 export function getInitializeCheckedInstructionDataDecoder(): FixedSizeDecoder<InitializeCheckedInstructionData> {
-  return getStructDecoder([['discriminator', getU32Decoder()]]);
+  return getStructDecoder([['discriminator', getU8Decoder()]]);
 }
 
 export function getInitializeCheckedInstructionDataCodec(): FixedSizeCodec<
@@ -98,13 +96,9 @@ export type InitializeCheckedInput<
   TAccountStakeAuthority extends string = string,
   TAccountWithdrawAuthority extends string = string,
 > = {
-  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
-  /** Rent sysvar */
-  rentSysvar?: Address<TAccountRentSysvar>;
-  /** The stake authority */
+  rentSysvar: Address<TAccountRentSysvar>;
   stakeAuthority: Address<TAccountStakeAuthority>;
-  /** The withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
 };
 
@@ -147,12 +141,6 @@ export function getInitializeCheckedInstruction<
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.rentSysvar.value) {
-    accounts.rentSysvar.value =
-      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -178,13 +166,9 @@ export type ParsedInitializeCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Uninitialized stake account */
     stake: TAccountMetas[0];
-    /** Rent sysvar */
     rentSysvar: TAccountMetas[1];
-    /** The stake authority */
     stakeAuthority: TAccountMetas[2];
-    /** The withdraw authority */
     withdrawAuthority: TAccountMetas[3];
   };
   data: InitializeCheckedInstructionData;

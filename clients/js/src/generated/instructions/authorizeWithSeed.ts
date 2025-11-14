@@ -7,17 +7,11 @@
  */
 
 import {
-  addDecoderSizePrefix,
-  addEncoderSizePrefix,
   combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
-  getUtf8Decoder,
-  getUtf8Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -37,25 +31,23 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getStakeAuthorizeDecoder,
-  getStakeAuthorizeEncoder,
-  type StakeAuthorize,
-  type StakeAuthorizeArgs,
+  getAuthorizeWithSeedArgsDecoder,
+  getAuthorizeWithSeedArgsEncoder,
+  type AuthorizeWithSeedArgs,
+  type AuthorizeWithSeedArgsArgs,
 } from '../types';
 
 export const AUTHORIZE_WITH_SEED_DISCRIMINATOR = 8;
 
 export function getAuthorizeWithSeedDiscriminatorBytes() {
-  return getU32Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
+  return getU8Encoder().encode(AUTHORIZE_WITH_SEED_DISCRIMINATOR);
 }
 
 export type AuthorizeWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountBase extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountAuthorityBase extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
     | AccountMeta<string>
@@ -68,9 +60,10 @@ export type AuthorizeWithSeedInstruction<
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
-      TAccountBase extends string
-        ? ReadonlySignerAccount<TAccountBase> & AccountSignerMeta<TAccountBase>
-        : TAccountBase,
+      TAccountAuthorityBase extends string
+        ? ReadonlySignerAccount<TAccountAuthorityBase> &
+            AccountSignerMeta<TAccountAuthorityBase>
+        : TAccountAuthorityBase,
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
@@ -88,30 +81,18 @@ export type AuthorizeWithSeedInstruction<
 
 export type AuthorizeWithSeedInstructionData = {
   discriminator: number;
-  newAuthorizedPubkey: Address;
-  stakeAuthorize: StakeAuthorize;
-  authoritySeed: string;
-  authorityOwner: Address;
+  args: AuthorizeWithSeedArgs;
 };
 
 export type AuthorizeWithSeedInstructionDataArgs = {
-  newAuthorizedPubkey: Address;
-  stakeAuthorize: StakeAuthorizeArgs;
-  authoritySeed: string;
-  authorityOwner: Address;
+  args: AuthorizeWithSeedArgsArgs;
 };
 
 export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['newAuthorizedPubkey', getAddressEncoder()],
-      ['stakeAuthorize', getStakeAuthorizeEncoder()],
-      [
-        'authoritySeed',
-        addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder()),
-      ],
-      ['authorityOwner', getAddressEncoder()],
+      ['discriminator', getU8Encoder()],
+      ['args', getAuthorizeWithSeedArgsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_WITH_SEED_DISCRIMINATOR })
   );
@@ -119,11 +100,8 @@ export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeW
 
 export function getAuthorizeWithSeedInstructionDataDecoder(): Decoder<AuthorizeWithSeedInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['newAuthorizedPubkey', getAddressDecoder()],
-    ['stakeAuthorize', getStakeAuthorizeDecoder()],
-    ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ['authorityOwner', getAddressDecoder()],
+    ['discriminator', getU8Decoder()],
+    ['args', getAuthorizeWithSeedArgsDecoder()],
   ]);
 }
 
@@ -139,34 +117,27 @@ export function getAuthorizeWithSeedInstructionDataCodec(): Codec<
 
 export type AuthorizeWithSeedInput<
   TAccountStake extends string = string,
-  TAccountBase extends string = string,
+  TAccountAuthorityBase extends string = string,
   TAccountClockSysvar extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
-  /** Stake account to be updated */
   stake: Address<TAccountStake>;
-  /** Base key of stake or withdraw authority */
-  base: TransactionSigner<TAccountBase>;
-  /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Lockup authority */
+  authorityBase: TransactionSigner<TAccountAuthorityBase>;
+  clockSysvar: Address<TAccountClockSysvar>;
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  newAuthorizedPubkey: AuthorizeWithSeedInstructionDataArgs['newAuthorizedPubkey'];
-  stakeAuthorize: AuthorizeWithSeedInstructionDataArgs['stakeAuthorize'];
-  authoritySeed: AuthorizeWithSeedInstructionDataArgs['authoritySeed'];
-  authorityOwner: AuthorizeWithSeedInstructionDataArgs['authorityOwner'];
+  args: AuthorizeWithSeedInstructionDataArgs['args'];
 };
 
 export function getAuthorizeWithSeedInstruction<
   TAccountStake extends string,
-  TAccountBase extends string,
+  TAccountAuthorityBase extends string,
   TAccountClockSysvar extends string,
   TAccountLockupAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: AuthorizeWithSeedInput<
     TAccountStake,
-    TAccountBase,
+    TAccountAuthorityBase,
     TAccountClockSysvar,
     TAccountLockupAuthority
   >,
@@ -174,7 +145,7 @@ export function getAuthorizeWithSeedInstruction<
 ): AuthorizeWithSeedInstruction<
   TProgramAddress,
   TAccountStake,
-  TAccountBase,
+  TAccountAuthorityBase,
   TAccountClockSysvar,
   TAccountLockupAuthority
 > {
@@ -184,7 +155,7 @@ export function getAuthorizeWithSeedInstruction<
   // Original accounts.
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
-    base: { value: input.base ?? null, isWritable: false },
+    authorityBase: { value: input.authorityBase ?? null, isWritable: false },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
     lockupAuthority: {
       value: input.lockupAuthority ?? null,
@@ -199,17 +170,11 @@ export function getAuthorizeWithSeedInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.stake),
-      getAccountMeta(accounts.base),
+      getAccountMeta(accounts.authorityBase),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.lockupAuthority),
     ].filter(<T>(x: T | undefined): x is T => x !== undefined),
@@ -220,7 +185,7 @@ export function getAuthorizeWithSeedInstruction<
   } as AuthorizeWithSeedInstruction<
     TProgramAddress,
     TAccountStake,
-    TAccountBase,
+    TAccountAuthorityBase,
     TAccountClockSysvar,
     TAccountLockupAuthority
   >);
@@ -232,13 +197,9 @@ export type ParsedAuthorizeWithSeedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Stake account to be updated */
     stake: TAccountMetas[0];
-    /** Base key of stake or withdraw authority */
-    base: TAccountMetas[1];
-    /** Clock sysvar */
+    authorityBase: TAccountMetas[1];
     clockSysvar: TAccountMetas[2];
-    /** Lockup authority */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeWithSeedInstructionData;
@@ -272,7 +233,7 @@ export function parseAuthorizeWithSeedInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       stake: getNextAccount(),
-      base: getNextAccount(),
+      authorityBase: getNextAccount(),
       clockSysvar: getNextAccount(),
       lockupAuthority: getNextOptionalAccount(),
     },

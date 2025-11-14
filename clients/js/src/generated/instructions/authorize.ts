@@ -12,8 +12,8 @@ import {
   getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
+  getU8Decoder,
+  getU8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -42,15 +42,13 @@ import {
 export const AUTHORIZE_DISCRIMINATOR = 1;
 
 export function getAuthorizeDiscriminatorBytes() {
-  return getU32Encoder().encode(AUTHORIZE_DISCRIMINATOR);
+  return getU8Encoder().encode(AUTHORIZE_DISCRIMINATOR);
 }
 
 export type AuthorizeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -85,21 +83,21 @@ export type AuthorizeInstruction<
 
 export type AuthorizeInstructionData = {
   discriminator: number;
-  arg0: Address;
-  arg1: StakeAuthorize;
+  pubkey: Address;
+  stakeAuthorize: StakeAuthorize;
 };
 
 export type AuthorizeInstructionDataArgs = {
-  arg0: Address;
-  arg1: StakeAuthorizeArgs;
+  pubkey: Address;
+  stakeAuthorize: StakeAuthorizeArgs;
 };
 
 export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<AuthorizeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
-      ['discriminator', getU32Encoder()],
-      ['arg0', getAddressEncoder()],
-      ['arg1', getStakeAuthorizeEncoder()],
+      ['discriminator', getU8Encoder()],
+      ['pubkey', getAddressEncoder()],
+      ['stakeAuthorize', getStakeAuthorizeEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_DISCRIMINATOR })
   );
@@ -107,9 +105,9 @@ export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<Authorize
 
 export function getAuthorizeInstructionDataDecoder(): FixedSizeDecoder<AuthorizeInstructionData> {
   return getStructDecoder([
-    ['discriminator', getU32Decoder()],
-    ['arg0', getAddressDecoder()],
-    ['arg1', getStakeAuthorizeDecoder()],
+    ['discriminator', getU8Decoder()],
+    ['pubkey', getAddressDecoder()],
+    ['stakeAuthorize', getStakeAuthorizeDecoder()],
   ]);
 }
 
@@ -129,16 +127,12 @@ export type AuthorizeInput<
   TAccountAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
-  /** Stake account to be updated */
   stake: Address<TAccountStake>;
-  /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake or withdraw authority */
+  clockSysvar: Address<TAccountClockSysvar>;
   authority: TransactionSigner<TAccountAuthority>;
-  /** Lockup authority */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  arg0: AuthorizeInstructionDataArgs['arg0'];
-  arg1: AuthorizeInstructionDataArgs['arg1'];
+  pubkey: AuthorizeInstructionDataArgs['pubkey'];
+  stakeAuthorize: AuthorizeInstructionDataArgs['stakeAuthorize'];
 };
 
 export function getAuthorizeInstruction<
@@ -183,12 +177,6 @@ export function getAuthorizeInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -216,13 +204,9 @@ export type ParsedAuthorizeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Stake account to be updated */
     stake: TAccountMetas[0];
-    /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
-    /** Stake or withdraw authority */
     authority: TAccountMetas[2];
-    /** Lockup authority */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeInstructionData;

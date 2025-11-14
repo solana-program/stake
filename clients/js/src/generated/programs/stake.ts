@@ -8,7 +8,7 @@
 
 import {
   containsBytes,
-  getU32Encoder,
+  getU8Encoder,
   type Address,
   type ReadonlyUint8Array,
 } from '@solana/kit';
@@ -26,6 +26,7 @@ import {
   type ParsedMergeInstruction,
   type ParsedMoveLamportsInstruction,
   type ParsedMoveStakeInstruction,
+  type ParsedRedelegateInstruction,
   type ParsedSetLockupCheckedInstruction,
   type ParsedSetLockupInstruction,
   type ParsedSplitInstruction,
@@ -55,6 +56,7 @@ export enum StakeInstruction {
   SetLockupChecked,
   GetMinimumDelegation,
   DeactivateDelinquent,
+  Redelegate,
   MoveStake,
   MoveLamports,
 }
@@ -63,55 +65,58 @@ export function identifyStakeInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): StakeInstruction {
   const data = 'data' in instruction ? instruction.data : instruction;
-  if (containsBytes(data, getU32Encoder().encode(0), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return StakeInstruction.Initialize;
   }
-  if (containsBytes(data, getU32Encoder().encode(1), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return StakeInstruction.Authorize;
   }
-  if (containsBytes(data, getU32Encoder().encode(2), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return StakeInstruction.DelegateStake;
   }
-  if (containsBytes(data, getU32Encoder().encode(3), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return StakeInstruction.Split;
   }
-  if (containsBytes(data, getU32Encoder().encode(4), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
     return StakeInstruction.Withdraw;
   }
-  if (containsBytes(data, getU32Encoder().encode(5), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0)) {
     return StakeInstruction.Deactivate;
   }
-  if (containsBytes(data, getU32Encoder().encode(6), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(6), 0)) {
     return StakeInstruction.SetLockup;
   }
-  if (containsBytes(data, getU32Encoder().encode(7), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(7), 0)) {
     return StakeInstruction.Merge;
   }
-  if (containsBytes(data, getU32Encoder().encode(8), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(8), 0)) {
     return StakeInstruction.AuthorizeWithSeed;
   }
-  if (containsBytes(data, getU32Encoder().encode(9), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(9), 0)) {
     return StakeInstruction.InitializeChecked;
   }
-  if (containsBytes(data, getU32Encoder().encode(10), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(10), 0)) {
     return StakeInstruction.AuthorizeChecked;
   }
-  if (containsBytes(data, getU32Encoder().encode(11), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(11), 0)) {
     return StakeInstruction.AuthorizeCheckedWithSeed;
   }
-  if (containsBytes(data, getU32Encoder().encode(12), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(12), 0)) {
     return StakeInstruction.SetLockupChecked;
   }
-  if (containsBytes(data, getU32Encoder().encode(13), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(13), 0)) {
     return StakeInstruction.GetMinimumDelegation;
   }
-  if (containsBytes(data, getU32Encoder().encode(14), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(14), 0)) {
     return StakeInstruction.DeactivateDelinquent;
   }
-  if (containsBytes(data, getU32Encoder().encode(16), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(15), 0)) {
+    return StakeInstruction.Redelegate;
+  }
+  if (containsBytes(data, getU8Encoder().encode(16), 0)) {
     return StakeInstruction.MoveStake;
   }
-  if (containsBytes(data, getU32Encoder().encode(17), 0)) {
+  if (containsBytes(data, getU8Encoder().encode(17), 0)) {
     return StakeInstruction.MoveLamports;
   }
   throw new Error(
@@ -167,6 +172,9 @@ export type ParsedStakeInstruction<
   | ({
       instructionType: StakeInstruction.DeactivateDelinquent;
     } & ParsedDeactivateDelinquentInstruction<TProgram>)
+  | ({
+      instructionType: StakeInstruction.Redelegate;
+    } & ParsedRedelegateInstruction<TProgram>)
   | ({
       instructionType: StakeInstruction.MoveStake;
     } & ParsedMoveStakeInstruction<TProgram>)
