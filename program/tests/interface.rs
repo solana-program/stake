@@ -22,6 +22,7 @@ use {
         },
     },
     solana_stake_program::{get_minimum_delegation, id},
+    solana_svm_log_collector::LogCollector,
     solana_sysvar_id::SysvarId,
     solana_vote_interface::{
         program as vote_program,
@@ -1121,5 +1122,91 @@ fn test_no_use_dealloc() {
                 env.reset();
             }
         }
+    }
+}
+
+// this prints ballpark compute unit costs suitable for insertion in README.md
+// run with `cargo test --test interface show_compute_usage -- --nocapture --ignored`
+#[test]
+#[ignore]
+fn show_compute_usage() {
+    let mut env = Env::init();
+    solana_logger::setup_with("");
+    env.mollusk.logger = Some(LogCollector::new_ref());
+    let mut compute_tracker = ComputeTracker::new();
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
+        env.process_success(&instruction);
+
+        let logs = env
+            .mollusk
+            .logger
+            .as_ref()
+            .unwrap()
+            .replace(LogCollector::default())
+            .into_messages();
+
+        compute_tracker.add(&logs);
+        env.reset();
+    }
+
+    compute_tracker.show();
+}
+
+struct ComputeTracker(HashMap<String, u64>);
+impl ComputeTracker {
+    fn new() -> Self {
+        Self(HashMap::from([("GetMinimumDelegation".to_string(), 0)]))
+    }
+
+    fn add(&mut self, logs: &[String]) {
+        const IX_PREFIX: &str = "Program log: Instruction: ";
+        const CU_PREFIX: &str = "Program Stake11111111111111111111111111111111111111 consumed ";
+
+        let instruction = logs
+            .iter()
+            .find_map(|line| {
+                line.strip_prefix(IX_PREFIX)
+                    .map(|rest| rest.split_whitespace().next().unwrap().to_string())
+            })
+            .unwrap();
+
+        let compute_units = logs
+            .iter()
+            .find_map(|line| {
+                line.strip_prefix(CU_PREFIX).map(|rest| {
+                    rest.split_whitespace()
+                        .next()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+            })
+            .unwrap();
+
+        self.0
+            .entry(instruction)
+            .and_modify(|v| *v = std::cmp::max(compute_units, *v))
+            .or_insert(compute_units);
+    }
+
+    fn show(&self) {
+        let mut instructions = self.0.keys().collect::<Vec<_>>();
+        instructions.sort();
+
+        println!("\n| Instruction | Estimated Cost |");
+        println!("| --- | --- |");
+
+        for instruction in instructions.into_iter() {
+            let compute_units = match self.0[instruction] {
+                n if n < 100 => "(negligible)".to_string(),
+                n => ((n + 50) / 100 * 100).to_string(),
+            };
+
+            println!("| `{}` | {} |", instruction, compute_units);
+        }
+
+        println!();
     }
 }
