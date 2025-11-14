@@ -35,11 +35,17 @@ pub enum StakeError {
 
     // 5
     /// Stake account with transient stake cannot be merged.
-    #[codama(error(code = 5, message = "Stake account with transient stake cannot be merged"))]
+    #[codama(error(
+        code = 5,
+        message = "Stake account with transient stake cannot be merged"
+    ))]
     MergeTransientStake,
 
     /// Stake account merge failed due to different authority, lockups or state.
-    #[codama(error(code = 6, message = "Stake account merge failed due to different authority, lockups or state"))]
+    #[codama(error(
+        code = 6,
+        message = "Stake account merge failed due to different authority, lockups or state"
+    ))]
     MergeMismatch,
 
     /// Custodian address not present.
@@ -51,17 +57,26 @@ pub enum StakeError {
     CustodianSignatureMissing,
 
     /// Insufficient voting activity in the reference vote account.
-    #[codama(error(code = 9, message = "Insufficient voting activity in the reference vote account"))]
+    #[codama(error(
+        code = 9,
+        message = "Insufficient voting activity in the reference vote account"
+    ))]
     InsufficientReferenceVotes,
 
     // 10
     /// Stake account is not delegated to the provided vote account.
-    #[codama(error(code = 10, message = "Stake account is not delegated to the provided vote account"))]
+    #[codama(error(
+        code = 10,
+        message = "Stake account is not delegated to the provided vote account"
+    ))]
     VoteAddressMismatch,
 
     /// Stake account has not been delinquent for the minimum epochs required
     /// for deactivation.
-    #[codama(error(code = 11, message = "Stake account has not been delinquent for the minimum epochs required for deactivation"))]
+    #[codama(error(
+        code = 11,
+        message = "Stake account has not been delinquent for the minimum epochs required for deactivation"
+    ))]
     MinimumDelinquentEpochsForDeactivationNotMet,
 
     /// Delegation amount is less than the minimum.
@@ -69,20 +84,32 @@ pub enum StakeError {
     InsufficientDelegation,
 
     /// Stake account with transient or inactive stake cannot be redelegated.
-    #[codama(error(code = 13, message = "Stake account with transient or inactive stake cannot be redelegated"))]
+    #[codama(error(
+        code = 13,
+        message = "Stake account with transient or inactive stake cannot be redelegated"
+    ))]
     RedelegateTransientOrInactiveStake,
 
     /// Stake redelegation to the same vote account is not permitted.
-    #[codama(error(code = 14, message = "Stake redelegation to the same vote account is not permitted"))]
+    #[codama(error(
+        code = 14,
+        message = "Stake redelegation to the same vote account is not permitted"
+    ))]
     RedelegateToSameVoteAccount,
 
     // 15
     /// Redelegated stake must be fully activated before deactivation.
-    #[codama(error(code = 15, message = "Redelegated stake must be fully activated before deactivation"))]
+    #[codama(error(
+        code = 15,
+        message = "Redelegated stake must be fully activated before deactivation"
+    ))]
     RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
 
     /// Stake action is not permitted while the epoch rewards period is active.
-    #[codama(error(code = 16, message = "Stake action is not permitted while the epoch rewards period is active"))]
+    #[codama(error(
+        code = 16,
+        message = "Stake action is not permitted while the epoch rewards period is active"
+    ))]
     EpochRewardsActive,
 }
 

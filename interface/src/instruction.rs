@@ -98,9 +98,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "stake", writable))]
     #[codama(account(name = "split_stake", writable))]
     #[codama(account(name = "stake_authority", signer))]
-    Split {
-        lamports: u64,
-    },
+    Split { lamports: u64 },
 
     /// Withdraw unstaked lamports from the stake account
     ///
@@ -120,9 +118,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "stake_history_sysvar"))]
     #[codama(account(name = "withdraw_authority", signer))]
     #[codama(account(name = "lockup_authority", optional, signer))]
-    Withdraw {
-        lamports: u64,
-    },
+    Withdraw { lamports: u64 },
 
     /// Deactivates the stake in the account
     ///
@@ -145,9 +141,7 @@ pub enum StakeInstruction {
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
     #[codama(account(name = "stake", writable))]
     #[codama(account(name = "authority", signer))]
-    SetLockup {
-        lockup: LockupArgs,
-    },
+    SetLockup { lockup: LockupArgs },
 
     /// Merge two stake accounts.
     ///
@@ -192,9 +186,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "authority_base", signer))]
     #[codama(account(name = "clock_sysvar"))]
     #[codama(account(name = "lockup_authority", optional, signer))]
-    AuthorizeWithSeed {
-        args: AuthorizeWithSeedArgs,
-    },
+    AuthorizeWithSeed { args: AuthorizeWithSeedArgs },
 
     /// Initialize a stake with authorization information
     ///
@@ -229,9 +221,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "authority", signer))]
     #[codama(account(name = "new_authority", signer))]
     #[codama(account(name = "lockup_authority", optional, signer))]
-    AuthorizeChecked {
-        stake_authorize: StakeAuthorize,
-    },
+    AuthorizeChecked { stake_authorize: StakeAuthorize },
 
     /// Authorize a key to manage stake or withdrawal with a derived key
     ///
@@ -250,9 +240,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "clock_sysvar"))]
     #[codama(account(name = "new_authority", signer))]
     #[codama(account(name = "lockup_authority", optional, signer))]
-    AuthorizeCheckedWithSeed {
-        args: AuthorizeCheckedWithSeedArgs,
-    },
+    AuthorizeCheckedWithSeed { args: AuthorizeCheckedWithSeedArgs },
 
     /// Set stake lockup
     ///
@@ -269,9 +257,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "stake", writable))]
     #[codama(account(name = "authority", signer))]
     #[codama(account(name = "new_lockup_authority", optional, signer))]
-    SetLockupChecked {
-        lockup: LockupCheckedArgs,
-    },
+    SetLockupChecked { lockup: LockupCheckedArgs },
 
     /// Get the minimum stake delegation, in lamports
     ///
@@ -347,9 +333,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "source", writable))]
     #[codama(account(name = "destination", writable))]
     #[codama(account(name = "stake_authority", signer))]
-    MoveStake {
-        lamports: u64,
-    },
+    MoveStake { lamports: u64 },
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
     /// authority.
@@ -367,9 +351,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "source", writable))]
     #[codama(account(name = "destination", writable))]
     #[codama(account(name = "stake_authority", signer))]
-    MoveLamports {
-        lamports: u64,
-    },
+    MoveLamports { lamports: u64 },
 }
 
 #[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
@@ -846,7 +828,11 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup { lockup: *lockup }, account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::SetLockup { lockup: *lockup },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]
@@ -992,7 +978,11 @@ pub fn move_lamports(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveLamports { lamports }, account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::MoveLamports { lamports },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]

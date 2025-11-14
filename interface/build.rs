@@ -33,4 +33,3 @@ fn generate_idl() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:warning=IDL written to: {}", idl_path.display());
     Ok(())
 }
-

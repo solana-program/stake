@@ -7,13 +7,13 @@
 #[cfg(feature = "borsh")]
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
 use {
-    codama_macros::{codama, CodamaType},
     crate::{
         error::StakeError,
         instruction::LockupArgs,
         stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
     },
+    codama_macros::{codama, CodamaType},
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
     solana_pubkey::Pubkey,
