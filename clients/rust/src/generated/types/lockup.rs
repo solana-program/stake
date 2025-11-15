@@ -6,6 +6,7 @@
 //!
 
 use {
+    crate::generated::types::{Epoch, UnixTimestamp},
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::pubkey::Pubkey,
 };
@@ -13,8 +14,8 @@ use {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lockup {
-    pub unix_timestamp: i64,
-    pub epoch: u64,
+    pub unix_timestamp: UnixTimestamp,
+    pub epoch: Epoch,
     #[cfg_attr(
         feature = "serde",
         serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
