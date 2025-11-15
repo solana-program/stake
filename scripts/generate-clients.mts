@@ -11,16 +11,16 @@ const idl = JSON.parse(
 );
 const codama = c.createFromRoot(idl);
 
-// Rename the program from solanaStakeInterface to stake
+// Rename the program.
 codama.update(
   c.updateProgramsVisitor({
     solanaStakeInterface: { name: 'stake' },
   })
 );
 
-// Delete deprecated/disabled instructions
 codama.update(
   c.updateInstructionsVisitor({
+    // Deprecated instruction.
     redelegate: { delete: true },
   })
 );
@@ -89,22 +89,6 @@ codama.update(
       },
     },
     {
-      // instruction: use omitted optional accounts + fix discriminator u8 -> u32
-      select: '[instructionNode]',
-      transform: (node) => {
-        c.assertIsNode(node, 'instructionNode');
-        return {
-          ...node,
-          optionalAccountStrategy: 'omitted',
-          arguments: node.arguments.map((arg) =>
-            arg.name === 'discriminator'
-              ? { ...arg, type: c.numberTypeNode('u32') }
-              : arg
-          ),
-        };
-      },
-    },
-    {
       // enum discriminator -> u32
       select: '[definedTypeNode]stakeState.[enumTypeNode]',
       transform: (node) => {
@@ -126,10 +110,27 @@ codama.update(
         };
       },
     },
+    {
+      // Use omitted optional account strategy for all instructions.
+      // + fix discriminator u8 -> u32.
+      select: '[instructionNode]',
+      transform: (node) => {
+        c.assertIsNode(node, 'instructionNode');
+        return {
+          ...node,
+          optionalAccountStrategy: 'omitted',
+          arguments: node.arguments.map((arg) =>
+            arg.name === 'discriminator'
+              ? { ...arg, type: c.numberTypeNode('u32') }
+              : arg
+          ),
+        };
+      },
+    },
   ])
 );
 
-// Render JavaScript client
+// Render JavaScript.
 const jsClient = path.join(workingDirectory, 'clients', 'js');
 codama.accept(
   renderJavaScriptVisitor(path.join(jsClient, 'src', 'generated'), {
@@ -140,14 +141,14 @@ codama.accept(
 );
 
 // Remove the stake account from the accounts since the Rust client
-// provides its own implementation in the hooked module
+// provides its own implementation.
 codama.update(
   c.updateAccountsVisitor({
     stakeStateAccount: { delete: true },
   })
 );
 
-// Render Rust client
+// Render Rust.
 const rustClient = path.join(workingDirectory, 'clients', 'rust');
 codama.accept(
   renderRustVisitor(path.join(rustClient, 'src', 'generated'), {
@@ -163,6 +164,7 @@ codama.accept(
         'serde::Deserialize',
         'Clone',
         'Debug',
+        // 'Eq', <- Remove 'Eq' from the default traits.
         'PartialEq',
       ],
     },
