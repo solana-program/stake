@@ -333,7 +333,8 @@ pub enum StakeInstruction {
     #[codama(account(name = "sourceStake", writable))]
     #[codama(account(name = "destinationStake", writable))]
     #[codama(account(name = "stake_authority", signer))]
-    MoveStake { lamports: u64 },
+    // sadly named `args` to avoid breaking users of old IDL
+    MoveStake { args: u64 },
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
     /// authority.
@@ -351,7 +352,8 @@ pub enum StakeInstruction {
     #[codama(account(name = "source_stake", writable))]
     #[codama(account(name = "destination_stake", writable))]
     #[codama(account(name = "stake_authority", signer))]
-    MoveLamports { lamports: u64 },
+    // sadly named `args` to avoid breaking users of old IDL
+    MoveLamports { args: u64 },
 }
 
 #[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]

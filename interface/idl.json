@@ -1532,7 +1532,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lamports",
+            "name": "args",
             "type": {
               "endian": "le",
               "format": "u64",
@@ -1588,7 +1588,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lamports",
+            "name": "args",
             "type": {
               "endian": "le",
               "format": "u64",

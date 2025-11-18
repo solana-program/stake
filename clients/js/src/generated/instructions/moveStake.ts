@@ -62,18 +62,15 @@ export type MoveStakeInstruction<
     ]
   >;
 
-export type MoveStakeInstructionData = {
-  discriminator: number;
-  lamports: bigint;
-};
+export type MoveStakeInstructionData = { discriminator: number; args: bigint };
 
-export type MoveStakeInstructionDataArgs = { lamports: number | bigint };
+export type MoveStakeInstructionDataArgs = { args: number | bigint };
 
 export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStakeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lamports', getU64Encoder()],
+      ['args', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: MOVE_STAKE_DISCRIMINATOR })
   );
@@ -82,7 +79,7 @@ export function getMoveStakeInstructionDataEncoder(): FixedSizeEncoder<MoveStake
 export function getMoveStakeInstructionDataDecoder(): FixedSizeDecoder<MoveStakeInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lamports', getU64Decoder()],
+    ['args', getU64Decoder()],
   ]);
 }
 
@@ -104,7 +101,7 @@ export type MoveStakeInput<
   sourceStake: Address<TAccountSourceStake>;
   destinationStake: Address<TAccountDestinationStake>;
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
-  lamports: MoveStakeInstructionDataArgs['lamports'];
+  args: MoveStakeInstructionDataArgs['args'];
 };
 
 export function getMoveStakeInstruction<
