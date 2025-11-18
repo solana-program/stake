@@ -15,9 +15,9 @@ use {
     solana_stake_interface::{
         instruction::{self, LockupArgs},
         stake_flags::StakeFlags,
-        stake_history::StakeHistory,
+        stake_history::{StakeHistory, StakeHistoryEntry},
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
-        warmup_cooldown_allowance::warmup_cooldown_rate_fraction,
+        warmup_cooldown_allowance::warmup_cooldown_rate_bps,
     },
     solana_stake_program::{get_minimum_delegation, id},
     solana_svm_log_collector::LogCollector,
@@ -142,13 +142,13 @@ impl Env {
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
         // backfill stake history
-        let (num, den) = warmup_cooldown_rate_fraction(0, Some(0));
-        let stake_delta_amount = ((PERSISTENT_ACTIVE_STAKE as u128 * num) / den) as u64;
+        let rate_bps = warmup_cooldown_rate_bps(0, Some(0));
+        let stake_delta_amount =
+            ((PERSISTENT_ACTIVE_STAKE as u128 * rate_bps as u128) / 10_000) as u64;
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
-                // TODO: Remove when mollusk updates to latest solana-stake-interface version
-                solana_stake_interface_legacy::stake_history::StakeHistoryEntry {
+                StakeHistoryEntry {
                     effective: PERSISTENT_ACTIVE_STAKE,
                     activating: stake_delta_amount,
                     deactivating: stake_delta_amount,

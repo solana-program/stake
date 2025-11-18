@@ -1,20 +1,15 @@
 use {crate::stake_history::StakeHistoryEntry, solana_clock::Epoch};
 
-type Numerator = u128;
-type Denominator = u128;
-
-pub const PREV_WARMUP_COOLDOWN_RATE_FRACTION: (Numerator, Denominator) = (1, 4); // 25%
-pub const CURR_WARMUP_COOLDOWN_RATE_FRACTION: (Numerator, Denominator) = (9, 100); // 9%
+pub const BASIS_POINTS_PER_UNIT: u64 = 10_000;
+pub const ORIGINAL_WARMUP_COOLDOWN_RATE_BPS: u64 = 2_500; // 25%
+pub const TOWER_WARMUP_COOLDOWN_RATE_BPS: u64 = 900; // 9%
 
 #[inline]
-pub fn warmup_cooldown_rate_fraction(
-    epoch: Epoch,
-    new_rate_activation_epoch: Option<Epoch>,
-) -> (Numerator, Denominator) {
+pub fn warmup_cooldown_rate_bps(epoch: Epoch, new_rate_activation_epoch: Option<Epoch>) -> u64 {
     if epoch < new_rate_activation_epoch.unwrap_or(u64::MAX) {
-        PREV_WARMUP_COOLDOWN_RATE_FRACTION
+        ORIGINAL_WARMUP_COOLDOWN_RATE_BPS
     } else {
-        CURR_WARMUP_COOLDOWN_RATE_FRACTION
+        TOWER_WARMUP_COOLDOWN_RATE_BPS
     }
 }
 
@@ -41,7 +36,7 @@ pub fn calculate_activation_allowance(
 ///
 /// This function allocates a share of the cluster's per-epoch deactivation allowance
 /// proportional to the account's share of the previous epoch's total deactivating stake.
-pub fn calculate_cooldown_allowance(
+pub fn calculate_deactivation_allowance(
     current_epoch: Epoch,
     account_deactivating_stake: u64,
     prev_epoch_cluster_state: &StakeHistoryEntry,
@@ -69,8 +64,7 @@ fn rate_limited_stake_change(
         return 0;
     }
 
-    let (rate_numerator, rate_denominator) =
-        warmup_cooldown_rate_fraction(epoch, new_rate_activation_epoch);
+    let rate_bps = warmup_cooldown_rate_bps(epoch, new_rate_activation_epoch);
 
     // Calculate this account's proportional share of the network-wide stake change allowance for the epoch.
     // Formula: `change = (account_portion / cluster_portion) * (cluster_effective * rate)`
@@ -78,28 +72,23 @@ fn rate_limited_stake_change(
     //   - `(account_portion / cluster_portion)` is this account's share of the pool.
     //   - `(cluster_effective * rate)` is the total network allowance for change this epoch.
     //
-    // Re-arranged formula to use only integer arithmetic w/ rate fraction:
-    // `change = (account_portion * cluster_effective * rate_numerator) / (cluster_portion * rate_denominator)`
+    // Re-arranged formula to maximize precision:
+    // `change = (account_portion * cluster_effective * rate_bps) / (cluster_portion * BASIS_POINTS_PER_UNIT)`
     //
     // Using `u128` for the intermediate calculations to prevent overflow.
     let numerator = (account_portion as u128)
         .checked_mul(cluster_effective as u128)
-        .and_then(|x| x.checked_mul(rate_numerator));
-    let denominator = (cluster_portion as u128).saturating_mul(rate_denominator);
+        .and_then(|x| x.checked_mul(rate_bps as u128));
+    let denominator = (cluster_portion as u128).saturating_mul(BASIS_POINTS_PER_UNIT as u128);
 
     match numerator {
         Some(n) => {
-            let delta = n.checked_div(denominator).unwrap_or(u128::MAX);
+            // Safe unwrap as denominator cannot be zero
+            let delta = n.checked_div(denominator).unwrap();
             // The calculated delta can be larger than `account_portion` if the network's stake change
             // allowance is greater than the total stake waiting to change. In this case, the account's
             // entire portion is allowed to change.
-            if delta >= account_portion as u128 {
-                account_portion
-            } else {
-                // The cast is safe because we have just confirmed that `delta` is less than
-                // `account_portion`, which is a `u64`.
-                delta as u64
-            }
+            delta.min(account_portion as u128) as u64
         }
         // Overflowing u128 is not a realistic scenario except in tests. However, in that case
         // it's reasonable to allow activation/deactivation of the account's entire portion.
@@ -111,38 +100,38 @@ fn rate_limited_stake_change(
 mod test {
     #[allow(deprecated)]
     use crate::state::{DEFAULT_WARMUP_COOLDOWN_RATE, NEW_WARMUP_COOLDOWN_RATE};
-    use {super::*, proptest::prelude::*};
+    use {super::*, crate::test_utils::max_ulp_tolerance, proptest::prelude::*};
 
     // === Rate selector ===
 
     #[test]
-    fn rate_fraction_before_activation_epoch_uses_prev_rate() {
+    fn rate_bps_before_activation_epoch_uses_prev_rate() {
         let epoch = 9;
         let new_rate_activation_epoch = Some(10);
-        let frac = warmup_cooldown_rate_fraction(epoch, new_rate_activation_epoch);
-        assert_eq!(frac, PREV_WARMUP_COOLDOWN_RATE_FRACTION);
+        let bps = warmup_cooldown_rate_bps(epoch, new_rate_activation_epoch);
+        assert_eq!(bps, ORIGINAL_WARMUP_COOLDOWN_RATE_BPS);
     }
 
     #[test]
-    fn rate_fraction_at_or_after_activation_epoch_uses_curr_rate() {
+    fn rate_bps_at_or_after_activation_epoch_uses_curr_rate() {
         let epoch = 10;
         let new_rate_activation_epoch = Some(10);
         assert_eq!(
-            warmup_cooldown_rate_fraction(epoch, new_rate_activation_epoch),
-            CURR_WARMUP_COOLDOWN_RATE_FRACTION
+            warmup_cooldown_rate_bps(epoch, new_rate_activation_epoch),
+            TOWER_WARMUP_COOLDOWN_RATE_BPS
         );
         let epoch2 = 11;
         assert_eq!(
-            warmup_cooldown_rate_fraction(epoch2, new_rate_activation_epoch),
-            CURR_WARMUP_COOLDOWN_RATE_FRACTION
+            warmup_cooldown_rate_bps(epoch2, new_rate_activation_epoch),
+            TOWER_WARMUP_COOLDOWN_RATE_BPS
         );
     }
 
     #[test]
-    fn rate_fraction_none_activation_epoch_behaves_like_prev_rate() {
+    fn rate_bps_none_activation_epoch_behaves_like_prev_rate() {
         let epoch = 123;
-        let frac = warmup_cooldown_rate_fraction(epoch, None);
-        assert_eq!(frac, PREV_WARMUP_COOLDOWN_RATE_FRACTION);
+        let bps = warmup_cooldown_rate_bps(epoch, None);
+        assert_eq!(bps, ORIGINAL_WARMUP_COOLDOWN_RATE_BPS);
     }
 
     // === Activation allowance ===
@@ -241,7 +230,7 @@ mod test {
             effective: 100,
             ..Default::default()
         };
-        assert_eq!(calculate_cooldown_allowance(0, 0, &prev, Some(0)), 0);
+        assert_eq!(calculate_deactivation_allowance(0, 0, &prev, Some(0)), 0);
 
         // cluster_portion == 0
         let prev = StakeHistoryEntry {
@@ -249,7 +238,7 @@ mod test {
             effective: 100,
             ..Default::default()
         };
-        assert_eq!(calculate_cooldown_allowance(0, 5, &prev, Some(0)), 0);
+        assert_eq!(calculate_deactivation_allowance(0, 5, &prev, Some(0)), 0);
 
         // cluster_effective == 0
         let prev = StakeHistoryEntry {
@@ -257,7 +246,7 @@ mod test {
             effective: 0,
             ..Default::default()
         };
-        assert_eq!(calculate_cooldown_allowance(0, 5, &prev, Some(0)), 0);
+        assert_eq!(calculate_deactivation_allowance(0, 5, &prev, Some(0)), 0);
     }
 
     #[test]
@@ -272,7 +261,7 @@ mod test {
             ..Default::default()
         };
         let result =
-            calculate_cooldown_allowance(current_epoch, 200, &prev, new_rate_activation_epoch);
+            calculate_deactivation_allowance(current_epoch, 200, &prev, new_rate_activation_epoch);
         assert_eq!(result, 180);
     }
 
@@ -286,7 +275,7 @@ mod test {
             ..Default::default()
         };
         let account_portion = 70;
-        let result = calculate_cooldown_allowance(
+        let result = calculate_deactivation_allowance(
             current_epoch,
             account_portion,
             &prev,
@@ -309,7 +298,8 @@ mod test {
         };
         let account = 333;
         let act = calculate_activation_allowance(epoch, account, &prev, new_rate_activation_epoch);
-        let cool = calculate_cooldown_allowance(epoch, account, &prev, new_rate_activation_epoch);
+        let cool =
+            calculate_deactivation_allowance(epoch, account, &prev, new_rate_activation_epoch);
         assert_eq!(act, cool);
     }
 
@@ -332,7 +322,7 @@ mod test {
         assert_eq!(result, 90);
     }
 
-    // === Property tests: compare the integer refactor vs legacy f64 ===
+    // === Property tests: compare the integer refactor vs legacy `f64` ===
 
     #[allow(deprecated)]
     fn legacy_warmup_cooldown_rate(
@@ -364,6 +354,8 @@ mod test {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10_000))]
+
         #[test]
         fn rate_limited_change_consistent_with_legacy(
             account_portion in 0u64..=u64::MAX,
@@ -388,30 +380,33 @@ mod test {
                 new_rate_activation_epoch_option,
             ).min(account_portion);
 
-            let (rate_num, _rate_den) =
-                warmup_cooldown_rate_fraction(current_epoch, new_rate_activation_epoch_option);
+            let rate_bps =
+                warmup_cooldown_rate_bps(current_epoch, new_rate_activation_epoch_option);
 
-            // See if the u128 product would overflow: account * effective * rate_num
+            // See if the u128 product would overflow: account * effective * rate_bps
             let would_overflow = (account_portion as u128)
                 .checked_mul(cluster_effective as u128)
-                .and_then(|n| n.checked_mul(rate_num))
+                .and_then(|n| n.checked_mul(rate_bps as u128))
                 .is_none();
 
             if account_portion == 0 || cluster_portion == 0 || cluster_effective == 0 {
                 prop_assert_eq!(integer_math_result, 0);
                 prop_assert_eq!(float_math_result, 0);
             } else if would_overflow {
-                // In the u128 overflow region, the f64 implementation is guaranteed to be imprecise.
+                // In the u128 overflow region, the `f64` implementation is guaranteed to be imprecise.
                 // We only assert that our implementation correctly falls back to account_portion.
                 prop_assert_eq!(integer_math_result, account_portion);
             } else {
                 prop_assert!(integer_math_result <= account_portion);
                 prop_assert!(float_math_result <= account_portion);
-                // The `f64`-based oracle calculation loses precision when `u64` inputs exceed 2^53.
-                // The new integer-based implementation is more precise using `u128` arithmetic.
-                // The small difference seen in failing tests is a measure of this legacy inaccuracy.
-                let diff = integer_math_result.abs_diff(float_math_result) as u128;
-                prop_assert!(diff <= 3750, "candidate={}, oracle={}, diff={}", integer_math_result, float_math_result, diff);
+
+                let diff = integer_math_result.abs_diff(float_math_result);
+                let tolerance = max_ulp_tolerance(integer_math_result, float_math_result);
+                prop_assert!(
+                    diff <= tolerance,
+                    "Test failed: candidate={}, oracle={}, diff={}, tolerance={}",
+                    integer_math_result, float_math_result, diff, tolerance
+                );
             }
         }
     }

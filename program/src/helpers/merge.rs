@@ -238,7 +238,7 @@ mod tests {
         solana_rent::Rent,
         solana_stake_interface::{
             stake_history::{StakeHistory, StakeHistoryEntry},
-            warmup_cooldown_allowance::warmup_cooldown_rate_fraction,
+            warmup_cooldown_allowance::warmup_cooldown_rate_bps,
         },
     };
 
@@ -534,9 +534,8 @@ mod tests {
         // all paritially activated, transient epochs fail
         loop {
             clock.epoch += 1;
-            let (rate_num, rate_den) =
-                warmup_cooldown_rate_fraction(clock.epoch, new_rate_activation_epoch);
-            let rate_limited = ((effective as u128) * rate_num / rate_den) as u64;
+            let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_rate_activation_epoch);
+            let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
             let delta = activating.min(rate_limited);
             effective += delta;
             activating -= delta;
@@ -611,9 +610,8 @@ mod tests {
         // all transient, deactivating epochs fail
         loop {
             clock.epoch += 1;
-            let (rate_num, rate_den) =
-                warmup_cooldown_rate_fraction(clock.epoch, new_rate_activation_epoch);
-            let rate_limited = ((effective as u128) * rate_num / rate_den) as u64;
+            let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_rate_activation_epoch);
+            let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
             let delta = deactivating.min(rate_limited);
             effective -= delta;
             deactivating -= delta;
