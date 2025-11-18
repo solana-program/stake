@@ -974,7 +974,11 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake { lamports }, account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::MoveStake { args: lamports },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]
@@ -992,7 +996,7 @@ pub fn move_lamports(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::MoveLamports { lamports },
+        &StakeInstruction::MoveLamports { args: lamports },
         account_metas,
     )
 }
