@@ -12,6 +12,8 @@ pub mod stake_history;
 pub mod state;
 #[cfg(feature = "sysvar")]
 pub mod sysvar;
+#[cfg(test)]
+mod test_utils;
 pub mod tools;
 pub mod warmup_cooldown_allowance;
 

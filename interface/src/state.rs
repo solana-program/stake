@@ -14,7 +14,9 @@ use {
         instruction::LockupArgs,
         stake_flags::StakeFlags,
         stake_history::{StakeHistoryEntry, StakeHistoryGetEntry},
-        warmup_cooldown_allowance::{calculate_activation_allowance, calculate_cooldown_allowance},
+        warmup_cooldown_allowance::{
+            calculate_activation_allowance, calculate_deactivation_allowance,
+        },
     },
     solana_clock::{Clock, Epoch, UnixTimestamp},
     solana_instruction::error::InstructionError,
@@ -28,17 +30,14 @@ pub type StakeActivationStatus = StakeHistoryEntry;
 // epoch.
 #[deprecated(
     since = "2.0.1",
-    note = "Use PREV_WARMUP_COOLDOWN_RATE_FRACTION instead"
+    note = "Use ORIGINAL_WARMUP_COOLDOWN_RATE_BPS instead"
 )]
 pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
-#[deprecated(
-    since = "2.0.1",
-    note = "Use CURR_WARMUP_COOLDOWN_RATE_FRACTION instead"
-)]
+#[deprecated(since = "2.0.1", note = "Use TOWER_WARMUP_COOLDOWN_RATE_BPS instead")]
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
 
-#[deprecated(since = "2.0.1", note = "Use warmup_cooldown_rate_fraction() instead")]
+#[deprecated(since = "2.0.1", note = "Use warmup_cooldown_rate_bps() instead")]
 pub fn warmup_cooldown_rate(current_epoch: Epoch, new_rate_activation_epoch: Option<Epoch>) -> f64 {
     if current_epoch < new_rate_activation_epoch.unwrap_or(u64::MAX) {
         DEFAULT_WARMUP_COOLDOWN_RATE
@@ -528,7 +527,199 @@ impl Delegation {
             .effective
     }
 
-    #[allow(clippy::comparison_chain)]
+    /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
+    /// rate-limiting. For the purpose of consumers like Agave that need to feature gate the update.
+    #[deprecated(since = "2.0.1", note = "Use stake() instead")]
+    pub fn stake_v1_legacy<T: StakeHistoryGetEntry>(
+        &self,
+        epoch: Epoch,
+        history: &T,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> u64 {
+        self.stake_activating_and_deactivating_v1_legacy(epoch, history, new_rate_activation_epoch)
+            .effective
+    }
+
+    /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
+    /// rate-limiting. For the purpose of consumers like Agave that need to feature gate the update.
+    #[deprecated(
+        since = "2.0.1",
+        note = "Use stake_activating_and_deactivating() instead"
+    )]
+    pub fn stake_activating_and_deactivating_v1_legacy<T: StakeHistoryGetEntry>(
+        &self,
+        target_epoch: Epoch,
+        history: &T,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> StakeActivationStatus {
+        // first, calculate an effective and activating stake
+        let (effective_stake, activating_stake) =
+            self.stake_and_activating_v1_legacy(target_epoch, history, new_rate_activation_epoch);
+
+        // then de-activate some portion if necessary
+        if target_epoch < self.deactivation_epoch {
+            // not deactivated
+            if activating_stake == 0 {
+                StakeActivationStatus::with_effective(effective_stake)
+            } else {
+                StakeActivationStatus::with_effective_and_activating(
+                    effective_stake,
+                    activating_stake,
+                )
+            }
+        } else if target_epoch == self.deactivation_epoch {
+            // can only deactivate what's activated
+            StakeActivationStatus::with_deactivating(effective_stake)
+        } else if let Some((history, mut prev_epoch, mut prev_cluster_stake)) = history
+            .get_entry(self.deactivation_epoch)
+            .map(|cluster_stake_at_deactivation_epoch| {
+                (
+                    history,
+                    self.deactivation_epoch,
+                    cluster_stake_at_deactivation_epoch,
+                )
+            })
+        {
+            // target_epoch > self.deactivation_epoch
+
+            // loop from my deactivation epoch until the target epoch
+            // current effective stake is updated using its previous epoch's cluster stake
+            let mut current_epoch;
+            let mut current_effective_stake = effective_stake;
+            loop {
+                current_epoch = prev_epoch + 1;
+                // if there is no deactivating stake at prev epoch, we should have been
+                // fully undelegated at this moment
+                if prev_cluster_stake.deactivating == 0 {
+                    break;
+                }
+
+                // I'm trying to get to zero, how much of the deactivation in stake
+                //   this account is entitled to take
+                let weight =
+                    current_effective_stake as f64 / prev_cluster_stake.deactivating as f64;
+                let warmup_cooldown_rate =
+                    warmup_cooldown_rate(current_epoch, new_rate_activation_epoch);
+
+                // portion of newly not-effective cluster stake I'm entitled to at current epoch
+                let newly_not_effective_cluster_stake =
+                    prev_cluster_stake.effective as f64 * warmup_cooldown_rate;
+                let newly_not_effective_stake =
+                    ((weight * newly_not_effective_cluster_stake) as u64).max(1);
+
+                current_effective_stake =
+                    current_effective_stake.saturating_sub(newly_not_effective_stake);
+                if current_effective_stake == 0 {
+                    break;
+                }
+
+                if current_epoch >= target_epoch {
+                    break;
+                }
+                if let Some(current_cluster_stake) = history.get_entry(current_epoch) {
+                    prev_epoch = current_epoch;
+                    prev_cluster_stake = current_cluster_stake;
+                } else {
+                    break;
+                }
+            }
+
+            // deactivating stake should equal to all of currently remaining effective stake
+            StakeActivationStatus::with_deactivating(current_effective_stake)
+        } else {
+            // no history or I've dropped out of history, so assume fully deactivated
+            StakeActivationStatus::default()
+        }
+    }
+
+    // returned tuple is (effective, activating) stake
+    #[deprecated(since = "2.0.1", note = "Use stake_and_activating() instead")]
+    fn stake_and_activating_v1_legacy<T: StakeHistoryGetEntry>(
+        &self,
+        target_epoch: Epoch,
+        history: &T,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> (u64, u64) {
+        let delegated_stake = self.stake;
+
+        if self.is_bootstrap() {
+            // fully effective immediately
+            (delegated_stake, 0)
+        } else if self.activation_epoch == self.deactivation_epoch {
+            // activated but instantly deactivated; no stake at all regardless of target_epoch
+            // this must be after the bootstrap check and before all-is-activating check
+            (0, 0)
+        } else if target_epoch == self.activation_epoch {
+            // all is activating
+            (0, delegated_stake)
+        } else if target_epoch < self.activation_epoch {
+            // not yet enabled
+            (0, 0)
+        } else if let Some((history, mut prev_epoch, mut prev_cluster_stake)) = history
+            .get_entry(self.activation_epoch)
+            .map(|cluster_stake_at_activation_epoch| {
+                (
+                    history,
+                    self.activation_epoch,
+                    cluster_stake_at_activation_epoch,
+                )
+            })
+        {
+            // target_epoch > self.activation_epoch
+
+            // loop from my activation epoch until the target epoch summing up my entitlement
+            // current effective stake is updated using its previous epoch's cluster stake
+            let mut current_epoch;
+            let mut current_effective_stake = 0;
+            loop {
+                current_epoch = prev_epoch + 1;
+                // if there is no activating stake at prev epoch, we should have been
+                // fully effective at this moment
+                if prev_cluster_stake.activating == 0 {
+                    break;
+                }
+
+                // how much of the growth in stake this account is
+                //  entitled to take
+                let remaining_activating_stake = delegated_stake - current_effective_stake;
+                let weight =
+                    remaining_activating_stake as f64 / prev_cluster_stake.activating as f64;
+                let warmup_cooldown_rate =
+                    warmup_cooldown_rate(current_epoch, new_rate_activation_epoch);
+
+                // portion of newly effective cluster stake I'm entitled to at current epoch
+                let newly_effective_cluster_stake =
+                    prev_cluster_stake.effective as f64 * warmup_cooldown_rate;
+                let newly_effective_stake =
+                    ((weight * newly_effective_cluster_stake) as u64).max(1);
+
+                current_effective_stake += newly_effective_stake;
+                if current_effective_stake >= delegated_stake {
+                    current_effective_stake = delegated_stake;
+                    break;
+                }
+
+                if current_epoch >= target_epoch || current_epoch >= self.deactivation_epoch {
+                    break;
+                }
+                if let Some(current_cluster_stake) = history.get_entry(current_epoch) {
+                    prev_epoch = current_epoch;
+                    prev_cluster_stake = current_cluster_stake;
+                } else {
+                    break;
+                }
+            }
+
+            (
+                current_effective_stake,
+                delegated_stake - current_effective_stake,
+            )
+        } else {
+            // no history or I've dropped out of history, so assume fully effective
+            (delegated_stake, 0)
+        }
+    }
+
     pub fn stake_activating_and_deactivating<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
@@ -580,12 +771,15 @@ impl Delegation {
                 }
 
                 // Compute how much of this account's stake cools down in `current_epoch`
-                let newly_deactivated_stake = calculate_cooldown_allowance(
+                let newly_deactivated_stake = calculate_deactivation_allowance(
                     current_epoch,
                     remaining_deactivating_stake,
                     &prev_cluster_stake,
                     new_rate_activation_epoch,
                 );
+
+                // Substract the newly deactivated stake, clamping the per-epoch decrease to at
+                // least 1 lamport so cooldown always makes progress
                 remaining_deactivating_stake =
                     remaining_deactivating_stake.saturating_sub(newly_deactivated_stake.max(1));
 
@@ -674,7 +868,7 @@ impl Delegation {
                     new_rate_activation_epoch,
                 );
 
-                // Add the newly effective stake, ensuring at least one lamport activates to prevent getting stuck.
+                // Add the newly effective stake, clamping the per-epoch increase to at least 1 lamport so warmup always makes progress
                 activated_stake_amount += newly_effective_stake.max(1);
 
                 // Stop if we've fully warmed up this account's stake.
@@ -739,6 +933,17 @@ impl Stake {
             .stake(epoch, history, new_rate_activation_epoch)
     }
 
+    #[deprecated(since = "2.0.1", note = "Use stake() instead")]
+    pub fn stake_v1_legacy<T: StakeHistoryGetEntry>(
+        &self,
+        epoch: Epoch,
+        history: &T,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> u64 {
+        self.delegation
+            .stake_v1_legacy(epoch, history, new_rate_activation_epoch)
+    }
+
     pub fn split(
         &mut self,
         remaining_stake_delta: u64,
@@ -773,9 +978,7 @@ impl Stake {
 mod tests {
     use {
         super::*,
-        crate::{
-            stake_history::StakeHistory, warmup_cooldown_allowance::warmup_cooldown_rate_fraction,
-        },
+        crate::{stake_history::StakeHistory, warmup_cooldown_allowance::warmup_cooldown_rate_bps},
         assert_matches::assert_matches,
         bincode::serialize,
         solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
@@ -1004,8 +1207,8 @@ mod tests {
         };
 
         // save this off so stake.config.warmup_rate changes don't break this test
-        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
-        let increment = ((1_000u128 * rate_num) / rate_den) as u64;
+        let rate_bps = warmup_cooldown_rate_bps(0, None);
+        let increment = ((1_000u128 * rate_bps as u128) / 10_000) as u64;
 
         let mut stake_history = StakeHistory::default();
         // assert that this stake follows step function if there's no history
@@ -1374,7 +1577,7 @@ mod tests {
         let mut effective = base_stake;
         let other_activation = 100;
         let mut other_activations = vec![0];
-        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
+        let rate_bps = warmup_cooldown_rate_bps(0, None);
 
         // Build a stake history where the test staker always consumes all of the available warm
         // up and cool down stake. However, simulate other stakers beginning to activate during
@@ -1397,7 +1600,7 @@ mod tests {
                 },
             );
 
-            let effective_rate_limited = ((effective as u128) * rate_num / rate_den) as u64;
+            let effective_rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
             if epoch < stake.deactivation_epoch {
                 effective += effective_rate_limited.min(activating);
                 other_activations.push(0);
@@ -1440,8 +1643,8 @@ mod tests {
         let epochs = 7;
         // make bootstrap stake smaller than warmup so warmup/cooldownn
         //  increment is always smaller than 1
-        let (rate_num, rate_den) = warmup_cooldown_rate_fraction(0, None);
-        let bootstrap = ((100u128 * rate_num) / (2u128 * rate_den)) as u64;
+        let rate_bps = warmup_cooldown_rate_bps(0, None);
+        let bootstrap = ((100u128 * rate_bps as u128) / (2u128 * 10_000)) as u64;
         let stake_history =
             create_stake_history_from_delegations(Some(bootstrap), 0..epochs, &delegations, None);
         let mut max_stake = 0;
@@ -1543,9 +1746,9 @@ mod tests {
             // (0..(total_effective_stake as usize / (delegations.len() * 5))).for_each(|_| eprint("#"));
             // eprintln();
 
-            let (rate_num, rate_den) =
-                warmup_cooldown_rate_fraction(epoch, new_rate_activation_epoch);
-            let max_delta = ((prev_total_effective_stake as u128) * rate_num / rate_den) as u64;
+            let rate_bps = warmup_cooldown_rate_bps(epoch, new_rate_activation_epoch);
+            let max_delta =
+                ((prev_total_effective_stake as u128) * rate_bps as u128 / 10_000) as u64;
             assert!(delta <= max_delta.max(1));
 
             prev_total_effective_stake = total_effective_stake;
@@ -1758,6 +1961,117 @@ mod tests {
             1,
         );
         check_flag(StakeFlags::empty(), 0);
+    }
+
+    #[cfg(test)]
+    #[allow(deprecated)]
+    mod delegation_prop_tests {
+        use {
+            super::*,
+            crate::{
+                stake_history::{StakeHistory, StakeHistoryEntry},
+                test_utils::max_ulp_tolerance,
+            },
+            proptest::prelude::*,
+            solana_pubkey::Pubkey,
+        };
+
+        prop_compose! {
+            fn arbitrary_delegation()(
+                // This tests is bounded to the range where `f64` can represent every integer exactly.
+                // Beyond this, integer math and float math diverge considerably.
+                // This case is covered in `warmup_cooldown_allowance.rs`.
+                stake in 0u64..=(1u64 << 53) - 1,
+                activation_epoch in 0u64..=50,
+                deactivation_offset in 0u64..=50,
+            ) -> Delegation {
+                let deactivation_epoch = activation_epoch.saturating_add(deactivation_offset);
+
+                Delegation {
+                    voter_pubkey: Pubkey::new_unique(),
+                    stake,
+                    activation_epoch,
+                    deactivation_epoch,
+                    ..Delegation::default()
+                }
+            }
+        }
+
+        prop_compose! {
+            fn arbitrary_stake_history(max_epoch: Epoch)(
+                entries in prop::collection::vec(
+                    (
+                        0u64..=max_epoch,
+                        0u64..=1_000_000_000_000, // effective
+                        0u64..=1_000_000_000_000, // activating
+                        0u64..=1_000_000_000_000, // deactivating
+                    ),
+                    0..=((max_epoch + 1) as usize),
+                )
+            ) -> StakeHistory {
+                let mut history = StakeHistory::default();
+                for (epoch, effective, activating, deactivating) in entries {
+                    history.add(
+                        epoch,
+                        StakeHistoryEntry {
+                            effective,
+                            activating,
+                            deactivating,
+                        },
+                    );
+                }
+                history
+            }
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(10_000))]
+
+            #[test]
+            fn delegation_stake_matches_legacy_within_tolerance(
+                delegation in arbitrary_delegation(),
+                target_epoch in 0u64..=50,
+                new_rate_activation_epoch_option in prop::option::of(0u64..=50),
+                stake_history in arbitrary_stake_history(50),
+            ) {
+                let new_stake = delegation.stake(
+                    target_epoch,
+                    &stake_history,
+                    new_rate_activation_epoch_option,
+                );
+                let legacy_stake = delegation.stake_v1_legacy(
+                    target_epoch,
+                    &stake_history,
+                    new_rate_activation_epoch_option,
+                );
+
+                // neither path should ever exceed the delegated amount.
+                prop_assert!(new_stake <= delegation.stake);
+                prop_assert!(legacy_stake <= delegation.stake);
+
+                // If the delegation has no stake, both must be zero.
+                if delegation.stake == 0 {
+                    prop_assert_eq!(new_stake, 0);
+                    prop_assert_eq!(legacy_stake, 0);
+                } else {
+                    // Compare with a ULP-based tolerance to account for float vs integer math.
+                    let diff = new_stake.abs_diff(legacy_stake);
+                    let tolerance = max_ulp_tolerance(new_stake, legacy_stake);
+
+                    prop_assert!(
+                        diff <= tolerance,
+                        "stake mismatch: new={}, legacy={}, diff={}, tol={}, delegation={:?}, target_epoch={}, new_rate_activation_epoch_option={:?}",
+                        new_stake,
+                        legacy_stake,
+                        diff,
+                        tolerance,
+                        delegation,
+                        target_epoch,
+                        new_rate_activation_epoch_option,
+                    );
+                }
+            }
+        }
     }
 
     mod deprecated {
