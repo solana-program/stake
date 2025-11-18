@@ -763,7 +763,7 @@
             "isSigner": false,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "config"
+            "name": "unused"
           },
           {
             "isSigner": true,
@@ -1008,7 +1008,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lockup",
+            "name": "lockupArgs",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "lockupArgs"
@@ -1031,13 +1031,13 @@
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "destination"
+            "name": "destinationStake"
           },
           {
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "source"
+            "name": "sourceStake"
           },
           {
             "isSigner": false,
@@ -1096,7 +1096,7 @@
             "isSigner": true,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "authorityBase"
+            "name": "base"
           },
           {
             "isSigner": false,
@@ -1129,7 +1129,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "args",
+            "name": "authorizeWithSeedArgs",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "authorizeWithSeedArgs"
@@ -1279,7 +1279,7 @@
             "isSigner": true,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "authorityBase"
+            "name": "base"
           },
           {
             "isSigner": false,
@@ -1318,7 +1318,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "args",
+            "name": "authorizeCheckedWithSeedArgs",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "authorizeCheckedWithSeedArgs"
@@ -1354,7 +1354,7 @@
             "isSigner": true,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "newLockupAuthority"
+            "name": "lockupAuthority"
           }
         ],
         "arguments": [
@@ -1374,7 +1374,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lockup",
+            "name": "lockupCheckedArgs",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "lockupCheckedArgs"
@@ -1500,13 +1500,13 @@
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "source"
+            "name": "sourceStake"
           },
           {
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "destination"
+            "name": "destinationStake"
           },
           {
             "isSigner": true,
@@ -1556,13 +1556,13 @@
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "source"
+            "name": "sourceStake"
           },
           {
             "isSigner": false,
             "isWritable": true,
             "kind": "instructionAccountNode",
-            "name": "destination"
+            "name": "destinationStake"
           },
           {
             "isSigner": true,

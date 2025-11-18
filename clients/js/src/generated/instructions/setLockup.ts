@@ -64,16 +64,16 @@ export type SetLockupInstruction<
 
 export type SetLockupInstructionData = {
   discriminator: number;
-  lockup: LockupParams;
+  lockupArgs: LockupParams;
 };
 
-export type SetLockupInstructionDataArgs = { lockup: LockupParamsArgs };
+export type SetLockupInstructionDataArgs = { lockupArgs: LockupParamsArgs };
 
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lockup', getLockupParamsEncoder()],
+      ['lockupArgs', getLockupParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
   );
@@ -82,7 +82,7 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lockup', getLockupParamsDecoder()],
+    ['lockupArgs', getLockupParamsDecoder()],
   ]);
 }
 
@@ -102,7 +102,7 @@ export type SetLockupInput<
 > = {
   stake: Address<TAccountStake>;
   authority: TransactionSigner<TAccountAuthority>;
-  lockup: SetLockupInstructionDataArgs['lockup'];
+  lockupArgs: SetLockupInstructionDataArgs['lockupArgs'];
 };
 
 export function getSetLockupInstruction<

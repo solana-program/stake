@@ -46,7 +46,7 @@ export function getAuthorizeCheckedWithSeedDiscriminatorBytes() {
 export type AuthorizeCheckedWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountAuthorityBase extends string | AccountMeta<string> = string,
+  TAccountBase extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
@@ -61,10 +61,9 @@ export type AuthorizeCheckedWithSeedInstruction<
       TAccountStake extends string
         ? WritableAccount<TAccountStake>
         : TAccountStake,
-      TAccountAuthorityBase extends string
-        ? ReadonlySignerAccount<TAccountAuthorityBase> &
-            AccountSignerMeta<TAccountAuthorityBase>
-        : TAccountAuthorityBase,
+      TAccountBase extends string
+        ? ReadonlySignerAccount<TAccountBase> & AccountSignerMeta<TAccountBase>
+        : TAccountBase,
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
@@ -86,18 +85,21 @@ export type AuthorizeCheckedWithSeedInstruction<
 
 export type AuthorizeCheckedWithSeedInstructionData = {
   discriminator: number;
-  args: AuthorizeCheckedWithSeedParams;
+  authorizeCheckedWithSeedArgs: AuthorizeCheckedWithSeedParams;
 };
 
 export type AuthorizeCheckedWithSeedInstructionDataArgs = {
-  args: AuthorizeCheckedWithSeedParamsArgs;
+  authorizeCheckedWithSeedArgs: AuthorizeCheckedWithSeedParamsArgs;
 };
 
 export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<AuthorizeCheckedWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['args', getAuthorizeCheckedWithSeedParamsEncoder()],
+      [
+        'authorizeCheckedWithSeedArgs',
+        getAuthorizeCheckedWithSeedParamsEncoder(),
+      ],
     ]),
     (value) => ({
       ...value,
@@ -109,7 +111,10 @@ export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<Aut
 export function getAuthorizeCheckedWithSeedInstructionDataDecoder(): Decoder<AuthorizeCheckedWithSeedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['args', getAuthorizeCheckedWithSeedParamsDecoder()],
+    [
+      'authorizeCheckedWithSeedArgs',
+      getAuthorizeCheckedWithSeedParamsDecoder(),
+    ],
   ]);
 }
 
@@ -125,22 +130,22 @@ export function getAuthorizeCheckedWithSeedInstructionDataCodec(): Codec<
 
 export type AuthorizeCheckedWithSeedInput<
   TAccountStake extends string = string,
-  TAccountAuthorityBase extends string = string,
+  TAccountBase extends string = string,
   TAccountClockSysvar extends string = string,
   TAccountNewAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
   stake: Address<TAccountStake>;
-  authorityBase: TransactionSigner<TAccountAuthorityBase>;
+  base: TransactionSigner<TAccountBase>;
   clockSysvar: Address<TAccountClockSysvar>;
   newAuthority: TransactionSigner<TAccountNewAuthority>;
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  args: AuthorizeCheckedWithSeedInstructionDataArgs['args'];
+  authorizeCheckedWithSeedArgs: AuthorizeCheckedWithSeedInstructionDataArgs['authorizeCheckedWithSeedArgs'];
 };
 
 export function getAuthorizeCheckedWithSeedInstruction<
   TAccountStake extends string,
-  TAccountAuthorityBase extends string,
+  TAccountBase extends string,
   TAccountClockSysvar extends string,
   TAccountNewAuthority extends string,
   TAccountLockupAuthority extends string,
@@ -148,7 +153,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
 >(
   input: AuthorizeCheckedWithSeedInput<
     TAccountStake,
-    TAccountAuthorityBase,
+    TAccountBase,
     TAccountClockSysvar,
     TAccountNewAuthority,
     TAccountLockupAuthority
@@ -157,7 +162,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
 ): AuthorizeCheckedWithSeedInstruction<
   TProgramAddress,
   TAccountStake,
-  TAccountAuthorityBase,
+  TAccountBase,
   TAccountClockSysvar,
   TAccountNewAuthority,
   TAccountLockupAuthority
@@ -168,7 +173,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
   // Original accounts.
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
-    authorityBase: { value: input.authorityBase ?? null, isWritable: false },
+    base: { value: input.base ?? null, isWritable: false },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
     newAuthority: { value: input.newAuthority ?? null, isWritable: false },
     lockupAuthority: {
@@ -188,7 +193,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.stake),
-      getAccountMeta(accounts.authorityBase),
+      getAccountMeta(accounts.base),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.newAuthority),
       getAccountMeta(accounts.lockupAuthority),
@@ -200,7 +205,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
   } as AuthorizeCheckedWithSeedInstruction<
     TProgramAddress,
     TAccountStake,
-    TAccountAuthorityBase,
+    TAccountBase,
     TAccountClockSysvar,
     TAccountNewAuthority,
     TAccountLockupAuthority
@@ -214,7 +219,7 @@ export type ParsedAuthorizeCheckedWithSeedInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     stake: TAccountMetas[0];
-    authorityBase: TAccountMetas[1];
+    base: TAccountMetas[1];
     clockSysvar: TAccountMetas[2];
     newAuthority: TAccountMetas[3];
     lockupAuthority?: TAccountMetas[4] | undefined;
@@ -250,7 +255,7 @@ export function parseAuthorizeCheckedWithSeedInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       stake: getNextAccount(),
-      authorityBase: getNextAccount(),
+      base: getNextAccount(),
       clockSysvar: getNextAccount(),
       newAuthority: getNextAccount(),
       lockupAuthority: getNextOptionalAccount(),

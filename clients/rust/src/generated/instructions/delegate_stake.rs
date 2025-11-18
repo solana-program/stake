@@ -18,7 +18,7 @@ pub struct DelegateStake {
 
     pub stake_history_sysvar: solana_program::pubkey::Pubkey,
 
-    pub config: solana_program::pubkey::Pubkey,
+    pub unused: solana_program::pubkey::Pubkey,
 
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
@@ -48,7 +48,7 @@ impl DelegateStake {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.config,
+            self.unused,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -92,7 +92,7 @@ impl Default for DelegateStakeInstructionData {
 ///   1. `[]` vote
 ///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history_sysvar
-///   4. `[]` config
+///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DelegateStakeBuilder {
@@ -100,7 +100,7 @@ pub struct DelegateStakeBuilder {
     vote: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_history_sysvar: Option<solana_program::pubkey::Pubkey>,
-    config: Option<solana_program::pubkey::Pubkey>,
+    unused: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
@@ -133,8 +133,8 @@ impl DelegateStakeBuilder {
         self
     }
     #[inline(always)]
-    pub fn config(&mut self, config: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.config = Some(config);
+    pub fn unused(&mut self, unused: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.unused = Some(unused);
         self
     }
     #[inline(always)]
@@ -172,7 +172,7 @@ impl DelegateStakeBuilder {
             stake_history_sysvar: self
                 .stake_history_sysvar
                 .expect("stake_history_sysvar is not set"),
-            config: self.config.expect("config is not set"),
+            unused: self.unused.expect("unused is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
 
@@ -190,7 +190,7 @@ pub struct DelegateStakeCpiAccounts<'a, 'b> {
 
     pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub config: &'b solana_program::account_info::AccountInfo<'a>,
+    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
@@ -208,7 +208,7 @@ pub struct DelegateStakeCpi<'a, 'b> {
 
     pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub config: &'b solana_program::account_info::AccountInfo<'a>,
+    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
@@ -224,7 +224,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             vote: accounts.vote,
             clock_sysvar: accounts.clock_sysvar,
             stake_history_sysvar: accounts.stake_history_sysvar,
-            config: accounts.config,
+            unused: accounts.unused,
             stake_authority: accounts.stake_authority,
         }
     }
@@ -279,7 +279,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.config.key,
+            *self.unused.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -306,7 +306,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
         account_infos.push(self.vote.clone());
         account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.stake_history_sysvar.clone());
-        account_infos.push(self.config.clone());
+        account_infos.push(self.unused.clone());
         account_infos.push(self.stake_authority.clone());
         remaining_accounts
             .iter()
@@ -328,7 +328,7 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
 ///   1. `[]` vote
 ///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history_sysvar
-///   4. `[]` config
+///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug)]
 pub struct DelegateStakeCpiBuilder<'a, 'b> {
@@ -343,7 +343,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
             vote: None,
             clock_sysvar: None,
             stake_history_sysvar: None,
-            config: None,
+            unused: None,
             stake_authority: None,
             __remaining_accounts: Vec::new(),
         });
@@ -376,11 +376,11 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn config(
+    pub fn unused(
         &mut self,
-        config: &'b solana_program::account_info::AccountInfo<'a>,
+        unused: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.config = Some(config);
+        self.instruction.unused = Some(unused);
         self
     }
     #[inline(always)]
@@ -449,7 +449,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
                 .stake_history_sysvar
                 .expect("stake_history_sysvar is not set"),
 
-            config: self.instruction.config.expect("config is not set"),
+            unused: self.instruction.unused.expect("unused is not set"),
 
             stake_authority: self
                 .instruction
@@ -470,7 +470,7 @@ struct DelegateStakeCpiBuilderInstruction<'a, 'b> {
     vote: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_history_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    config: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    unused: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(

@@ -15,7 +15,7 @@ use {
 pub struct AuthorizeCheckedWithSeed {
     pub stake: solana_program::pubkey::Pubkey,
 
-    pub authority_base: solana_program::pubkey::Pubkey,
+    pub base: solana_program::pubkey::Pubkey,
 
     pub clock_sysvar: solana_program::pubkey::Pubkey,
 
@@ -42,8 +42,7 @@ impl AuthorizeCheckedWithSeed {
             self.stake, false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.authority_base,
-            true,
+            self.base, true,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.clock_sysvar,
@@ -93,7 +92,7 @@ impl Default for AuthorizeCheckedWithSeedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeCheckedWithSeedInstructionArgs {
-    pub args: AuthorizeCheckedWithSeedParams,
+    pub authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
 }
 
 /// Instruction builder for `AuthorizeCheckedWithSeed`.
@@ -101,18 +100,18 @@ pub struct AuthorizeCheckedWithSeedInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[signer]` authority_base
+///   1. `[signer]` base
 ///   2. `[]` clock_sysvar
 ///   3. `[signer]` new_authority
 ///   4. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
 pub struct AuthorizeCheckedWithSeedBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
-    authority_base: Option<solana_program::pubkey::Pubkey>,
+    base: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     new_authority: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    args: Option<AuthorizeCheckedWithSeedParams>,
+    authorize_checked_with_seed_args: Option<AuthorizeCheckedWithSeedParams>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -126,8 +125,8 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn authority_base(&mut self, authority_base: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.authority_base = Some(authority_base);
+    pub fn base(&mut self, base: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.base = Some(base);
         self
     }
     #[inline(always)]
@@ -150,8 +149,11 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeCheckedWithSeedParams) -> &mut Self {
-        self.args = Some(args);
+    pub fn authorize_checked_with_seed_args(
+        &mut self,
+        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
+    ) -> &mut Self {
+        self.authorize_checked_with_seed_args = Some(authorize_checked_with_seed_args);
         self
     }
     /// Add an additional account to the instruction.
@@ -176,13 +178,16 @@ impl AuthorizeCheckedWithSeedBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = AuthorizeCheckedWithSeed {
             stake: self.stake.expect("stake is not set"),
-            authority_base: self.authority_base.expect("authority_base is not set"),
+            base: self.base.expect("base is not set"),
             clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
             new_authority: self.new_authority.expect("new_authority is not set"),
             lockup_authority: self.lockup_authority,
         };
         let args = AuthorizeCheckedWithSeedInstructionArgs {
-            args: self.args.clone().expect("args is not set"),
+            authorize_checked_with_seed_args: self
+                .authorize_checked_with_seed_args
+                .clone()
+                .expect("authorize_checked_with_seed_args is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -193,7 +198,7 @@ impl AuthorizeCheckedWithSeedBuilder {
 pub struct AuthorizeCheckedWithSeedCpiAccounts<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub authority_base: &'b solana_program::account_info::AccountInfo<'a>,
+    pub base: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
@@ -209,7 +214,7 @@ pub struct AuthorizeCheckedWithSeedCpi<'a, 'b> {
 
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub authority_base: &'b solana_program::account_info::AccountInfo<'a>,
+    pub base: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
@@ -229,7 +234,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpi<'a, 'b> {
         Self {
             __program: program,
             stake: accounts.stake,
-            authority_base: accounts.authority_base,
+            base: accounts.base,
             clock_sysvar: accounts.clock_sysvar,
             new_authority: accounts.new_authority,
             lockup_authority: accounts.lockup_authority,
@@ -275,7 +280,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpi<'a, 'b> {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.authority_base.key,
+            *self.base.key,
             true,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -311,7 +316,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpi<'a, 'b> {
         let mut account_infos = Vec::with_capacity(6 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.stake.clone());
-        account_infos.push(self.authority_base.clone());
+        account_infos.push(self.base.clone());
         account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.new_authority.clone());
         if let Some(lockup_authority) = self.lockup_authority {
@@ -334,7 +339,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpi<'a, 'b> {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[signer]` authority_base
+///   1. `[signer]` base
 ///   2. `[]` clock_sysvar
 ///   3. `[signer]` new_authority
 ///   4. `[signer, optional]` lockup_authority
@@ -348,11 +353,11 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         let instruction = Box::new(AuthorizeCheckedWithSeedCpiBuilderInstruction {
             __program: program,
             stake: None,
-            authority_base: None,
+            base: None,
             clock_sysvar: None,
             new_authority: None,
             lockup_authority: None,
-            args: None,
+            authorize_checked_with_seed_args: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -363,11 +368,8 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn authority_base(
-        &mut self,
-        authority_base: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.authority_base = Some(authority_base);
+    pub fn base(&mut self, base: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+        self.instruction.base = Some(base);
         self
     }
     #[inline(always)]
@@ -396,8 +398,11 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn args(&mut self, args: AuthorizeCheckedWithSeedParams) -> &mut Self {
-        self.instruction.args = Some(args);
+    pub fn authorize_checked_with_seed_args(
+        &mut self,
+        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
+    ) -> &mut Self {
+        self.instruction.authorize_checked_with_seed_args = Some(authorize_checked_with_seed_args);
         self
     }
     /// Add an additional account to the instruction.
@@ -442,17 +447,18 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = AuthorizeCheckedWithSeedInstructionArgs {
-            args: self.instruction.args.clone().expect("args is not set"),
+            authorize_checked_with_seed_args: self
+                .instruction
+                .authorize_checked_with_seed_args
+                .clone()
+                .expect("authorize_checked_with_seed_args is not set"),
         };
         let instruction = AuthorizeCheckedWithSeedCpi {
             __program: self.instruction.__program,
 
             stake: self.instruction.stake.expect("stake is not set"),
 
-            authority_base: self
-                .instruction
-                .authority_base
-                .expect("authority_base is not set"),
+            base: self.instruction.base.expect("base is not set"),
 
             clock_sysvar: self
                 .instruction
@@ -478,11 +484,11 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
 struct AuthorizeCheckedWithSeedCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    authority_base: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    base: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    args: Option<AuthorizeCheckedWithSeedParams>,
+    authorize_checked_with_seed_args: Option<AuthorizeCheckedWithSeedParams>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

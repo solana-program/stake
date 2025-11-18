@@ -43,7 +43,7 @@ export type DelegateStakeInstruction<
   TAccountVote extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
-  TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountUnused extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -62,9 +62,9 @@ export type DelegateStakeInstruction<
       TAccountStakeHistorySysvar extends string
         ? ReadonlyAccount<TAccountStakeHistorySysvar>
         : TAccountStakeHistorySysvar,
-      TAccountConfig extends string
-        ? ReadonlyAccount<TAccountConfig>
-        : TAccountConfig,
+      TAccountUnused extends string
+        ? ReadonlyAccount<TAccountUnused>
+        : TAccountUnused,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
             AccountSignerMeta<TAccountStakeAuthority>
@@ -103,14 +103,14 @@ export type DelegateStakeInput<
   TAccountVote extends string = string,
   TAccountClockSysvar extends string = string,
   TAccountStakeHistorySysvar extends string = string,
-  TAccountConfig extends string = string,
+  TAccountUnused extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
   stake: Address<TAccountStake>;
   vote: Address<TAccountVote>;
   clockSysvar: Address<TAccountClockSysvar>;
   stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
-  config: Address<TAccountConfig>;
+  unused: Address<TAccountUnused>;
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
@@ -119,7 +119,7 @@ export function getDelegateStakeInstruction<
   TAccountVote extends string,
   TAccountClockSysvar extends string,
   TAccountStakeHistorySysvar extends string,
-  TAccountConfig extends string,
+  TAccountUnused extends string,
   TAccountStakeAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
@@ -128,7 +128,7 @@ export function getDelegateStakeInstruction<
     TAccountVote,
     TAccountClockSysvar,
     TAccountStakeHistorySysvar,
-    TAccountConfig,
+    TAccountUnused,
     TAccountStakeAuthority
   >,
   config?: { programAddress?: TProgramAddress }
@@ -138,7 +138,7 @@ export function getDelegateStakeInstruction<
   TAccountVote,
   TAccountClockSysvar,
   TAccountStakeHistorySysvar,
-  TAccountConfig,
+  TAccountUnused,
   TAccountStakeAuthority
 > {
   // Program address.
@@ -153,7 +153,7 @@ export function getDelegateStakeInstruction<
       value: input.stakeHistorySysvar ?? null,
       isWritable: false,
     },
-    config: { value: input.config ?? null, isWritable: false },
+    unused: { value: input.unused ?? null, isWritable: false },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -168,7 +168,7 @@ export function getDelegateStakeInstruction<
       getAccountMeta(accounts.vote),
       getAccountMeta(accounts.clockSysvar),
       getAccountMeta(accounts.stakeHistorySysvar),
-      getAccountMeta(accounts.config),
+      getAccountMeta(accounts.unused),
       getAccountMeta(accounts.stakeAuthority),
     ],
     data: getDelegateStakeInstructionDataEncoder().encode({}),
@@ -179,7 +179,7 @@ export function getDelegateStakeInstruction<
     TAccountVote,
     TAccountClockSysvar,
     TAccountStakeHistorySysvar,
-    TAccountConfig,
+    TAccountUnused,
     TAccountStakeAuthority
   >);
 }
@@ -194,7 +194,7 @@ export type ParsedDelegateStakeInstruction<
     vote: TAccountMetas[1];
     clockSysvar: TAccountMetas[2];
     stakeHistorySysvar: TAccountMetas[3];
-    config: TAccountMetas[4];
+    unused: TAccountMetas[4];
     stakeAuthority: TAccountMetas[5];
   };
   data: DelegateStakeInstructionData;
@@ -225,7 +225,7 @@ export function parseDelegateStakeInstruction<
       vote: getNextAccount(),
       clockSysvar: getNextAccount(),
       stakeHistorySysvar: getNextAccount(),
-      config: getNextAccount(),
+      unused: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },
     data: getDelegateStakeInstructionDataDecoder().decode(instruction.data),

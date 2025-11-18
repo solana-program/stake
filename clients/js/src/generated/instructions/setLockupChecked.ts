@@ -46,7 +46,7 @@ export type SetLockupCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountNewLockupAuthority extends
+  TAccountLockupAuthority extends
     | string
     | AccountMeta<string>
     | undefined = undefined,
@@ -62,13 +62,13 @@ export type SetLockupCheckedInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      ...(TAccountNewLockupAuthority extends undefined
+      ...(TAccountLockupAuthority extends undefined
         ? []
         : [
-            TAccountNewLockupAuthority extends string
-              ? ReadonlySignerAccount<TAccountNewLockupAuthority> &
-                  AccountSignerMeta<TAccountNewLockupAuthority>
-              : TAccountNewLockupAuthority,
+            TAccountLockupAuthority extends string
+              ? ReadonlySignerAccount<TAccountLockupAuthority> &
+                  AccountSignerMeta<TAccountLockupAuthority>
+              : TAccountLockupAuthority,
           ]),
       ...TRemainingAccounts,
     ]
@@ -76,18 +76,18 @@ export type SetLockupCheckedInstruction<
 
 export type SetLockupCheckedInstructionData = {
   discriminator: number;
-  lockup: LockupCheckedParams;
+  lockupCheckedArgs: LockupCheckedParams;
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  lockup: LockupCheckedParamsArgs;
+  lockupCheckedArgs: LockupCheckedParamsArgs;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lockup', getLockupCheckedParamsEncoder()],
+      ['lockupCheckedArgs', getLockupCheckedParamsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_CHECKED_DISCRIMINATOR })
   );
@@ -96,7 +96,7 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lockup', getLockupCheckedParamsDecoder()],
+    ['lockupCheckedArgs', getLockupCheckedParamsDecoder()],
   ]);
 }
 
@@ -113,31 +113,31 @@ export function getSetLockupCheckedInstructionDataCodec(): Codec<
 export type SetLockupCheckedInput<
   TAccountStake extends string = string,
   TAccountAuthority extends string = string,
-  TAccountNewLockupAuthority extends string = string,
+  TAccountLockupAuthority extends string = string,
 > = {
   stake: Address<TAccountStake>;
   authority: TransactionSigner<TAccountAuthority>;
-  newLockupAuthority?: TransactionSigner<TAccountNewLockupAuthority>;
-  lockup: SetLockupCheckedInstructionDataArgs['lockup'];
+  lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
+  lockupCheckedArgs: SetLockupCheckedInstructionDataArgs['lockupCheckedArgs'];
 };
 
 export function getSetLockupCheckedInstruction<
   TAccountStake extends string,
   TAccountAuthority extends string,
-  TAccountNewLockupAuthority extends string,
+  TAccountLockupAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: SetLockupCheckedInput<
     TAccountStake,
     TAccountAuthority,
-    TAccountNewLockupAuthority
+    TAccountLockupAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): SetLockupCheckedInstruction<
   TProgramAddress,
   TAccountStake,
   TAccountAuthority,
-  TAccountNewLockupAuthority
+  TAccountLockupAuthority
 > {
   // Program address.
   const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
@@ -146,8 +146,8 @@ export function getSetLockupCheckedInstruction<
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: false },
-    newLockupAuthority: {
-      value: input.newLockupAuthority ?? null,
+    lockupAuthority: {
+      value: input.lockupAuthority ?? null,
       isWritable: false,
     },
   };
@@ -164,7 +164,7 @@ export function getSetLockupCheckedInstruction<
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.newLockupAuthority),
+      getAccountMeta(accounts.lockupAuthority),
     ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     data: getSetLockupCheckedInstructionDataEncoder().encode(
       args as SetLockupCheckedInstructionDataArgs
@@ -174,7 +174,7 @@ export function getSetLockupCheckedInstruction<
     TProgramAddress,
     TAccountStake,
     TAccountAuthority,
-    TAccountNewLockupAuthority
+    TAccountLockupAuthority
   >);
 }
 
@@ -186,7 +186,7 @@ export type ParsedSetLockupCheckedInstruction<
   accounts: {
     stake: TAccountMetas[0];
     authority: TAccountMetas[1];
-    newLockupAuthority?: TAccountMetas[2] | undefined;
+    lockupAuthority?: TAccountMetas[2] | undefined;
   };
   data: SetLockupCheckedInstructionData;
 };
@@ -220,7 +220,7 @@ export function parseSetLockupCheckedInstruction<
     accounts: {
       stake: getNextAccount(),
       authority: getNextAccount(),
-      newLockupAuthority: getNextOptionalAccount(),
+      lockupAuthority: getNextOptionalAccount(),
     },
     data: getSetLockupCheckedInstructionDataDecoder().decode(instruction.data),
   };

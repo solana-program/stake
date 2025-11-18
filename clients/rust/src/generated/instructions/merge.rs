@@ -10,9 +10,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct Merge {
-    pub destination: solana_program::pubkey::Pubkey,
+    pub destination_stake: solana_program::pubkey::Pubkey,
 
-    pub source: solana_program::pubkey::Pubkey,
+    pub source_stake: solana_program::pubkey::Pubkey,
 
     pub clock_sysvar: solana_program::pubkey::Pubkey,
 
@@ -32,11 +32,11 @@ impl Merge {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.destination,
+            self.destination_stake,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.source,
+            self.source_stake,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -84,15 +84,15 @@ impl Default for MergeInstructionData {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` destination
-///   1. `[writable]` source
+///   0. `[writable]` destination_stake
+///   1. `[writable]` source_stake
 ///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history_sysvar
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MergeBuilder {
-    destination: Option<solana_program::pubkey::Pubkey>,
-    source: Option<solana_program::pubkey::Pubkey>,
+    destination_stake: Option<solana_program::pubkey::Pubkey>,
+    source_stake: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_history_sysvar: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
@@ -104,13 +104,16 @@ impl MergeBuilder {
         Self::default()
     }
     #[inline(always)]
-    pub fn destination(&mut self, destination: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.destination = Some(destination);
+    pub fn destination_stake(
+        &mut self,
+        destination_stake: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.destination_stake = Some(destination_stake);
         self
     }
     #[inline(always)]
-    pub fn source(&mut self, source: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.source = Some(source);
+    pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.source_stake = Some(source_stake);
         self
     }
     #[inline(always)]
@@ -155,8 +158,10 @@ impl MergeBuilder {
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Merge {
-            destination: self.destination.expect("destination is not set"),
-            source: self.source.expect("source is not set"),
+            destination_stake: self
+                .destination_stake
+                .expect("destination_stake is not set"),
+            source_stake: self.source_stake.expect("source_stake is not set"),
             clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
             stake_history_sysvar: self
                 .stake_history_sysvar
@@ -170,9 +175,9 @@ impl MergeBuilder {
 
 /// `merge` CPI accounts.
 pub struct MergeCpiAccounts<'a, 'b> {
-    pub destination: &'b solana_program::account_info::AccountInfo<'a>,
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub source: &'b solana_program::account_info::AccountInfo<'a>,
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
@@ -186,9 +191,9 @@ pub struct MergeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub destination: &'b solana_program::account_info::AccountInfo<'a>,
+    pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub source: &'b solana_program::account_info::AccountInfo<'a>,
+    pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
 
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 
@@ -204,8 +209,8 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
     ) -> Self {
         Self {
             __program: program,
-            destination: accounts.destination,
-            source: accounts.source,
+            destination_stake: accounts.destination_stake,
+            source_stake: accounts.source_stake,
             clock_sysvar: accounts.clock_sysvar,
             stake_history_sysvar: accounts.stake_history_sysvar,
             stake_authority: accounts.stake_authority,
@@ -246,11 +251,11 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.destination.key,
+            *self.destination_stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.source.key,
+            *self.source_stake.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -281,8 +286,8 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
         };
         let mut account_infos = Vec::with_capacity(6 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.destination.clone());
-        account_infos.push(self.source.clone());
+        account_infos.push(self.destination_stake.clone());
+        account_infos.push(self.source_stake.clone());
         account_infos.push(self.clock_sysvar.clone());
         account_infos.push(self.stake_history_sysvar.clone());
         account_infos.push(self.stake_authority.clone());
@@ -302,8 +307,8 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` destination
-///   1. `[writable]` source
+///   0. `[writable]` destination_stake
+///   1. `[writable]` source_stake
 ///   2. `[]` clock_sysvar
 ///   3. `[]` stake_history_sysvar
 ///   4. `[signer]` stake_authority
@@ -316,8 +321,8 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(MergeCpiBuilderInstruction {
             __program: program,
-            destination: None,
-            source: None,
+            destination_stake: None,
+            source_stake: None,
             clock_sysvar: None,
             stake_history_sysvar: None,
             stake_authority: None,
@@ -326,19 +331,19 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
         Self { instruction }
     }
     #[inline(always)]
-    pub fn destination(
+    pub fn destination_stake(
         &mut self,
-        destination: &'b solana_program::account_info::AccountInfo<'a>,
+        destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.destination = Some(destination);
+        self.instruction.destination_stake = Some(destination_stake);
         self
     }
     #[inline(always)]
-    pub fn source(
+    pub fn source_stake(
         &mut self,
-        source: &'b solana_program::account_info::AccountInfo<'a>,
+        source_stake: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.source = Some(source);
+        self.instruction.source_stake = Some(source_stake);
         self
     }
     #[inline(always)]
@@ -409,12 +414,15 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
         let instruction = MergeCpi {
             __program: self.instruction.__program,
 
-            destination: self
+            destination_stake: self
                 .instruction
-                .destination
-                .expect("destination is not set"),
+                .destination_stake
+                .expect("destination_stake is not set"),
 
-            source: self.instruction.source.expect("source is not set"),
+            source_stake: self
+                .instruction
+                .source_stake
+                .expect("source_stake is not set"),
 
             clock_sysvar: self
                 .instruction
@@ -441,8 +449,8 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
 #[derive(Clone, Debug)]
 struct MergeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    destination: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    source: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    destination_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    source_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_history_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
