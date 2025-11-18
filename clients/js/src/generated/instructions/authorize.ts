@@ -83,21 +83,21 @@ export type AuthorizeInstruction<
 
 export type AuthorizeInstructionData = {
   discriminator: number;
-  pubkey: Address;
-  stakeAuthorize: StakeAuthorize;
+  arg0: Address;
+  arg1: StakeAuthorize;
 };
 
 export type AuthorizeInstructionDataArgs = {
-  pubkey: Address;
-  stakeAuthorize: StakeAuthorizeArgs;
+  arg0: Address;
+  arg1: StakeAuthorizeArgs;
 };
 
 export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<AuthorizeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['pubkey', getAddressEncoder()],
-      ['stakeAuthorize', getStakeAuthorizeEncoder()],
+      ['arg0', getAddressEncoder()],
+      ['arg1', getStakeAuthorizeEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_DISCRIMINATOR })
   );
@@ -106,8 +106,8 @@ export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<Authorize
 export function getAuthorizeInstructionDataDecoder(): FixedSizeDecoder<AuthorizeInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['pubkey', getAddressDecoder()],
-    ['stakeAuthorize', getStakeAuthorizeDecoder()],
+    ['arg0', getAddressDecoder()],
+    ['arg1', getStakeAuthorizeDecoder()],
   ]);
 }
 
@@ -131,8 +131,8 @@ export type AuthorizeInput<
   clockSysvar: Address<TAccountClockSysvar>;
   authority: TransactionSigner<TAccountAuthority>;
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  pubkey: AuthorizeInstructionDataArgs['pubkey'];
-  stakeAuthorize: AuthorizeInstructionDataArgs['stakeAuthorize'];
+  arg0: AuthorizeInstructionDataArgs['arg0'];
+  arg1: AuthorizeInstructionDataArgs['arg1'];
 };
 
 export function getAuthorizeInstruction<

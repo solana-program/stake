@@ -639,7 +639,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "authorized",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "authorized"
@@ -647,7 +647,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lockup",
+            "name": "arg1",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "lockup"
@@ -709,14 +709,14 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "pubkey",
+            "name": "arg0",
             "type": {
               "kind": "publicKeyTypeNode"
             }
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "stakeAuthorize",
+            "name": "arg1",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "stakeAuthorize"
@@ -1354,7 +1354,7 @@
             "isSigner": true,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
+            "name": "newAuthority"
           }
         ],
         "arguments": [

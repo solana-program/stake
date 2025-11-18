@@ -46,7 +46,7 @@ export type SetLockupCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountLockupAuthority extends
+  TAccountNewAuthority extends
     | string
     | AccountMeta<string>
     | undefined = undefined,
@@ -62,13 +62,13 @@ export type SetLockupCheckedInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      ...(TAccountLockupAuthority extends undefined
+      ...(TAccountNewAuthority extends undefined
         ? []
         : [
-            TAccountLockupAuthority extends string
-              ? ReadonlySignerAccount<TAccountLockupAuthority> &
-                  AccountSignerMeta<TAccountLockupAuthority>
-              : TAccountLockupAuthority,
+            TAccountNewAuthority extends string
+              ? ReadonlySignerAccount<TAccountNewAuthority> &
+                  AccountSignerMeta<TAccountNewAuthority>
+              : TAccountNewAuthority,
           ]),
       ...TRemainingAccounts,
     ]
@@ -113,31 +113,31 @@ export function getSetLockupCheckedInstructionDataCodec(): Codec<
 export type SetLockupCheckedInput<
   TAccountStake extends string = string,
   TAccountAuthority extends string = string,
-  TAccountLockupAuthority extends string = string,
+  TAccountNewAuthority extends string = string,
 > = {
   stake: Address<TAccountStake>;
   authority: TransactionSigner<TAccountAuthority>;
-  lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
+  newAuthority?: TransactionSigner<TAccountNewAuthority>;
   lockupCheckedArgs: SetLockupCheckedInstructionDataArgs['lockupCheckedArgs'];
 };
 
 export function getSetLockupCheckedInstruction<
   TAccountStake extends string,
   TAccountAuthority extends string,
-  TAccountLockupAuthority extends string,
+  TAccountNewAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
   input: SetLockupCheckedInput<
     TAccountStake,
     TAccountAuthority,
-    TAccountLockupAuthority
+    TAccountNewAuthority
   >,
   config?: { programAddress?: TProgramAddress }
 ): SetLockupCheckedInstruction<
   TProgramAddress,
   TAccountStake,
   TAccountAuthority,
-  TAccountLockupAuthority
+  TAccountNewAuthority
 > {
   // Program address.
   const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
@@ -146,10 +146,7 @@ export function getSetLockupCheckedInstruction<
   const originalAccounts = {
     stake: { value: input.stake ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: false },
-    lockupAuthority: {
-      value: input.lockupAuthority ?? null,
-      isWritable: false,
-    },
+    newAuthority: { value: input.newAuthority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -164,7 +161,7 @@ export function getSetLockupCheckedInstruction<
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.lockupAuthority),
+      getAccountMeta(accounts.newAuthority),
     ].filter(<T>(x: T | undefined): x is T => x !== undefined),
     data: getSetLockupCheckedInstructionDataEncoder().encode(
       args as SetLockupCheckedInstructionDataArgs
@@ -174,7 +171,7 @@ export function getSetLockupCheckedInstruction<
     TProgramAddress,
     TAccountStake,
     TAccountAuthority,
-    TAccountLockupAuthority
+    TAccountNewAuthority
   >);
 }
 
@@ -186,7 +183,7 @@ export type ParsedSetLockupCheckedInstruction<
   accounts: {
     stake: TAccountMetas[0];
     authority: TAccountMetas[1];
-    lockupAuthority?: TAccountMetas[2] | undefined;
+    newAuthority?: TAccountMetas[2] | undefined;
   };
   data: SetLockupCheckedInstructionData;
 };
@@ -220,7 +217,7 @@ export function parseSetLockupCheckedInstruction<
     accounts: {
       stake: getNextAccount(),
       authority: getNextAccount(),
-      lockupAuthority: getNextOptionalAccount(),
+      newAuthority: getNextOptionalAccount(),
     },
     data: getSetLockupCheckedInstructionDataDecoder().decode(instruction.data),
   };

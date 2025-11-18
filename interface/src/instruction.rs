@@ -47,10 +47,7 @@ pub enum StakeInstruction {
     /// withdrawal restrictions.
     #[codama(account(name = "stake", writable))]
     #[codama(account(name = "rent_sysvar"))]
-    Initialize {
-        authorized: Authorized,
-        lockup: Lockup,
-    },
+    Initialize { arg0: Authorized, arg1: Lockup },
 
     /// Authorize a key to manage stake or withdrawal
     ///
@@ -64,10 +61,7 @@ pub enum StakeInstruction {
     #[codama(account(name = "clock_sysvar"))]
     #[codama(account(name = "authority", signer))]
     #[codama(account(name = "lockup_authority", optional, signer))]
-    Authorize {
-        pubkey: Pubkey,
-        stake_authorize: StakeAuthorize,
-    },
+    Authorize { arg0: Pubkey, arg1: StakeAuthorize },
 
     /// Delegate a stake to a particular vote account
     ///
@@ -260,7 +254,7 @@ pub enum StakeInstruction {
     ///   2. Optional: `[SIGNER]` New lockup authority
     #[codama(account(name = "stake", writable))]
     #[codama(account(name = "authority", signer))]
-    #[codama(account(name = "lockup_authority", optional, signer))]
+    #[codama(account(name = "new_authority", optional, signer))]
     SetLockupChecked {
         lockup_checked_args: LockupCheckedArgs,
     },
@@ -336,8 +330,8 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` Stake authority
     ///
     /// The `u64` is the portion of the stake to move, which may be the entire delegation
-    #[codama(account(name = "source_stake", writable))]
-    #[codama(account(name = "destination_stake", writable))]
+    #[codama(account(name = "sourceStake", writable))]
+    #[codama(account(name = "destinationStake", writable))]
     #[codama(account(name = "stake_authority", signer))]
     MoveStake { lamports: u64 },
 
@@ -413,8 +407,8 @@ pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Locku
     Instruction::new_with_bincode(
         ID,
         &StakeInstruction::Initialize {
-            authorized: *authorized,
-            lockup: *lockup,
+            arg0: *authorized,
+            arg1: *lockup,
         },
         vec![
             AccountMeta::new(*stake_pubkey, false),
@@ -676,8 +670,8 @@ pub fn authorize(
     Instruction::new_with_bincode(
         ID,
         &StakeInstruction::Authorize {
-            pubkey: *new_authorized_pubkey,
-            stake_authorize,
+            arg0: *new_authorized_pubkey,
+            arg1: stake_authorize,
         },
         account_metas,
     )

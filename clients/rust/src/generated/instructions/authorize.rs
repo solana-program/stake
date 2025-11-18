@@ -88,8 +88,8 @@ impl Default for AuthorizeInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeInstructionArgs {
-    pub pubkey: Pubkey,
-    pub stake_authorize: StakeAuthorize,
+    pub arg0: Pubkey,
+    pub arg1: StakeAuthorize,
 }
 
 /// Instruction builder for `Authorize`.
@@ -106,8 +106,8 @@ pub struct AuthorizeBuilder {
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     authority: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    pubkey: Option<Pubkey>,
-    stake_authorize: Option<StakeAuthorize>,
+    arg0: Option<Pubkey>,
+    arg1: Option<StakeAuthorize>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -140,13 +140,13 @@ impl AuthorizeBuilder {
         self
     }
     #[inline(always)]
-    pub fn pubkey(&mut self, pubkey: Pubkey) -> &mut Self {
-        self.pubkey = Some(pubkey);
+    pub fn arg0(&mut self, arg0: Pubkey) -> &mut Self {
+        self.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
-    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
-        self.stake_authorize = Some(stake_authorize);
+    pub fn arg1(&mut self, arg1: StakeAuthorize) -> &mut Self {
+        self.arg1 = Some(arg1);
         self
     }
     /// Add an additional account to the instruction.
@@ -176,11 +176,8 @@ impl AuthorizeBuilder {
             lockup_authority: self.lockup_authority,
         };
         let args = AuthorizeInstructionArgs {
-            pubkey: self.pubkey.clone().expect("pubkey is not set"),
-            stake_authorize: self
-                .stake_authorize
-                .clone()
-                .expect("stake_authorize is not set"),
+            arg0: self.arg0.clone().expect("arg0 is not set"),
+            arg1: self.arg1.clone().expect("arg1 is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -338,8 +335,8 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
             clock_sysvar: None,
             authority: None,
             lockup_authority: None,
-            pubkey: None,
-            stake_authorize: None,
+            arg0: None,
+            arg1: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -375,13 +372,13 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn pubkey(&mut self, pubkey: Pubkey) -> &mut Self {
-        self.instruction.pubkey = Some(pubkey);
+    pub fn arg0(&mut self, arg0: Pubkey) -> &mut Self {
+        self.instruction.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
-    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
-        self.instruction.stake_authorize = Some(stake_authorize);
+    pub fn arg1(&mut self, arg1: StakeAuthorize) -> &mut Self {
+        self.instruction.arg1 = Some(arg1);
         self
     }
     /// Add an additional account to the instruction.
@@ -426,12 +423,8 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = AuthorizeInstructionArgs {
-            pubkey: self.instruction.pubkey.clone().expect("pubkey is not set"),
-            stake_authorize: self
-                .instruction
-                .stake_authorize
-                .clone()
-                .expect("stake_authorize is not set"),
+            arg0: self.instruction.arg0.clone().expect("arg0 is not set"),
+            arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
         };
         let instruction = AuthorizeCpi {
             __program: self.instruction.__program,
@@ -462,8 +455,8 @@ struct AuthorizeCpiBuilderInstruction<'a, 'b> {
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    pubkey: Option<Pubkey>,
-    stake_authorize: Option<StakeAuthorize>,
+    arg0: Option<Pubkey>,
+    arg1: Option<StakeAuthorize>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

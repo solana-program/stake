@@ -73,8 +73,8 @@ impl Default for InitializeInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeInstructionArgs {
-    pub authorized: Authorized,
-    pub lockup: Lockup,
+    pub arg0: Authorized,
+    pub arg1: Lockup,
 }
 
 /// Instruction builder for `Initialize`.
@@ -87,8 +87,8 @@ pub struct InitializeInstructionArgs {
 pub struct InitializeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     rent_sysvar: Option<solana_program::pubkey::Pubkey>,
-    authorized: Option<Authorized>,
-    lockup: Option<Lockup>,
+    arg0: Option<Authorized>,
+    arg1: Option<Lockup>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -107,13 +107,13 @@ impl InitializeBuilder {
         self
     }
     #[inline(always)]
-    pub fn authorized(&mut self, authorized: Authorized) -> &mut Self {
-        self.authorized = Some(authorized);
+    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
+        self.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: Lockup) -> &mut Self {
-        self.lockup = Some(lockup);
+    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
+        self.arg1 = Some(arg1);
         self
     }
     /// Add an additional account to the instruction.
@@ -141,8 +141,8 @@ impl InitializeBuilder {
             rent_sysvar: self.rent_sysvar.expect("rent_sysvar is not set"),
         };
         let args = InitializeInstructionArgs {
-            authorized: self.authorized.clone().expect("authorized is not set"),
-            lockup: self.lockup.clone().expect("lockup is not set"),
+            arg0: self.arg0.clone().expect("arg0 is not set"),
+            arg1: self.arg1.clone().expect("arg1 is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -272,8 +272,8 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             rent_sysvar: None,
-            authorized: None,
-            lockup: None,
+            arg0: None,
+            arg1: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -292,13 +292,13 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn authorized(&mut self, authorized: Authorized) -> &mut Self {
-        self.instruction.authorized = Some(authorized);
+    pub fn arg0(&mut self, arg0: Authorized) -> &mut Self {
+        self.instruction.arg0 = Some(arg0);
         self
     }
     #[inline(always)]
-    pub fn lockup(&mut self, lockup: Lockup) -> &mut Self {
-        self.instruction.lockup = Some(lockup);
+    pub fn arg1(&mut self, arg1: Lockup) -> &mut Self {
+        self.instruction.arg1 = Some(arg1);
         self
     }
     /// Add an additional account to the instruction.
@@ -343,12 +343,8 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = InitializeInstructionArgs {
-            authorized: self
-                .instruction
-                .authorized
-                .clone()
-                .expect("authorized is not set"),
-            lockup: self.instruction.lockup.clone().expect("lockup is not set"),
+            arg0: self.instruction.arg0.clone().expect("arg0 is not set"),
+            arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
         };
         let instruction = InitializeCpi {
             __program: self.instruction.__program,
@@ -373,8 +369,8 @@ struct InitializeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     rent_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    authorized: Option<Authorized>,
-    lockup: Option<Lockup>,
+    arg0: Option<Authorized>,
+    arg1: Option<Lockup>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

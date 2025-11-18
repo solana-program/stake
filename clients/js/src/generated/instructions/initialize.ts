@@ -65,21 +65,21 @@ export type InitializeInstruction<
 
 export type InitializeInstructionData = {
   discriminator: number;
-  authorized: Authorized;
-  lockup: Lockup;
+  arg0: Authorized;
+  arg1: Lockup;
 };
 
 export type InitializeInstructionDataArgs = {
-  authorized: AuthorizedArgs;
-  lockup: LockupArgs;
+  arg0: AuthorizedArgs;
+  arg1: LockupArgs;
 };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['authorized', getAuthorizedEncoder()],
-      ['lockup', getLockupEncoder()],
+      ['arg0', getAuthorizedEncoder()],
+      ['arg1', getLockupEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR })
   );
@@ -88,8 +88,8 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['authorized', getAuthorizedDecoder()],
-    ['lockup', getLockupDecoder()],
+    ['arg0', getAuthorizedDecoder()],
+    ['arg1', getLockupDecoder()],
   ]);
 }
 
@@ -109,8 +109,8 @@ export type InitializeInput<
 > = {
   stake: Address<TAccountStake>;
   rentSysvar: Address<TAccountRentSysvar>;
-  authorized: InitializeInstructionDataArgs['authorized'];
-  lockup: InitializeInstructionDataArgs['lockup'];
+  arg0: InitializeInstructionDataArgs['arg0'];
+  arg1: InitializeInstructionDataArgs['arg1'];
 };
 
 export function getInitializeInstruction<
