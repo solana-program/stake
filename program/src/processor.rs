@@ -289,36 +289,36 @@ fn move_stake_or_lamports_shared_checks(
     Ok((source_merge_kind, destination_merge_kind))
 }
 
-// NOTE our usage of the accounts iter is idiosyncratic, in imitation of the native stake program
-// native stake typically, but not always, accumulated signers from the accounts array indiscriminately
-// this essentially allowed any account to act as a stake account signing authority
-// instruction processors also asserted a required number of instruction accounts, often fewer than the actual number
-// when lengths were asserted in setup, accounts were retrieved via hardcoded index from InstructionContext
-// but after control was passed to main processing functions, they were pulled from the TransactionContext
+// NOTE Our usage of the accounts iter is nonstandard, in imitation of the Native Stake Program.
+// Native Stake typically, but not always, accumulated signers from the accounts array indiscriminately.
+// This essentially allowed any account to act as a stake account signing authority.
+// Instruction processors also asserted a required number of instruction accounts, often fewer than the actual number.
+// When lengths were asserted in setup, accounts were retrieved via hardcoded index from `InstructionContext`,
+// but after control was passed to main processing functions, they were pulled from the `TransactionContext`.
 //
-// when porting to bpf, we reimplemented this behavior exactly, such that both programs would be consensus-compatible:
-// * all transactions that would fail on one program also fail on the other
-// * all transactions that would succeed on one program also succeed on the other
-// * for successful transactions, all account state transitions are identical
-// error codes and log output sometimes differed
+// When porting to BPF, we reimplemented this behavior exactly, such that both programs would be consensus-compatible:
+// * All transactions that would fail on one program also fail on the other.
+// * All transactions that would succeed on one program also succeed on the other.
+// * For successful transactions, all account state transitions are identical.
+// Error codes and log output sometimes differed.
 //
-// the native stake program also accepted some sysvars as input accounts, but pulled others from `InvokeContext`
-// this was done for backwards compatibility but the end result was highly inconsistent
+// Native Stake also accepted some sysvars as input accounts, but pulled others from `InvokeContext`.
+// This was done for backwards compatibility, but the end result was highly inconsistent.
 //
-// bpf stake implements a new, stricter, interface, and supports both by branching when necessary
-// this new interface asserts that authorities are present in expected positions, and that they are signers
-// self-signed stake accounts are still supported; the key simply must be passed in twice
-// the new interface also requires no sysvar accounts, retrieving all sysvars by syscall
-// thus we can fall back to the old interface if we encounter the first old-interface sysvar
-// each processor has its own special logic, but we annotate "invariant," "diverge," and "converge" to make the flow obvious
+// BPF Stake implements a new, stricter, interface, and supports both by branching when necessary.
+// This new interface asserts that authorities are present in expected positions, and that they are signers.
+// Self-signed stake accounts are still supported; the key simply must be passed in twice.
+// The new interface also requires no sysvar accounts, retrieving all sysvars by syscall.
+// Thus, we can fall back to the old interface if we encounter the first old-interface sysvar.
+// Each processor has its own special logic, but we annotate "invariant," "diverge," and "converge" to make the flow obvious.
 //
-// we do not modify `Split`, `SetLockup`, and `SetLockupChecked`, as it would be a breaking change
-// these instructions never accepted sysvar accounts so there is no way to distinguish "old" from "new"
-// however we may make this change if we determine there are no legitimate mainnet users of the lax constraints
-// eventually we may be able to remove the old interface and move to standard positional accounts for all instructions
+// We do not modify `Split`, `SetLockup`, and `SetLockupChecked`, as it would be a breaking change.
+// These instructions never accepted sysvar accounts, so there is no way to distinguish "old" from "new."
+// However, we may make this change if we determine there are no legitimate mainnet users of the lax constraints.
+// Eventually, we may be able to remove the old interface and move to standard positional accounts for all instructions.
 //
-// new interface signer checks may duplicate later signer hashset checks. this is intended and harmless
-// `ok()` account retrievals (lockup custodians) were, are, and will always be optional by design
+// New interface signer checks may duplicate later signer hashset checks. This is intended and harmless.
+// `ok()` account retrievals (lockup custodians) were, are, and will always be optional by design.
 pub struct Processor {}
 impl Processor {
     fn process_initialize(
