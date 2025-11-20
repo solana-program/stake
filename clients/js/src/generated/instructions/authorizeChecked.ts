@@ -127,10 +127,15 @@ export type AuthorizeCheckedInput<
   TAccountNewAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
+  /** Stake account to be updated */
   stake: Address<TAccountStake>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
+  /** The new stake or withdraw authority */
   newAuthority: TransactionSigner<TAccountNewAuthority>;
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   stakeAuthorize: AuthorizeCheckedInstructionDataArgs['stakeAuthorize'];
 };
@@ -210,10 +215,15 @@ export type ParsedAuthorizeCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Stake account to be updated */
     stake: TAccountMetas[0];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
+    /** The stake or withdraw authority */
     authority: TAccountMetas[2];
+    /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedInstructionData;

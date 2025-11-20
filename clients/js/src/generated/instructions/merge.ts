@@ -101,10 +101,15 @@ export type MergeInput<
   TAccountStakeHistorySysvar extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
+  /** Destination stake account for the merge */
   destinationStake: Address<TAccountDestinationStake>;
+  /** Source stake account for to merge.  This account will be drained */
   sourceStake: Address<TAccountSourceStake>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
   stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
@@ -181,10 +186,15 @@ export type ParsedMergeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Destination stake account for the merge */
     destinationStake: TAccountMetas[0];
+    /** Source stake account for to merge.  This account will be drained */
     sourceStake: TAccountMetas[1];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistorySysvar: TAccountMetas[3];
+    /** Stake authority */
     stakeAuthority: TAccountMetas[4];
   };
   data: MergeInstructionData;

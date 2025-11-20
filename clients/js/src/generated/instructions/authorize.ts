@@ -127,9 +127,13 @@ export type AuthorizeInput<
   TAccountAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
+  /** Stake account to be updated */
   stake: Address<TAccountStake>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   arg0: AuthorizeInstructionDataArgs['arg0'];
   arg1: AuthorizeInstructionDataArgs['arg1'];
@@ -204,9 +208,13 @@ export type ParsedAuthorizeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Stake account to be updated */
     stake: TAccountMetas[0];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
+    /** The stake or withdraw authority */
     authority: TAccountMetas[2];
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeInstructionData;

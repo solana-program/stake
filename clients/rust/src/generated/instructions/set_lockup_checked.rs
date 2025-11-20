@@ -13,10 +13,11 @@ use {
 /// Accounts.
 #[derive(Debug)]
 pub struct SetLockupChecked {
+    /// Initialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-
+    /// Lockup authority or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
-
+    /// New lockup authority
     pub new_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -104,17 +105,20 @@ impl SetLockupCheckedBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
         self
     }
     /// `[optional account]`
+    /// New lockup authority
     #[inline(always)]
     pub fn new_authority(
         &mut self,
@@ -166,10 +170,11 @@ impl SetLockupCheckedBuilder {
 
 /// `set_lockup_checked` CPI accounts.
 pub struct SetLockupCheckedCpiAccounts<'a, 'b> {
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// New lockup authority
     pub new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -177,11 +182,11 @@ pub struct SetLockupCheckedCpiAccounts<'a, 'b> {
 pub struct SetLockupCheckedCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// New lockup authority
     pub new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: SetLockupCheckedInstructionArgs,
@@ -308,11 +313,13 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,
@@ -322,6 +329,7 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
+    /// New lockup authority
     #[inline(always)]
     pub fn new_authority(
         &mut self,

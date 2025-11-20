@@ -10,10 +10,11 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct MoveStake {
+    /// Active source stake account
     pub source_stake: solana_program::pubkey::Pubkey,
-
+    /// Active or inactive destination stake account
     pub destination_stake: solana_program::pubkey::Pubkey,
-
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -100,11 +101,13 @@ impl MoveStakeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Active source stake account
     #[inline(always)]
     pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.source_stake = Some(source_stake);
         self
     }
+    /// Active or inactive destination stake account
     #[inline(always)]
     pub fn destination_stake(
         &mut self,
@@ -113,6 +116,7 @@ impl MoveStakeBuilder {
         self.destination_stake = Some(destination_stake);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -163,10 +167,11 @@ impl MoveStakeBuilder {
 
 /// `move_stake` CPI accounts.
 pub struct MoveStakeCpiAccounts<'a, 'b> {
+    /// Active source stake account
     pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Active or inactive destination stake account
     pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -174,11 +179,11 @@ pub struct MoveStakeCpiAccounts<'a, 'b> {
 pub struct MoveStakeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Active source stake account
     pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Active or inactive destination stake account
     pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: MoveStakeInstructionArgs,
@@ -301,6 +306,7 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Active source stake account
     #[inline(always)]
     pub fn source_stake(
         &mut self,
@@ -309,6 +315,7 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
         self.instruction.source_stake = Some(source_stake);
         self
     }
+    /// Active or inactive destination stake account
     #[inline(always)]
     pub fn destination_stake(
         &mut self,
@@ -317,6 +324,7 @@ impl<'a, 'b> MoveStakeCpiBuilder<'a, 'b> {
         self.instruction.destination_stake = Some(destination_stake);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,

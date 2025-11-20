@@ -10,10 +10,11 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct Deactivate {
+    /// Delegated stake account to be deactivated
     pub stake: solana_program::pubkey::Pubkey,
-
+    /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -86,16 +87,19 @@ impl DeactivateBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Delegated stake account to be deactivated
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -136,10 +140,11 @@ impl DeactivateBuilder {
 
 /// `deactivate` CPI accounts.
 pub struct DeactivateCpiAccounts<'a, 'b> {
+    /// Delegated stake account to be deactivated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -147,11 +152,11 @@ pub struct DeactivateCpiAccounts<'a, 'b> {
 pub struct DeactivateCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Delegated stake account to be deactivated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -267,11 +272,13 @@ impl<'a, 'b> DeactivateCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Delegated stake account to be deactivated
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,
@@ -280,6 +287,7 @@ impl<'a, 'b> DeactivateCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,

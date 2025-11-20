@@ -107,7 +107,9 @@ export type InitializeInput<
   TAccountStake extends string = string,
   TAccountRentSysvar extends string = string,
 > = {
+  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
+  /** Rent sysvar */
   rentSysvar: Address<TAccountRentSysvar>;
   arg0: InitializeInstructionDataArgs['arg0'];
   arg1: InitializeInstructionDataArgs['arg1'];
@@ -160,7 +162,9 @@ export type ParsedInitializeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Uninitialized stake account */
     stake: TAccountMetas[0];
+    /** Rent sysvar */
     rentSysvar: TAccountMetas[1];
   };
   data: InitializeInstructionData;

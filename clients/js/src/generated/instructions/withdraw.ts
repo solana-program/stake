@@ -125,11 +125,17 @@ export type WithdrawInput<
   TAccountWithdrawAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
+  /** Stake account from which to withdraw */
   stake: Address<TAccountStake>;
+  /** Recipient account */
   recipient: Address<TAccountRecipient>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
   stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
+  /** Withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
+  /** Lockup authority, if before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   lamports: WithdrawInstructionDataArgs['lamports'];
 };
@@ -221,11 +227,17 @@ export type ParsedWithdrawInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Stake account from which to withdraw */
     stake: TAccountMetas[0];
+    /** Recipient account */
     recipient: TAccountMetas[1];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistorySysvar: TAccountMetas[3];
+    /** Withdraw authority */
     withdrawAuthority: TAccountMetas[4];
+    /** Lockup authority, if before lockup expiration */
     lockupAuthority?: TAccountMetas[5] | undefined;
   };
   data: WithdrawInstructionData;

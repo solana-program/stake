@@ -10,16 +10,17 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct DelegateStake {
+    /// Initialized stake account to be delegated
     pub stake: solana_program::pubkey::Pubkey,
-
+    /// Vote account to which this stake will be delegated
     pub vote: solana_program::pubkey::Pubkey,
-
+    /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history_sysvar: solana_program::pubkey::Pubkey,
-
+    /// Unused account, formerly the stake config
     pub unused: solana_program::pubkey::Pubkey,
-
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -109,21 +110,25 @@ impl DelegateStakeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Initialized stake account to be delegated
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
+    /// Vote account to which this stake will be delegated
     #[inline(always)]
     pub fn vote(&mut self, vote: solana_program::pubkey::Pubkey) -> &mut Self {
         self.vote = Some(vote);
         self
     }
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history_sysvar(
         &mut self,
@@ -132,11 +137,13 @@ impl DelegateStakeBuilder {
         self.stake_history_sysvar = Some(stake_history_sysvar);
         self
     }
+    /// Unused account, formerly the stake config
     #[inline(always)]
     pub fn unused(&mut self, unused: solana_program::pubkey::Pubkey) -> &mut Self {
         self.unused = Some(unused);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -182,16 +189,17 @@ impl DelegateStakeBuilder {
 
 /// `delegate_stake` CPI accounts.
 pub struct DelegateStakeCpiAccounts<'a, 'b> {
+    /// Initialized stake account to be delegated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Vote account to which this stake will be delegated
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Unused account, formerly the stake config
     pub unused: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -199,17 +207,17 @@ pub struct DelegateStakeCpiAccounts<'a, 'b> {
 pub struct DelegateStakeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Initialized stake account to be delegated
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Vote account to which this stake will be delegated
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Unused account, formerly the stake config
     pub unused: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -349,16 +357,19 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Initialized stake account to be delegated
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
+    /// Vote account to which this stake will be delegated
     #[inline(always)]
     pub fn vote(&mut self, vote: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.vote = Some(vote);
         self
     }
+    /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,
@@ -367,6 +378,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history_sysvar(
         &mut self,
@@ -375,6 +387,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self.instruction.stake_history_sysvar = Some(stake_history_sysvar);
         self
     }
+    /// Unused account, formerly the stake config
     #[inline(always)]
     pub fn unused(
         &mut self,
@@ -383,6 +396,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self.instruction.unused = Some(unused);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,

@@ -98,8 +98,11 @@ export type SplitInput<
   TAccountSplitStake extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
+  /** Stake account to be split; must be in the Initialized or Stake state */
   stake: Address<TAccountStake>;
+  /** Uninitialized stake account that will take the split-off amount */
   splitStake: Address<TAccountSplitStake>;
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
   lamports: SplitInstructionDataArgs['lamports'];
 };
@@ -160,8 +163,11 @@ export type ParsedSplitInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Stake account to be split; must be in the Initialized or Stake state */
     stake: TAccountMetas[0];
+    /** Uninitialized stake account that will take the split-off amount */
     splitStake: TAccountMetas[1];
+    /** Stake authority */
     stakeAuthority: TAccountMetas[2];
   };
   data: SplitInstructionData;

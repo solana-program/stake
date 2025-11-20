@@ -90,8 +90,11 @@ export type DeactivateDelinquentInput<
   TAccountDelinquentVote extends string = string,
   TAccountReferenceVote extends string = string,
 > = {
+  /** Delegated stake account */
   stake: Address<TAccountStake>;
+  /** Delinquent vote account for the delegated stake account */
   delinquentVote: Address<TAccountDelinquentVote>;
+  /** Reference vote account that has voted at least once in the last [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs */
   referenceVote: Address<TAccountReferenceVote>;
 };
 
@@ -150,8 +153,11 @@ export type ParsedDeactivateDelinquentInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Delegated stake account */
     stake: TAccountMetas[0];
+    /** Delinquent vote account for the delegated stake account */
     delinquentVote: TAccountMetas[1];
+    /** Reference vote account that has voted at least once in the last [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs */
     referenceVote: TAccountMetas[2];
   };
   data: DeactivateDelinquentInstructionData;

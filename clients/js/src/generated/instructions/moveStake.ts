@@ -98,8 +98,11 @@ export type MoveStakeInput<
   TAccountDestinationStake extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
+  /** Active source stake account */
   sourceStake: Address<TAccountSourceStake>;
+  /** Active or inactive destination stake account */
   destinationStake: Address<TAccountDestinationStake>;
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
   args: MoveStakeInstructionDataArgs['args'];
 };
@@ -167,8 +170,11 @@ export type ParsedMoveStakeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Active source stake account */
     sourceStake: TAccountMetas[0];
+    /** Active or inactive destination stake account */
     destinationStake: TAccountMetas[1];
+    /** Stake authority */
     stakeAuthority: TAccountMetas[2];
   };
   data: MoveStakeInstructionData;

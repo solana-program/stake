@@ -106,11 +106,17 @@ export type DelegateStakeInput<
   TAccountUnused extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
+  /** Initialized stake account to be delegated */
   stake: Address<TAccountStake>;
+  /** Vote account to which this stake will be delegated */
   vote: Address<TAccountVote>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
   stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
+  /** Unused account, formerly the stake config */
   unused: Address<TAccountUnused>;
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
@@ -190,11 +196,17 @@ export type ParsedDelegateStakeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Initialized stake account to be delegated */
     stake: TAccountMetas[0];
+    /** Vote account to which this stake will be delegated */
     vote: TAccountMetas[1];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistorySysvar: TAccountMetas[3];
+    /** Unused account, formerly the stake config */
     unused: TAccountMetas[4];
+    /** Stake authority */
     stakeAuthority: TAccountMetas[5];
   };
   data: DelegateStakeInstructionData;

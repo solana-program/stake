@@ -10,10 +10,11 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct MoveLamports {
+    /// Active or inactive source stake account
     pub source_stake: solana_program::pubkey::Pubkey,
-
+    /// Mergeable destination stake account
     pub destination_stake: solana_program::pubkey::Pubkey,
-
+    /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
 
@@ -100,11 +101,13 @@ impl MoveLamportsBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Active or inactive source stake account
     #[inline(always)]
     pub fn source_stake(&mut self, source_stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.source_stake = Some(source_stake);
         self
     }
+    /// Mergeable destination stake account
     #[inline(always)]
     pub fn destination_stake(
         &mut self,
@@ -113,6 +116,7 @@ impl MoveLamportsBuilder {
         self.destination_stake = Some(destination_stake);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
@@ -163,10 +167,11 @@ impl MoveLamportsBuilder {
 
 /// `move_lamports` CPI accounts.
 pub struct MoveLamportsCpiAccounts<'a, 'b> {
+    /// Active or inactive source stake account
     pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Mergeable destination stake account
     pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -174,11 +179,11 @@ pub struct MoveLamportsCpiAccounts<'a, 'b> {
 pub struct MoveLamportsCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Active or inactive source stake account
     pub source_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Mergeable destination stake account
     pub destination_stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: MoveLamportsInstructionArgs,
@@ -301,6 +306,7 @@ impl<'a, 'b> MoveLamportsCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Active or inactive source stake account
     #[inline(always)]
     pub fn source_stake(
         &mut self,
@@ -309,6 +315,7 @@ impl<'a, 'b> MoveLamportsCpiBuilder<'a, 'b> {
         self.instruction.source_stake = Some(source_stake);
         self
     }
+    /// Mergeable destination stake account
     #[inline(always)]
     pub fn destination_stake(
         &mut self,
@@ -317,6 +324,7 @@ impl<'a, 'b> MoveLamportsCpiBuilder<'a, 'b> {
         self.instruction.destination_stake = Some(destination_stake);
         self
     }
+    /// Stake authority
     #[inline(always)]
     pub fn stake_authority(
         &mut self,

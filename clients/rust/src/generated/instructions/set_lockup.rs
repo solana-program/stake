@@ -13,8 +13,9 @@ use {
 /// Accounts.
 #[derive(Debug)]
 pub struct SetLockup {
+    /// Initialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-
+    /// Lockup authority or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
 }
 
@@ -94,11 +95,13 @@ impl SetLockupBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
@@ -143,8 +146,9 @@ impl SetLockupBuilder {
 
 /// `set_lockup` CPI accounts.
 pub struct SetLockupCpiAccounts<'a, 'b> {
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -152,9 +156,9 @@ pub struct SetLockupCpiAccounts<'a, 'b> {
 pub struct SetLockupCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Initialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Lockup authority or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: SetLockupInstructionArgs,
@@ -269,11 +273,13 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Initialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
+    /// Lockup authority or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,

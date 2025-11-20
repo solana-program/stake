@@ -101,8 +101,11 @@ export type MoveLamportsInput<
   TAccountDestinationStake extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
+  /** Active or inactive source stake account */
   sourceStake: Address<TAccountSourceStake>;
+  /** Mergeable destination stake account */
   destinationStake: Address<TAccountDestinationStake>;
+  /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
   args: MoveLamportsInstructionDataArgs['args'];
 };
@@ -170,8 +173,11 @@ export type ParsedMoveLamportsInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Active or inactive source stake account */
     sourceStake: TAccountMetas[0];
+    /** Mergeable destination stake account */
     destinationStake: TAccountMetas[1];
+    /** Stake authority */
     stakeAuthority: TAccountMetas[2];
   };
   data: MoveLamportsInstructionData;

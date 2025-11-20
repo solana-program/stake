@@ -115,8 +115,11 @@ export type SetLockupCheckedInput<
   TAccountAuthority extends string = string,
   TAccountNewAuthority extends string = string,
 > = {
+  /** Initialized stake account */
   stake: Address<TAccountStake>;
+  /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
+  /** New lockup authority */
   newAuthority?: TransactionSigner<TAccountNewAuthority>;
   lockupCheckedArgs: SetLockupCheckedInstructionDataArgs['lockupCheckedArgs'];
 };
@@ -181,8 +184,11 @@ export type ParsedSetLockupCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Initialized stake account */
     stake: TAccountMetas[0];
+    /** Lockup authority or withdraw authority */
     authority: TAccountMetas[1];
+    /** New lockup authority */
     newAuthority?: TAccountMetas[2] | undefined;
   };
   data: SetLockupCheckedInstructionData;

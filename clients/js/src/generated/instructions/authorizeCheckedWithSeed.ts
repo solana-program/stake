@@ -135,10 +135,15 @@ export type AuthorizeCheckedWithSeedInput<
   TAccountNewAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
+  /** Stake account to be updated */
   stake: Address<TAccountStake>;
+  /** Base key of stake or withdraw authority */
   base: TransactionSigner<TAccountBase>;
+  /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
+  /** The new stake or withdraw authority */
   newAuthority: TransactionSigner<TAccountNewAuthority>;
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   authorizeCheckedWithSeedArgs: AuthorizeCheckedWithSeedInstructionDataArgs['authorizeCheckedWithSeedArgs'];
 };
@@ -218,10 +223,15 @@ export type ParsedAuthorizeCheckedWithSeedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Stake account to be updated */
     stake: TAccountMetas[0];
+    /** Base key of stake or withdraw authority */
     base: TAccountMetas[1];
+    /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
+    /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedWithSeedInstructionData;

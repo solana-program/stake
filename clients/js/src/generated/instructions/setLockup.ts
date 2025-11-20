@@ -100,7 +100,9 @@ export type SetLockupInput<
   TAccountStake extends string = string,
   TAccountAuthority extends string = string,
 > = {
+  /** Initialized stake account */
   stake: Address<TAccountStake>;
+  /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
   lockupArgs: SetLockupInstructionDataArgs['lockupArgs'];
 };
@@ -148,7 +150,9 @@ export type ParsedSetLockupInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Initialized stake account */
     stake: TAccountMetas[0];
+    /** Lockup authority or withdraw authority */
     authority: TAccountMetas[1];
   };
   data: SetLockupInstructionData;

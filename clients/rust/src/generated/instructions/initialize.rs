@@ -13,8 +13,9 @@ use {
 /// Accounts.
 #[derive(Debug)]
 pub struct Initialize {
+    /// Uninitialized stake account
     pub stake: solana_program::pubkey::Pubkey,
-
+    /// Rent sysvar
     pub rent_sysvar: solana_program::pubkey::Pubkey,
 }
 
@@ -96,11 +97,13 @@ impl InitializeBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
+    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.rent_sysvar = Some(rent_sysvar);
@@ -151,8 +154,9 @@ impl InitializeBuilder {
 
 /// `initialize` CPI accounts.
 pub struct InitializeCpiAccounts<'a, 'b> {
+    /// Uninitialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Rent sysvar
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
@@ -160,9 +164,9 @@ pub struct InitializeCpiAccounts<'a, 'b> {
 pub struct InitializeCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Uninitialized stake account
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-
+    /// Rent sysvar
     pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: InitializeInstructionArgs,
@@ -278,11 +282,13 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
+    /// Uninitialized stake account
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
+    /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(
         &mut self,

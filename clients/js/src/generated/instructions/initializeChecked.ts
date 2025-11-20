@@ -96,9 +96,13 @@ export type InitializeCheckedInput<
   TAccountStakeAuthority extends string = string,
   TAccountWithdrawAuthority extends string = string,
 > = {
+  /** Uninitialized stake account */
   stake: Address<TAccountStake>;
+  /** Rent sysvar */
   rentSysvar: Address<TAccountRentSysvar>;
+  /** The stake authority */
   stakeAuthority: Address<TAccountStakeAuthority>;
+  /** The withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
 };
 
@@ -166,9 +170,13 @@ export type ParsedInitializeCheckedInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
+    /** Uninitialized stake account */
     stake: TAccountMetas[0];
+    /** Rent sysvar */
     rentSysvar: TAccountMetas[1];
+    /** The stake authority */
     stakeAuthority: TAccountMetas[2];
+    /** The withdraw authority */
     withdrawAuthority: TAccountMetas[3];
   };
   data: InitializeCheckedInstructionData;
