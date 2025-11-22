@@ -6,8 +6,9 @@
 //!
 
 use {
-    crate::generated::types::AuthorizeCheckedWithSeedParams,
+    crate::generated::types::StakeAuthorize,
     borsh::{BorshDeserialize, BorshSerialize},
+    solana_program::pubkey::Pubkey,
 };
 
 /// Accounts.
@@ -93,7 +94,9 @@ impl Default for AuthorizeCheckedWithSeedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeCheckedWithSeedInstructionArgs {
-    pub authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
+    pub stake_authorize: StakeAuthorize,
+    pub authority_seed: String,
+    pub authority_owner: Pubkey,
 }
 
 /// Instruction builder for `AuthorizeCheckedWithSeed`.
@@ -112,7 +115,9 @@ pub struct AuthorizeCheckedWithSeedBuilder {
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     new_authority: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    authorize_checked_with_seed_args: Option<AuthorizeCheckedWithSeedParams>,
+    stake_authorize: Option<StakeAuthorize>,
+    authority_seed: Option<String>,
+    authority_owner: Option<Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -155,11 +160,18 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn authorize_checked_with_seed_args(
-        &mut self,
-        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
-    ) -> &mut Self {
-        self.authorize_checked_with_seed_args = Some(authorize_checked_with_seed_args);
+    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
+        self.stake_authorize = Some(stake_authorize);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+        self.authority_seed = Some(authority_seed);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_owner(&mut self, authority_owner: Pubkey) -> &mut Self {
+        self.authority_owner = Some(authority_owner);
         self
     }
     /// Add an additional account to the instruction.
@@ -190,10 +202,18 @@ impl AuthorizeCheckedWithSeedBuilder {
             lockup_authority: self.lockup_authority,
         };
         let args = AuthorizeCheckedWithSeedInstructionArgs {
-            authorize_checked_with_seed_args: self
-                .authorize_checked_with_seed_args
+            stake_authorize: self
+                .stake_authorize
                 .clone()
-                .expect("authorize_checked_with_seed_args is not set"),
+                .expect("stake_authorize is not set"),
+            authority_seed: self
+                .authority_seed
+                .clone()
+                .expect("authority_seed is not set"),
+            authority_owner: self
+                .authority_owner
+                .clone()
+                .expect("authority_owner is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -364,7 +384,9 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
             clock_sysvar: None,
             new_authority: None,
             lockup_authority: None,
-            authorize_checked_with_seed_args: None,
+            stake_authorize: None,
+            authority_seed: None,
+            authority_owner: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -410,11 +432,18 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn authorize_checked_with_seed_args(
-        &mut self,
-        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedParams,
-    ) -> &mut Self {
-        self.instruction.authorize_checked_with_seed_args = Some(authorize_checked_with_seed_args);
+    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
+        self.instruction.stake_authorize = Some(stake_authorize);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+        self.instruction.authority_seed = Some(authority_seed);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_owner(&mut self, authority_owner: Pubkey) -> &mut Self {
+        self.instruction.authority_owner = Some(authority_owner);
         self
     }
     /// Add an additional account to the instruction.
@@ -459,11 +488,21 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = AuthorizeCheckedWithSeedInstructionArgs {
-            authorize_checked_with_seed_args: self
+            stake_authorize: self
                 .instruction
-                .authorize_checked_with_seed_args
+                .stake_authorize
                 .clone()
-                .expect("authorize_checked_with_seed_args is not set"),
+                .expect("stake_authorize is not set"),
+            authority_seed: self
+                .instruction
+                .authority_seed
+                .clone()
+                .expect("authority_seed is not set"),
+            authority_owner: self
+                .instruction
+                .authority_owner
+                .clone()
+                .expect("authority_owner is not set"),
         };
         let instruction = AuthorizeCheckedWithSeedCpi {
             __program: self.instruction.__program,
@@ -500,7 +539,9 @@ struct AuthorizeCheckedWithSeedCpiBuilderInstruction<'a, 'b> {
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    authorize_checked_with_seed_args: Option<AuthorizeCheckedWithSeedParams>,
+    stake_authorize: Option<StakeAuthorize>,
+    authority_seed: Option<String>,
+    authority_owner: Option<Pubkey>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

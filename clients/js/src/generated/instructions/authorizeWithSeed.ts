@@ -7,11 +7,17 @@
  */
 
 import {
+  addDecoderSizePrefix,
+  addEncoderSizePrefix,
   combineCodec,
+  getAddressDecoder,
+  getAddressEncoder,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
   getU32Encoder,
+  getUtf8Decoder,
+  getUtf8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -31,10 +37,10 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getAuthorizeWithSeedParamsDecoder,
-  getAuthorizeWithSeedParamsEncoder,
-  type AuthorizeWithSeedParams,
-  type AuthorizeWithSeedParamsArgs,
+  getStakeAuthorizeDecoder,
+  getStakeAuthorizeEncoder,
+  type StakeAuthorize,
+  type StakeAuthorizeArgs,
 } from '../types';
 
 export const AUTHORIZE_WITH_SEED_DISCRIMINATOR = 8;
@@ -80,18 +86,30 @@ export type AuthorizeWithSeedInstruction<
 
 export type AuthorizeWithSeedInstructionData = {
   discriminator: number;
-  authorizeWithSeedArgs: AuthorizeWithSeedParams;
+  newAuthorizedPubkey: Address;
+  stakeAuthorize: StakeAuthorize;
+  authoritySeed: string;
+  authorityOwner: Address;
 };
 
 export type AuthorizeWithSeedInstructionDataArgs = {
-  authorizeWithSeedArgs: AuthorizeWithSeedParamsArgs;
+  newAuthorizedPubkey: Address;
+  stakeAuthorize: StakeAuthorizeArgs;
+  authoritySeed: string;
+  authorityOwner: Address;
 };
 
 export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeWithSeedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['authorizeWithSeedArgs', getAuthorizeWithSeedParamsEncoder()],
+      ['newAuthorizedPubkey', getAddressEncoder()],
+      ['stakeAuthorize', getStakeAuthorizeEncoder()],
+      [
+        'authoritySeed',
+        addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder()),
+      ],
+      ['authorityOwner', getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: AUTHORIZE_WITH_SEED_DISCRIMINATOR })
   );
@@ -100,7 +118,10 @@ export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeW
 export function getAuthorizeWithSeedInstructionDataDecoder(): Decoder<AuthorizeWithSeedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['authorizeWithSeedArgs', getAuthorizeWithSeedParamsDecoder()],
+    ['newAuthorizedPubkey', getAddressDecoder()],
+    ['stakeAuthorize', getStakeAuthorizeDecoder()],
+    ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
+    ['authorityOwner', getAddressDecoder()],
   ]);
 }
 
@@ -128,7 +149,10 @@ export type AuthorizeWithSeedInput<
   clockSysvar: Address<TAccountClockSysvar>;
   /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  authorizeWithSeedArgs: AuthorizeWithSeedInstructionDataArgs['authorizeWithSeedArgs'];
+  newAuthorizedPubkey: AuthorizeWithSeedInstructionDataArgs['newAuthorizedPubkey'];
+  stakeAuthorize: AuthorizeWithSeedInstructionDataArgs['stakeAuthorize'];
+  authoritySeed: AuthorizeWithSeedInstructionDataArgs['authoritySeed'];
+  authorityOwner: AuthorizeWithSeedInstructionDataArgs['authorityOwner'];
 };
 
 export function getAuthorizeWithSeedInstruction<

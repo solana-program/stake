@@ -8,6 +8,10 @@
 
 import {
   combineCodec,
+  getAddressDecoder,
+  getAddressEncoder,
+  getOptionDecoder,
+  getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
@@ -22,6 +26,8 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
+  type Option,
+  type OptionOrNullable,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
@@ -30,10 +36,14 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getLockupParamsDecoder,
-  getLockupParamsEncoder,
-  type LockupParams,
-  type LockupParamsArgs,
+  getEpochDecoder,
+  getEpochEncoder,
+  getUnixTimestampDecoder,
+  getUnixTimestampEncoder,
+  type Epoch,
+  type EpochArgs,
+  type UnixTimestamp,
+  type UnixTimestampArgs,
 } from '../types';
 
 export const SET_LOCKUP_DISCRIMINATOR = 6;
@@ -64,16 +74,24 @@ export type SetLockupInstruction<
 
 export type SetLockupInstructionData = {
   discriminator: number;
-  lockupArgs: LockupParams;
+  unixTimestamp: Option<UnixTimestamp>;
+  epoch: Option<Epoch>;
+  custodian: Option<Address>;
 };
 
-export type SetLockupInstructionDataArgs = { lockupArgs: LockupParamsArgs };
+export type SetLockupInstructionDataArgs = {
+  unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
+  epoch: OptionOrNullable<EpochArgs>;
+  custodian: OptionOrNullable<Address>;
+};
 
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lockupArgs', getLockupParamsEncoder()],
+      ['unixTimestamp', getOptionEncoder(getUnixTimestampEncoder())],
+      ['epoch', getOptionEncoder(getEpochEncoder())],
+      ['custodian', getOptionEncoder(getAddressEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
   );
@@ -82,7 +100,9 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lockupArgs', getLockupParamsDecoder()],
+    ['unixTimestamp', getOptionDecoder(getUnixTimestampDecoder())],
+    ['epoch', getOptionDecoder(getEpochDecoder())],
+    ['custodian', getOptionDecoder(getAddressDecoder())],
   ]);
 }
 
@@ -104,7 +124,9 @@ export type SetLockupInput<
   stake: Address<TAccountStake>;
   /** Lockup authority or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  lockupArgs: SetLockupInstructionDataArgs['lockupArgs'];
+  unixTimestamp: SetLockupInstructionDataArgs['unixTimestamp'];
+  epoch: SetLockupInstructionDataArgs['epoch'];
+  custodian: SetLockupInstructionDataArgs['custodian'];
 };
 
 export function getSetLockupInstruction<

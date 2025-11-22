@@ -35,6 +35,10 @@ codama.update(
   })
 );
 
+// Unwrap defined type links used only as instruction args, then flatten them
+codama.update(c.unwrapInstructionArgsDefinedTypesVisitor());
+codama.update(c.flattenInstructionDataArgumentsVisitor());
+
 // Add type aliases for semantic external types
 codama.update(
   c.bottomUpTransformerVisitor([

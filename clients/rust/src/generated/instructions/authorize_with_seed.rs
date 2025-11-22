@@ -6,8 +6,9 @@
 //!
 
 use {
-    crate::generated::types::AuthorizeWithSeedParams,
+    crate::generated::types::StakeAuthorize,
     borsh::{BorshDeserialize, BorshSerialize},
+    solana_program::pubkey::Pubkey,
 };
 
 /// Accounts.
@@ -87,7 +88,10 @@ impl Default for AuthorizeWithSeedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeWithSeedInstructionArgs {
-    pub authorize_with_seed_args: AuthorizeWithSeedParams,
+    pub new_authorized_pubkey: Pubkey,
+    pub stake_authorize: StakeAuthorize,
+    pub authority_seed: String,
+    pub authority_owner: Pubkey,
 }
 
 /// Instruction builder for `AuthorizeWithSeed`.
@@ -104,7 +108,10 @@ pub struct AuthorizeWithSeedBuilder {
     base: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
     lockup_authority: Option<solana_program::pubkey::Pubkey>,
-    authorize_with_seed_args: Option<AuthorizeWithSeedParams>,
+    new_authorized_pubkey: Option<Pubkey>,
+    stake_authorize: Option<StakeAuthorize>,
+    authority_seed: Option<String>,
+    authority_owner: Option<Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -141,11 +148,23 @@ impl AuthorizeWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn authorize_with_seed_args(
-        &mut self,
-        authorize_with_seed_args: AuthorizeWithSeedParams,
-    ) -> &mut Self {
-        self.authorize_with_seed_args = Some(authorize_with_seed_args);
+    pub fn new_authorized_pubkey(&mut self, new_authorized_pubkey: Pubkey) -> &mut Self {
+        self.new_authorized_pubkey = Some(new_authorized_pubkey);
+        self
+    }
+    #[inline(always)]
+    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
+        self.stake_authorize = Some(stake_authorize);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+        self.authority_seed = Some(authority_seed);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_owner(&mut self, authority_owner: Pubkey) -> &mut Self {
+        self.authority_owner = Some(authority_owner);
         self
     }
     /// Add an additional account to the instruction.
@@ -175,10 +194,22 @@ impl AuthorizeWithSeedBuilder {
             lockup_authority: self.lockup_authority,
         };
         let args = AuthorizeWithSeedInstructionArgs {
-            authorize_with_seed_args: self
-                .authorize_with_seed_args
+            new_authorized_pubkey: self
+                .new_authorized_pubkey
                 .clone()
-                .expect("authorize_with_seed_args is not set"),
+                .expect("new_authorized_pubkey is not set"),
+            stake_authorize: self
+                .stake_authorize
+                .clone()
+                .expect("stake_authorize is not set"),
+            authority_seed: self
+                .authority_seed
+                .clone()
+                .expect("authority_seed is not set"),
+            authority_owner: self
+                .authority_owner
+                .clone()
+                .expect("authority_owner is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
@@ -337,7 +368,10 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
             base: None,
             clock_sysvar: None,
             lockup_authority: None,
-            authorize_with_seed_args: None,
+            new_authorized_pubkey: None,
+            stake_authorize: None,
+            authority_seed: None,
+            authority_owner: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -374,11 +408,23 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn authorize_with_seed_args(
-        &mut self,
-        authorize_with_seed_args: AuthorizeWithSeedParams,
-    ) -> &mut Self {
-        self.instruction.authorize_with_seed_args = Some(authorize_with_seed_args);
+    pub fn new_authorized_pubkey(&mut self, new_authorized_pubkey: Pubkey) -> &mut Self {
+        self.instruction.new_authorized_pubkey = Some(new_authorized_pubkey);
+        self
+    }
+    #[inline(always)]
+    pub fn stake_authorize(&mut self, stake_authorize: StakeAuthorize) -> &mut Self {
+        self.instruction.stake_authorize = Some(stake_authorize);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+        self.instruction.authority_seed = Some(authority_seed);
+        self
+    }
+    #[inline(always)]
+    pub fn authority_owner(&mut self, authority_owner: Pubkey) -> &mut Self {
+        self.instruction.authority_owner = Some(authority_owner);
         self
     }
     /// Add an additional account to the instruction.
@@ -423,11 +469,26 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
         let args = AuthorizeWithSeedInstructionArgs {
-            authorize_with_seed_args: self
+            new_authorized_pubkey: self
                 .instruction
-                .authorize_with_seed_args
+                .new_authorized_pubkey
                 .clone()
-                .expect("authorize_with_seed_args is not set"),
+                .expect("new_authorized_pubkey is not set"),
+            stake_authorize: self
+                .instruction
+                .stake_authorize
+                .clone()
+                .expect("stake_authorize is not set"),
+            authority_seed: self
+                .instruction
+                .authority_seed
+                .clone()
+                .expect("authority_seed is not set"),
+            authority_owner: self
+                .instruction
+                .authority_owner
+                .clone()
+                .expect("authority_owner is not set"),
         };
         let instruction = AuthorizeWithSeedCpi {
             __program: self.instruction.__program,
@@ -458,7 +519,10 @@ struct AuthorizeWithSeedCpiBuilderInstruction<'a, 'b> {
     base: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    authorize_with_seed_args: Option<AuthorizeWithSeedParams>,
+    new_authorized_pubkey: Option<Pubkey>,
+    stake_authorize: Option<StakeAuthorize>,
+    authority_seed: Option<String>,
+    authority_owner: Option<Pubkey>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

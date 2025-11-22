@@ -8,6 +8,8 @@
 
 import {
   combineCodec,
+  getOptionDecoder,
+  getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
@@ -22,6 +24,8 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
+  type Option,
+  type OptionOrNullable,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
@@ -30,10 +34,14 @@ import {
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
-  getLockupCheckedParamsDecoder,
-  getLockupCheckedParamsEncoder,
-  type LockupCheckedParams,
-  type LockupCheckedParamsArgs,
+  getEpochDecoder,
+  getEpochEncoder,
+  getUnixTimestampDecoder,
+  getUnixTimestampEncoder,
+  type Epoch,
+  type EpochArgs,
+  type UnixTimestamp,
+  type UnixTimestampArgs,
 } from '../types';
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
@@ -76,18 +84,21 @@ export type SetLockupCheckedInstruction<
 
 export type SetLockupCheckedInstructionData = {
   discriminator: number;
-  lockupCheckedArgs: LockupCheckedParams;
+  unixTimestamp: Option<UnixTimestamp>;
+  epoch: Option<Epoch>;
 };
 
 export type SetLockupCheckedInstructionDataArgs = {
-  lockupCheckedArgs: LockupCheckedParamsArgs;
+  unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
+  epoch: OptionOrNullable<EpochArgs>;
 };
 
 export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCheckedInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lockupCheckedArgs', getLockupCheckedParamsEncoder()],
+      ['unixTimestamp', getOptionEncoder(getUnixTimestampEncoder())],
+      ['epoch', getOptionEncoder(getEpochEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_CHECKED_DISCRIMINATOR })
   );
@@ -96,7 +107,8 @@ export function getSetLockupCheckedInstructionDataEncoder(): Encoder<SetLockupCh
 export function getSetLockupCheckedInstructionDataDecoder(): Decoder<SetLockupCheckedInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lockupCheckedArgs', getLockupCheckedParamsDecoder()],
+    ['unixTimestamp', getOptionDecoder(getUnixTimestampDecoder())],
+    ['epoch', getOptionDecoder(getEpochDecoder())],
   ]);
 }
 
@@ -121,7 +133,8 @@ export type SetLockupCheckedInput<
   authority: TransactionSigner<TAccountAuthority>;
   /** New lockup authority */
   newAuthority?: TransactionSigner<TAccountNewAuthority>;
-  lockupCheckedArgs: SetLockupCheckedInstructionDataArgs['lockupCheckedArgs'];
+  unixTimestamp: SetLockupCheckedInstructionDataArgs['unixTimestamp'];
+  epoch: SetLockupCheckedInstructionDataArgs['epoch'];
 };
 
 export function getSetLockupCheckedInstruction<
