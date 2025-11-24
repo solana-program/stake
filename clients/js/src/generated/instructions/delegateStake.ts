@@ -42,7 +42,7 @@ export type DelegateStakeInstruction<
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountVote extends string | AccountMeta<string> = string,
   TAccountClockSysvar extends string | AccountMeta<string> = string,
-  TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
+  TAccountStakeHistory extends string | AccountMeta<string> = string,
   TAccountUnused extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -59,9 +59,9 @@ export type DelegateStakeInstruction<
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
-      TAccountStakeHistorySysvar extends string
-        ? ReadonlyAccount<TAccountStakeHistorySysvar>
-        : TAccountStakeHistorySysvar,
+      TAccountStakeHistory extends string
+        ? ReadonlyAccount<TAccountStakeHistory>
+        : TAccountStakeHistory,
       TAccountUnused extends string
         ? ReadonlyAccount<TAccountUnused>
         : TAccountUnused,
@@ -102,7 +102,7 @@ export type DelegateStakeInput<
   TAccountStake extends string = string,
   TAccountVote extends string = string,
   TAccountClockSysvar extends string = string,
-  TAccountStakeHistorySysvar extends string = string,
+  TAccountStakeHistory extends string = string,
   TAccountUnused extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
@@ -113,7 +113,7 @@ export type DelegateStakeInput<
   /** Clock sysvar */
   clockSysvar: Address<TAccountClockSysvar>;
   /** Stake history sysvar that carries stake warmup/cooldown history */
-  stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
+  stakeHistory: Address<TAccountStakeHistory>;
   /** Unused account, formerly the stake config */
   unused: Address<TAccountUnused>;
   /** Stake authority */
@@ -124,7 +124,7 @@ export function getDelegateStakeInstruction<
   TAccountStake extends string,
   TAccountVote extends string,
   TAccountClockSysvar extends string,
-  TAccountStakeHistorySysvar extends string,
+  TAccountStakeHistory extends string,
   TAccountUnused extends string,
   TAccountStakeAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
@@ -133,7 +133,7 @@ export function getDelegateStakeInstruction<
     TAccountStake,
     TAccountVote,
     TAccountClockSysvar,
-    TAccountStakeHistorySysvar,
+    TAccountStakeHistory,
     TAccountUnused,
     TAccountStakeAuthority
   >,
@@ -143,7 +143,7 @@ export function getDelegateStakeInstruction<
   TAccountStake,
   TAccountVote,
   TAccountClockSysvar,
-  TAccountStakeHistorySysvar,
+  TAccountStakeHistory,
   TAccountUnused,
   TAccountStakeAuthority
 > {
@@ -155,10 +155,7 @@ export function getDelegateStakeInstruction<
     stake: { value: input.stake ?? null, isWritable: true },
     vote: { value: input.vote ?? null, isWritable: false },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-    stakeHistorySysvar: {
-      value: input.stakeHistorySysvar ?? null,
-      isWritable: false,
-    },
+    stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
     unused: { value: input.unused ?? null, isWritable: false },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
@@ -173,7 +170,7 @@ export function getDelegateStakeInstruction<
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.vote),
       getAccountMeta(accounts.clockSysvar),
-      getAccountMeta(accounts.stakeHistorySysvar),
+      getAccountMeta(accounts.stakeHistory),
       getAccountMeta(accounts.unused),
       getAccountMeta(accounts.stakeAuthority),
     ],
@@ -184,7 +181,7 @@ export function getDelegateStakeInstruction<
     TAccountStake,
     TAccountVote,
     TAccountClockSysvar,
-    TAccountStakeHistorySysvar,
+    TAccountStakeHistory,
     TAccountUnused,
     TAccountStakeAuthority
   >);
@@ -203,7 +200,7 @@ export type ParsedDelegateStakeInstruction<
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
     /** Stake history sysvar that carries stake warmup/cooldown history */
-    stakeHistorySysvar: TAccountMetas[3];
+    stakeHistory: TAccountMetas[3];
     /** Unused account, formerly the stake config */
     unused: TAccountMetas[4];
     /** Stake authority */
@@ -236,7 +233,7 @@ export function parseDelegateStakeInstruction<
       stake: getNextAccount(),
       vote: getNextAccount(),
       clockSysvar: getNextAccount(),
-      stakeHistorySysvar: getNextAccount(),
+      stakeHistory: getNextAccount(),
       unused: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },

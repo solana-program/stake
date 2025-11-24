@@ -91,7 +91,7 @@ pub enum StakeInstruction {
     ))]
     #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
     #[codama(account(
-        name = "stake_history_sysvar",
+        name = "stake_history",
         docs = "Stake history sysvar that carries stake warmup/cooldown history"
     ))]
     #[codama(account(name = "unused", docs = "Unused account, formerly the stake config"))]
@@ -366,7 +366,7 @@ pub enum StakeInstruction {
     GetMinimumDelegation,
 
     /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
+    /// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
@@ -375,7 +375,7 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
-    ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
+    ///      `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     #[codama(account(name = "stake", writable, docs = "Delegated stake account"))]
     #[codama(account(
         name = "delinquent_vote",
@@ -383,7 +383,7 @@ pub enum StakeInstruction {
     ))]
     #[codama(account(
         name = "reference_vote",
-        docs = "Reference vote account that has voted at least once in the last [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs"
+        docs = "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
     ))]
     DeactivateDelinquent,
 
