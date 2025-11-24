@@ -4,6 +4,8 @@ members = [
     "clients/rust",
     "interface",
     "program",
+    "pinocchio/interface",
+    "pinocchio/test-utils",
 ]
 
 [workspace.package]
