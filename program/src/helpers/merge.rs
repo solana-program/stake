@@ -43,7 +43,7 @@ impl MergeKind {
             StakeStateV2::Stake(meta, stake, stake_flags) => {
                 // stake must not be in a transient state. Transient here meaning
                 // activating or deactivating with non-zero effective stake.
-                let status = stake.delegation.stake_activating_and_deactivating(
+                let status = stake.delegation.stake_activating_and_deactivating_v2(
                     clock.epoch,
                     stake_history,
                     PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
