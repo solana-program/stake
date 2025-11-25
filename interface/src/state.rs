@@ -517,6 +517,9 @@ impl Delegation {
         self.activation_epoch == u64::MAX
     }
 
+    /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
+    /// rate-limiting. New `stake_v2()` uses integers (upstream eBPF-compatible).
+    #[deprecated(since = "2.0.1", note = "Use stake_v2() instead")]
     pub fn stake<T: StakeHistoryGetEntry>(
         &self,
         epoch: Epoch,
@@ -528,25 +531,12 @@ impl Delegation {
     }
 
     /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
-    /// rate-limiting. For the purpose of consumers like Agave that need to feature gate the update.
-    #[deprecated(since = "2.0.1", note = "Use stake() instead")]
-    pub fn stake_v1_legacy<T: StakeHistoryGetEntry>(
-        &self,
-        epoch: Epoch,
-        history: &T,
-        new_rate_activation_epoch: Option<Epoch>,
-    ) -> u64 {
-        self.stake_activating_and_deactivating_v1_legacy(epoch, history, new_rate_activation_epoch)
-            .effective
-    }
-
-    /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
-    /// rate-limiting. For the purpose of consumers like Agave that need to feature gate the update.
+    /// rate-limiting. New `stake_activating_and_deactivating_v2()` uses integers (upstream eBPF-compatible).
     #[deprecated(
         since = "2.0.1",
-        note = "Use stake_activating_and_deactivating() instead"
+        note = "Use stake_activating_and_deactivating_v2() instead"
     )]
-    pub fn stake_activating_and_deactivating_v1_legacy<T: StakeHistoryGetEntry>(
+    pub fn stake_activating_and_deactivating<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
         history: &T,
@@ -554,7 +544,7 @@ impl Delegation {
     ) -> StakeActivationStatus {
         // first, calculate an effective and activating stake
         let (effective_stake, activating_stake) =
-            self.stake_and_activating_v1_legacy(target_epoch, history, new_rate_activation_epoch);
+            self.stake_and_activating(target_epoch, history, new_rate_activation_epoch);
 
         // then de-activate some portion if necessary
         if target_epoch < self.deactivation_epoch {
@@ -633,8 +623,8 @@ impl Delegation {
     }
 
     // returned tuple is (effective, activating) stake
-    #[deprecated(since = "2.0.1", note = "Use stake_and_activating() instead")]
-    fn stake_and_activating_v1_legacy<T: StakeHistoryGetEntry>(
+    #[deprecated(since = "2.0.1", note = "Use stake_and_activating_v2() instead")]
+    fn stake_and_activating<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
         history: &T,
@@ -720,7 +710,17 @@ impl Delegation {
         }
     }
 
-    pub fn stake_activating_and_deactivating<T: StakeHistoryGetEntry>(
+    pub fn stake_v2<T: StakeHistoryGetEntry>(
+        &self,
+        epoch: Epoch,
+        history: &T,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> u64 {
+        self.stake_activating_and_deactivating_v2(epoch, history, new_rate_activation_epoch)
+            .effective
+    }
+
+    pub fn stake_activating_and_deactivating_v2<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
         history: &T,
@@ -728,7 +728,7 @@ impl Delegation {
     ) -> StakeActivationStatus {
         // first, calculate an effective and activating stake
         let (effective_stake, activating_stake) =
-            self.stake_and_activating(target_epoch, history, new_rate_activation_epoch);
+            self.stake_and_activating_v2(target_epoch, history, new_rate_activation_epoch);
 
         // then de-activate some portion if necessary
         if target_epoch < self.deactivation_epoch {
@@ -812,7 +812,7 @@ impl Delegation {
     }
 
     // returned tuple is (effective, activating) stake
-    fn stake_and_activating<T: StakeHistoryGetEntry>(
+    fn stake_and_activating_v2<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
         history: &T,
@@ -923,6 +923,7 @@ pub struct Stake {
 }
 
 impl Stake {
+    #[deprecated(since = "2.0.1", note = "Use stake_v2() instead")]
     pub fn stake<T: StakeHistoryGetEntry>(
         &self,
         epoch: Epoch,
@@ -933,15 +934,14 @@ impl Stake {
             .stake(epoch, history, new_rate_activation_epoch)
     }
 
-    #[deprecated(since = "2.0.1", note = "Use stake() instead")]
-    pub fn stake_v1_legacy<T: StakeHistoryGetEntry>(
+    pub fn stake_v2<T: StakeHistoryGetEntry>(
         &self,
         epoch: Epoch,
         history: &T,
         new_rate_activation_epoch: Option<Epoch>,
     ) -> u64 {
         self.delegation
-            .stake_v1_legacy(epoch, history, new_rate_activation_epoch)
+            .stake_v2(epoch, history, new_rate_activation_epoch)
     }
 
     pub fn split(
@@ -1005,7 +1005,11 @@ mod tests {
         I: Iterator<Item = &'a Delegation>,
     {
         stakes.fold(StakeHistoryEntry::default(), |sum, stake| {
-            sum + stake.stake_activating_and_deactivating(epoch, history, new_rate_activation_epoch)
+            sum + stake.stake_activating_and_deactivating_v2(
+                epoch,
+                history,
+                new_rate_activation_epoch,
+            )
         })
     }
 
@@ -1213,23 +1217,31 @@ mod tests {
         let mut stake_history = StakeHistory::default();
         // assert that this stake follows step function if there's no history
         assert_eq!(
-            stake.stake_activating_and_deactivating(stake.activation_epoch, &stake_history, None),
+            stake.stake_activating_and_deactivating_v2(
+                stake.activation_epoch,
+                &stake_history,
+                None
+            ),
             StakeActivationStatus::with_effective_and_activating(0, stake.stake),
         );
         for epoch in stake.activation_epoch + 1..stake.deactivation_epoch {
             assert_eq!(
-                stake.stake_activating_and_deactivating(epoch, &stake_history, None),
+                stake.stake_activating_and_deactivating_v2(epoch, &stake_history, None),
                 StakeActivationStatus::with_effective(stake.stake),
             );
         }
         // assert that this stake is full deactivating
         assert_eq!(
-            stake.stake_activating_and_deactivating(stake.deactivation_epoch, &stake_history, None),
+            stake.stake_activating_and_deactivating_v2(
+                stake.deactivation_epoch,
+                &stake_history,
+                None
+            ),
             StakeActivationStatus::with_deactivating(stake.stake),
         );
         // assert that this stake is fully deactivated if there's no history
         assert_eq!(
-            stake.stake_activating_and_deactivating(
+            stake.stake_activating_and_deactivating_v2(
                 stake.deactivation_epoch + 1,
                 &stake_history,
                 None
@@ -1246,7 +1258,7 @@ mod tests {
         );
         // assert that this stake is broken, because above setup is broken
         assert_eq!(
-            stake.stake_activating_and_deactivating(1, &stake_history, None),
+            stake.stake_activating_and_deactivating_v2(1, &stake_history, None),
             StakeActivationStatus::with_effective_and_activating(0, stake.stake),
         );
 
@@ -1261,7 +1273,7 @@ mod tests {
         );
         // assert that this stake is broken, because above setup is broken
         assert_eq!(
-            stake.stake_activating_and_deactivating(2, &stake_history, None),
+            stake.stake_activating_and_deactivating_v2(2, &stake_history, None),
             StakeActivationStatus::with_effective_and_activating(
                 increment,
                 stake.stake - increment
@@ -1280,7 +1292,7 @@ mod tests {
         );
         // assert that this stake is broken, because above setup is broken
         assert_eq!(
-            stake.stake_activating_and_deactivating(
+            stake.stake_activating_and_deactivating_v2(
                 stake.deactivation_epoch + 1,
                 &stake_history,
                 None,
@@ -1299,7 +1311,7 @@ mod tests {
         );
         // assert that this stake is broken, because above setup is broken
         assert_eq!(
-            stake.stake_activating_and_deactivating(
+            stake.stake_activating_and_deactivating_v2(
                 stake.deactivation_epoch + 2,
                 &stake_history,
                 None,
@@ -1369,7 +1381,7 @@ mod tests {
             assert_eq!(
                 expected_stakes,
                 (0..expected_stakes.len())
-                    .map(|epoch| stake.stake_activating_and_deactivating(
+                    .map(|epoch| stake.stake_activating_and_deactivating_v2(
                         epoch as u64,
                         &stake_history,
                         None,
@@ -1500,7 +1512,7 @@ mod tests {
         let calculate_each_staking_status = |stake: &Delegation, epoch_count: usize| -> Vec<_> {
             (0..epoch_count)
                 .map(|epoch| {
-                    stake.stake_activating_and_deactivating(epoch as u64, &stake_history, None)
+                    stake.stake_activating_and_deactivating_v2(epoch as u64, &stake_history, None)
                 })
                 .collect::<Vec<_>>()
         };
@@ -1621,7 +1633,7 @@ mod tests {
                 (0, history.deactivating)
             };
             assert_eq!(
-                stake.stake_activating_and_deactivating(epoch, &stake_history, None),
+                stake.stake_activating_and_deactivating_v2(epoch, &stake_history, None),
                 StakeActivationStatus {
                     effective: expected_stake,
                     activating: expected_activating,
@@ -1653,7 +1665,7 @@ mod tests {
         for epoch in 0..epochs {
             let stake = delegations
                 .iter()
-                .map(|delegation| delegation.stake(epoch, &stake_history, None))
+                .map(|delegation| delegation.stake_v2(epoch, &stake_history, None))
                 .sum::<u64>();
             max_stake = max_stake.max(stake);
             min_stake = min_stake.min(stake);
@@ -1722,7 +1734,7 @@ mod tests {
 
         let mut prev_total_effective_stake = delegations
             .iter()
-            .map(|delegation| delegation.stake(0, &stake_history, new_rate_activation_epoch))
+            .map(|delegation| delegation.stake_v2(0, &stake_history, new_rate_activation_epoch))
             .sum::<u64>();
 
         // uncomment and add ! for fun with graphing
@@ -1731,7 +1743,7 @@ mod tests {
             let total_effective_stake = delegations
                 .iter()
                 .map(|delegation| {
-                    delegation.stake(epoch, &stake_history, new_rate_activation_epoch)
+                    delegation.stake_v2(epoch, &stake_history, new_rate_activation_epoch)
                 })
                 .sum::<u64>();
 
@@ -1970,7 +1982,7 @@ mod tests {
             super::*,
             crate::{
                 stake_history::{StakeHistory, StakeHistoryEntry},
-                test_utils::max_ulp_tolerance,
+                ulp::max_ulp_tolerance,
             },
             proptest::prelude::*,
             solana_pubkey::Pubkey,
@@ -2034,12 +2046,12 @@ mod tests {
                 new_rate_activation_epoch_option in prop::option::of(0u64..=50),
                 stake_history in arbitrary_stake_history(50),
             ) {
-                let new_stake = delegation.stake(
+                let new_stake = delegation.stake_v2(
                     target_epoch,
                     &stake_history,
                     new_rate_activation_epoch_option,
                 );
-                let legacy_stake = delegation.stake_v1_legacy(
+                let legacy_stake = delegation.stake(
                     target_epoch,
                     &stake_history,
                     new_rate_activation_epoch_option,

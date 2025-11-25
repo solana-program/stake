@@ -228,7 +228,7 @@ fn get_active_stake_for_tests(
     let mut active_stake = 0;
     for account in stake_accounts {
         if let Ok(StakeStateV2::Stake(_meta, stake, _stake_flags)) = account.state() {
-            let stake_status = stake.delegation.stake_activating_and_deactivating(
+            let stake_status = stake.delegation.stake_activating_and_deactivating_v2(
                 clock.epoch,
                 stake_history,
                 None,
@@ -253,7 +253,7 @@ where
     I: Iterator<Item = &'a Delegation>,
 {
     stakes.fold(StakeHistoryEntry::default(), |sum, stake| {
-        sum + stake.stake_activating_and_deactivating(epoch, history, new_rate_activation_epoch)
+        sum + stake.stake_activating_and_deactivating_v2(epoch, history, new_rate_activation_epoch)
     })
 }
 
@@ -6364,9 +6364,10 @@ fn test_merge_active_stake() {
             StakeHistory::id(),
             create_account_shared_data_for_test(&stake_history),
         );
-        if stake_amount == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+        if stake_amount
+            == stake.stake_v2(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
             && merge_from_amount
-                == merge_from_stake.stake(
+                == merge_from_stake.stake_v2(
                     clock.epoch,
                     &stake_history,
                     new_warmup_cooldown_rate_epoch,
@@ -6447,8 +6448,8 @@ fn test_merge_active_stake() {
             StakeHistory::id(),
             create_account_shared_data_for_test(&stake_history),
         );
-        if 0 == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
-            && 0 == merge_from_stake.stake(
+        if 0 == stake.stake_v2(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+            && 0 == merge_from_stake.stake_v2(
                 clock.epoch,
                 &stake_history,
                 new_warmup_cooldown_rate_epoch,

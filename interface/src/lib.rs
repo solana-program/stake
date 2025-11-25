@@ -12,9 +12,9 @@ pub mod stake_history;
 pub mod state;
 #[cfg(feature = "sysvar")]
 pub mod sysvar;
-#[cfg(test)]
-mod test_utils;
 pub mod tools;
+#[cfg(test)]
+mod ulp;
 pub mod warmup_cooldown_allowance;
 
 #[cfg(feature = "codama")]

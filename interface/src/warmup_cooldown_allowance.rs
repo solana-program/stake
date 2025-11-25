@@ -100,7 +100,7 @@ fn rate_limited_stake_change(
 mod test {
     #[allow(deprecated)]
     use crate::state::{DEFAULT_WARMUP_COOLDOWN_RATE, NEW_WARMUP_COOLDOWN_RATE};
-    use {super::*, crate::test_utils::max_ulp_tolerance, proptest::prelude::*};
+    use {super::*, crate::ulp::max_ulp_tolerance, proptest::prelude::*};
 
     // === Rate selector ===
 

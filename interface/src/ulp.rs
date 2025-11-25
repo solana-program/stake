@@ -1,4 +1,4 @@
-//! Shared utilities for tests only
+//! Math utilities for calculating float/int differences
 
 /// Calculates the "Unit in the Last Place" (`ULP`) for a `u64` value, which is
 /// the gap between adjacent `f64` values at that magnitude. We need this because

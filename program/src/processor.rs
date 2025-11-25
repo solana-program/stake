@@ -519,11 +519,13 @@ impl Processor {
 
                 let minimum_delegation = crate::get_minimum_delegation();
 
-                let status = source_stake.delegation.stake_activating_and_deactivating(
-                    clock.epoch,
-                    stake_history,
-                    PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
-                );
+                let status = source_stake
+                    .delegation
+                    .stake_activating_and_deactivating_v2(
+                        clock.epoch,
+                        stake_history,
+                        PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
+                    );
 
                 let is_active = status.effective > 0;
 
@@ -693,7 +695,7 @@ impl Processor {
                     .map_err(to_program_error)?;
                 // if we have a deactivation epoch and we're in cooldown
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
-                    stake.delegation.stake(
+                    stake.delegation.stake_v2(
                         clock.epoch,
                         stake_history,
                         PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,

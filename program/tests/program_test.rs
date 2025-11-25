@@ -198,7 +198,7 @@ pub async fn get_effective_stake(banks_client: &mut BanksClient, pubkey: &Pubkey
         StakeStateV2::Stake(_, stake, _) => {
             stake
                 .delegation
-                .stake_activating_and_deactivating(clock.epoch, &stake_history, Some(0))
+                .stake_activating_and_deactivating_v2(clock.epoch, &stake_history, Some(0))
                 .effective
         }
         _ => 0,
