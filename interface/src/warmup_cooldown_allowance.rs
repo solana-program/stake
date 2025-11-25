@@ -76,24 +76,20 @@ fn rate_limited_stake_change(
     // `change = (account_portion * cluster_effective * rate_bps) / (cluster_portion * BASIS_POINTS_PER_UNIT)`
     //
     // Using `u128` for the intermediate calculations to prevent overflow.
+    // If the multiplication would overflow, we saturate to u128::MAX. This ensures
+    // that even in extreme edge cases, the rate-limiting invariant is maintained
+    // (fail-safe) rather than bypassing rate limits entirely (fail-open).
     let numerator = (account_portion as u128)
-        .checked_mul(cluster_effective as u128)
-        .and_then(|x| x.checked_mul(rate_bps as u128));
+        .saturating_mul(cluster_effective as u128)
+        .saturating_mul(rate_bps as u128);
     let denominator = (cluster_portion as u128).saturating_mul(BASIS_POINTS_PER_UNIT as u128);
 
-    match numerator {
-        Some(n) => {
-            // Safe unwrap as denominator cannot be zero
-            let delta = n.checked_div(denominator).unwrap();
-            // The calculated delta can be larger than `account_portion` if the network's stake change
-            // allowance is greater than the total stake waiting to change. In this case, the account's
-            // entire portion is allowed to change.
-            delta.min(account_portion as u128) as u64
-        }
-        // Overflowing u128 is not a realistic scenario except in tests. However, in that case
-        // it's reasonable to allow activation/deactivation of the account's entire portion.
-        None => account_portion,
-    }
+    // Safe unwrap as denominator cannot be zero due to early return guards above
+    let delta = numerator.checked_div(denominator).unwrap();
+    // The calculated delta can be larger than `account_portion` if the network's stake change
+    // allowance is greater than the total stake waiting to change. In this case, the account's
+    // entire portion is allowed to change.
+    delta.min(account_portion as u128) as u64
 }
 
 #[cfg(test)]
@@ -200,24 +196,46 @@ mod test {
     }
 
     #[test]
-    fn activation_overflow_path_returns_account_portion() {
-        // Force the u128 multiply to overflow: (u64::MAX * u64::MAX * 9) overflows u128.
-        // When that happens, the helper returns the full account_portion.
-        let current_epoch = 0;
-        let new_rate_activation_epoch = Some(0); // use "current" 9/100 to maximize multiplier
+    fn activation_overflow_scenario_still_rate_limits() {
+        // Extreme scenario where a single account holding nearly the total supply
+        // and tries to activate everything at once. Asserting rate limiting is maintained.
+        let supply_lamports: u64 = 400_000_000_000_000_000; // 400M SOL
+        let account_portion = supply_lamports;
         let prev = StakeHistoryEntry {
-            activating: 1,       // non-zero cluster_portion
-            effective: u64::MAX, // huge cluster_effective
+            activating: supply_lamports,
+            effective: supply_lamports,
             ..Default::default()
         };
-        let account_portion = u64::MAX;
+
         let result = calculate_activation_allowance(
-            current_epoch,
+            100,
             account_portion,
             &prev,
-            new_rate_activation_epoch,
+            None, // forces 25% rate
         );
-        assert_eq!(result, account_portion);
+
+        // Verify overflow actually occurs in this scenario
+        let rate_bps = ORIGINAL_WARMUP_COOLDOWN_RATE_BPS;
+        let would_overflow = (account_portion as u128)
+            .checked_mul(supply_lamports as u128)
+            .and_then(|n| n.checked_mul(rate_bps as u128))
+            .is_none();
+        assert!(would_overflow);
+
+        // The ideal result (with infinite precision) is 25% of the stake.
+        // 400M * 0.25 = 100M
+        let ideal_allowance = supply_lamports / 4;
+
+        // With saturation fix:
+        // Numerator saturates to u128::MAX (≈ 3.4e38)
+        // Denominator = 4e17 * 10,000 = 4e21
+        // Result = 3.4e38 / 4e21 ≈ 8.5e16 (85M SOL)
+        // 85M is ~21.25% of the stake (fail-safe)
+        // If we allowed unlocking the full account portion it would have been 100% (fail-open)
+        assert!(result < account_portion);
+
+        // Assert result is in a reasonable throttling range
+        assert!(result > 0 && result <= ideal_allowance);
     }
 
     // === Cooldown allowance ===
@@ -394,8 +412,8 @@ mod test {
                 prop_assert_eq!(float_math_result, 0);
             } else if would_overflow {
                 // In the u128 overflow region, the `f64` implementation is guaranteed to be imprecise.
-                // We only assert that our implementation correctly falls back to account_portion.
-                prop_assert_eq!(integer_math_result, account_portion);
+                // We only assert that the result does not exceed the account's balance
+                prop_assert!(integer_math_result <= account_portion);
             } else {
                 prop_assert!(integer_math_result <= account_portion);
                 prop_assert!(float_math_result <= account_portion);
