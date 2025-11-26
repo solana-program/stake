@@ -5,6 +5,7 @@
 
 use {
     crate::state::{Authorized, Lockup, StakeAuthorize},
+    codama_macros::{codama, CodamaInstructions, CodamaType},
     solana_clock::{Epoch, UnixTimestamp},
     solana_pubkey::Pubkey,
 };
@@ -29,11 +30,11 @@ const RENT_ID: Pubkey = Pubkey::from_str_const("SysvarRent1111111111111111111111
 const STAKE_HISTORY_ID: Pubkey =
     Pubkey::from_str_const("SysvarStakeHistory1111111111111111111111111");
 
+#[derive(CodamaInstructions, Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
     ///
@@ -44,7 +45,9 @@ pub enum StakeInstruction {
     /// [`Authorized`] carries pubkeys that must sign staker transactions
     /// and withdrawer transactions; [`Lockup`] carries information about
     /// withdrawal restrictions.
-    Initialize(Authorized, Lockup),
+    #[codama(account(name = "stake", writable, docs = "Uninitialized stake account"))]
+    #[codama(account(name = "rent_sysvar", docs = "Rent sysvar"))]
+    Initialize { arg0: Authorized, arg1: Lockup },
 
     /// Authorize a key to manage stake or withdrawal
     ///
@@ -54,7 +57,16 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` The stake or withdraw authority
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating `StakeAuthorize::Withdrawer` before
     ///      lockup expiration
-    Authorize(Pubkey, StakeAuthorize),
+    #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "authority", signer, docs = "The stake or withdraw authority"))]
+    #[codama(account(
+        name = "lockup_authority",
+        optional,
+        signer,
+        docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+    ))]
+    Authorize { arg0: Pubkey, arg1: StakeAuthorize },
 
     /// Delegate a stake to a particular vote account
     ///
@@ -68,6 +80,22 @@ pub enum StakeInstruction {
     ///
     /// The entire balance of the staking account is staked. `DelegateStake`
     /// can be called multiple times, but re-delegation is delayed by one epoch.
+    #[codama(account(
+        name = "stake",
+        writable,
+        docs = "Initialized stake account to be delegated"
+    ))]
+    #[codama(account(
+        name = "vote",
+        docs = "Vote account to which this stake will be delegated"
+    ))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(
+        name = "stake_history",
+        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+    ))]
+    #[codama(account(name = "unused", docs = "Unused account, formerly the stake config"))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
     DelegateStake,
 
     /// Split `u64` tokens and stake off a stake account into another stake account.
@@ -76,7 +104,18 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Stake account to be split; must be in the Initialized or Stake state
     ///   1. `[WRITE]` Uninitialized stake account that will take the split-off amount
     ///   2. `[SIGNER]` Stake authority
-    Split(u64),
+    #[codama(account(
+        name = "stake",
+        writable,
+        docs = "Stake account to be split; must be in the Initialized or Stake state"
+    ))]
+    #[codama(account(
+        name = "split_stake",
+        writable,
+        docs = "Uninitialized stake account that will take the split-off amount"
+    ))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
+    Split { lamports: u64 },
 
     /// Withdraw unstaked lamports from the stake account
     ///
@@ -90,7 +129,25 @@ pub enum StakeInstruction {
     ///
     /// The `u64` is the portion of the stake account balance to be withdrawn,
     /// must be `<= StakeAccount.lamports - staked_lamports`.
-    Withdraw(u64),
+    #[codama(account(
+        name = "stake",
+        writable,
+        docs = "Stake account from which to withdraw"
+    ))]
+    #[codama(account(name = "recipient", writable, docs = "Recipient account"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(
+        name = "stake_history_sysvar",
+        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+    ))]
+    #[codama(account(name = "withdraw_authority", signer, docs = "Withdraw authority"))]
+    #[codama(account(
+        name = "lockup_authority",
+        optional,
+        signer,
+        docs = "Lockup authority, if before lockup expiration"
+    ))]
+    Withdraw { lamports: u64 },
 
     /// Deactivates the stake in the account
     ///
@@ -98,6 +155,13 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Clock sysvar
     ///   2. `[SIGNER]` Stake authority
+    #[codama(account(
+        name = "stake",
+        writable,
+        docs = "Delegated stake account to be deactivated"
+    ))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
     Deactivate,
 
     /// Set stake lockup
@@ -108,7 +172,13 @@ pub enum StakeInstruction {
     /// # Account references
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
-    SetLockup(LockupArgs),
+    #[codama(account(name = "stake", writable, docs = "Initialized stake account"))]
+    #[codama(account(
+        name = "authority",
+        signer,
+        docs = "Lockup authority or withdraw authority"
+    ))]
+    SetLockup { lockup_args: LockupArgs },
 
     /// Merge two stake accounts.
     ///
@@ -134,6 +204,22 @@ pub enum StakeInstruction {
     ///   2. `[]` Clock sysvar
     ///   3. `[]` Stake history sysvar that carries stake warmup/cooldown history
     ///   4. `[SIGNER]` Stake authority
+    #[codama(account(
+        name = "destination_stake",
+        writable,
+        docs = "Destination stake account for the merge"
+    ))]
+    #[codama(account(
+        name = "source_stake",
+        writable,
+        docs = "Source stake account for to merge.  This account will be drained"
+    ))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(
+        name = "stake_history_sysvar",
+        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+    ))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
     Merge,
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -144,7 +230,22 @@ pub enum StakeInstruction {
     ///   2. `[]` Clock sysvar
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    AuthorizeWithSeed(AuthorizeWithSeedArgs),
+    #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
+    #[codama(account(
+        name = "base",
+        signer,
+        docs = "Base key of stake or withdraw authority"
+    ))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(
+        name = "lockup_authority",
+        optional,
+        signer,
+        docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+    ))]
+    AuthorizeWithSeed {
+        authorize_with_seed_args: AuthorizeWithSeedArgs,
+    },
 
     /// Initialize a stake with authorization information
     ///
@@ -156,6 +257,10 @@ pub enum StakeInstruction {
     ///   1. `[]` Rent sysvar
     ///   2. `[]` The stake authority
     ///   3. `[SIGNER]` The withdraw authority
+    #[codama(account(name = "stake", writable, docs = "Uninitialized stake account"))]
+    #[codama(account(name = "rent_sysvar", docs = "Rent sysvar"))]
+    #[codama(account(name = "stake_authority", docs = "The stake authority"))]
+    #[codama(account(name = "withdraw_authority", signer, docs = "The withdraw authority"))]
     InitializeChecked,
 
     /// Authorize a key to manage stake or withdrawal
@@ -170,7 +275,21 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    AuthorizeChecked(StakeAuthorize),
+    #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "authority", signer, docs = "The stake or withdraw authority"))]
+    #[codama(account(
+        name = "new_authority",
+        signer,
+        docs = "The new stake or withdraw authority"
+    ))]
+    #[codama(account(
+        name = "lockup_authority",
+        optional,
+        signer,
+        docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+    ))]
+    AuthorizeChecked { stake_authorize: StakeAuthorize },
 
     /// Authorize a key to manage stake or withdrawal with a derived key
     ///
@@ -184,7 +303,27 @@ pub enum StakeInstruction {
     ///   3. `[SIGNER]` The new stake or withdraw authority
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
-    AuthorizeCheckedWithSeed(AuthorizeCheckedWithSeedArgs),
+    #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
+    #[codama(account(
+        name = "base",
+        signer,
+        docs = "Base key of stake or withdraw authority"
+    ))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(
+        name = "new_authority",
+        signer,
+        docs = "The new stake or withdraw authority"
+    ))]
+    #[codama(account(
+        name = "lockup_authority",
+        optional,
+        signer,
+        docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+    ))]
+    AuthorizeCheckedWithSeed {
+        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedArgs,
+    },
 
     /// Set stake lockup
     ///
@@ -198,7 +337,21 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Initialized stake account
     ///   1. `[SIGNER]` Lockup authority or withdraw authority
     ///   2. Optional: `[SIGNER]` New lockup authority
-    SetLockupChecked(LockupCheckedArgs),
+    #[codama(account(name = "stake", writable, docs = "Initialized stake account"))]
+    #[codama(account(
+        name = "authority",
+        signer,
+        docs = "Lockup authority or withdraw authority"
+    ))]
+    #[codama(account(
+        name = "new_authority",
+        optional,
+        signer,
+        docs = "New lockup authority"
+    ))]
+    SetLockupChecked {
+        lockup_checked_args: LockupCheckedArgs,
+    },
 
     /// Get the minimum stake delegation, in lamports
     ///
@@ -213,7 +366,7 @@ pub enum StakeInstruction {
     GetMinimumDelegation,
 
     /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs.
+    /// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
@@ -222,7 +375,16 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
     ///   2. `[]` Reference vote account that has voted at least once in the last
-    ///      [`crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`] epochs
+    ///      `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    #[codama(account(name = "stake", writable, docs = "Delegated stake account"))]
+    #[codama(account(
+        name = "delinquent_vote",
+        docs = "Delinquent vote account for the delegated stake account"
+    ))]
+    #[codama(account(
+        name = "reference_vote",
+        docs = "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
+    ))]
     DeactivateDelinquent,
 
     /// Redelegate activated stake to another vote account.
@@ -246,6 +408,7 @@ pub enum StakeInstruction {
     ///   4. `[SIGNER]` Stake authority
     ///
     #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
+    // NOTE: No codama attributes - this instruction is disabled and excluded from IDL
     Redelegate,
 
     /// Move stake between accounts with the same authorities and lockups, using Staker authority.
@@ -267,7 +430,15 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` Stake authority
     ///
     /// The `u64` is the portion of the stake to move, which may be the entire delegation
-    MoveStake(u64),
+    #[codama(account(name = "sourceStake", writable, docs = "Active source stake account"))]
+    #[codama(account(
+        name = "destinationStake",
+        writable,
+        docs = "Active or inactive destination stake account"
+    ))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
+    // sadly named `args` to avoid breaking users of old IDL
+    MoveStake { args: u64 },
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
     /// authority.
@@ -282,35 +453,50 @@ pub enum StakeInstruction {
     ///   2. `[SIGNER]` Stake authority
     ///
     /// The `u64` is the portion of available lamports to move
-    MoveLamports(u64),
+    #[codama(account(
+        name = "source_stake",
+        writable,
+        docs = "Active or inactive source stake account"
+    ))]
+    #[codama(account(
+        name = "destination_stake",
+        writable,
+        docs = "Mergeable destination stake account"
+    ))]
+    #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
+    // sadly named `args` to avoid breaking users of old IDL
+    MoveLamports { args: u64 },
 }
 
+#[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[codama(name = "lockupParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LockupArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
     pub custodian: Option<Pubkey>,
 }
 
+#[derive(CodamaType, Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[codama(name = "lockupCheckedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LockupCheckedArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
 }
 
+#[derive(CodamaType, Debug, PartialEq, Eq, Clone)]
+#[codama(name = "authorizeWithSeedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthorizeWithSeedArgs {
     pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
@@ -318,11 +504,12 @@ pub struct AuthorizeWithSeedArgs {
     pub authority_owner: Pubkey,
 }
 
+#[derive(CodamaType, Debug, PartialEq, Eq, Clone)]
+#[codama(name = "authorizeCheckedWithSeedParams")]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthorizeCheckedWithSeedArgs {
     pub stake_authorize: StakeAuthorize,
     pub authority_seed: String,
@@ -333,7 +520,10 @@ pub struct AuthorizeCheckedWithSeedArgs {
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::Initialize(*authorized, *lockup),
+        &StakeInstruction::Initialize {
+            arg0: *authorized,
+            arg1: *lockup,
+        },
         vec![
             AccountMeta::new(*stake_pubkey, false),
             AccountMeta::new_readonly(RENT_ID, false),
@@ -454,7 +644,7 @@ fn _split(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Split { lamports }, account_metas)
 }
 
 #[cfg(feature = "bincode")]
@@ -593,7 +783,10 @@ pub fn authorize(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::Authorize(*new_authorized_pubkey, stake_authorize),
+        &StakeInstruction::Authorize {
+            arg0: *new_authorized_pubkey,
+            arg1: stake_authorize,
+        },
         account_metas,
     )
 }
@@ -619,7 +812,7 @@ pub fn authorize_checked(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeChecked(stake_authorize),
+        &StakeInstruction::AuthorizeChecked { stake_authorize },
         account_metas,
     )
 }
@@ -653,7 +846,9 @@ pub fn authorize_with_seed(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeWithSeed(args),
+        &StakeInstruction::AuthorizeWithSeed {
+            authorize_with_seed_args: args,
+        },
         account_metas,
     )
 }
@@ -687,7 +882,9 @@ pub fn authorize_checked_with_seed(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeCheckedWithSeed(args),
+        &StakeInstruction::AuthorizeCheckedWithSeed {
+            authorize_checked_with_seed_args: args,
+        },
         account_metas,
     )
 }
@@ -730,7 +927,7 @@ pub fn withdraw(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw(lamports), account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw { lamports }, account_metas)
 }
 
 #[cfg(feature = "bincode")]
@@ -753,7 +950,13 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup(*lockup), account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::SetLockup {
+            lockup_args: *lockup,
+        },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]
@@ -776,7 +979,9 @@ pub fn set_lockup_checked(
     }
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::SetLockupChecked(lockup_checked),
+        &StakeInstruction::SetLockupChecked {
+            lockup_checked_args: lockup_checked,
+        },
         account_metas,
     )
 }
@@ -881,7 +1086,11 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake(lamports), account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::MoveStake { args: lamports },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]
@@ -897,7 +1106,11 @@ pub fn move_lamports(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveLamports(lamports), account_metas)
+    Instruction::new_with_bincode(
+        ID,
+        &StakeInstruction::MoveLamports { args: lamports },
+        account_metas,
+    )
 }
 
 #[cfg(feature = "bincode")]

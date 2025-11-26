@@ -18,9 +18,9 @@ pub struct Authorize {
     pub stake: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -98,7 +98,7 @@ pub struct AuthorizeInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   1. `[]` clock_sysvar
 ///   2. `[signer]` authority
 ///   3. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
@@ -122,21 +122,20 @@ impl AuthorizeBuilder {
         self.stake = Some(stake);
         self
     }
-    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -177,9 +176,7 @@ impl AuthorizeBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Authorize {
             stake: self.stake.expect("stake is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarC1ock11111111111111111111111111111111"
-            )),
+            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
             authority: self.authority.expect("authority is not set"),
             lockup_authority: self.lockup_authority,
         };
@@ -198,9 +195,9 @@ pub struct AuthorizeCpiAccounts<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -212,9 +209,9 @@ pub struct AuthorizeCpi<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: AuthorizeInstructionArgs,
@@ -365,7 +362,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,
@@ -375,7 +372,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,

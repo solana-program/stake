@@ -43,10 +43,8 @@ export type WithdrawInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountRecipient extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
+  TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -66,9 +64,9 @@ export type WithdrawInstruction<
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
-      TAccountStakeHistory extends string
-        ? ReadonlyAccount<TAccountStakeHistory>
-        : TAccountStakeHistory,
+      TAccountStakeHistorySysvar extends string
+        ? ReadonlyAccount<TAccountStakeHistorySysvar>
+        : TAccountStakeHistorySysvar,
       TAccountWithdrawAuthority extends string
         ? ReadonlySignerAccount<TAccountWithdrawAuthority> &
             AccountSignerMeta<TAccountWithdrawAuthority>
@@ -85,15 +83,18 @@ export type WithdrawInstruction<
     ]
   >;
 
-export type WithdrawInstructionData = { discriminator: number; args: bigint };
+export type WithdrawInstructionData = {
+  discriminator: number;
+  lamports: bigint;
+};
 
-export type WithdrawInstructionDataArgs = { args: number | bigint };
+export type WithdrawInstructionDataArgs = { lamports: number | bigint };
 
 export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['args', getU64Encoder()],
+      ['lamports', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: WITHDRAW_DISCRIMINATOR })
   );
@@ -102,7 +103,7 @@ export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<WithdrawIn
 export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<WithdrawInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['args', getU64Decoder()],
+    ['lamports', getU64Decoder()],
   ]);
 }
 
@@ -120,7 +121,7 @@ export type WithdrawInput<
   TAccountStake extends string = string,
   TAccountRecipient extends string = string,
   TAccountClockSysvar extends string = string,
-  TAccountStakeHistory extends string = string,
+  TAccountStakeHistorySysvar extends string = string,
   TAccountWithdrawAuthority extends string = string,
   TAccountLockupAuthority extends string = string,
 > = {
@@ -129,21 +130,21 @@ export type WithdrawInput<
   /** Recipient account */
   recipient: Address<TAccountRecipient>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
-  stakeHistory: Address<TAccountStakeHistory>;
+  clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
+  stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
   /** Withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
-  args: WithdrawInstructionDataArgs['args'];
+  lamports: WithdrawInstructionDataArgs['lamports'];
 };
 
 export function getWithdrawInstruction<
   TAccountStake extends string,
   TAccountRecipient extends string,
   TAccountClockSysvar extends string,
-  TAccountStakeHistory extends string,
+  TAccountStakeHistorySysvar extends string,
   TAccountWithdrawAuthority extends string,
   TAccountLockupAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
@@ -152,7 +153,7 @@ export function getWithdrawInstruction<
     TAccountStake,
     TAccountRecipient,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountWithdrawAuthority,
     TAccountLockupAuthority
   >,
@@ -162,7 +163,7 @@ export function getWithdrawInstruction<
   TAccountStake,
   TAccountRecipient,
   TAccountClockSysvar,
-  TAccountStakeHistory,
+  TAccountStakeHistorySysvar,
   TAccountWithdrawAuthority,
   TAccountLockupAuthority
 > {
@@ -174,7 +175,10 @@ export function getWithdrawInstruction<
     stake: { value: input.stake ?? null, isWritable: true },
     recipient: { value: input.recipient ?? null, isWritable: true },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-    stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
+    stakeHistorySysvar: {
+      value: input.stakeHistorySysvar ?? null,
+      isWritable: false,
+    },
     withdrawAuthority: {
       value: input.withdrawAuthority ?? null,
       isWritable: false,
@@ -192,19 +196,13 @@ export function getWithdrawInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.stake),
       getAccountMeta(accounts.recipient),
       getAccountMeta(accounts.clockSysvar),
-      getAccountMeta(accounts.stakeHistory),
+      getAccountMeta(accounts.stakeHistorySysvar),
       getAccountMeta(accounts.withdrawAuthority),
       getAccountMeta(accounts.lockupAuthority),
     ].filter(<T>(x: T | undefined): x is T => x !== undefined),
@@ -217,7 +215,7 @@ export function getWithdrawInstruction<
     TAccountStake,
     TAccountRecipient,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountWithdrawAuthority,
     TAccountLockupAuthority
   >);
@@ -235,11 +233,11 @@ export type ParsedWithdrawInstruction<
     recipient: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
-    stakeHistory: TAccountMetas[3];
+    /** Stake history sysvar that carries stake warmup/cooldown history */
+    stakeHistorySysvar: TAccountMetas[3];
     /** Withdraw authority */
     withdrawAuthority: TAccountMetas[4];
-    /** Lockup authority */
+    /** Lockup authority, if before lockup expiration */
     lockupAuthority?: TAccountMetas[5] | undefined;
   };
   data: WithdrawInstructionData;
@@ -275,7 +273,7 @@ export function parseWithdrawInstruction<
       stake: getNextAccount(),
       recipient: getNextAccount(),
       clockSysvar: getNextAccount(),
-      stakeHistory: getNextAccount(),
+      stakeHistorySysvar: getNextAccount(),
       withdrawAuthority: getNextAccount(),
       lockupAuthority: getNextOptionalAccount(),
     },

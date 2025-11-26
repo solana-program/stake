@@ -48,9 +48,7 @@ export function getAuthorizeDiscriminatorBytes() {
 export type AuthorizeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -132,10 +130,10 @@ export type AuthorizeInput<
   /** Stake account to be updated */
   stake: Address<TAccountStake>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake or withdraw authority */
+  clockSysvar: Address<TAccountClockSysvar>;
+  /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   arg0: AuthorizeInstructionDataArgs['arg0'];
   arg1: AuthorizeInstructionDataArgs['arg1'];
@@ -183,12 +181,6 @@ export function getAuthorizeInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -220,9 +212,9 @@ export type ParsedAuthorizeInstruction<
     stake: TAccountMetas[0];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
-    /** Stake or withdraw authority */
+    /** The stake or withdraw authority */
     authority: TAccountMetas[2];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeInstructionData;

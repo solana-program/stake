@@ -40,9 +40,7 @@ export function getInitializeCheckedDiscriminatorBytes() {
 export type InitializeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountRentSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountRentSysvar extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -101,7 +99,7 @@ export type InitializeCheckedInput<
   /** Uninitialized stake account */
   stake: Address<TAccountStake>;
   /** Rent sysvar */
-  rentSysvar?: Address<TAccountRentSysvar>;
+  rentSysvar: Address<TAccountRentSysvar>;
   /** The stake authority */
   stakeAuthority: Address<TAccountStakeAuthority>;
   /** The withdraw authority */
@@ -146,12 +144,6 @@ export function getInitializeCheckedInstruction<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
-
-  // Resolve default values.
-  if (!accounts.rentSysvar.value) {
-    accounts.rentSysvar.value =
-      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({

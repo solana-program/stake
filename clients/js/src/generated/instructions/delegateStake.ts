@@ -41,9 +41,7 @@ export type DelegateStakeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountVote extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountStakeHistory extends string | AccountMeta<string> = string,
   TAccountUnused extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
@@ -113,8 +111,8 @@ export type DelegateStakeInput<
   /** Vote account to which this stake will be delegated */
   vote: Address<TAccountVote>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
+  clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
   stakeHistory: Address<TAccountStakeHistory>;
   /** Unused account, formerly the stake config */
   unused: Address<TAccountUnused>;
@@ -166,12 +164,6 @@ export function getDelegateStakeInstruction<
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -207,7 +199,7 @@ export type ParsedDelegateStakeInstruction<
     vote: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistory: TAccountMetas[3];
     /** Unused account, formerly the stake config */
     unused: TAccountMetas[4];

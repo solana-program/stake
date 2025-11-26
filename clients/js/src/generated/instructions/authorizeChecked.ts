@@ -46,9 +46,7 @@ export function getAuthorizeCheckedDiscriminatorBytes() {
 export type AuthorizeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountNewAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
@@ -132,12 +130,12 @@ export type AuthorizeCheckedInput<
   /** Stake account to be updated */
   stake: Address<TAccountStake>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
+  clockSysvar: Address<TAccountClockSysvar>;
   /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
   /** The new stake or withdraw authority */
   newAuthority: TransactionSigner<TAccountNewAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   stakeAuthorize: AuthorizeCheckedInstructionDataArgs['stakeAuthorize'];
 };
@@ -188,12 +186,6 @@ export function getAuthorizeCheckedInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -231,7 +223,7 @@ export type ParsedAuthorizeCheckedInstruction<
     authority: TAccountMetas[2];
     /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedInstructionData;

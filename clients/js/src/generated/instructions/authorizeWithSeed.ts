@@ -53,9 +53,7 @@ export type AuthorizeWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountBase extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
     | AccountMeta<string>
@@ -148,8 +146,8 @@ export type AuthorizeWithSeedInput<
   /** Base key of stake or withdraw authority */
   base: TransactionSigner<TAccountBase>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Lockup authority */
+  clockSysvar: Address<TAccountClockSysvar>;
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   newAuthorizedPubkey: AuthorizeWithSeedInstructionDataArgs['newAuthorizedPubkey'];
   stakeAuthorize: AuthorizeWithSeedInstructionDataArgs['stakeAuthorize'];
@@ -199,12 +197,6 @@ export function getAuthorizeWithSeedInstruction<
   // Original args.
   const args = { ...input };
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -238,7 +230,7 @@ export type ParsedAuthorizeWithSeedInstruction<
     base: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeWithSeedInstructionData;

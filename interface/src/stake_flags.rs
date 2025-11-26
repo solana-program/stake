@@ -2,6 +2,7 @@
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 /// Additional flags for stake state.
+#[derive(codama_macros::CodamaType, Copy, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Debug)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "borsh",
@@ -12,7 +13,6 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Debug)]
 pub struct StakeFlags {
     bits: u8,
 }

@@ -41,10 +41,8 @@ export type MergeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountDestinationStake extends string | AccountMeta<string> = string,
   TAccountSourceStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
+  TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -60,9 +58,9 @@ export type MergeInstruction<
       TAccountClockSysvar extends string
         ? ReadonlyAccount<TAccountClockSysvar>
         : TAccountClockSysvar,
-      TAccountStakeHistory extends string
-        ? ReadonlyAccount<TAccountStakeHistory>
-        : TAccountStakeHistory,
+      TAccountStakeHistorySysvar extends string
+        ? ReadonlyAccount<TAccountStakeHistorySysvar>
+        : TAccountStakeHistorySysvar,
       TAccountStakeAuthority extends string
         ? ReadonlySignerAccount<TAccountStakeAuthority> &
             AccountSignerMeta<TAccountStakeAuthority>
@@ -100,17 +98,17 @@ export type MergeInput<
   TAccountDestinationStake extends string = string,
   TAccountSourceStake extends string = string,
   TAccountClockSysvar extends string = string,
-  TAccountStakeHistory extends string = string,
+  TAccountStakeHistorySysvar extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Destination stake account */
+  /** Destination stake account for the merge */
   destinationStake: Address<TAccountDestinationStake>;
-  /** Source stake account */
+  /** Source stake account for to merge.  This account will be drained */
   sourceStake: Address<TAccountSourceStake>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
-  stakeHistory: Address<TAccountStakeHistory>;
+  clockSysvar: Address<TAccountClockSysvar>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
+  stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
   /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
@@ -119,7 +117,7 @@ export function getMergeInstruction<
   TAccountDestinationStake extends string,
   TAccountSourceStake extends string,
   TAccountClockSysvar extends string,
-  TAccountStakeHistory extends string,
+  TAccountStakeHistorySysvar extends string,
   TAccountStakeAuthority extends string,
   TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
@@ -127,7 +125,7 @@ export function getMergeInstruction<
     TAccountDestinationStake,
     TAccountSourceStake,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountStakeAuthority
   >,
   config?: { programAddress?: TProgramAddress }
@@ -136,7 +134,7 @@ export function getMergeInstruction<
   TAccountDestinationStake,
   TAccountSourceStake,
   TAccountClockSysvar,
-  TAccountStakeHistory,
+  TAccountStakeHistorySysvar,
   TAccountStakeAuthority
 > {
   // Program address.
@@ -150,7 +148,10 @@ export function getMergeInstruction<
     },
     sourceStake: { value: input.sourceStake ?? null, isWritable: true },
     clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-    stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
+    stakeHistorySysvar: {
+      value: input.stakeHistorySysvar ?? null,
+      isWritable: false,
+    },
     stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -158,19 +159,13 @@ export function getMergeInstruction<
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.destinationStake),
       getAccountMeta(accounts.sourceStake),
       getAccountMeta(accounts.clockSysvar),
-      getAccountMeta(accounts.stakeHistory),
+      getAccountMeta(accounts.stakeHistorySysvar),
       getAccountMeta(accounts.stakeAuthority),
     ],
     data: getMergeInstructionDataEncoder().encode({}),
@@ -180,7 +175,7 @@ export function getMergeInstruction<
     TAccountDestinationStake,
     TAccountSourceStake,
     TAccountClockSysvar,
-    TAccountStakeHistory,
+    TAccountStakeHistorySysvar,
     TAccountStakeAuthority
   >);
 }
@@ -191,14 +186,14 @@ export type ParsedMergeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Destination stake account */
+    /** Destination stake account for the merge */
     destinationStake: TAccountMetas[0];
-    /** Source stake account */
+    /** Source stake account for to merge.  This account will be drained */
     sourceStake: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
-    stakeHistory: TAccountMetas[3];
+    /** Stake history sysvar that carries stake warmup/cooldown history */
+    stakeHistorySysvar: TAccountMetas[3];
     /** Stake authority */
     stakeAuthority: TAccountMetas[4];
   };
@@ -229,7 +224,7 @@ export function parseMergeInstruction<
       destinationStake: getNextAccount(),
       sourceStake: getNextAccount(),
       clockSysvar: getNextAccount(),
-      stakeHistory: getNextAccount(),
+      stakeHistorySysvar: getNextAccount(),
       stakeAuthority: getNextAccount(),
     },
     data: getMergeInstructionDataDecoder().decode(instruction.data),

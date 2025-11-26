@@ -6,6 +6,7 @@
 //!
 
 use {
+    crate::generated::types::Epoch,
     borsh::{BorshDeserialize, BorshSerialize},
     solana_program::pubkey::Pubkey,
 };
@@ -19,7 +20,7 @@ pub struct Delegation {
     )]
     pub voter_pubkey: Pubkey,
     pub stake: u64,
-    pub activation_epoch: u64,
-    pub deactivation_epoch: u64,
+    pub activation_epoch: Epoch,
+    pub deactivation_epoch: Epoch,
     pub warmup_cooldown_rate: f64,
 }

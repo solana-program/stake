@@ -40,9 +40,7 @@ export function getDeactivateDiscriminatorBytes() {
 export type DeactivateInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> = string,
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -93,10 +91,10 @@ export type DeactivateInput<
   TAccountClockSysvar extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Delegated stake account */
+  /** Delegated stake account to be deactivated */
   stake: Address<TAccountStake>;
   /** Clock sysvar */
-  clockSysvar?: Address<TAccountClockSysvar>;
+  clockSysvar: Address<TAccountClockSysvar>;
   /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
@@ -133,12 +131,6 @@ export function getDeactivateInstruction<
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.clockSysvar.value) {
-    accounts.clockSysvar.value =
-      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
     accounts: [
@@ -162,7 +154,7 @@ export type ParsedDeactivateInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Delegated stake account */
+    /** Delegated stake account to be deactivated */
     stake: TAccountMetas[0];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[1];

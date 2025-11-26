@@ -47,9 +47,7 @@ export function getInitializeDiscriminatorBytes() {
 export type InitializeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountRentSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountRentSysvar extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -112,7 +110,7 @@ export type InitializeInput<
   /** Uninitialized stake account */
   stake: Address<TAccountStake>;
   /** Rent sysvar */
-  rentSysvar?: Address<TAccountRentSysvar>;
+  rentSysvar: Address<TAccountRentSysvar>;
   arg0: InitializeInstructionDataArgs['arg0'];
   arg1: InitializeInstructionDataArgs['arg1'];
 };
@@ -140,12 +138,6 @@ export function getInitializeInstruction<
 
   // Original args.
   const args = { ...input };
-
-  // Resolve default values.
-  if (!accounts.rentSysvar.value) {
-    accounts.rentSysvar.value =
-      'SysvarRent111111111111111111111111111111111' as Address<'SysvarRent111111111111111111111111111111111'>;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({

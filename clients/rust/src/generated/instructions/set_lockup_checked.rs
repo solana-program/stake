@@ -5,7 +5,10 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use borsh::{BorshDeserialize, BorshSerialize};
+use {
+    crate::generated::types::{Epoch, UnixTimestamp},
+    borsh::{BorshDeserialize, BorshSerialize},
+};
 
 /// Accounts.
 #[derive(Debug)]
@@ -79,8 +82,8 @@ impl Default for SetLockupCheckedInstructionData {
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionArgs {
-    pub unix_timestamp: Option<i64>,
-    pub epoch: Option<u64>,
+    pub unix_timestamp: Option<UnixTimestamp>,
+    pub epoch: Option<Epoch>,
 }
 
 /// Instruction builder for `SetLockupChecked`.
@@ -95,8 +98,8 @@ pub struct SetLockupCheckedBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
     authority: Option<solana_program::pubkey::Pubkey>,
     new_authority: Option<solana_program::pubkey::Pubkey>,
-    unix_timestamp: Option<i64>,
-    epoch: Option<u64>,
+    unix_timestamp: Option<UnixTimestamp>,
+    epoch: Option<Epoch>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
@@ -128,13 +131,13 @@ impl SetLockupCheckedBuilder {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
+    pub fn unix_timestamp(&mut self, unix_timestamp: UnixTimestamp) -> &mut Self {
         self.unix_timestamp = Some(unix_timestamp);
         self
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
+    pub fn epoch(&mut self, epoch: Epoch) -> &mut Self {
         self.epoch = Some(epoch);
         self
     }
@@ -345,13 +348,13 @@ impl<'a, 'b> SetLockupCheckedCpiBuilder<'a, 'b> {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn unix_timestamp(&mut self, unix_timestamp: i64) -> &mut Self {
+    pub fn unix_timestamp(&mut self, unix_timestamp: UnixTimestamp) -> &mut Self {
         self.instruction.unix_timestamp = Some(unix_timestamp);
         self
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn epoch(&mut self, epoch: u64) -> &mut Self {
+    pub fn epoch(&mut self, epoch: Epoch) -> &mut Self {
         self.instruction.epoch = Some(epoch);
         self
     }
@@ -423,8 +426,8 @@ struct SetLockupCheckedCpiBuilderInstruction<'a, 'b> {
     stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     new_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    unix_timestamp: Option<i64>,
-    epoch: Option<u64>,
+    unix_timestamp: Option<UnixTimestamp>,
+    epoch: Option<Epoch>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

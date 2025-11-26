@@ -22,7 +22,7 @@ pub struct AuthorizeCheckedWithSeed {
     pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// The new stake or withdraw authority
     pub new_authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -105,7 +105,7 @@ pub struct AuthorizeCheckedWithSeedInstructionArgs {
 ///
 ///   0. `[writable]` stake
 ///   1. `[signer]` base
-///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   2. `[]` clock_sysvar
 ///   3. `[signer]` new_authority
 ///   4. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
@@ -137,7 +137,6 @@ impl AuthorizeCheckedWithSeedBuilder {
         self.base = Some(base);
         self
     }
-    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -151,7 +150,7 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -198,9 +197,7 @@ impl AuthorizeCheckedWithSeedBuilder {
         let accounts = AuthorizeCheckedWithSeed {
             stake: self.stake.expect("stake is not set"),
             base: self.base.expect("base is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
-                "SysvarC1ock11111111111111111111111111111111"
-            )),
+            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
             new_authority: self.new_authority.expect("new_authority is not set"),
             lockup_authority: self.lockup_authority,
         };
@@ -233,7 +230,7 @@ pub struct AuthorizeCheckedWithSeedCpiAccounts<'a, 'b> {
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The new stake or withdraw authority
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -249,7 +246,7 @@ pub struct AuthorizeCheckedWithSeedCpi<'a, 'b> {
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The new stake or withdraw authority
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: AuthorizeCheckedWithSeedInstructionArgs,
@@ -425,7 +422,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
