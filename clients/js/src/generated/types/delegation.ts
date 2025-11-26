@@ -8,10 +8,12 @@
 
 import {
   combineCodec,
+  fixDecoderSize,
+  fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getF64Decoder,
-  getF64Encoder,
+  getBytesDecoder,
+  getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
   getU64Decoder,
@@ -20,6 +22,7 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
+  type ReadonlyUint8Array,
 } from '@solana/kit';
 
 export type Delegation = {
@@ -27,7 +30,7 @@ export type Delegation = {
   stake: bigint;
   activationEpoch: bigint;
   deactivationEpoch: bigint;
-  warmupCooldownRate: number;
+  reserved: ReadonlyUint8Array;
 };
 
 export type DelegationArgs = {
@@ -35,7 +38,7 @@ export type DelegationArgs = {
   stake: number | bigint;
   activationEpoch: number | bigint;
   deactivationEpoch: number | bigint;
-  warmupCooldownRate: number;
+  reserved: ReadonlyUint8Array;
 };
 
 export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
@@ -44,7 +47,7 @@ export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
     ['stake', getU64Encoder()],
     ['activationEpoch', getU64Encoder()],
     ['deactivationEpoch', getU64Encoder()],
-    ['warmupCooldownRate', getF64Encoder()],
+    ['reserved', fixEncoderSize(getBytesEncoder(), 8)],
   ]);
 }
 
@@ -54,7 +57,7 @@ export function getDelegationDecoder(): FixedSizeDecoder<Delegation> {
     ['stake', getU64Decoder()],
     ['activationEpoch', getU64Decoder()],
     ['deactivationEpoch', getU64Decoder()],
-    ['warmupCooldownRate', getF64Decoder()],
+    ['reserved', fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 

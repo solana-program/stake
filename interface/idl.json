@@ -959,9 +959,12 @@
             }
           },
           {
-            "name": "warmupCooldownRate",
+            "name": "_reserved",
             "type": {
-              "defined": "f64"
+              "array": [
+                "u8",
+                8
+              ]
             }
           }
         ]

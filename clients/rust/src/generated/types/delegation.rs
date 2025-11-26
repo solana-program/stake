@@ -21,5 +21,5 @@ pub struct Delegation {
     pub stake: u64,
     pub activation_epoch: u64,
     pub deactivation_epoch: u64,
-    pub warmup_cooldown_rate: f64,
+    pub reserved: [u8; 8],
 }

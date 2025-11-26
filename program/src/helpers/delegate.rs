@@ -38,7 +38,7 @@ pub(crate) fn redelegate_stake(
     stake_history: &StakeHistorySysvar,
 ) -> Result<(), ProgramError> {
     // If stake is currently active:
-    if stake.stake(
+    if stake.stake_v2(
         epoch,
         stake_history,
         PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
