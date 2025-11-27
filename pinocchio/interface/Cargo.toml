@@ -1,0 +1,11 @@
+[package]
+name = "p-stake-interface"
+version = "0.1.0"
+edition = "2021"
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+
+[dev-dependencies]
+p-stake-test-utils = { path = "../test-utils" }
