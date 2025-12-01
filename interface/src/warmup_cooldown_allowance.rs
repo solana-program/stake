@@ -96,7 +96,7 @@ fn rate_limited_stake_change(
 mod test {
     #[allow(deprecated)]
     use crate::state::{DEFAULT_WARMUP_COOLDOWN_RATE, NEW_WARMUP_COOLDOWN_RATE};
-    use {super::*, crate::ulp::max_ulp_tolerance, proptest::prelude::*};
+    use {super::*, crate::ulp::max_ulp_tolerance, proptest::prelude::*, std::ops::Div};
 
     // === Rate selector ===
 
@@ -207,7 +207,7 @@ mod test {
             ..Default::default()
         };
 
-        let result = calculate_activation_allowance(
+        let actual_result = calculate_activation_allowance(
             100,
             account_portion,
             &prev,
@@ -228,14 +228,25 @@ mod test {
 
         // With saturation fix:
         // Numerator saturates to u128::MAX (≈ 3.4e38)
+        let numerator = (account_portion as u128)
+            .saturating_mul(supply_lamports as u128)
+            .saturating_mul(rate_bps as u128);
+        assert_eq!(numerator, u128::MAX);
+
         // Denominator = 4e17 * 10,000 = 4e21
-        // Result = 3.4e38 / 4e21 ≈ 8.5e16 (85M SOL)
+        let denominator = (supply_lamports as u128).saturating_mul(BASIS_POINTS_PER_UNIT as u128);
+        assert_eq!(denominator, 4_000_000_000_000_000_000_000);
+
+        // Result = u128::MAX / 4e21 ≈ 8.5e16 (~85M SOL)
         // 85M is ~21.25% of the stake (fail-safe)
         // If we allowed unlocking the full account portion it would have been 100% (fail-open)
-        assert!(result < account_portion);
+        let expected_result = numerator.div(denominator).min(account_portion as u128) as u64;
+        assert_eq!(expected_result, 85_070_591_730_234_615);
 
-        // Assert result is in a reasonable throttling range
-        assert!(result > 0 && result <= ideal_allowance);
+        // Assert actual result is expected
+        assert_eq!(actual_result, expected_result);
+        assert!(actual_result < account_portion);
+        assert!(actual_result <= ideal_allowance);
     }
 
     // === Cooldown allowance ===
@@ -411,8 +422,10 @@ mod test {
                 prop_assert_eq!(integer_math_result, 0);
                 prop_assert_eq!(float_math_result, 0);
             } else if would_overflow {
-                // In the u128 overflow region, the `f64` implementation is guaranteed to be imprecise.
-                // We only assert that the result does not exceed the account's balance
+                // In the overflow path, the numerator is `u128::MAX` and is divided then clamped to
+                // `account_portion`. This math often results in less than `account_portion`, but
+                // never should exceed it. It may be equal in the case the denominator is small and
+                // post-division result gets clamped.
                 prop_assert!(integer_math_result <= account_portion);
             } else {
                 prop_assert!(integer_math_result <= account_portion);
