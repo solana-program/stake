@@ -1,6 +1,6 @@
 [package]
 name = "solana-stake-interface"
-version = "2.0.1"
+version = "2.0.2"
 description = "Instructions and constructors for the Stake program"
 readme = "README.md"
 authors = { workspace = true }
