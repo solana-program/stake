@@ -102,7 +102,7 @@ pub struct AuthorizeCheckedInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[]` clock_sysvar
+///   1. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
 ///   2. `[signer]` authority
 ///   3. `[signer]` new_authority
 ///   4. `[signer, optional]` lockup_authority
@@ -127,6 +127,7 @@ impl AuthorizeCheckedBuilder {
         self.stake = Some(stake);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -182,7 +183,9 @@ impl AuthorizeCheckedBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = AuthorizeChecked {
             stake: self.stake.expect("stake is not set"),
-            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
             authority: self.authority.expect("authority is not set"),
             new_authority: self.new_authority.expect("new_authority is not set"),
             lockup_authority: self.lockup_authority,

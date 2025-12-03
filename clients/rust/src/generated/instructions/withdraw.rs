@@ -106,8 +106,8 @@ pub struct WithdrawInstructionArgs {
 ///
 ///   0. `[writable]` stake
 ///   1. `[writable]` recipient
-///   2. `[]` clock_sysvar
-///   3. `[]` stake_history_sysvar
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   3. `[optional]` stake_history_sysvar (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[signer]` withdraw_authority
 ///   5. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
@@ -138,12 +138,14 @@ impl WithdrawBuilder {
         self.recipient = Some(recipient);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history_sysvar(
@@ -200,10 +202,12 @@ impl WithdrawBuilder {
         let accounts = Withdraw {
             stake: self.stake.expect("stake is not set"),
             recipient: self.recipient.expect("recipient is not set"),
-            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
-            stake_history_sysvar: self
-                .stake_history_sysvar
-                .expect("stake_history_sysvar is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
+            stake_history_sysvar: self.stake_history_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             withdraw_authority: self
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),

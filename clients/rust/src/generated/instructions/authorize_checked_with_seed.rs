@@ -105,7 +105,7 @@ pub struct AuthorizeCheckedWithSeedInstructionArgs {
 ///
 ///   0. `[writable]` stake
 ///   1. `[signer]` base
-///   2. `[]` clock_sysvar
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
 ///   3. `[signer]` new_authority
 ///   4. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
@@ -137,6 +137,7 @@ impl AuthorizeCheckedWithSeedBuilder {
         self.base = Some(base);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -197,7 +198,9 @@ impl AuthorizeCheckedWithSeedBuilder {
         let accounts = AuthorizeCheckedWithSeed {
             stake: self.stake.expect("stake is not set"),
             base: self.base.expect("base is not set"),
-            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
             new_authority: self.new_authority.expect("new_authority is not set"),
             lockup_authority: self.lockup_authority,
         };

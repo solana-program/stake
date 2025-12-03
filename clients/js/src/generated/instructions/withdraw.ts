@@ -43,8 +43,12 @@ export type WithdrawInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountRecipient extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends string | AccountMeta<string> = string,
-  TAccountStakeHistorySysvar extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends
+    | string
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistorySysvar extends
+    | string
+    | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -130,9 +134,9 @@ export type WithdrawInput<
   /** Recipient account */
   recipient: Address<TAccountRecipient>;
   /** Clock sysvar */
-  clockSysvar: Address<TAccountClockSysvar>;
+  clockSysvar?: Address<TAccountClockSysvar>;
   /** Stake history sysvar that carries stake warmup/cooldown history */
-  stakeHistorySysvar: Address<TAccountStakeHistorySysvar>;
+  stakeHistorySysvar?: Address<TAccountStakeHistorySysvar>;
   /** Withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
   /** Lockup authority, if before lockup expiration */
@@ -195,6 +199,16 @@ export function getWithdrawInstruction<
 
   // Original args.
   const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.clockSysvar.value) {
+    accounts.clockSysvar.value =
+      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
+  }
+  if (!accounts.stakeHistorySysvar.value) {
+    accounts.stakeHistorySysvar.value =
+      'SysvarStakeHistory1111111111111111111111111' as Address<'SysvarStakeHistory1111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({

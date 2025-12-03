@@ -83,7 +83,7 @@ pub struct InitializeInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[]` rent_sysvar
+///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
 #[derive(Clone, Debug, Default)]
 pub struct InitializeBuilder {
     stake: Option<solana_program::pubkey::Pubkey>,
@@ -103,6 +103,7 @@ impl InitializeBuilder {
         self.stake = Some(stake);
         self
     }
+    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
     /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -141,7 +142,9 @@ impl InitializeBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = Initialize {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.expect("rent_sysvar is not set"),
+            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarRent111111111111111111111111111111111"
+            )),
         };
         let args = InitializeInstructionArgs {
             arg0: self.arg0.clone().expect("arg0 is not set"),

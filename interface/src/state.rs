@@ -268,6 +268,7 @@ impl StakeStateV2 {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[codama(enum_discriminator(size = number(u32)))]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,

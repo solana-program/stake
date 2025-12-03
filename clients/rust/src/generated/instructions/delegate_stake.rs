@@ -91,8 +91,8 @@ impl Default for DelegateStakeInstructionData {
 ///
 ///   0. `[writable]` stake
 ///   1. `[]` vote
-///   2. `[]` clock_sysvar
-///   3. `[]` stake_history
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
@@ -122,12 +122,14 @@ impl DelegateStakeBuilder {
         self.vote = Some(vote);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -172,8 +174,12 @@ impl DelegateStakeBuilder {
         let accounts = DelegateStake {
             stake: self.stake.expect("stake is not set"),
             vote: self.vote.expect("vote is not set"),
-            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
-            stake_history: self.stake_history.expect("stake_history is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
+            stake_history: self.stake_history.unwrap_or(solana_program::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             unused: self.unused.expect("unused is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };

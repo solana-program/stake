@@ -39,6 +39,24 @@ codama.update(
 codama.update(c.unwrapInstructionArgsDefinedTypesVisitor());
 codama.update(c.flattenInstructionDataArgumentsVisitor());
 
+// Set default values for sysvar accounts (the proper Codama way)
+codama.update(
+  c.setInstructionAccountDefaultValuesVisitor([
+    {
+      account: 'clockSysvar',
+      defaultValue: c.publicKeyValueNode('SysvarC1ock11111111111111111111111111111111'),
+    },
+    {
+      account: 'rentSysvar',
+      defaultValue: c.publicKeyValueNode('SysvarRent111111111111111111111111111111111'),
+    },
+    {
+      account: /^stake[Hh]istory/,
+      defaultValue: c.publicKeyValueNode('SysvarStakeHistory1111111111111111111111111'),
+    },
+  ])
+);
+
 // Add type aliases for semantic external types
 codama.update(
   c.bottomUpTransformerVisitor([

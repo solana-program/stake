@@ -3,7 +3,7 @@
   "idls": [
     {
       "path": "interface/idl.json",
-      "format": "anchor"
+      "format": "codama"
     }
   ],
   "generators": [

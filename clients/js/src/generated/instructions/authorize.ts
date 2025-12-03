@@ -48,7 +48,9 @@ export function getAuthorizeDiscriminatorBytes() {
 export type AuthorizeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends string | AccountMeta<string> = string,
+  TAccountClockSysvar extends
+    | string
+    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -130,7 +132,7 @@ export type AuthorizeInput<
   /** Stake account to be updated */
   stake: Address<TAccountStake>;
   /** Clock sysvar */
-  clockSysvar: Address<TAccountClockSysvar>;
+  clockSysvar?: Address<TAccountClockSysvar>;
   /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
   /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
@@ -180,6 +182,12 @@ export function getAuthorizeInstruction<
 
   // Original args.
   const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.clockSysvar.value) {
+    accounts.clockSysvar.value =
+      'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({

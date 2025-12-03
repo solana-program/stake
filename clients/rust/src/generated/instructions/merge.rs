@@ -87,8 +87,8 @@ impl Default for MergeInstructionData {
 ///
 ///   0. `[writable]` destination_stake
 ///   1. `[writable]` source_stake
-///   2. `[]` clock_sysvar
-///   3. `[]` stake_history_sysvar
+///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
+///   3. `[optional]` stake_history_sysvar (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MergeBuilder {
@@ -119,12 +119,14 @@ impl MergeBuilder {
         self.source_stake = Some(source_stake);
         self
     }
+    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
     pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history_sysvar(
@@ -168,10 +170,12 @@ impl MergeBuilder {
                 .destination_stake
                 .expect("destination_stake is not set"),
             source_stake: self.source_stake.expect("source_stake is not set"),
-            clock_sysvar: self.clock_sysvar.expect("clock_sysvar is not set"),
-            stake_history_sysvar: self
-                .stake_history_sysvar
-                .expect("stake_history_sysvar is not set"),
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarC1ock11111111111111111111111111111111"
+            )),
+            stake_history_sysvar: self.stake_history_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
 
