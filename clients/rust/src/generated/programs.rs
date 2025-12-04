@@ -7,5 +7,7 @@
 
 use solana_program::{pubkey, pubkey::Pubkey};
 
-/// `stake` program ID.
-pub const STAKE_ID: Pubkey = pubkey!("Stake11111111111111111111111111111111111111");
+
+  /// `stake` program ID.
+  pub const STAKE_ID: Pubkey = pubkey!("Stake11111111111111111111111111111111111111");
+

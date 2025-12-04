@@ -619,6 +619,10 @@
             "name": "stake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
             "docs": [
               "Rent sysvar"
             ],
@@ -682,6 +686,10 @@
             "name": "stake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -772,6 +780,10 @@
             "name": "vote"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -781,6 +793,10 @@
             "name": "clockSysvar"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -920,6 +936,10 @@
             "name": "recipient"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -929,6 +949,10 @@
             "name": "clockSysvar"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -1004,6 +1028,10 @@
             "name": "stake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -1124,6 +1152,10 @@
             "name": "sourceStake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -1133,6 +1165,10 @@
             "name": "clockSysvar"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -1198,6 +1234,10 @@
             "name": "base"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -1328,6 +1368,10 @@
             "name": "stake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -1420,6 +1464,10 @@
             "name": "base"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
             "docs": [
               "Clock sysvar"
             ],

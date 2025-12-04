@@ -5,412 +5,371 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
+use borsh::BorshDeserialize;
 
 /// Accounts.
 #[derive(Debug)]
 pub struct Split {
-    /// Stake account to be split; must be in the Initialized or Stake state
-    pub stake: solana_program::pubkey::Pubkey,
-    /// Uninitialized stake account that will take the split-off amount
-    pub split_stake: solana_program::pubkey::Pubkey,
-    /// Stake authority
-    pub stake_authority: solana_program::pubkey::Pubkey,
-}
+            /// Stake account to be split; must be in the Initialized or Stake state
+
+    
+              
+          pub stake: solana_program::pubkey::Pubkey,
+                /// Uninitialized stake account that will take the split-off amount
+
+    
+              
+          pub split_stake: solana_program::pubkey::Pubkey,
+                /// Stake authority
+
+    
+              
+          pub stake_authority: solana_program::pubkey::Pubkey,
+      }
 
 impl Split {
-    pub fn instruction(
-        &self,
-        args: SplitInstructionArgs,
-    ) -> solana_program::instruction::Instruction {
-        self.instruction_with_remaining_accounts(args, &[])
-    }
-    #[allow(clippy::vec_init_then_push)]
-    pub fn instruction_with_remaining_accounts(
-        &self,
-        args: SplitInstructionArgs,
-        remaining_accounts: &[solana_program::instruction::AccountMeta],
-    ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            self.stake, false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new(
+  pub fn instruction(&self, args: SplitInstructionArgs) -> solana_program::instruction::Instruction {
+    self.instruction_with_remaining_accounts(args, &[])
+  }
+  #[allow(clippy::vec_init_then_push)]
+  pub fn instruction_with_remaining_accounts(&self, args: SplitInstructionArgs, remaining_accounts: &[solana_program::instruction::AccountMeta]) -> solana_program::instruction::Instruction {
+    let mut accounts = Vec::with_capacity(3+ remaining_accounts.len());
+                            accounts.push(solana_program::instruction::AccountMeta::new(
+            self.stake,
+            false
+          ));
+                                          accounts.push(solana_program::instruction::AccountMeta::new(
             self.split_stake,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            false
+          ));
+                                          accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.stake_authority,
-            true,
-        ));
-        accounts.extend_from_slice(remaining_accounts);
-        let mut data = borsh::to_vec(&SplitInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&args).unwrap();
-        data.append(&mut args);
-
-        solana_program::instruction::Instruction {
-            program_id: crate::STAKE_ID,
-            accounts,
-            data,
-        }
+            true
+          ));
+                      accounts.extend_from_slice(remaining_accounts);
+    let mut data = borsh::to_vec(&SplitInstructionData::new()).unwrap();
+          let mut args = borsh::to_vec(&args).unwrap();
+      data.append(&mut args);
+    
+    solana_program::instruction::Instruction {
+      program_id: crate::STAKE_ID,
+      accounts,
+      data,
     }
+  }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SplitInstructionData {
-    discriminator: u32,
-}
+ pub struct SplitInstructionData {
+            discriminator: u32,
+            }
 
 impl SplitInstructionData {
-    pub fn new() -> Self {
-        Self { discriminator: 3 }
-    }
+  pub fn new() -> Self {
+    Self {
+                        discriminator: 3,
+                                }
+  }
 }
 
 impl Default for SplitInstructionData {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SplitInstructionArgs {
-    pub lamports: u64,
-}
+ pub struct SplitInstructionArgs {
+                  pub lamports: u64,
+      }
+
 
 /// Instruction builder for `Split`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` stake
-///   1. `[writable]` split_stake
-///   2. `[signer]` stake_authority
+                ///   0. `[writable]` stake
+                ///   1. `[writable]` split_stake
+                ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct SplitBuilder {
-    stake: Option<solana_program::pubkey::Pubkey>,
-    split_stake: Option<solana_program::pubkey::Pubkey>,
-    stake_authority: Option<solana_program::pubkey::Pubkey>,
-    lamports: Option<u64>,
-    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
+            stake: Option<solana_program::pubkey::Pubkey>,
+                split_stake: Option<solana_program::pubkey::Pubkey>,
+                stake_authority: Option<solana_program::pubkey::Pubkey>,
+                        lamports: Option<u64>,
+        __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
 impl SplitBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    /// Stake account to be split; must be in the Initialized or Stake state
-    #[inline(always)]
+  pub fn new() -> Self {
+    Self::default()
+  }
+            /// Stake account to be split; must be in the Initialized or Stake state
+#[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.stake = Some(stake);
-        self
+                        self.stake = Some(stake);
+                    self
     }
-    /// Uninitialized stake account that will take the split-off amount
-    #[inline(always)]
+            /// Uninitialized stake account that will take the split-off amount
+#[inline(always)]
     pub fn split_stake(&mut self, split_stake: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.split_stake = Some(split_stake);
-        self
+                        self.split_stake = Some(split_stake);
+                    self
     }
-    /// Stake authority
-    #[inline(always)]
-    pub fn stake_authority(
-        &mut self,
-        stake_authority: solana_program::pubkey::Pubkey,
-    ) -> &mut Self {
-        self.stake_authority = Some(stake_authority);
-        self
+            /// Stake authority
+#[inline(always)]
+    pub fn stake_authority(&mut self, stake_authority: solana_program::pubkey::Pubkey) -> &mut Self {
+                        self.stake_authority = Some(stake_authority);
+                    self
     }
-    #[inline(always)]
-    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
+                    #[inline(always)]
+      pub fn lamports(&mut self, lamports: u64) -> &mut Self {
         self.lamports = Some(lamports);
         self
-    }
-    /// Add an additional account to the instruction.
-    #[inline(always)]
-    pub fn add_remaining_account(
-        &mut self,
-        account: solana_program::instruction::AccountMeta,
-    ) -> &mut Self {
-        self.__remaining_accounts.push(account);
-        self
-    }
-    /// Add additional accounts to the instruction.
-    #[inline(always)]
-    pub fn add_remaining_accounts(
-        &mut self,
-        accounts: &[solana_program::instruction::AccountMeta],
-    ) -> &mut Self {
-        self.__remaining_accounts.extend_from_slice(accounts);
-        self
-    }
-    #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> solana_program::instruction::Instruction {
-        let accounts = Split {
-            stake: self.stake.expect("stake is not set"),
-            split_stake: self.split_stake.expect("split_stake is not set"),
-            stake_authority: self.stake_authority.expect("stake_authority is not set"),
-        };
-        let args = SplitInstructionArgs {
-            lamports: self.lamports.clone().expect("lamports is not set"),
-        };
-
-        accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
-    }
+      }
+        /// Add an additional account to the instruction.
+  #[inline(always)]
+  pub fn add_remaining_account(&mut self, account: solana_program::instruction::AccountMeta) -> &mut Self {
+    self.__remaining_accounts.push(account);
+    self
+  }
+  /// Add additional accounts to the instruction.
+  #[inline(always)]
+  pub fn add_remaining_accounts(&mut self, accounts: &[solana_program::instruction::AccountMeta]) -> &mut Self {
+    self.__remaining_accounts.extend_from_slice(accounts);
+    self
+  }
+  #[allow(clippy::clone_on_copy)]
+  pub fn instruction(&self) -> solana_program::instruction::Instruction {
+    let accounts = Split {
+                              stake: self.stake.expect("stake is not set"),
+                                        split_stake: self.split_stake.expect("split_stake is not set"),
+                                        stake_authority: self.stake_authority.expect("stake_authority is not set"),
+                      };
+          let args = SplitInstructionArgs {
+                                                              lamports: self.lamports.clone().expect("lamports is not set"),
+                                    };
+    
+    accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
+  }
 }
 
-/// `split` CPI accounts.
-pub struct SplitCpiAccounts<'a, 'b> {
-    /// Stake account to be split; must be in the Initialized or Stake state
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account that will take the split-off amount
-    pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
-    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
-}
+  /// `split` CPI accounts.
+  pub struct SplitCpiAccounts<'a, 'b> {
+                  /// Stake account to be split; must be in the Initialized or Stake state
+
+      
+                    
+              pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+                        /// Uninitialized stake account that will take the split-off amount
+
+      
+                    
+              pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
+                        /// Stake authority
+
+      
+                    
+              pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+            }
 
 /// `split` CPI instruction.
 pub struct SplitCpi<'a, 'b> {
-    /// The program to invoke.
-    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake account to be split; must be in the Initialized or Stake state
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account that will take the split-off amount
-    pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake authority
-    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The arguments for the instruction.
+  /// The program to invoke.
+  pub __program: &'b solana_program::account_info::AccountInfo<'a>,
+            /// Stake account to be split; must be in the Initialized or Stake state
+
+    
+              
+          pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+                /// Uninitialized stake account that will take the split-off amount
+
+    
+              
+          pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
+                /// Stake authority
+
+    
+              
+          pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+            /// The arguments for the instruction.
     pub __args: SplitInstructionArgs,
-}
+  }
 
 impl<'a, 'b> SplitCpi<'a, 'b> {
-    pub fn new(
-        program: &'b solana_program::account_info::AccountInfo<'a>,
-        accounts: SplitCpiAccounts<'a, 'b>,
-        args: SplitInstructionArgs,
-    ) -> Self {
-        Self {
-            __program: program,
-            stake: accounts.stake,
-            split_stake: accounts.split_stake,
-            stake_authority: accounts.stake_authority,
-            __args: args,
-        }
-    }
-    #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
-        self.invoke_signed_with_remaining_accounts(&[], &[])
-    }
-    #[inline(always)]
-    pub fn invoke_with_remaining_accounts(
-        &self,
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
-        self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
-    }
-    #[inline(always)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
-        self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
-    }
-    #[allow(clippy::clone_on_copy)]
-    #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed_with_remaining_accounts(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
+  pub fn new(
+    program: &'b solana_program::account_info::AccountInfo<'a>,
+          accounts: SplitCpiAccounts<'a, 'b>,
+              args: SplitInstructionArgs,
+      ) -> Self {
+    Self {
+      __program: program,
+              stake: accounts.stake,
+              split_stake: accounts.split_stake,
+              stake_authority: accounts.stake_authority,
+                    __args: args,
+          }
+  }
+  #[inline(always)]
+  pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    self.invoke_signed_with_remaining_accounts(&[], &[])
+  }
+  #[inline(always)]
+  pub fn invoke_with_remaining_accounts(&self, remaining_accounts: &[(&'b solana_program::account_info::AccountInfo<'a>, bool, bool)]) -> solana_program::entrypoint::ProgramResult {
+    self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
+  }
+  #[inline(always)]
+  pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program::entrypoint::ProgramResult {
+    self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
+  }
+  #[allow(clippy::clone_on_copy)]
+  #[allow(clippy::vec_init_then_push)]
+  pub fn invoke_signed_with_remaining_accounts(
+    &self,
+    signers_seeds: &[&[&[u8]]],
+    remaining_accounts: &[(&'b solana_program::account_info::AccountInfo<'a>, bool, bool)]
+  ) -> solana_program::entrypoint::ProgramResult {
+    let mut accounts = Vec::with_capacity(3+ remaining_accounts.len());
+                            accounts.push(solana_program::instruction::AccountMeta::new(
             *self.stake.key,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new(
+            false
+          ));
+                                          accounts.push(solana_program::instruction::AccountMeta::new(
             *self.split_stake.key,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            false
+          ));
+                                          accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.stake_authority.key,
-            true,
-        ));
-        remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(solana_program::instruction::AccountMeta {
-                pubkey: *remaining_account.0.key,
-                is_signer: remaining_account.1,
-                is_writable: remaining_account.2,
-            })
-        });
-        let mut data = borsh::to_vec(&SplitInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&self.__args).unwrap();
-        data.append(&mut args);
+            true
+          ));
+                      remaining_accounts.iter().for_each(|remaining_account| {
+      accounts.push(solana_program::instruction::AccountMeta {
+          pubkey: *remaining_account.0.key,
+          is_signer: remaining_account.1,
+          is_writable: remaining_account.2,
+      })
+    });
+    let mut data = borsh::to_vec(&SplitInstructionData::new()).unwrap();
+          let mut args = borsh::to_vec(&self.__args).unwrap();
+      data.append(&mut args);
+    
+    let instruction = solana_program::instruction::Instruction {
+      program_id: crate::STAKE_ID,
+      accounts,
+      data,
+    };
+    let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
+    account_infos.push(self.__program.clone());
+                  account_infos.push(self.stake.clone());
+                        account_infos.push(self.split_stake.clone());
+                        account_infos.push(self.stake_authority.clone());
+              remaining_accounts.iter().for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
-        let instruction = solana_program::instruction::Instruction {
-            program_id: crate::STAKE_ID,
-            accounts,
-            data,
-        };
-        let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
-        account_infos.push(self.__program.clone());
-        account_infos.push(self.stake.clone());
-        account_infos.push(self.split_stake.clone());
-        account_infos.push(self.stake_authority.clone());
-        remaining_accounts
-            .iter()
-            .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
-
-        if signers_seeds.is_empty() {
-            solana_program::program::invoke(&instruction, &account_infos)
-        } else {
-            solana_program::program::invoke_signed(&instruction, &account_infos, signers_seeds)
-        }
+    if signers_seeds.is_empty() {
+      solana_program::program::invoke(&instruction, &account_infos)
+    } else {
+      solana_program::program::invoke_signed(&instruction, &account_infos, signers_seeds)
     }
+  }
 }
 
 /// Instruction builder for `Split` via CPI.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` stake
-///   1. `[writable]` split_stake
-///   2. `[signer]` stake_authority
+                ///   0. `[writable]` stake
+                ///   1. `[writable]` split_stake
+                ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug)]
 pub struct SplitCpiBuilder<'a, 'b> {
-    instruction: Box<SplitCpiBuilderInstruction<'a, 'b>>,
+  instruction: Box<SplitCpiBuilderInstruction<'a, 'b>>,
 }
 
 impl<'a, 'b> SplitCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(SplitCpiBuilderInstruction {
-            __program: program,
-            stake: None,
-            split_stake: None,
-            stake_authority: None,
-            lamports: None,
-            __remaining_accounts: Vec::new(),
-        });
-        Self { instruction }
-    }
-    /// Stake account to be split; must be in the Initialized or Stake state
-    #[inline(always)]
+  pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
+    let instruction = Box::new(SplitCpiBuilderInstruction {
+      __program: program,
+              stake: None,
+              split_stake: None,
+              stake_authority: None,
+                                            lamports: None,
+                    __remaining_accounts: Vec::new(),
+    });
+    Self { instruction }
+  }
+      /// Stake account to be split; must be in the Initialized or Stake state
+#[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.stake = Some(stake);
-        self
+                        self.instruction.stake = Some(stake);
+                    self
     }
-    /// Uninitialized stake account that will take the split-off amount
-    #[inline(always)]
-    pub fn split_stake(
-        &mut self,
-        split_stake: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.split_stake = Some(split_stake);
-        self
+      /// Uninitialized stake account that will take the split-off amount
+#[inline(always)]
+    pub fn split_stake(&mut self, split_stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+                        self.instruction.split_stake = Some(split_stake);
+                    self
     }
-    /// Stake authority
-    #[inline(always)]
-    pub fn stake_authority(
-        &mut self,
-        stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.stake_authority = Some(stake_authority);
-        self
+      /// Stake authority
+#[inline(always)]
+    pub fn stake_authority(&mut self, stake_authority: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+                        self.instruction.stake_authority = Some(stake_authority);
+                    self
     }
-    #[inline(always)]
-    pub fn lamports(&mut self, lamports: u64) -> &mut Self {
+                    #[inline(always)]
+      pub fn lamports(&mut self, lamports: u64) -> &mut Self {
         self.instruction.lamports = Some(lamports);
         self
-    }
-    /// Add an additional account to the instruction.
-    #[inline(always)]
-    pub fn add_remaining_account(
-        &mut self,
-        account: &'b solana_program::account_info::AccountInfo<'a>,
-        is_writable: bool,
-        is_signer: bool,
-    ) -> &mut Self {
-        self.instruction
-            .__remaining_accounts
-            .push((account, is_writable, is_signer));
-        self
-    }
-    /// Add additional accounts to the instruction.
-    ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
-    #[inline(always)]
-    pub fn add_remaining_accounts(
-        &mut self,
-        accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> &mut Self {
-        self.instruction
-            .__remaining_accounts
-            .extend_from_slice(accounts);
-        self
-    }
-    #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
-        self.invoke_signed(&[])
-    }
-    #[allow(clippy::clone_on_copy)]
-    #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
-        let args = SplitInstructionArgs {
-            lamports: self
-                .instruction
-                .lamports
-                .clone()
-                .expect("lamports is not set"),
-        };
+      }
+        /// Add an additional account to the instruction.
+  #[inline(always)]
+  pub fn add_remaining_account(&mut self, account: &'b solana_program::account_info::AccountInfo<'a>, is_writable: bool, is_signer: bool) -> &mut Self {
+    self.instruction.__remaining_accounts.push((account, is_writable, is_signer));
+    self
+  }
+  /// Add additional accounts to the instruction.
+  ///
+  /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+  /// and a `bool` indicating whether the account is a signer or not.
+  #[inline(always)]
+  pub fn add_remaining_accounts(&mut self, accounts: &[(&'b solana_program::account_info::AccountInfo<'a>, bool, bool)]) -> &mut Self {
+    self.instruction.__remaining_accounts.extend_from_slice(accounts);
+    self
+  }
+  #[inline(always)]
+  pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    self.invoke_signed(&[])
+  }
+  #[allow(clippy::clone_on_copy)]
+  #[allow(clippy::vec_init_then_push)]
+  pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program::entrypoint::ProgramResult {
+          let args = SplitInstructionArgs {
+                                                              lamports: self.instruction.lamports.clone().expect("lamports is not set"),
+                                    };
         let instruction = SplitCpi {
-            __program: self.instruction.__program,
-
-            stake: self.instruction.stake.expect("stake is not set"),
-
-            split_stake: self
-                .instruction
-                .split_stake
-                .expect("split_stake is not set"),
-
-            stake_authority: self
-                .instruction
-                .stake_authority
-                .expect("stake_authority is not set"),
-            __args: args,
-        };
-        instruction.invoke_signed_with_remaining_accounts(
-            signers_seeds,
-            &self.instruction.__remaining_accounts,
-        )
-    }
+        __program: self.instruction.__program,
+                  
+          stake: self.instruction.stake.expect("stake is not set"),
+                  
+          split_stake: self.instruction.split_stake.expect("split_stake is not set"),
+                  
+          stake_authority: self.instruction.stake_authority.expect("stake_authority is not set"),
+                          __args: args,
+            };
+    instruction.invoke_signed_with_remaining_accounts(signers_seeds, &self.instruction.__remaining_accounts)
+  }
 }
 
 #[derive(Clone, Debug)]
 struct SplitCpiBuilderInstruction<'a, 'b> {
-    __program: &'b solana_program::account_info::AccountInfo<'a>,
-    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    split_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    lamports: Option<u64>,
-    /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(
-        &'b solana_program::account_info::AccountInfo<'a>,
-        bool,
-        bool,
-    )>,
+  __program: &'b solana_program::account_info::AccountInfo<'a>,
+            stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+                split_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+                stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+                        lamports: Option<u64>,
+        /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
+  __remaining_accounts: Vec<(&'b solana_program::account_info::AccountInfo<'a>, bool, bool)>,
 }
+

@@ -46,7 +46,7 @@ pub enum StakeInstruction {
     /// and withdrawer transactions; [`Lockup`] carries information about
     /// withdrawal restrictions.
     #[codama(account(name = "stake", writable, docs = "Uninitialized stake account"))]
-    #[codama(account(name = "rent_sysvar", docs = "Rent sysvar"))]
+    #[codama(account(name = "rent_sysvar", docs = "Rent sysvar", default_value = sysvar("rent")))]
     Initialize { arg0: Authorized, arg1: Lockup },
 
     /// Authorize a key to manage stake or withdrawal
@@ -58,7 +58,7 @@ pub enum StakeInstruction {
     ///   3. Optional: `[SIGNER]` Lockup authority, if updating `StakeAuthorize::Withdrawer` before
     ///      lockup expiration
     #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(name = "authority", signer, docs = "The stake or withdraw authority"))]
     #[codama(account(
         name = "lockup_authority",
@@ -89,10 +89,11 @@ pub enum StakeInstruction {
         name = "vote",
         docs = "Vote account to which this stake will be delegated"
     ))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(
         name = "stake_history",
-        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+        docs = "Stake history sysvar that carries stake warmup/cooldown history",
+        default_value = sysvar("stake_history")
     ))]
     #[codama(account(name = "unused", docs = "Unused account, formerly the stake config"))]
     #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
@@ -135,10 +136,11 @@ pub enum StakeInstruction {
         docs = "Stake account from which to withdraw"
     ))]
     #[codama(account(name = "recipient", writable, docs = "Recipient account"))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(
         name = "stake_history_sysvar",
-        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+        docs = "Stake history sysvar that carries stake warmup/cooldown history",
+        default_value = sysvar("stake_history")
     ))]
     #[codama(account(name = "withdraw_authority", signer, docs = "Withdraw authority"))]
     #[codama(account(
@@ -160,7 +162,7 @@ pub enum StakeInstruction {
         writable,
         docs = "Delegated stake account to be deactivated"
     ))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
     Deactivate,
 
@@ -214,10 +216,11 @@ pub enum StakeInstruction {
         writable,
         docs = "Source stake account for to merge.  This account will be drained"
     ))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(
         name = "stake_history_sysvar",
-        docs = "Stake history sysvar that carries stake warmup/cooldown history"
+        docs = "Stake history sysvar that carries stake warmup/cooldown history",
+        default_value = sysvar("stake_history")
     ))]
     #[codama(account(name = "stake_authority", signer, docs = "Stake authority"))]
     Merge,
@@ -236,7 +239,7 @@ pub enum StakeInstruction {
         signer,
         docs = "Base key of stake or withdraw authority"
     ))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(
         name = "lockup_authority",
         optional,
@@ -276,7 +279,7 @@ pub enum StakeInstruction {
     ///   4. Optional: `[SIGNER]` Lockup authority, if updating [`StakeAuthorize::Withdrawer`]
     ///      before lockup expiration
     #[codama(account(name = "stake", writable, docs = "Stake account to be updated"))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(name = "authority", signer, docs = "The stake or withdraw authority"))]
     #[codama(account(
         name = "new_authority",
@@ -309,7 +312,7 @@ pub enum StakeInstruction {
         signer,
         docs = "Base key of stake or withdraw authority"
     ))]
-    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar"))]
+    #[codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock")))]
     #[codama(account(
         name = "new_authority",
         signer,

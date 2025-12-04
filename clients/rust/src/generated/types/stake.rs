@@ -5,14 +5,15 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use {
-    crate::generated::types::Delegation,
-    borsh::{BorshDeserialize, BorshSerialize},
-};
+use crate::generated::types::Delegation;
+use borsh::BorshSerialize;
+use borsh::BorshDeserialize;
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Stake {
-    pub delegation: Delegation,
-    pub credits_observed: u64,
+pub delegation: Delegation,
+pub credits_observed: u64,
 }
+
+

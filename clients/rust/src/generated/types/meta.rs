@@ -5,15 +5,17 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use {
-    crate::generated::types::{Authorized, Lockup},
-    borsh::{BorshDeserialize, BorshSerialize},
-};
+use crate::generated::types::Authorized;
+use crate::generated::types::Lockup;
+use borsh::BorshSerialize;
+use borsh::BorshDeserialize;
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Meta {
-    pub rent_exempt_reserve: u64,
-    pub authorized: Authorized,
-    pub lockup: Lockup,
+pub rent_exempt_reserve: u64,
+pub authorized: Authorized,
+pub lockup: Lockup,
 }
+
+

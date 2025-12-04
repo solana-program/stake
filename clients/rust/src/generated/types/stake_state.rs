@@ -5,16 +5,18 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use {
-    crate::generated::types::{Meta, Stake},
-    borsh::{BorshDeserialize, BorshSerialize},
-};
+use crate::generated::types::Meta;
+use crate::generated::types::Stake;
+use borsh::BorshSerialize;
+use borsh::BorshDeserialize;
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StakeState {
-    Uninitialized,
-    Initialized(Meta),
-    Stake(Meta, Stake),
-    RewardsPool,
+Uninitialized,
+Initialized(Meta),
+Stake(Meta, Stake),
+RewardsPool,
 }
+
+
