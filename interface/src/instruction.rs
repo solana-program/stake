@@ -299,7 +299,7 @@ pub enum StakeInstruction {
     )]
     #[cfg_attr(feature = "codama", codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock"))))]
     #[cfg_attr(feature = "codama", codama(account(
-        name = "stake_history_sysvar",
+        name = "stake_history",
         docs = "Stake history sysvar that carries stake warmup/cooldown history",
         default_value = sysvar("stake_history")
     )))]

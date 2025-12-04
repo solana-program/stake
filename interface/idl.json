@@ -1175,7 +1175,7 @@
             "isSigner": false,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "stakeHistorySysvar"
+            "name": "stakeHistory"
           },
           {
             "docs": [

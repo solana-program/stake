@@ -17,7 +17,7 @@ pub struct Merge {
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history_sysvar: solana_program::pubkey::Pubkey,
+    pub stake_history: solana_program::pubkey::Pubkey,
     /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
 }
@@ -45,7 +45,7 @@ impl Merge {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.stake_history_sysvar,
+            self.stake_history,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -88,14 +88,14 @@ impl Default for MergeInstructionData {
 ///   0. `[writable]` destination_stake
 ///   1. `[writable]` source_stake
 ///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[optional]` stake_history_sysvar (default to `SysvarStakeHistory1111111111111111111111111`)
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MergeBuilder {
     destination_stake: Option<solana_program::pubkey::Pubkey>,
     source_stake: Option<solana_program::pubkey::Pubkey>,
     clock_sysvar: Option<solana_program::pubkey::Pubkey>,
-    stake_history_sysvar: Option<solana_program::pubkey::Pubkey>,
+    stake_history: Option<solana_program::pubkey::Pubkey>,
     stake_authority: Option<solana_program::pubkey::Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
@@ -129,11 +129,8 @@ impl MergeBuilder {
     /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
-    pub fn stake_history_sysvar(
-        &mut self,
-        stake_history_sysvar: solana_program::pubkey::Pubkey,
-    ) -> &mut Self {
-        self.stake_history_sysvar = Some(stake_history_sysvar);
+    pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.stake_history = Some(stake_history);
         self
     }
     /// Stake authority
@@ -173,7 +170,7 @@ impl MergeBuilder {
             clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history_sysvar: self.stake_history_sysvar.unwrap_or(solana_program::pubkey!(
+            stake_history: self.stake_history.unwrap_or(solana_program::pubkey!(
                 "SysvarStakeHistory1111111111111111111111111"
             )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
@@ -192,7 +189,7 @@ pub struct MergeCpiAccounts<'a, 'b> {
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
@@ -208,7 +205,7 @@ pub struct MergeCpi<'a, 'b> {
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
 }
@@ -223,7 +220,7 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
             destination_stake: accounts.destination_stake,
             source_stake: accounts.source_stake,
             clock_sysvar: accounts.clock_sysvar,
-            stake_history_sysvar: accounts.stake_history_sysvar,
+            stake_history: accounts.stake_history,
             stake_authority: accounts.stake_authority,
         }
     }
@@ -274,7 +271,7 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.stake_history_sysvar.key,
+            *self.stake_history.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -300,7 +297,7 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
         account_infos.push(self.destination_stake.clone());
         account_infos.push(self.source_stake.clone());
         account_infos.push(self.clock_sysvar.clone());
-        account_infos.push(self.stake_history_sysvar.clone());
+        account_infos.push(self.stake_history.clone());
         account_infos.push(self.stake_authority.clone());
         remaining_accounts
             .iter()
@@ -321,7 +318,7 @@ impl<'a, 'b> MergeCpi<'a, 'b> {
 ///   0. `[writable]` destination_stake
 ///   1. `[writable]` source_stake
 ///   2. `[]` clock_sysvar
-///   3. `[]` stake_history_sysvar
+///   3. `[]` stake_history
 ///   4. `[signer]` stake_authority
 #[derive(Clone, Debug)]
 pub struct MergeCpiBuilder<'a, 'b> {
@@ -335,7 +332,7 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
             destination_stake: None,
             source_stake: None,
             clock_sysvar: None,
-            stake_history_sysvar: None,
+            stake_history: None,
             stake_authority: None,
             __remaining_accounts: Vec::new(),
         });
@@ -370,11 +367,11 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
     }
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
-    pub fn stake_history_sysvar(
+    pub fn stake_history(
         &mut self,
-        stake_history_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+        stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
-        self.instruction.stake_history_sysvar = Some(stake_history_sysvar);
+        self.instruction.stake_history = Some(stake_history);
         self
     }
     /// Stake authority
@@ -445,10 +442,10 @@ impl<'a, 'b> MergeCpiBuilder<'a, 'b> {
                 .clock_sysvar
                 .expect("clock_sysvar is not set"),
 
-            stake_history_sysvar: self
+            stake_history: self
                 .instruction
-                .stake_history_sysvar
-                .expect("stake_history_sysvar is not set"),
+                .stake_history
+                .expect("stake_history is not set"),
 
             stake_authority: self
                 .instruction
@@ -468,7 +465,7 @@ struct MergeCpiBuilderInstruction<'a, 'b> {
     destination_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     source_stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_history_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
