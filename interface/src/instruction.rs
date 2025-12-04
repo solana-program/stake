@@ -53,10 +53,7 @@ pub enum StakeInstruction {
     )]
     #[cfg_attr(feature = "codama", codama(account(name = "rent_sysvar", docs = "Rent sysvar", default_value = sysvar("rent"))))]
     // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
-    Initialize(
-        Authorized,
-        Lockup,
-    ),
+    Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
     ///
@@ -85,10 +82,7 @@ pub enum StakeInstruction {
         ))
     )]
     // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
-    Authorize(
-        Pubkey,
-        StakeAuthorize,
-    ),
+    Authorize(Pubkey, StakeAuthorize),
 
     /// Delegate a stake to a particular vote account
     ///
@@ -160,10 +154,7 @@ pub enum StakeInstruction {
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
     // backwards compatibility with old IDL demands old `args` name
-    Split(
-        #[cfg_attr(feature = "codama", codama(name = "args"))]
-        u64,
-    ),
+    Split(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 
     /// Withdraw unstaked lamports from the stake account
     ///
@@ -209,10 +200,7 @@ pub enum StakeInstruction {
         ))
     )]
     // backwards compatibility with old IDL demands old `args` name
-    Withdraw(
-        #[cfg_attr(feature = "codama", codama(name = "args"))]
-        u64,
-    ),
+    Withdraw(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 
     /// Deactivates the stake in the account
     ///
@@ -408,8 +396,7 @@ pub enum StakeInstruction {
         ))
     )]
     AuthorizeChecked(
-        #[cfg_attr(feature = "codama", codama(name = "stakeAuthorize"))]
-        StakeAuthorize,
+        #[cfg_attr(feature = "codama", codama(name = "stakeAuthorize"))] StakeAuthorize,
     ),
 
     /// Authorize a key to manage stake or withdrawal with a derived key
@@ -489,9 +476,7 @@ pub enum StakeInstruction {
             docs = "New lockup authority"
         ))
     )]
-    SetLockupChecked(
-        LockupCheckedArgs,
-    ),
+    SetLockupChecked(LockupCheckedArgs),
 
     /// Get the minimum stake delegation, in lamports
     ///
@@ -596,10 +581,7 @@ pub enum StakeInstruction {
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
     // sadly named `args` to avoid breaking users of old IDL
-    MoveStake(
-        #[cfg_attr(feature = "codama", codama(name = "args"))]
-        u64,
-    ),
+    MoveStake(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
     /// authority.
@@ -635,10 +617,7 @@ pub enum StakeInstruction {
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
     // sadly named `args` to avoid breaking users of old IDL
-    MoveLamports(
-        #[cfg_attr(feature = "codama", codama(name = "args"))]
-        u64,
-    ),
+    MoveLamports(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 }
 
 #[cfg_attr(feature = "codama", derive(CodamaType))]
@@ -1117,11 +1096,7 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(
-        ID,
-        &StakeInstruction::SetLockup(*lockup),
-        account_metas,
-    )
+    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup(*lockup), account_metas)
 }
 
 #[cfg(feature = "bincode")]
