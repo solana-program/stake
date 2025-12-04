@@ -1,5 +1,4 @@
 use {
-    crate::PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
     solana_account_info::AccountInfo,
     solana_clock::Epoch,
     solana_program_error::ProgramError,
@@ -7,7 +6,6 @@ use {
     solana_stake_interface::{
         error::StakeError,
         state::{Delegation, Meta, Stake},
-        sysvar::stake_history::StakeHistorySysvar,
     },
 };
 
@@ -27,46 +25,6 @@ pub(crate) fn new_stake(
         delegation: Delegation::new(voter_pubkey, stake, activation_epoch),
         credits_observed,
     }
-}
-
-pub(crate) fn redelegate_stake(
-    stake: &mut Stake,
-    stake_lamports: u64,
-    voter_pubkey: &Pubkey,
-    credits_observed: u64,
-    epoch: Epoch,
-    stake_history: &StakeHistorySysvar,
-) -> Result<(), ProgramError> {
-    // If stake is currently active:
-    if stake.stake(
-        epoch,
-        stake_history,
-        PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
-    ) != 0
-    {
-        // If pubkey of new voter is the same as current,
-        // and we are scheduled to start deactivating this epoch,
-        // we rescind deactivation
-        if stake.delegation.voter_pubkey == *voter_pubkey
-            && epoch == stake.delegation.deactivation_epoch
-        {
-            stake.delegation.deactivation_epoch = u64::MAX;
-            return Ok(());
-        } else {
-            // can't redelegate to another pubkey if stake is active.
-            return Err(StakeError::TooSoonToRedelegate.into());
-        }
-    }
-    // Either the stake is freshly activated, is active but has been
-    // deactivated this epoch, or has fully de-activated.
-    // Redelegation implies either re-activation or un-deactivation
-
-    stake.delegation.stake = stake_lamports;
-    stake.delegation.activation_epoch = epoch;
-    stake.delegation.deactivation_epoch = u64::MAX;
-    stake.delegation.voter_pubkey = *voter_pubkey;
-    stake.credits_observed = credits_observed;
-    Ok(())
 }
 
 /// Ensure the stake delegation amount is valid.  This checks that the account

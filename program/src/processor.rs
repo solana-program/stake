@@ -404,22 +404,45 @@ impl Processor {
                 )
             }
             StakeStateV2::Stake(meta, mut stake, flags) => {
+                // Only the staker may (re)delegate
                 meta.authorized
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(to_program_error)?;
 
+                // Compute the maximum stake allowed to (re)delegate
                 let ValidatedDelegatedInfo { stake_amount } =
                     validate_delegated_amount(stake_account_info, &meta)?;
 
-                redelegate_stake(
-                    &mut stake,
-                    stake_amount,
-                    vote_account_info.key,
-                    vote_state.credits(),
+                // Get current activation status at this epoch
+                let effective_stake = stake.delegation.stake(
                     clock.epoch,
                     stake_history,
-                )?;
+                    PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
+                );
 
+                if effective_stake == 0 {
+                    // The stake has no effective voting power this epoch. This means it is either:
+                    //   1. Inactive (fully cooled down after a previous deactivation)
+                    //   2. Still activating (was delegated for the first time this epoch)
+                    stake = new_stake(
+                        stake_amount,
+                        vote_account_info.key,
+                        vote_state.credits(),
+                        clock.epoch,
+                    );
+                } else if clock.epoch == stake.delegation.deactivation_epoch
+                    && stake.delegation.voter_pubkey == *vote_account_info.key
+                {
+                    if stake_amount < stake.delegation.stake {
+                        return Err(StakeError::InsufficientDelegation.into());
+                    }
+                    stake.delegation.deactivation_epoch = u64::MAX;
+                } else {
+                    // Not a valid state for redelegation
+                    return Err(StakeError::TooSoonToRedelegate.into());
+                }
+
+                // Persist the updated stake state back to the account.
                 set_stake_state(stake_account_info, &StakeStateV2::Stake(meta, stake, flags))
             }
             _ => Err(ProgramError::InvalidAccountData),
