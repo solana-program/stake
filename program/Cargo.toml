@@ -11,7 +11,7 @@ edition = "2021"
 bincode = "1.3.3"
 solana-account-info = { version = "3.0.0", features = ["bincode"] }
 solana-clock = "3.0.0"
-solana-cpi = "3.0.0"
+solana-cpi = "3.1.0"
 solana-instruction-error = "2.0.0"
 solana-msg = "3.0.0"
 solana-native-token = "3.0.0"
