@@ -116,7 +116,6 @@ codama.update(
     },
     {
       // Use omitted optional account strategy for all instructions.
-      // + fix discriminator u8 -> u32.
       select: '[instructionNode]',
       transform: (node) => {
         c.assertIsNode(node, 'instructionNode');

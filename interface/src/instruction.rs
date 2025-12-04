@@ -52,7 +52,11 @@ pub enum StakeInstruction {
         codama(account(name = "stake", writable, docs = "Uninitialized stake account"))
     )]
     #[cfg_attr(feature = "codama", codama(account(name = "rent_sysvar", docs = "Rent sysvar", default_value = sysvar("rent"))))]
-    Initialize { arg0: Authorized, arg1: Lockup },
+    // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
+    Initialize(
+        Authorized,
+        Lockup,
+    ),
 
     /// Authorize a key to manage stake or withdrawal
     ///
@@ -80,7 +84,11 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
         ))
     )]
-    Authorize { arg0: Pubkey, arg1: StakeAuthorize },
+    // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
+    Authorize(
+        Pubkey,
+        StakeAuthorize,
+    ),
 
     /// Delegate a stake to a particular vote account
     ///
@@ -151,7 +159,11 @@ pub enum StakeInstruction {
         feature = "codama",
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
-    Split { lamports: u64 },
+    // backwards compatibility with old IDL demands old `args` name
+    Split(
+        #[cfg_attr(feature = "codama", codama(name = "args"))]
+        u64,
+    ),
 
     /// Withdraw unstaked lamports from the stake account
     ///
@@ -179,7 +191,7 @@ pub enum StakeInstruction {
     )]
     #[cfg_attr(feature = "codama", codama(account(name = "clock_sysvar", docs = "Clock sysvar", default_value = sysvar("clock"))))]
     #[cfg_attr(feature = "codama", codama(account(
-        name = "stake_history_sysvar",
+        name = "stake_history",
         docs = "Stake history sysvar that carries stake warmup/cooldown history",
         default_value = sysvar("stake_history")
     )))]
@@ -196,7 +208,11 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if before lockup expiration"
         ))
     )]
-    Withdraw { lamports: u64 },
+    // backwards compatibility with old IDL demands old `args` name
+    Withdraw(
+        #[cfg_attr(feature = "codama", codama(name = "args"))]
+        u64,
+    ),
 
     /// Deactivates the stake in the account
     ///
@@ -239,7 +255,7 @@ pub enum StakeInstruction {
             docs = "Lockup authority or withdraw authority"
         ))
     )]
-    SetLockup { lockup_args: LockupArgs },
+    SetLockup(LockupArgs),
 
     /// Merge two stake accounts.
     ///
@@ -323,9 +339,7 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
         ))
     )]
-    AuthorizeWithSeed {
-        authorize_with_seed_args: AuthorizeWithSeedArgs,
-    },
+    AuthorizeWithSeed(AuthorizeWithSeedArgs),
 
     /// Initialize a stake with authorization information
     ///
@@ -343,7 +357,7 @@ pub enum StakeInstruction {
     )]
     #[cfg_attr(
         feature = "codama",
-        codama(account(name = "rent_sysvar", docs = "Rent sysvar"))
+        codama(account(name = "rent_sysvar", docs = "Rent sysvar", default_value = sysvar("rent")))
     )]
     #[cfg_attr(
         feature = "codama",
@@ -393,7 +407,10 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
         ))
     )]
-    AuthorizeChecked { stake_authorize: StakeAuthorize },
+    AuthorizeChecked(
+        #[cfg_attr(feature = "codama", codama(name = "stakeAuthorize"))]
+        StakeAuthorize,
+    ),
 
     /// Authorize a key to manage stake or withdrawal with a derived key
     ///
@@ -437,9 +454,7 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
         ))
     )]
-    AuthorizeCheckedWithSeed {
-        authorize_checked_with_seed_args: AuthorizeCheckedWithSeedArgs,
-    },
+    AuthorizeCheckedWithSeed(AuthorizeCheckedWithSeedArgs),
 
     /// Set stake lockup
     ///
@@ -474,9 +489,9 @@ pub enum StakeInstruction {
             docs = "New lockup authority"
         ))
     )]
-    SetLockupChecked {
-        lockup_checked_args: LockupCheckedArgs,
-    },
+    SetLockupChecked(
+        LockupCheckedArgs,
+    ),
 
     /// Get the minimum stake delegation, in lamports
     ///
@@ -581,7 +596,10 @@ pub enum StakeInstruction {
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
     // sadly named `args` to avoid breaking users of old IDL
-    MoveStake { args: u64 },
+    MoveStake(
+        #[cfg_attr(feature = "codama", codama(name = "args"))]
+        u64,
+    ),
 
     /// Move unstaked lamports between accounts with the same authorities and lockups, using Staker
     /// authority.
@@ -617,7 +635,10 @@ pub enum StakeInstruction {
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
     // sadly named `args` to avoid breaking users of old IDL
-    MoveLamports { args: u64 },
+    MoveLamports(
+        #[cfg_attr(feature = "codama", codama(name = "args"))]
+        u64,
+    ),
 }
 
 #[cfg_attr(feature = "codama", derive(CodamaType))]
@@ -676,10 +697,7 @@ pub struct AuthorizeCheckedWithSeedArgs {
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::Initialize {
-            arg0: *authorized,
-            arg1: *lockup,
-        },
+        &StakeInstruction::Initialize(*authorized, *lockup),
         vec![
             AccountMeta::new(*stake_pubkey, false),
             AccountMeta::new_readonly(RENT_ID, false),
@@ -800,7 +818,7 @@ fn _split(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Split { lamports }, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
 }
 
 #[cfg(feature = "bincode")]
@@ -939,10 +957,7 @@ pub fn authorize(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::Authorize {
-            arg0: *new_authorized_pubkey,
-            arg1: stake_authorize,
-        },
+        &StakeInstruction::Authorize(*new_authorized_pubkey, stake_authorize),
         account_metas,
     )
 }
@@ -968,7 +983,7 @@ pub fn authorize_checked(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeChecked { stake_authorize },
+        &StakeInstruction::AuthorizeChecked(stake_authorize),
         account_metas,
     )
 }
@@ -1002,9 +1017,7 @@ pub fn authorize_with_seed(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeWithSeed {
-            authorize_with_seed_args: args,
-        },
+        &StakeInstruction::AuthorizeWithSeed(args),
         account_metas,
     )
 }
@@ -1038,9 +1051,7 @@ pub fn authorize_checked_with_seed(
 
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::AuthorizeCheckedWithSeed {
-            authorize_checked_with_seed_args: args,
-        },
+        &StakeInstruction::AuthorizeCheckedWithSeed(args),
         account_metas,
     )
 }
@@ -1083,7 +1094,7 @@ pub fn withdraw(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw { lamports }, account_metas)
+    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw(lamports), account_metas)
 }
 
 #[cfg(feature = "bincode")]
@@ -1108,9 +1119,7 @@ pub fn set_lockup(
     ];
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::SetLockup {
-            lockup_args: *lockup,
-        },
+        &StakeInstruction::SetLockup(*lockup),
         account_metas,
     )
 }
@@ -1135,9 +1144,7 @@ pub fn set_lockup_checked(
     }
     Instruction::new_with_bincode(
         ID,
-        &StakeInstruction::SetLockupChecked {
-            lockup_checked_args: lockup_checked,
-        },
+        &StakeInstruction::SetLockupChecked(lockup_checked),
         account_metas,
     )
 }
@@ -1242,11 +1249,7 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(
-        ID,
-        &StakeInstruction::MoveStake { args: lamports },
-        account_metas,
-    )
+    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake(lamports), account_metas)
 }
 
 #[cfg(feature = "bincode")]
@@ -1262,11 +1265,7 @@ pub fn move_lamports(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(
-        ID,
-        &StakeInstruction::MoveLamports { args: lamports },
-        account_metas,
-    )
+    Instruction::new_with_bincode(ID, &StakeInstruction::MoveLamports(lamports), account_metas)
 }
 
 #[cfg(feature = "bincode")]

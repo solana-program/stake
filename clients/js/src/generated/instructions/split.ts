@@ -62,15 +62,15 @@ export type SplitInstruction<
     ]
   >;
 
-export type SplitInstructionData = { discriminator: number; lamports: bigint };
+export type SplitInstructionData = { discriminator: number; args: bigint };
 
-export type SplitInstructionDataArgs = { lamports: number | bigint };
+export type SplitInstructionDataArgs = { args: number | bigint };
 
 export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['lamports', getU64Encoder()],
+      ['args', getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: SPLIT_DISCRIMINATOR })
   );
@@ -79,7 +79,7 @@ export function getSplitInstructionDataEncoder(): FixedSizeEncoder<SplitInstruct
 export function getSplitInstructionDataDecoder(): FixedSizeDecoder<SplitInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['lamports', getU64Decoder()],
+    ['args', getU64Decoder()],
   ]);
 }
 
@@ -104,7 +104,7 @@ export type SplitInput<
   splitStake: Address<TAccountSplitStake>;
   /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
-  lamports: SplitInstructionDataArgs['lamports'];
+  args: SplitInstructionDataArgs['args'];
 };
 
 export function getSplitInstruction<

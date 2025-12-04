@@ -18,8 +18,8 @@ program-id = "Stake11111111111111111111111111111111111111"
 
 [dependencies]
 borsh = { version = "1.5.7", features = ["derive", "unstable__schema"], optional = true }
-codama = { version = "0.6.4", optional = true }
-codama-macros = { version = "0.6.4", optional = true }
+codama = { version = "0.6.5", git = "https://github.com/rustopian/codama-rs", branch = "custom-tuple-arg-names", optional = true }
+codama-macros = { version = "0.6.5", git = "https://github.com/rustopian/codama-rs", branch = "custom-tuple-arg-names", optional = true }
 num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
 serde_derive = { version = "1.0.210", optional = true }

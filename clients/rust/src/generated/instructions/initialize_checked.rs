@@ -79,7 +79,7 @@ impl Default for InitializeCheckedInstructionData {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[]` rent_sysvar
+///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
 ///   2. `[]` stake_authority
 ///   3. `[signer]` withdraw_authority
 #[derive(Clone, Debug, Default)]
@@ -101,6 +101,7 @@ impl InitializeCheckedBuilder {
         self.stake = Some(stake);
         self
     }
+    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
     /// Rent sysvar
     #[inline(always)]
     pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
@@ -147,7 +148,9 @@ impl InitializeCheckedBuilder {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = InitializeChecked {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.expect("rent_sysvar is not set"),
+            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
+                "SysvarRent111111111111111111111111111111111"
+            )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
             withdraw_authority: self
                 .withdraw_authority

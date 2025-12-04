@@ -897,7 +897,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lamports",
+            "name": "args",
             "type": {
               "endian": "le",
               "format": "u64",
@@ -959,7 +959,7 @@
             "isSigner": false,
             "isWritable": false,
             "kind": "instructionAccountNode",
-            "name": "stakeHistorySysvar"
+            "name": "stakeHistory"
           },
           {
             "docs": [
@@ -998,7 +998,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lamports",
+            "name": "args",
             "type": {
               "endian": "le",
               "format": "u64",
@@ -1114,7 +1114,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lockupArgs",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "lockupArgs"
@@ -1274,7 +1274,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "authorizeWithSeedArgs",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "authorizeWithSeedArgs"
@@ -1303,6 +1303,10 @@
             "name": "stake"
           },
           {
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
             "docs": [
               "Rent sysvar"
             ],
@@ -1513,7 +1517,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "authorizeCheckedWithSeedArgs",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "authorizeCheckedWithSeedArgs"
@@ -1578,7 +1582,7 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "lockupCheckedArgs",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
               "name": "lockupCheckedArgs"
