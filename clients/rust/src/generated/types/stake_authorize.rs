@@ -5,15 +5,16 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use borsh::BorshSerialize;
-use borsh::BorshDeserialize;
-use num_derive::FromPrimitive;
+use {
+    borsh::{BorshDeserialize, BorshSerialize},
+    num_derive::FromPrimitive,
+};
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Copy, PartialOrd, Hash, FromPrimitive)]
+#[derive(
+    BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Copy, PartialOrd, Hash, FromPrimitive,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StakeAuthorize {
-Staker,
-Withdrawer,
+    Staker,
+    Withdrawer,
 }
-
-

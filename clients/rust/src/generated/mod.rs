@@ -5,9 +5,9 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-        pub mod errors;
-        pub mod instructions;
-        pub mod programs;
-          pub mod types;
-  
-  pub(crate) use programs::*;
+pub mod errors;
+pub mod instructions;
+pub mod programs;
+pub mod types;
+
+pub(crate) use programs::*;

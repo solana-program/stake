@@ -1,20 +1,12 @@
-//! Codama IDL build script.
-
+//! Codama IDL generation binary.
+#[cfg(feature = "codama")]
 use {
     codama::Codama,
     std::{env, fs, path::Path},
 };
 
-fn main() {
-    println!("cargo:rerun-if-changed=src/");
-    println!("cargo:rerun-if-env-changed=GENERATE_IDL");
-
-    if let Err(e) = generate_idl() {
-        println!("cargo:warning=Failed to generate IDL: {}", e)
-    }
-}
-
-fn generate_idl() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(feature = "codama")]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate IDL.
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")?;
     let crate_path = Path::new(&manifest_dir);
@@ -30,6 +22,11 @@ fn generate_idl() -> Result<(), Box<dyn std::error::Error>> {
     let idl_path = Path::new(&manifest_dir).join("idl.json");
     fs::write(&idl_path, formatted_json)?;
 
-    println!("cargo:warning=IDL written to: {}", idl_path.display());
+    println!("IDL written to: {}", idl_path.display());
     Ok(())
+}
+
+#[cfg(not(feature = "codama"))]
+fn main() {
+    println!("Codama is not enabled");
 }

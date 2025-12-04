@@ -5,39 +5,28 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-  pub(crate) mod r#authorize;
-  pub(crate) mod r#authorize_checked;
-  pub(crate) mod r#authorize_checked_with_seed;
-  pub(crate) mod r#authorize_with_seed;
-  pub(crate) mod r#deactivate;
-  pub(crate) mod r#deactivate_delinquent;
-  pub(crate) mod r#delegate_stake;
-  pub(crate) mod r#get_minimum_delegation;
-  pub(crate) mod r#initialize;
-  pub(crate) mod r#initialize_checked;
-  pub(crate) mod r#merge;
-  pub(crate) mod r#move_lamports;
-  pub(crate) mod r#move_stake;
-  pub(crate) mod r#set_lockup;
-  pub(crate) mod r#set_lockup_checked;
-  pub(crate) mod r#split;
-  pub(crate) mod r#withdraw;
+pub(crate) mod r#authorize;
+pub(crate) mod r#authorize_checked;
+pub(crate) mod r#authorize_checked_with_seed;
+pub(crate) mod r#authorize_with_seed;
+pub(crate) mod r#deactivate;
+pub(crate) mod r#deactivate_delinquent;
+pub(crate) mod r#delegate_stake;
+pub(crate) mod r#get_minimum_delegation;
+pub(crate) mod r#initialize;
+pub(crate) mod r#initialize_checked;
+pub(crate) mod r#merge;
+pub(crate) mod r#move_lamports;
+pub(crate) mod r#move_stake;
+pub(crate) mod r#set_lockup;
+pub(crate) mod r#set_lockup_checked;
+pub(crate) mod r#split;
+pub(crate) mod r#withdraw;
 
-  pub use self::r#authorize::*;
-  pub use self::r#authorize_checked::*;
-  pub use self::r#authorize_checked_with_seed::*;
-  pub use self::r#authorize_with_seed::*;
-  pub use self::r#deactivate::*;
-  pub use self::r#deactivate_delinquent::*;
-  pub use self::r#delegate_stake::*;
-  pub use self::r#get_minimum_delegation::*;
-  pub use self::r#initialize::*;
-  pub use self::r#initialize_checked::*;
-  pub use self::r#merge::*;
-  pub use self::r#move_lamports::*;
-  pub use self::r#move_stake::*;
-  pub use self::r#set_lockup::*;
-  pub use self::r#set_lockup_checked::*;
-  pub use self::r#split::*;
-  pub use self::r#withdraw::*;
-
+pub use self::{
+    r#authorize::*, r#authorize_checked::*, r#authorize_checked_with_seed::*,
+    r#authorize_with_seed::*, r#deactivate::*, r#deactivate_delinquent::*, r#delegate_stake::*,
+    r#get_minimum_delegation::*, r#initialize::*, r#initialize_checked::*, r#merge::*,
+    r#move_lamports::*, r#move_stake::*, r#set_lockup::*, r#set_lockup_checked::*, r#split::*,
+    r#withdraw::*,
+};

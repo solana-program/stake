@@ -5,27 +5,20 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-  pub(crate) mod r#authorized;
-  pub(crate) mod r#delegation;
-  pub(crate) mod r#epoch;
-  pub(crate) mod r#lockup;
-  pub(crate) mod r#meta;
-  pub(crate) mod r#stake;
-  pub(crate) mod r#stake_authorize;
-  pub(crate) mod r#stake_flags;
-  pub(crate) mod r#stake_state;
-  pub(crate) mod r#stake_state_v2;
-  pub(crate) mod r#unix_timestamp;
+pub(crate) mod r#authorized;
+pub(crate) mod r#delegation;
+pub(crate) mod r#epoch;
+pub(crate) mod r#lockup;
+pub(crate) mod r#meta;
+pub(crate) mod r#stake;
+pub(crate) mod r#stake_authorize;
+pub(crate) mod r#stake_flags;
+pub(crate) mod r#stake_state;
+pub(crate) mod r#stake_state_v2;
+pub(crate) mod r#unix_timestamp;
 
-  pub use self::r#authorized::*;
-  pub use self::r#delegation::*;
-  pub use self::r#epoch::*;
-  pub use self::r#lockup::*;
-  pub use self::r#meta::*;
-  pub use self::r#stake::*;
-  pub use self::r#stake_authorize::*;
-  pub use self::r#stake_flags::*;
-  pub use self::r#stake_state::*;
-  pub use self::r#stake_state_v2::*;
-  pub use self::r#unix_timestamp::*;
-
+pub use self::{
+    r#authorized::*, r#delegation::*, r#epoch::*, r#lockup::*, r#meta::*, r#stake::*,
+    r#stake_authorize::*, r#stake_flags::*, r#stake_state::*, r#stake_state_v2::*,
+    r#unix_timestamp::*,
+};

@@ -5,20 +5,22 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use solana_program::pubkey::Pubkey;
-use crate::generated::types::Epoch;
-use borsh::BorshSerialize;
-use borsh::BorshDeserialize;
+use {
+    crate::generated::types::Epoch,
+    borsh::{BorshDeserialize, BorshSerialize},
+    solana_program::pubkey::Pubkey,
+};
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Delegation {
-#[cfg_attr(feature = "serde", serde(with = "serde_with::As::<serde_with::DisplayFromStr>"))]
-pub voter_pubkey: Pubkey,
-pub stake: u64,
-pub activation_epoch: Epoch,
-pub deactivation_epoch: Epoch,
-pub warmup_cooldown_rate: f64,
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
+    )]
+    pub voter_pubkey: Pubkey,
+    pub stake: u64,
+    pub activation_epoch: Epoch,
+    pub deactivation_epoch: Epoch,
+    pub warmup_cooldown_rate: f64,
 }
-
-

@@ -5,8 +5,7 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use num_derive::FromPrimitive;
-use thiserror::Error;
+use {num_derive::FromPrimitive, thiserror::Error};
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum StakeError {
@@ -44,7 +43,9 @@ pub enum StakeError {
     #[error("Stake account is not delegated to the provided vote account")]
     VoteAddressMismatch = 0xA,
     /// 11 - Stake account has not been delinquent for the minimum epochs required for deactivation
-    #[error("Stake account has not been delinquent for the minimum epochs required for deactivation")]
+    #[error(
+        "Stake account has not been delinquent for the minimum epochs required for deactivation"
+    )]
     MinimumDelinquentEpochsForDeactivationNotMet = 0xB,
     /// 12 - Delegation amount is less than the minimum
     #[error("Delegation amount is less than the minimum")]
@@ -74,4 +75,3 @@ impl<T> solana_program::decode_error::DecodeError<T> for StakeError {
         "StakeError"
     }
 }
-
