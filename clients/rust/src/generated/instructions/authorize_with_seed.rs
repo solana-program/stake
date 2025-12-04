@@ -20,7 +20,7 @@ pub struct AuthorizeWithSeed {
     pub base: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -139,7 +139,7 @@ impl AuthorizeWithSeedBuilder {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -227,7 +227,7 @@ pub struct AuthorizeWithSeedCpiAccounts<'a, 'b> {
     pub base: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -241,7 +241,7 @@ pub struct AuthorizeWithSeedCpi<'a, 'b> {
     pub base: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: AuthorizeWithSeedInstructionArgs,
@@ -401,7 +401,7 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,

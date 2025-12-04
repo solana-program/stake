@@ -20,7 +20,7 @@ solana = "3.0.0"
 level = "warn"
 check-cfg = [
     'cfg(target_os, values("solana"))',
-    'cfg(feature, values("custom-heap", "custom-panic", "frozen-abi", "no-entrypoint"))',
+    'cfg(feature, values("codama", "custom-heap", "custom-panic", "frozen-abi", "no-entrypoint"))',
 ]
 
 [workspace.metadata.toolchains]

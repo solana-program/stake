@@ -16,11 +16,11 @@ pub struct Withdraw {
     pub recipient: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: solana_program::pubkey::Pubkey,
     /// Withdraw authority
     pub withdraw_authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -107,7 +107,7 @@ pub struct WithdrawInstructionArgs {
 ///   0. `[writable]` stake
 ///   1. `[writable]` recipient
 ///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[]` stake_history
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[signer]` withdraw_authority
 ///   5. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
@@ -145,7 +145,8 @@ impl WithdrawBuilder {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake_history = Some(stake_history);
@@ -161,7 +162,7 @@ impl WithdrawBuilder {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -201,7 +202,9 @@ impl WithdrawBuilder {
             clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history: self.stake_history.expect("stake_history is not set"),
+            stake_history: self.stake_history.unwrap_or(solana_program::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             withdraw_authority: self
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),
@@ -223,11 +226,11 @@ pub struct WithdrawCpiAccounts<'a, 'b> {
     pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Withdraw authority
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -241,11 +244,11 @@ pub struct WithdrawCpi<'a, 'b> {
     pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Withdraw authority
     pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: WithdrawInstructionArgs,
@@ -420,7 +423,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(
         &mut self,
@@ -439,7 +442,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,

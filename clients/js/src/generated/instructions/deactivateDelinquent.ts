@@ -92,9 +92,9 @@ export type DeactivateDelinquentInput<
 > = {
   /** Delegated stake account */
   stake: Address<TAccountStake>;
-  /** Delinquent vote account */
+  /** Delinquent vote account for the delegated stake account */
   delinquentVote: Address<TAccountDelinquentVote>;
-  /** Reference vote account */
+  /** Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs */
   referenceVote: Address<TAccountReferenceVote>;
 };
 
@@ -155,9 +155,9 @@ export type ParsedDeactivateDelinquentInstruction<
   accounts: {
     /** Delegated stake account */
     stake: TAccountMetas[0];
-    /** Delinquent vote account */
+    /** Delinquent vote account for the delegated stake account */
     delinquentVote: TAccountMetas[1];
-    /** Reference vote account */
+    /** Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs */
     referenceVote: TAccountMetas[2];
   };
   data: DeactivateDelinquentInstructionData;

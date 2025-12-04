@@ -133,9 +133,9 @@ export type AuthorizeInput<
   stake: Address<TAccountStake>;
   /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake or withdraw authority */
+  /** The stake or withdraw authority */
   authority: TransactionSigner<TAccountAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   arg0: AuthorizeInstructionDataArgs['arg0'];
   arg1: AuthorizeInstructionDataArgs['arg1'];
@@ -220,9 +220,9 @@ export type ParsedAuthorizeInstruction<
     stake: TAccountMetas[0];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[1];
-    /** Stake or withdraw authority */
+    /** The stake or withdraw authority */
     authority: TAccountMetas[2];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeInstructionData;

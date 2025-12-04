@@ -22,7 +22,7 @@ pub struct AuthorizeCheckedWithSeed {
     pub clock_sysvar: solana_program::pubkey::Pubkey,
     /// The new stake or withdraw authority
     pub new_authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -151,7 +151,7 @@ impl AuthorizeCheckedWithSeedBuilder {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -233,7 +233,7 @@ pub struct AuthorizeCheckedWithSeedCpiAccounts<'a, 'b> {
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The new stake or withdraw authority
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -249,7 +249,7 @@ pub struct AuthorizeCheckedWithSeedCpi<'a, 'b> {
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
     /// The new stake or withdraw authority
     pub new_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: AuthorizeCheckedWithSeedInstructionArgs,
@@ -425,7 +425,7 @@ impl<'a, 'b> AuthorizeCheckedWithSeedCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,

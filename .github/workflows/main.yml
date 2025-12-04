@@ -10,6 +10,7 @@ env:
   RUST_PACKAGES: "['clients-rust', 'interface', 'program']"
   SBPF_PROGRAM_PACKAGES: "['program']"
   WASM_PACKAGES: "['interface', 'program']"
+  IDL_PACKAGES: "['interface']"
 
 jobs:
   set_env:
@@ -20,6 +21,7 @@ jobs:
       SBPF_PROGRAM_PACKAGES: ${{ steps.compute.outputs.SBPF_PROGRAM_PACKAGES }}
       RUST_PACKAGES: ${{ steps.compute.outputs.RUST_PACKAGES }}
       WASM_PACKAGES: ${{ steps.compute.outputs.WASM_PACKAGES }}
+      IDL_PACKAGES: ${{ steps.compute.outputs.IDL_PACKAGES }}
       RUST_TOOLCHAIN_NIGHTLY: ${{ steps.compute.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       SOLANA_CLI_VERSION: ${{ steps.compute.outputs.SOLANA_CLI_VERSION }}
     steps:
@@ -34,6 +36,7 @@ jobs:
           echo "SBPF_PROGRAM_PACKAGES=${{ env.SBPF_PROGRAM_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "RUST_PACKAGES=${{ env.RUST_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "WASM_PACKAGES=${{ env.WASM_PACKAGES }}" >> $GITHUB_OUTPUT
+          echo "IDL_PACKAGES=${{ env.IDL_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "RUST_TOOLCHAIN_NIGHTLY=$(make rust-toolchain-nightly)" >> "$GITHUB_OUTPUT"
           echo "SOLANA_CLI_VERSION=$(make solana-cli-version)" >> "$GITHUB_OUTPUT"
 
@@ -45,6 +48,7 @@ jobs:
       sbpf-program-packages: ${{ needs.set_env.outputs.SBPF_PROGRAM_PACKAGES }}
       rust-packages: ${{ needs.set_env.outputs.RUST_PACKAGES }}
       wasm-packages: ${{ needs.set_env.outputs.WASM_PACKAGES }}
+      idl-packages: ${{ needs.set_env.outputs.IDL_PACKAGES }}
       wasm-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       rustfmt-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       clippy-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}

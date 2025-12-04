@@ -16,7 +16,7 @@ pub struct DelegateStake {
     pub vote: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: solana_program::pubkey::Pubkey,
     /// Unused account, formerly the stake config
     pub unused: solana_program::pubkey::Pubkey,
@@ -92,7 +92,7 @@ impl Default for DelegateStakeInstructionData {
 ///   0. `[writable]` stake
 ///   1. `[]` vote
 ///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[]` stake_history
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
@@ -129,7 +129,8 @@ impl DelegateStakeBuilder {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake_history = Some(stake_history);
@@ -176,7 +177,9 @@ impl DelegateStakeBuilder {
             clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history: self.stake_history.expect("stake_history is not set"),
+            stake_history: self.stake_history.unwrap_or(solana_program::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             unused: self.unused.expect("unused is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
@@ -193,7 +196,7 @@ pub struct DelegateStakeCpiAccounts<'a, 'b> {
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Unused account, formerly the stake config
     pub unused: &'b solana_program::account_info::AccountInfo<'a>,
@@ -211,7 +214,7 @@ pub struct DelegateStakeCpi<'a, 'b> {
     pub vote: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
     /// Unused account, formerly the stake config
     pub unused: &'b solana_program::account_info::AccountInfo<'a>,
@@ -376,7 +379,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(
         &mut self,

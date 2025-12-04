@@ -44,7 +44,9 @@ export type MergeInstruction<
   TAccountClockSysvar extends
     | string
     | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountStakeHistory extends
+    | string
+    | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -103,14 +105,14 @@ export type MergeInput<
   TAccountStakeHistory extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Destination stake account */
+  /** Destination stake account for the merge */
   destinationStake: Address<TAccountDestinationStake>;
-  /** Source stake account */
+  /** Source stake account for to merge.  This account will be drained */
   sourceStake: Address<TAccountSourceStake>;
   /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
-  stakeHistory: Address<TAccountStakeHistory>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
+  stakeHistory?: Address<TAccountStakeHistory>;
   /** Stake authority */
   stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
@@ -163,6 +165,10 @@ export function getMergeInstruction<
     accounts.clockSysvar.value =
       'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
   }
+  if (!accounts.stakeHistory.value) {
+    accounts.stakeHistory.value =
+      'SysvarStakeHistory1111111111111111111111111' as Address<'SysvarStakeHistory1111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
@@ -191,13 +197,13 @@ export type ParsedMergeInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Destination stake account */
+    /** Destination stake account for the merge */
     destinationStake: TAccountMetas[0];
-    /** Source stake account */
+    /** Source stake account for to merge.  This account will be drained */
     sourceStake: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistory: TAccountMetas[3];
     /** Stake authority */
     stakeAuthority: TAccountMetas[4];

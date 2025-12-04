@@ -10,9 +10,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 #[derive(Debug)]
 pub struct Split {
-    /// Stake account to be split
+    /// Stake account to be split; must be in the Initialized or Stake state
     pub stake: solana_program::pubkey::Pubkey,
-    /// Uninitialized stake account
+    /// Uninitialized stake account that will take the split-off amount
     pub split_stake: solana_program::pubkey::Pubkey,
     /// Stake authority
     pub stake_authority: solana_program::pubkey::Pubkey,
@@ -100,13 +100,13 @@ impl SplitBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Stake account to be split
+    /// Stake account to be split; must be in the Initialized or Stake state
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
-    /// Uninitialized stake account
+    /// Uninitialized stake account that will take the split-off amount
     #[inline(always)]
     pub fn split_stake(&mut self, split_stake: solana_program::pubkey::Pubkey) -> &mut Self {
         self.split_stake = Some(split_stake);
@@ -161,9 +161,9 @@ impl SplitBuilder {
 
 /// `split` CPI accounts.
 pub struct SplitCpiAccounts<'a, 'b> {
-    /// Stake account to be split
+    /// Stake account to be split; must be in the Initialized or Stake state
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account
+    /// Uninitialized stake account that will take the split-off amount
     pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -173,9 +173,9 @@ pub struct SplitCpiAccounts<'a, 'b> {
 pub struct SplitCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake account to be split
+    /// Stake account to be split; must be in the Initialized or Stake state
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Uninitialized stake account
+    /// Uninitialized stake account that will take the split-off amount
     pub split_stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Stake authority
     pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
@@ -300,13 +300,13 @@ impl<'a, 'b> SplitCpiBuilder<'a, 'b> {
         });
         Self { instruction }
     }
-    /// Stake account to be split
+    /// Stake account to be split; must be in the Initialized or Stake state
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
-    /// Uninitialized stake account
+    /// Uninitialized stake account that will take the split-off amount
     #[inline(always)]
     pub fn split_stake(
         &mut self,

@@ -10,16 +10,12 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
   getU32Decoder,
   getU32Encoder,
-  getU64Decoder,
-  getU64Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -39,6 +35,16 @@ import {
 } from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
+import {
+  getEpochDecoder,
+  getEpochEncoder,
+  getUnixTimestampDecoder,
+  getUnixTimestampEncoder,
+  type Epoch,
+  type EpochArgs,
+  type UnixTimestamp,
+  type UnixTimestampArgs,
+} from '../types';
 
 export const SET_LOCKUP_DISCRIMINATOR = 6;
 
@@ -68,14 +74,14 @@ export type SetLockupInstruction<
 
 export type SetLockupInstructionData = {
   discriminator: number;
-  unixTimestamp: Option<bigint>;
-  epoch: Option<bigint>;
+  unixTimestamp: Option<UnixTimestamp>;
+  epoch: Option<Epoch>;
   custodian: Option<Address>;
 };
 
 export type SetLockupInstructionDataArgs = {
-  unixTimestamp: OptionOrNullable<number | bigint>;
-  epoch: OptionOrNullable<number | bigint>;
+  unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
+  epoch: OptionOrNullable<EpochArgs>;
   custodian: OptionOrNullable<Address>;
 };
 
@@ -83,8 +89,8 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
   return transformEncoder(
     getStructEncoder([
       ['discriminator', getU32Encoder()],
-      ['unixTimestamp', getOptionEncoder(getI64Encoder())],
-      ['epoch', getOptionEncoder(getU64Encoder())],
+      ['unixTimestamp', getOptionEncoder(getUnixTimestampEncoder())],
+      ['epoch', getOptionEncoder(getEpochEncoder())],
       ['custodian', getOptionEncoder(getAddressEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_LOCKUP_DISCRIMINATOR })
@@ -94,8 +100,8 @@ export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructi
 export function getSetLockupInstructionDataDecoder(): Decoder<SetLockupInstructionData> {
   return getStructDecoder([
     ['discriminator', getU32Decoder()],
-    ['unixTimestamp', getOptionDecoder(getI64Decoder())],
-    ['epoch', getOptionDecoder(getU64Decoder())],
+    ['unixTimestamp', getOptionDecoder(getUnixTimestampDecoder())],
+    ['epoch', getOptionDecoder(getEpochDecoder())],
     ['custodian', getOptionDecoder(getAddressDecoder())],
   ]);
 }

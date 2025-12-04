@@ -18,9 +18,9 @@ pub struct Authorize {
     pub stake: solana_program::pubkey::Pubkey,
     /// Clock sysvar
     pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
 }
 
@@ -129,14 +129,14 @@ impl AuthorizeBuilder {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     #[inline(always)]
     pub fn authority(&mut self, authority: solana_program::pubkey::Pubkey) -> &mut Self {
         self.authority = Some(authority);
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
@@ -198,9 +198,9 @@ pub struct AuthorizeCpiAccounts<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
@@ -212,9 +212,9 @@ pub struct AuthorizeCpi<'a, 'b> {
     pub stake: &'b solana_program::account_info::AccountInfo<'a>,
     /// Clock sysvar
     pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     pub authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: AuthorizeInstructionArgs,
@@ -365,7 +365,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake or withdraw authority
+    /// The stake or withdraw authority
     #[inline(always)]
     pub fn authority(
         &mut self,
@@ -375,7 +375,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
