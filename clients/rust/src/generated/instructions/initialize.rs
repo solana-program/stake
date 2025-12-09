@@ -10,42 +10,40 @@ use {
     borsh::{BorshDeserialize, BorshSerialize},
 };
 
+pub const INITIALIZE_DISCRIMINATOR: u32 = 0;
+
 /// Accounts.
 #[derive(Debug)]
 pub struct Initialize {
     /// Uninitialized stake account
-    pub stake: solana_program::pubkey::Pubkey,
+    pub stake: solana_pubkey::Pubkey,
     /// Rent sysvar
-    pub rent_sysvar: solana_program::pubkey::Pubkey,
+    pub rent_sysvar: solana_pubkey::Pubkey,
 }
 
 impl Initialize {
-    pub fn instruction(
-        &self,
-        args: InitializeInstructionArgs,
-    ) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self, args: InitializeInstructionArgs) -> solana_instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
         args: InitializeInstructionArgs,
-        remaining_accounts: &[solana_program::instruction::AccountMeta],
-    ) -> solana_program::instruction::Instruction {
+        remaining_accounts: &[solana_instruction::AccountMeta],
+    ) -> solana_instruction::Instruction {
         let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            self.stake, false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.rent_sysvar,
             false,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = borsh::to_vec(&InitializeInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&args).unwrap();
+        let mut data = InitializeInstructionData::new().try_to_vec().unwrap();
+        let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        solana_program::instruction::Instruction {
+        solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -63,6 +61,10 @@ impl InitializeInstructionData {
     pub fn new() -> Self {
         Self { discriminator: 0 }
     }
+
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
 }
 
 impl Default for InitializeInstructionData {
@@ -78,6 +80,12 @@ pub struct InitializeInstructionArgs {
     pub arg1: Lockup,
 }
 
+impl InitializeInstructionArgs {
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
+}
+
 /// Instruction builder for `Initialize`.
 ///
 /// ### Accounts:
@@ -86,11 +94,11 @@ pub struct InitializeInstructionArgs {
 ///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
 #[derive(Clone, Debug, Default)]
 pub struct InitializeBuilder {
-    stake: Option<solana_program::pubkey::Pubkey>,
-    rent_sysvar: Option<solana_program::pubkey::Pubkey>,
+    stake: Option<solana_pubkey::Pubkey>,
+    rent_sysvar: Option<solana_pubkey::Pubkey>,
     arg0: Option<Authorized>,
     arg1: Option<Lockup>,
-    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
+    __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
 impl InitializeBuilder {
@@ -99,14 +107,14 @@ impl InitializeBuilder {
     }
     /// Uninitialized stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
     /// Rent sysvar
     #[inline(always)]
-    pub fn rent_sysvar(&mut self, rent_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn rent_sysvar(&mut self, rent_sysvar: solana_pubkey::Pubkey) -> &mut Self {
         self.rent_sysvar = Some(rent_sysvar);
         self
     }
@@ -122,10 +130,7 @@ impl InitializeBuilder {
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(
-        &mut self,
-        account: solana_program::instruction::AccountMeta,
-    ) -> &mut Self {
+    pub fn add_remaining_account(&mut self, account: solana_instruction::AccountMeta) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
@@ -133,16 +138,16 @@ impl InitializeBuilder {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[solana_program::instruction::AccountMeta],
+        accounts: &[solana_instruction::AccountMeta],
     ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = Initialize {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_program::pubkey!(
+            rent_sysvar: self.rent_sysvar.unwrap_or(solana_pubkey::pubkey!(
                 "SysvarRent111111111111111111111111111111111"
             )),
         };
@@ -158,26 +163,26 @@ impl InitializeBuilder {
 /// `initialize` CPI accounts.
 pub struct InitializeCpiAccounts<'a, 'b> {
     /// Uninitialized stake account
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Rent sysvar
-    pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
 }
 
 /// `initialize` CPI instruction.
 pub struct InitializeCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
+    pub __program: &'b solana_account_info::AccountInfo<'a>,
     /// Uninitialized stake account
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Rent sysvar
-    pub rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: InitializeInstructionArgs,
 }
 
 impl<'a, 'b> InitializeCpi<'a, 'b> {
     pub fn new(
-        program: &'b solana_program::account_info::AccountInfo<'a>,
+        program: &'b solana_account_info::AccountInfo<'a>,
         accounts: InitializeCpiAccounts<'a, 'b>,
         args: InitializeInstructionArgs,
     ) -> Self {
@@ -189,59 +194,46 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.stake.key,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.rent_sysvar.key,
             false,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(solana_program::instruction::AccountMeta {
+            accounts.push(solana_instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.1,
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = borsh::to_vec(&InitializeInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&self.__args).unwrap();
+        let mut data = InitializeInstructionData::new().try_to_vec().unwrap();
+        let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        let instruction = solana_program::instruction::Instruction {
+        let instruction = solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -255,9 +247,9 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            solana_program::program::invoke(&instruction, &account_infos)
+            solana_cpi::invoke(&instruction, &account_infos)
         } else {
-            solana_program::program::invoke_signed(&instruction, &account_infos, signers_seeds)
+            solana_cpi::invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
@@ -274,7 +266,7 @@ pub struct InitializeCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(InitializeCpiBuilderInstruction {
             __program: program,
             stake: None,
@@ -287,7 +279,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     }
     /// Uninitialized stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+    pub fn stake(&mut self, stake: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
@@ -295,7 +287,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn rent_sysvar(
         &mut self,
-        rent_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+        rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.rent_sysvar = Some(rent_sysvar);
         self
@@ -314,7 +306,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b solana_program::account_info::AccountInfo<'a>,
+        account: &'b solana_account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -330,11 +322,7 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
+        accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -342,15 +330,12 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         let args = InitializeInstructionArgs {
             arg0: self.instruction.arg0.clone().expect("arg0 is not set"),
             arg1: self.instruction.arg1.clone().expect("arg1 is not set"),
@@ -375,15 +360,11 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct InitializeCpiBuilderInstruction<'a, 'b> {
-    __program: &'b solana_program::account_info::AccountInfo<'a>,
-    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    rent_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    __program: &'b solana_account_info::AccountInfo<'a>,
+    stake: Option<&'b solana_account_info::AccountInfo<'a>>,
+    rent_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
     arg0: Option<Authorized>,
     arg1: Option<Lockup>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(
-        &'b solana_program::account_info::AccountInfo<'a>,
-        bool,
-        bool,
-    )>,
+    __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,
 }

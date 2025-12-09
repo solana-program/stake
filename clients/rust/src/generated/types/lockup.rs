@@ -8,7 +8,7 @@
 use {
     crate::generated::types::{Epoch, UnixTimestamp},
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_program::pubkey::Pubkey,
+    solana_pubkey::Pubkey,
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]

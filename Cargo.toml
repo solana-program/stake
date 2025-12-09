@@ -24,7 +24,7 @@ check-cfg = [
 ]
 
 [workspace.metadata.toolchains]
-build = "1.86.0"
+build = "1.90.0"
 format = "nightly-2025-02-16"
 lint = "nightly-2025-02-16"
 test = "nightly-2025-02-16"
