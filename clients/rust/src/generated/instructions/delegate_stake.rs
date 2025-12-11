@@ -7,59 +7,60 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
+pub const DELEGATE_STAKE_DISCRIMINATOR: u32 = 2;
+
 /// Accounts.
 #[derive(Debug)]
 pub struct DelegateStake {
     /// Initialized stake account to be delegated
-    pub stake: solana_program::pubkey::Pubkey,
+    pub stake: solana_pubkey::Pubkey,
     /// Vote account to which this stake will be delegated
-    pub vote: solana_program::pubkey::Pubkey,
+    pub vote: solana_pubkey::Pubkey,
     /// Clock sysvar
-    pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake history sysvar
-    pub stake_history: solana_program::pubkey::Pubkey,
+    pub clock_sysvar: solana_pubkey::Pubkey,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: solana_pubkey::Pubkey,
     /// Unused account, formerly the stake config
-    pub unused: solana_program::pubkey::Pubkey,
+    pub unused: solana_pubkey::Pubkey,
     /// Stake authority
-    pub stake_authority: solana_program::pubkey::Pubkey,
+    pub stake_authority: solana_pubkey::Pubkey,
 }
 
 impl DelegateStake {
-    pub fn instruction(&self) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self) -> solana_instruction::Instruction {
         self.instruction_with_remaining_accounts(&[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        remaining_accounts: &[solana_program::instruction::AccountMeta],
-    ) -> solana_program::instruction::Instruction {
+        remaining_accounts: &[solana_instruction::AccountMeta],
+    ) -> solana_instruction::Instruction {
         let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            self.stake, false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.vote, false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.clock_sysvar,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.stake_history,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.unused,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.stake_authority,
             true,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = borsh::to_vec(&DelegateStakeInstructionData::new()).unwrap();
+        let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
 
-        solana_program::instruction::Instruction {
+        solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -77,6 +78,10 @@ impl DelegateStakeInstructionData {
     pub fn new() -> Self {
         Self { discriminator: 2 }
     }
+
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
 }
 
 impl Default for DelegateStakeInstructionData {
@@ -92,18 +97,18 @@ impl Default for DelegateStakeInstructionData {
 ///   0. `[writable]` stake
 ///   1. `[]` vote
 ///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[]` stake_history
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[]` unused
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DelegateStakeBuilder {
-    stake: Option<solana_program::pubkey::Pubkey>,
-    vote: Option<solana_program::pubkey::Pubkey>,
-    clock_sysvar: Option<solana_program::pubkey::Pubkey>,
-    stake_history: Option<solana_program::pubkey::Pubkey>,
-    unused: Option<solana_program::pubkey::Pubkey>,
-    stake_authority: Option<solana_program::pubkey::Pubkey>,
-    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
+    stake: Option<solana_pubkey::Pubkey>,
+    vote: Option<solana_pubkey::Pubkey>,
+    clock_sysvar: Option<solana_pubkey::Pubkey>,
+    stake_history: Option<solana_pubkey::Pubkey>,
+    unused: Option<solana_pubkey::Pubkey>,
+    stake_authority: Option<solana_pubkey::Pubkey>,
+    __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
 impl DelegateStakeBuilder {
@@ -112,50 +117,45 @@ impl DelegateStakeBuilder {
     }
     /// Initialized stake account to be delegated
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Vote account to which this stake will be delegated
     #[inline(always)]
-    pub fn vote(&mut self, vote: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn vote(&mut self, vote: solana_pubkey::Pubkey) -> &mut Self {
         self.vote = Some(vote);
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
-    pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn stake_history(&mut self, stake_history: solana_pubkey::Pubkey) -> &mut Self {
         self.stake_history = Some(stake_history);
         self
     }
     /// Unused account, formerly the stake config
     #[inline(always)]
-    pub fn unused(&mut self, unused: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn unused(&mut self, unused: solana_pubkey::Pubkey) -> &mut Self {
         self.unused = Some(unused);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(
-        &mut self,
-        stake_authority: solana_program::pubkey::Pubkey,
-    ) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(
-        &mut self,
-        account: solana_program::instruction::AccountMeta,
-    ) -> &mut Self {
+    pub fn add_remaining_account(&mut self, account: solana_instruction::AccountMeta) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
@@ -163,20 +163,22 @@ impl DelegateStakeBuilder {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[solana_program::instruction::AccountMeta],
+        accounts: &[solana_instruction::AccountMeta],
     ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = DelegateStake {
             stake: self.stake.expect("stake is not set"),
             vote: self.vote.expect("vote is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_pubkey::pubkey!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history: self.stake_history.expect("stake_history is not set"),
+            stake_history: self.stake_history.unwrap_or(solana_pubkey::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             unused: self.unused.expect("unused is not set"),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
         };
@@ -188,40 +190,40 @@ impl DelegateStakeBuilder {
 /// `delegate_stake` CPI accounts.
 pub struct DelegateStakeCpiAccounts<'a, 'b> {
     /// Initialized stake account to be delegated
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Vote account to which this stake will be delegated
-    pub vote: &'b solana_program::account_info::AccountInfo<'a>,
+    pub vote: &'b solana_account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
-    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Unused account, formerly the stake config
-    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
+    pub unused: &'b solana_account_info::AccountInfo<'a>,
     /// Stake authority
-    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake_authority: &'b solana_account_info::AccountInfo<'a>,
 }
 
 /// `delegate_stake` CPI instruction.
 pub struct DelegateStakeCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
+    pub __program: &'b solana_account_info::AccountInfo<'a>,
     /// Initialized stake account to be delegated
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Vote account to which this stake will be delegated
-    pub vote: &'b solana_program::account_info::AccountInfo<'a>,
+    pub vote: &'b solana_account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
-    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Unused account, formerly the stake config
-    pub unused: &'b solana_program::account_info::AccountInfo<'a>,
+    pub unused: &'b solana_account_info::AccountInfo<'a>,
     /// Stake authority
-    pub stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake_authority: &'b solana_account_info::AccountInfo<'a>,
 }
 
 impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
     pub fn new(
-        program: &'b solana_program::account_info::AccountInfo<'a>,
+        program: &'b solana_account_info::AccountInfo<'a>,
         accounts: DelegateStakeCpiAccounts<'a, 'b>,
     ) -> Self {
         Self {
@@ -235,73 +237,60 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.stake.key,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.vote.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.clock_sysvar.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.stake_history.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.unused.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.stake_authority.key,
             true,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(solana_program::instruction::AccountMeta {
+            accounts.push(solana_instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.1,
                 is_writable: remaining_account.2,
             })
         });
-        let data = borsh::to_vec(&DelegateStakeInstructionData::new()).unwrap();
+        let data = DelegateStakeInstructionData::new().try_to_vec().unwrap();
 
-        let instruction = solana_program::instruction::Instruction {
+        let instruction = solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -319,9 +308,9 @@ impl<'a, 'b> DelegateStakeCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            solana_program::program::invoke(&instruction, &account_infos)
+            solana_cpi::invoke(&instruction, &account_infos)
         } else {
-            solana_program::program::invoke_signed(&instruction, &account_infos, signers_seeds)
+            solana_cpi::invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
@@ -342,7 +331,7 @@ pub struct DelegateStakeCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(DelegateStakeCpiBuilderInstruction {
             __program: program,
             stake: None,
@@ -357,13 +346,13 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     }
     /// Initialized stake account to be delegated
     #[inline(always)]
-    pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+    pub fn stake(&mut self, stake: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
     /// Vote account to which this stake will be delegated
     #[inline(always)]
-    pub fn vote(&mut self, vote: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+    pub fn vote(&mut self, vote: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.vote = Some(vote);
         self
     }
@@ -371,26 +360,23 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,
-        clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+        clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(
         &mut self,
-        stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+        stake_history: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.stake_history = Some(stake_history);
         self
     }
     /// Unused account, formerly the stake config
     #[inline(always)]
-    pub fn unused(
-        &mut self,
-        unused: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
+    pub fn unused(&mut self, unused: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.unused = Some(unused);
         self
     }
@@ -398,7 +384,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn stake_authority(
         &mut self,
-        stake_authority: &'b solana_program::account_info::AccountInfo<'a>,
+        stake_authority: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.stake_authority = Some(stake_authority);
         self
@@ -407,7 +393,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b solana_program::account_info::AccountInfo<'a>,
+        account: &'b solana_account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -423,11 +409,7 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
+        accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -435,15 +417,12 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         let instruction = DelegateStakeCpi {
             __program: self.instruction.__program,
 
@@ -477,17 +456,13 @@ impl<'a, 'b> DelegateStakeCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct DelegateStakeCpiBuilderInstruction<'a, 'b> {
-    __program: &'b solana_program::account_info::AccountInfo<'a>,
-    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    vote: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    unused: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    __program: &'b solana_account_info::AccountInfo<'a>,
+    stake: Option<&'b solana_account_info::AccountInfo<'a>>,
+    vote: Option<&'b solana_account_info::AccountInfo<'a>>,
+    clock_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
+    stake_history: Option<&'b solana_account_info::AccountInfo<'a>>,
+    unused: Option<&'b solana_account_info::AccountInfo<'a>>,
+    stake_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(
-        &'b solana_program::account_info::AccountInfo<'a>,
-        bool,
-        bool,
-    )>,
+    __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,
 }

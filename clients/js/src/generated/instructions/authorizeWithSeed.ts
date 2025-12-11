@@ -149,7 +149,7 @@ export type AuthorizeWithSeedInput<
   base: TransactionSigner<TAccountBase>;
   /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
-  /** Lockup authority */
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   newAuthorizedPubkey: AuthorizeWithSeedInstructionDataArgs['newAuthorizedPubkey'];
   stakeAuthorize: AuthorizeWithSeedInstructionDataArgs['stakeAuthorize'];
@@ -238,7 +238,7 @@ export type ParsedAuthorizeWithSeedInstruction<
     base: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[3] | undefined;
   };
   data: AuthorizeWithSeedInstructionData;

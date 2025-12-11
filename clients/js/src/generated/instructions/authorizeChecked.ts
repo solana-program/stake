@@ -137,7 +137,7 @@ export type AuthorizeCheckedInput<
   authority: TransactionSigner<TAccountAuthority>;
   /** The new stake or withdraw authority */
   newAuthority: TransactionSigner<TAccountNewAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   stakeAuthorize: AuthorizeCheckedInstructionDataArgs['stakeAuthorize'];
 };
@@ -231,7 +231,7 @@ export type ParsedAuthorizeCheckedInstruction<
     authority: TAccountMetas[2];
     /** The new stake or withdraw authority */
     newAuthority: TAccountMetas[3];
-    /** Lockup authority */
+    /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
     lockupAuthority?: TAccountMetas[4] | undefined;
   };
   data: AuthorizeCheckedInstructionData;
