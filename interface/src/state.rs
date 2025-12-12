@@ -81,7 +81,11 @@ macro_rules! impl_borsh_stake_state {
         }
     };
 }
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(enum_discriminator(size = number(u32)))
+)]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
@@ -93,7 +97,6 @@ macro_rules! impl_borsh_stake_state {
     since = "1.17.0",
     note = "Please use `StakeStateV2` instead, and match the third `StakeFlags` field when matching `StakeStateV2::Stake` to resolve any breakage. For example, `if let StakeState::Stake(meta, stake)` becomes `if let StakeStateV2::Stake(meta, stake, _stake_flags)`."
 )]
-#[cfg_attr(feature = "codama", codama(enum_discriminator(size = number(u32))))]
 pub enum StakeState {
     #[default]
     Uninitialized,
@@ -144,7 +147,11 @@ impl StakeState {
     }
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(enum_discriminator(size = number(u32)))
+)]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
@@ -152,7 +159,6 @@ impl StakeState {
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
 #[allow(clippy::large_enum_variant)]
-#[cfg_attr(feature = "codama", codama(enum_discriminator(size = number(u32))))]
 pub enum StakeStateV2 {
     #[default]
     Uninitialized,
@@ -265,14 +271,17 @@ impl StakeStateV2 {
     }
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(enum_discriminator(size = number(u32)))
+)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[cfg_attr(feature = "codama", codama(enum_discriminator(size = number(u32))))]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,

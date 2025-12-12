@@ -525,9 +525,8 @@ pub enum StakeInstruction {
     MoveLamports(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(feature = "codama", derive(CodamaType), codama(name = "lockupParams"))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "codama", codama(name = "lockupParams"))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -538,9 +537,12 @@ pub struct LockupArgs {
     pub custodian: Option<Pubkey>,
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(name = "lockupCheckedParams")
+)]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "codama", codama(name = "lockupCheckedParams"))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -550,9 +552,12 @@ pub struct LockupCheckedArgs {
     pub epoch: Option<Epoch>,
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(name = "authorizeWithSeedParams")
+)]
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "codama", codama(name = "authorizeWithSeedParams"))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -564,9 +569,12 @@ pub struct AuthorizeWithSeedArgs {
     pub authority_owner: Pubkey,
 }
 
-#[cfg_attr(feature = "codama", derive(CodamaType))]
+#[cfg_attr(
+    feature = "codama",
+    derive(CodamaType),
+    codama(name = "authorizeCheckedWithSeedParams")
+)]
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "codama", codama(name = "authorizeCheckedWithSeedParams"))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
