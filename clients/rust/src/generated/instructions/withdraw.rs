@@ -7,68 +7,63 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 
+pub const WITHDRAW_DISCRIMINATOR: u32 = 4;
+
 /// Accounts.
 #[derive(Debug)]
 pub struct Withdraw {
     /// Stake account from which to withdraw
-    pub stake: solana_program::pubkey::Pubkey,
+    pub stake: solana_pubkey::Pubkey,
     /// Recipient account
-    pub recipient: solana_program::pubkey::Pubkey,
+    pub recipient: solana_pubkey::Pubkey,
     /// Clock sysvar
-    pub clock_sysvar: solana_program::pubkey::Pubkey,
-    /// Stake history sysvar
-    pub stake_history: solana_program::pubkey::Pubkey,
+    pub clock_sysvar: solana_pubkey::Pubkey,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: solana_pubkey::Pubkey,
     /// Withdraw authority
-    pub withdraw_authority: solana_program::pubkey::Pubkey,
-    /// Lockup authority
-    pub lockup_authority: Option<solana_program::pubkey::Pubkey>,
+    pub withdraw_authority: solana_pubkey::Pubkey,
+    /// Lockup authority, if before lockup expiration
+    pub lockup_authority: Option<solana_pubkey::Pubkey>,
 }
 
 impl Withdraw {
-    pub fn instruction(
-        &self,
-        args: WithdrawInstructionArgs,
-    ) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self, args: WithdrawInstructionArgs) -> solana_instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
         args: WithdrawInstructionArgs,
-        remaining_accounts: &[solana_program::instruction::AccountMeta],
-    ) -> solana_program::instruction::Instruction {
+        remaining_accounts: &[solana_instruction::AccountMeta],
+    ) -> solana_instruction::Instruction {
         let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            self.stake, false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            self.recipient,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
+        accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.clock_sysvar,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.stake_history,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.withdraw_authority,
             true,
         ));
         if let Some(lockup_authority) = self.lockup_authority {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            accounts.push(solana_instruction::AccountMeta::new_readonly(
                 lockup_authority,
                 true,
             ));
         }
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = borsh::to_vec(&WithdrawInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&args).unwrap();
+        let mut data = WithdrawInstructionData::new().try_to_vec().unwrap();
+        let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        solana_program::instruction::Instruction {
+        solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -86,6 +81,10 @@ impl WithdrawInstructionData {
     pub fn new() -> Self {
         Self { discriminator: 4 }
     }
+
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
 }
 
 impl Default for WithdrawInstructionData {
@@ -100,6 +99,12 @@ pub struct WithdrawInstructionArgs {
     pub args: u64,
 }
 
+impl WithdrawInstructionArgs {
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
+}
+
 /// Instruction builder for `Withdraw`.
 ///
 /// ### Accounts:
@@ -107,19 +112,19 @@ pub struct WithdrawInstructionArgs {
 ///   0. `[writable]` stake
 ///   1. `[writable]` recipient
 ///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[]` stake_history
+///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
 ///   4. `[signer]` withdraw_authority
 ///   5. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
 pub struct WithdrawBuilder {
-    stake: Option<solana_program::pubkey::Pubkey>,
-    recipient: Option<solana_program::pubkey::Pubkey>,
-    clock_sysvar: Option<solana_program::pubkey::Pubkey>,
-    stake_history: Option<solana_program::pubkey::Pubkey>,
-    withdraw_authority: Option<solana_program::pubkey::Pubkey>,
-    lockup_authority: Option<solana_program::pubkey::Pubkey>,
+    stake: Option<solana_pubkey::Pubkey>,
+    recipient: Option<solana_pubkey::Pubkey>,
+    clock_sysvar: Option<solana_pubkey::Pubkey>,
+    stake_history: Option<solana_pubkey::Pubkey>,
+    withdraw_authority: Option<solana_pubkey::Pubkey>,
+    lockup_authority: Option<solana_pubkey::Pubkey>,
     args: Option<u64>,
-    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
+    __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
 impl WithdrawBuilder {
@@ -128,44 +133,42 @@ impl WithdrawBuilder {
     }
     /// Stake account from which to withdraw
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Recipient account
     #[inline(always)]
-    pub fn recipient(&mut self, recipient: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn recipient(&mut self, recipient: solana_pubkey::Pubkey) -> &mut Self {
         self.recipient = Some(recipient);
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_pubkey::Pubkey) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
-    pub fn stake_history(&mut self, stake_history: solana_program::pubkey::Pubkey) -> &mut Self {
+    pub fn stake_history(&mut self, stake_history: solana_pubkey::Pubkey) -> &mut Self {
         self.stake_history = Some(stake_history);
         self
     }
     /// Withdraw authority
     #[inline(always)]
-    pub fn withdraw_authority(
-        &mut self,
-        withdraw_authority: solana_program::pubkey::Pubkey,
-    ) -> &mut Self {
+    pub fn withdraw_authority(&mut self, withdraw_authority: solana_pubkey::Pubkey) -> &mut Self {
         self.withdraw_authority = Some(withdraw_authority);
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
-        lockup_authority: Option<solana_program::pubkey::Pubkey>,
+        lockup_authority: Option<solana_pubkey::Pubkey>,
     ) -> &mut Self {
         self.lockup_authority = lockup_authority;
         self
@@ -177,10 +180,7 @@ impl WithdrawBuilder {
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(
-        &mut self,
-        account: solana_program::instruction::AccountMeta,
-    ) -> &mut Self {
+    pub fn add_remaining_account(&mut self, account: solana_instruction::AccountMeta) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
@@ -188,20 +188,22 @@ impl WithdrawBuilder {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[solana_program::instruction::AccountMeta],
+        accounts: &[solana_instruction::AccountMeta],
     ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> solana_program::instruction::Instruction {
+    pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = Withdraw {
             stake: self.stake.expect("stake is not set"),
             recipient: self.recipient.expect("recipient is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_program::pubkey!(
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_pubkey::pubkey!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history: self.stake_history.expect("stake_history is not set"),
+            stake_history: self.stake_history.unwrap_or(solana_pubkey::pubkey!(
+                "SysvarStakeHistory1111111111111111111111111"
+            )),
             withdraw_authority: self
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),
@@ -218,42 +220,42 @@ impl WithdrawBuilder {
 /// `withdraw` CPI accounts.
 pub struct WithdrawCpiAccounts<'a, 'b> {
     /// Stake account from which to withdraw
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Recipient account
-    pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
+    pub recipient: &'b solana_account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
-    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Withdraw authority
-    pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
-    pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    pub withdraw_authority: &'b solana_account_info::AccountInfo<'a>,
+    /// Lockup authority, if before lockup expiration
+    pub lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
 }
 
 /// `withdraw` CPI instruction.
 pub struct WithdrawCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
+    pub __program: &'b solana_account_info::AccountInfo<'a>,
     /// Stake account from which to withdraw
-    pub stake: &'b solana_program::account_info::AccountInfo<'a>,
+    pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Recipient account
-    pub recipient: &'b solana_program::account_info::AccountInfo<'a>,
+    pub recipient: &'b solana_account_info::AccountInfo<'a>,
     /// Clock sysvar
-    pub clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Stake history sysvar
-    pub stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
+    /// Stake history sysvar that carries stake warmup/cooldown history
+    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Withdraw authority
-    pub withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
-    /// Lockup authority
-    pub lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    pub withdraw_authority: &'b solana_account_info::AccountInfo<'a>,
+    /// Lockup authority, if before lockup expiration
+    pub lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: WithdrawInstructionArgs,
 }
 
 impl<'a, 'b> WithdrawCpi<'a, 'b> {
     pub fn new(
-        program: &'b solana_program::account_info::AccountInfo<'a>,
+        program: &'b solana_account_info::AccountInfo<'a>,
         accounts: WithdrawCpiAccounts<'a, 'b>,
         args: WithdrawInstructionArgs,
     ) -> Self {
@@ -269,77 +271,64 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
+    #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
-    ) -> solana_program::entrypoint::ProgramResult {
+        remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
+    ) -> solana_program_error::ProgramResult {
         let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
-        accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.stake.key,
-            false,
-        ));
-        accounts.push(solana_program::instruction::AccountMeta::new(
+        accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
+        accounts.push(solana_instruction::AccountMeta::new(
             *self.recipient.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.clock_sysvar.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.stake_history.key,
             false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+        accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.withdraw_authority.key,
             true,
         ));
         if let Some(lockup_authority) = self.lockup_authority {
-            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            accounts.push(solana_instruction::AccountMeta::new_readonly(
                 *lockup_authority.key,
                 true,
             ));
         }
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(solana_program::instruction::AccountMeta {
+            accounts.push(solana_instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.1,
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = borsh::to_vec(&WithdrawInstructionData::new()).unwrap();
-        let mut args = borsh::to_vec(&self.__args).unwrap();
+        let mut data = WithdrawInstructionData::new().try_to_vec().unwrap();
+        let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        let instruction = solana_program::instruction::Instruction {
+        let instruction = solana_instruction::Instruction {
             program_id: crate::STAKE_ID,
             accounts,
             data,
@@ -359,9 +348,9 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            solana_program::program::invoke(&instruction, &account_infos)
+            solana_cpi::invoke(&instruction, &account_infos)
         } else {
-            solana_program::program::invoke_signed(&instruction, &account_infos, signers_seeds)
+            solana_cpi::invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
@@ -382,7 +371,7 @@ pub struct WithdrawCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(WithdrawCpiBuilderInstruction {
             __program: program,
             stake: None,
@@ -398,16 +387,13 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     }
     /// Stake account from which to withdraw
     #[inline(always)]
-    pub fn stake(&mut self, stake: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+    pub fn stake(&mut self, stake: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
         self
     }
     /// Recipient account
     #[inline(always)]
-    pub fn recipient(
-        &mut self,
-        recipient: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
+    pub fn recipient(&mut self, recipient: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.recipient = Some(recipient);
         self
     }
@@ -415,16 +401,16 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn clock_sysvar(
         &mut self,
-        clock_sysvar: &'b solana_program::account_info::AccountInfo<'a>,
+        clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.clock_sysvar = Some(clock_sysvar);
         self
     }
-    /// Stake history sysvar
+    /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
     pub fn stake_history(
         &mut self,
-        stake_history: &'b solana_program::account_info::AccountInfo<'a>,
+        stake_history: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.stake_history = Some(stake_history);
         self
@@ -433,17 +419,17 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn withdraw_authority(
         &mut self,
-        withdraw_authority: &'b solana_program::account_info::AccountInfo<'a>,
+        withdraw_authority: &'b solana_account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.withdraw_authority = Some(withdraw_authority);
         self
     }
     /// `[optional account]`
-    /// Lockup authority
+    /// Lockup authority, if before lockup expiration
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
-        lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+        lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     ) -> &mut Self {
         self.instruction.lockup_authority = lockup_authority;
         self
@@ -457,7 +443,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b solana_program::account_info::AccountInfo<'a>,
+        account: &'b solana_account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -473,11 +459,7 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(
-            &'b solana_program::account_info::AccountInfo<'a>,
-            bool,
-            bool,
-        )],
+        accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -485,15 +467,12 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke(&self) -> solana_program_error::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(
-        &self,
-        signers_seeds: &[&[&[u8]]],
-    ) -> solana_program::entrypoint::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> solana_program_error::ProgramResult {
         let args = WithdrawInstructionArgs {
             args: self.instruction.args.clone().expect("args is not set"),
         };
@@ -531,18 +510,14 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct WithdrawCpiBuilderInstruction<'a, 'b> {
-    __program: &'b solana_program::account_info::AccountInfo<'a>,
-    stake: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    recipient: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    clock_sysvar: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    stake_history: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    withdraw_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    lockup_authority: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    __program: &'b solana_account_info::AccountInfo<'a>,
+    stake: Option<&'b solana_account_info::AccountInfo<'a>>,
+    recipient: Option<&'b solana_account_info::AccountInfo<'a>>,
+    clock_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
+    stake_history: Option<&'b solana_account_info::AccountInfo<'a>>,
+    withdraw_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
+    lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     args: Option<u64>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(
-        &'b solana_program::account_info::AccountInfo<'a>,
-        bool,
-        bool,
-    )>,
+    __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,
 }

@@ -93,7 +93,7 @@ export type DeactivateInput<
   TAccountClockSysvar extends string = string,
   TAccountStakeAuthority extends string = string,
 > = {
-  /** Delegated stake account */
+  /** Delegated stake account to be deactivated */
   stake: Address<TAccountStake>;
   /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
@@ -162,7 +162,7 @@ export type ParsedDeactivateInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Delegated stake account */
+    /** Delegated stake account to be deactivated */
     stake: TAccountMetas[0];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[1];

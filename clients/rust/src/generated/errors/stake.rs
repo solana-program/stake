@@ -64,14 +64,8 @@ pub enum StakeError {
     EpochRewardsActive = 0x10,
 }
 
-impl solana_program::program_error::PrintProgramError for StakeError {
-    fn print<E>(&self) {
-        solana_program::msg!(&self.to_string());
-    }
-}
-
-impl<T> solana_program::decode_error::DecodeError<T> for StakeError {
-    fn type_of() -> &'static str {
-        "StakeError"
+impl From<StakeError> for solana_program_error::ProgramError {
+    fn from(e: StakeError) -> Self {
+        solana_program_error::ProgramError::Custom(e as u32)
     }
 }

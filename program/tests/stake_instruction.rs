@@ -1037,6 +1037,7 @@ fn test_stake_checked_instructions() {
 }
 
 #[test]
+#[allow(deprecated)] // TODO: remove need for this
 fn test_stake_initialize() {
     let mollusk = mollusk_bpf();
 
@@ -2207,6 +2208,7 @@ fn test_redelegate_consider_balance_changes() {
 }
 
 #[test]
+#[allow(deprecated)] // TODO: remove need for this
 fn test_split() {
     let mollusk = mollusk_bpf();
 

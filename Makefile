@@ -84,6 +84,9 @@ stop-test-validator:
 generate-clients:
 	pnpm generate:clients $(ARGS)
 
+generate-idl-%:
+	cargo run --manifest-path $(call make-path,$*)/Cargo.toml --features codama --bin generate-idl $(ARGS)
+
 # Helpers for publishing
 tag-name = $(lastword $(subst /, ,$(call make-path,$1)))
 preid-arg = $(subst pre,--preid $2,$(findstring pre,$1))
