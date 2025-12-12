@@ -494,6 +494,10 @@ impl Processor {
         let stake_history = &StakeHistorySysvar(clock.epoch);
         let minimum_delegation = crate::get_minimum_delegation();
 
+        if source_stake_account_info.key == destination_stake_account_info.key {
+            return Err(ProgramError::InvalidArgument);
+        }
+
         if let StakeStateV2::Uninitialized = get_stake_state(destination_stake_account_info)? {
             // we can split into this
         } else {
@@ -599,9 +603,7 @@ impl Processor {
             }
 
             set_stake_state(destination_stake_account_info, &destination_stake_state)?;
-            if source_stake_account_info.key != destination_stake_account_info.key {
-                source_stake_account_info.resize(0)?;
-            }
+            source_stake_account_info.resize(0)?;
 
             relocate_lamports(
                 source_stake_account_info,

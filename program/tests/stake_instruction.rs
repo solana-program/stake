@@ -4343,65 +4343,58 @@ fn test_split_source_uninitialized() {
         (stake_address, stake_account),
         (split_to_address, split_to_account),
     ];
-    let mut instruction_accounts = vec![
+    let instruction_accounts = vec![
         AccountMeta {
             pubkey: stake_address,
             is_signer: true,
             is_writable: true,
         },
         AccountMeta {
-            pubkey: stake_address,
+            pubkey: split_to_address,
             is_signer: false,
             is_writable: true,
         },
     ];
 
     // splitting zero always fails
-    {
-        process_instruction(
-            &mollusk,
-            &serialize(&StakeInstruction::Split(0)).unwrap(),
-            transaction_accounts.clone(),
-            instruction_accounts.clone(),
-            Err(ProgramError::InsufficientFunds),
-        );
-    }
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Split(0)).unwrap(),
+        transaction_accounts.clone(),
+        instruction_accounts.clone(),
+        Err(ProgramError::InsufficientFunds),
+    );
 
-    // splitting an uninitialized account where the destination is the same as the source
+    // self-split always fails
     {
-        // splitting should work when...
-        // - when split amount is the full balance
-        // - when split amount is non-zero and less than the full balance
-        //
-        // and splitting should fail when the split amount is greater than the balance
-        // self-splitting also must not resize the source-destination
-        let accounts = process_instruction(
+        let mut instruction_accounts = instruction_accounts.clone();
+        instruction_accounts[1].pubkey = stake_address;
+
+        process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(stake_lamports)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
-            Ok(()),
+            Err(ProgramError::InvalidArgument),
         );
-        assert_eq!(accounts[0].data().len(), StakeStateV2::size_of());
 
         process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
-            Ok(()),
+            Err(ProgramError::InvalidArgument),
         );
         process_instruction(
             &mollusk,
             &serialize(&StakeInstruction::Split(stake_lamports + 1)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
-            Err(ProgramError::InsufficientFunds),
+            Err(ProgramError::InvalidArgument),
         );
     }
 
     // this should work
-    instruction_accounts[1].pubkey = split_to_address;
     let accounts = process_instruction(
         &mollusk,
         &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
@@ -4425,14 +4418,17 @@ fn test_split_source_uninitialized() {
     assert_eq!(accounts[1].data().len(), StakeStateV2::size_of());
 
     // no signers should fail
-    instruction_accounts[0].is_signer = false;
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
-        transaction_accounts,
-        instruction_accounts,
-        Err(ProgramError::MissingRequiredSignature),
-    );
+    {
+        let mut instruction_accounts = instruction_accounts.clone();
+        instruction_accounts[0].is_signer = false;
+        process_instruction(
+            &mollusk,
+            &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
+            transaction_accounts,
+            instruction_accounts,
+            Err(ProgramError::MissingRequiredSignature),
+        );
+    }
 }
 
 #[test]
@@ -4456,7 +4452,7 @@ fn test_split_split_not_uninitialized() {
             is_writable: true,
         },
         AccountMeta {
-            pubkey: stake_address,
+            pubkey: split_to_address,
             is_signer: false,
             is_writable: true,
         },
