@@ -1,70 +1,145 @@
+#[cfg(feature = "codama")]
+use codama_macros::CodamaErrors;
 use {
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program_error::ProgramError,
 };
 
 /// Reasons the Stake might have had an error.
+#[cfg_attr(feature = "codama", derive(CodamaErrors))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(strum_macros::FromRepr, strum_macros::EnumIter))]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StakeError {
-    // 0
     /// Not enough credits to redeem.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Not enough credits to redeem"))
+    )]
     NoCreditsToRedeem,
 
     /// Lockup has not yet expired.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Lockup has not yet expired"))
+    )]
     LockupInForce,
 
     /// Stake already deactivated.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Stake already deactivated"))
+    )]
     AlreadyDeactivated,
 
     /// One re-delegation permitted per epoch.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "One re-delegation permitted per epoch"))
+    )]
     TooSoonToRedelegate,
 
     /// Split amount is more than is staked.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Split amount is more than is staked"))
+    )]
     InsufficientStake,
 
-    // 5
     /// Stake account with transient stake cannot be merged.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Stake account with transient stake cannot be merged"))
+    )]
     MergeTransientStake,
 
     /// Stake account merge failed due to different authority, lockups or state.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(
+            message = "Stake account merge failed due to different authority, lockups or state"
+        ))
+    )]
     MergeMismatch,
 
     /// Custodian address not present.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Custodian address not present"))
+    )]
     CustodianMissing,
 
     /// Custodian signature not present.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Custodian signature not present"))
+    )]
     CustodianSignatureMissing,
 
     /// Insufficient voting activity in the reference vote account.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Insufficient voting activity in the reference vote account"))
+    )]
     InsufficientReferenceVotes,
 
-    // 10
     /// Stake account is not delegated to the provided vote account.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Stake account is not delegated to the provided vote account"))
+    )]
     VoteAddressMismatch,
 
     /// Stake account has not been delinquent for the minimum epochs required
     /// for deactivation.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(
+            message = "Stake account has not been delinquent for the minimum epochs required for deactivation"
+        ))
+    )]
     MinimumDelinquentEpochsForDeactivationNotMet,
 
     /// Delegation amount is less than the minimum.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Delegation amount is less than the minimum"))
+    )]
     InsufficientDelegation,
 
     /// Stake account with transient or inactive stake cannot be redelegated.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(
+            message = "Stake account with transient or inactive stake cannot be redelegated"
+        ))
+    )]
     RedelegateTransientOrInactiveStake,
 
     /// Stake redelegation to the same vote account is not permitted.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Stake redelegation to the same vote account is not permitted"))
+    )]
     RedelegateToSameVoteAccount,
 
-    // 15
     /// Redelegated stake must be fully activated before deactivation.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(message = "Redelegated stake must be fully activated before deactivation"))
+    )]
     RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
 
     /// Stake action is not permitted while the epoch rewards period is active.
+    #[cfg_attr(
+        feature = "codama",
+        codama(error(
+            message = "Stake action is not permitted while the epoch rewards period is active"
+        ))
+    )]
     EpochRewardsActive,
 }
 
