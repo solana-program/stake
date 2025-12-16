@@ -14,6 +14,7 @@ use {
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
 pub enum StakeError {
+    // 0
     /// Not enough credits to redeem.
     #[cfg_attr(
         feature = "codama",
@@ -21,6 +22,7 @@ pub enum StakeError {
     )]
     NoCreditsToRedeem,
 
+    // 1
     /// Lockup has not yet expired.
     #[cfg_attr(
         feature = "codama",
@@ -28,6 +30,7 @@ pub enum StakeError {
     )]
     LockupInForce,
 
+    // 2
     /// Stake already deactivated.
     #[cfg_attr(
         feature = "codama",
@@ -35,6 +38,7 @@ pub enum StakeError {
     )]
     AlreadyDeactivated,
 
+    // 3
     /// One re-delegation permitted per epoch.
     #[cfg_attr(
         feature = "codama",
@@ -42,6 +46,7 @@ pub enum StakeError {
     )]
     TooSoonToRedelegate,
 
+    // 4
     /// Split amount is more than is staked.
     #[cfg_attr(
         feature = "codama",
@@ -49,6 +54,7 @@ pub enum StakeError {
     )]
     InsufficientStake,
 
+    // 5
     /// Stake account with transient stake cannot be merged.
     #[cfg_attr(
         feature = "codama",
@@ -56,6 +62,7 @@ pub enum StakeError {
     )]
     MergeTransientStake,
 
+    // 6
     /// Stake account merge failed due to different authority, lockups or state.
     #[cfg_attr(
         feature = "codama",
@@ -65,6 +72,7 @@ pub enum StakeError {
     )]
     MergeMismatch,
 
+    // 7
     /// Custodian address not present.
     #[cfg_attr(
         feature = "codama",
@@ -72,6 +80,7 @@ pub enum StakeError {
     )]
     CustodianMissing,
 
+    // 8
     /// Custodian signature not present.
     #[cfg_attr(
         feature = "codama",
@@ -79,6 +88,7 @@ pub enum StakeError {
     )]
     CustodianSignatureMissing,
 
+    // 9
     /// Insufficient voting activity in the reference vote account.
     #[cfg_attr(
         feature = "codama",
@@ -86,6 +96,7 @@ pub enum StakeError {
     )]
     InsufficientReferenceVotes,
 
+    // 10
     /// Stake account is not delegated to the provided vote account.
     #[cfg_attr(
         feature = "codama",
@@ -93,6 +104,7 @@ pub enum StakeError {
     )]
     VoteAddressMismatch,
 
+    // 11
     /// Stake account has not been delinquent for the minimum epochs required
     /// for deactivation.
     #[cfg_attr(
@@ -103,6 +115,7 @@ pub enum StakeError {
     )]
     MinimumDelinquentEpochsForDeactivationNotMet,
 
+    // 12
     /// Delegation amount is less than the minimum.
     #[cfg_attr(
         feature = "codama",
@@ -110,6 +123,7 @@ pub enum StakeError {
     )]
     InsufficientDelegation,
 
+    // 13
     /// Stake account with transient or inactive stake cannot be redelegated.
     #[cfg_attr(
         feature = "codama",
@@ -119,6 +133,7 @@ pub enum StakeError {
     )]
     RedelegateTransientOrInactiveStake,
 
+    // 14
     /// Stake redelegation to the same vote account is not permitted.
     #[cfg_attr(
         feature = "codama",
@@ -126,6 +141,7 @@ pub enum StakeError {
     )]
     RedelegateToSameVoteAccount,
 
+    // 15
     /// Redelegated stake must be fully activated before deactivation.
     #[cfg_attr(
         feature = "codama",
@@ -133,6 +149,7 @@ pub enum StakeError {
     )]
     RedelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted,
 
+    // 16
     /// Stake action is not permitted while the epoch rewards period is active.
     #[cfg_attr(
         feature = "codama",

@@ -56,7 +56,6 @@ pub enum StakeInstruction {
         codama(account(name = "stake", writable, docs = "Uninitialized stake account")),
         codama(account(name = "rent_sysvar", docs = "Rent sysvar", default_value = sysvar("rent")))
     )]
-    // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
     Initialize(Authorized, Lockup),
 
     /// Authorize a key to manage stake or withdrawal
@@ -79,7 +78,6 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
         ))
     )]
-    // backwards compatibility with old IDL demands auto `arg0` and `arg1` names
     Authorize(Pubkey, StakeAuthorize),
 
     /// Delegate a stake to a particular vote account
@@ -136,7 +134,8 @@ pub enum StakeInstruction {
         )),
         codama(account(name = "stake_authority", signer, docs = "Stake authority"))
     )]
-    // backwards compatibility with old IDL demands old `args` name
+    // `args` name is required for backwards compatibility with the old Anchor-generated
+    // IDL. Changing this name could break existing clients.
     Split(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 
     /// Withdraw unstaked lamports from the stake account
@@ -173,7 +172,8 @@ pub enum StakeInstruction {
             docs = "Lockup authority, if before lockup expiration"
         ))
     )]
-    // backwards compatibility with old IDL demands old `args` name
+    // `args` name is required for backwards compatibility with the old Anchor-generated
+    // IDL. Changing this name could break existing clients.
     Withdraw(#[cfg_attr(feature = "codama", codama(name = "args"))] u64),
 
     /// Deactivates the stake in the account
