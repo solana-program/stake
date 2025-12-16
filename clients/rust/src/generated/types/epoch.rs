@@ -5,7 +5,4 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use solana_pubkey::{pubkey, Pubkey};
-
-/// `stake` program ID.
-pub const STAKE_ID: Pubkey = pubkey!("Stake11111111111111111111111111111111111111");
+pub type Epoch = u64;

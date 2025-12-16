@@ -46,7 +46,9 @@ export type WithdrawInstruction<
   TAccountClockSysvar extends
     | string
     | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends string | AccountMeta<string> = string,
+  TAccountStakeHistory extends
+    | string
+    | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TAccountLockupAuthority extends
     | string
@@ -130,11 +132,11 @@ export type WithdrawInput<
   recipient: Address<TAccountRecipient>;
   /** Clock sysvar */
   clockSysvar?: Address<TAccountClockSysvar>;
-  /** Stake history sysvar */
-  stakeHistory: Address<TAccountStakeHistory>;
+  /** Stake history sysvar that carries stake warmup/cooldown history */
+  stakeHistory?: Address<TAccountStakeHistory>;
   /** Withdraw authority */
   withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
-  /** Lockup authority */
+  /** Lockup authority, if before lockup expiration */
   lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
   args: WithdrawInstructionDataArgs['args'];
 };
@@ -197,6 +199,10 @@ export function getWithdrawInstruction<
     accounts.clockSysvar.value =
       'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
   }
+  if (!accounts.stakeHistory.value) {
+    accounts.stakeHistory.value =
+      'SysvarStakeHistory1111111111111111111111111' as Address<'SysvarStakeHistory1111111111111111111111111'>;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
   return Object.freeze({
@@ -235,11 +241,11 @@ export type ParsedWithdrawInstruction<
     recipient: TAccountMetas[1];
     /** Clock sysvar */
     clockSysvar: TAccountMetas[2];
-    /** Stake history sysvar */
+    /** Stake history sysvar that carries stake warmup/cooldown history */
     stakeHistory: TAccountMetas[3];
     /** Withdraw authority */
     withdrawAuthority: TAccountMetas[4];
-    /** Lockup authority */
+    /** Lockup authority, if before lockup expiration */
     lockupAuthority?: TAccountMetas[5] | undefined;
   };
   data: WithdrawInstructionData;

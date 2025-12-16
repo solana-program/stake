@@ -14,6 +14,9 @@ pub mod state;
 pub mod sysvar;
 pub mod tools;
 
+#[cfg(feature = "codama")]
+use codama_macros::codama;
+#[cfg_attr(feature = "codama", codama(name = "stake"))]
 pub mod program {
     solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");
 }

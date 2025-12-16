@@ -8,6 +8,7 @@
 
 export * from './authorized';
 export * from './delegation';
+export * from './epoch';
 export * from './lockup';
 export * from './meta';
 export * from './stake';
@@ -15,3 +16,4 @@ export * from './stakeAuthorize';
 export * from './stakeFlags';
 export * from './stakeState';
 export * from './stakeStateV2';
+export * from './unixTimestamp';

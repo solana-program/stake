@@ -1,0 +1,20 @@
+{
+  "$schema": "https://codama.gg/schemas/codama.json",
+  "idls": [
+    {
+      "path": "interface/idl.json",
+      "format": "codama"
+    }
+  ],
+  "generators": [
+    {
+      "generator": "@codama/renderers-js",
+      "path": "clients/js/src/generated"
+    },
+    {
+      "generator": "@codama/renderers-rust",
+      "path": "clients/rust/src/generated"
+    }
+  ]
+}
+

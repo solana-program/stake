@@ -10,42 +10,48 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
   type Address,
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
 } from '@solana/kit';
+import {
+  getEpochDecoder,
+  getEpochEncoder,
+  getUnixTimestampDecoder,
+  getUnixTimestampEncoder,
+  type Epoch,
+  type EpochArgs,
+  type UnixTimestamp,
+  type UnixTimestampArgs,
+} from '.';
 
 export type Lockup = {
-  unixTimestamp: bigint;
-  epoch: bigint;
+  unixTimestamp: UnixTimestamp;
+  epoch: Epoch;
   custodian: Address;
 };
 
 export type LockupArgs = {
-  unixTimestamp: number | bigint;
-  epoch: number | bigint;
+  unixTimestamp: UnixTimestampArgs;
+  epoch: EpochArgs;
   custodian: Address;
 };
 
 export function getLockupEncoder(): FixedSizeEncoder<LockupArgs> {
   return getStructEncoder([
-    ['unixTimestamp', getI64Encoder()],
-    ['epoch', getU64Encoder()],
+    ['unixTimestamp', getUnixTimestampEncoder()],
+    ['epoch', getEpochEncoder()],
     ['custodian', getAddressEncoder()],
   ]);
 }
 
 export function getLockupDecoder(): FixedSizeDecoder<Lockup> {
   return getStructDecoder([
-    ['unixTimestamp', getI64Decoder()],
-    ['epoch', getU64Decoder()],
+    ['unixTimestamp', getUnixTimestampDecoder()],
+    ['epoch', getEpochDecoder()],
     ['custodian', getAddressDecoder()],
   ]);
 }
