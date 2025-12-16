@@ -4,7 +4,7 @@
     "generate:clients": "tsx ./scripts/generate-clients.mts && (cd clients/js && pnpm format:fix)"
   },
   "devDependencies": {
-    "@codama/renderers-js": "^1.4",
+    "@codama/renderers-js": "^1.5",
     "@codama/renderers-rust": "^1.2.9",
     "@iarna/toml": "^2.2.5",
     "codama": "^1.5",
