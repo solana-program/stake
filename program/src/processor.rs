@@ -440,7 +440,7 @@ impl Processor {
                     validate_delegated_amount(stake_account_info, &meta)?;
 
                 // Get current activation status at this epoch
-                let effective_stake = stake.delegation.stake(
+                let effective_stake = stake.delegation.stake_v2(
                     clock.epoch,
                     stake_history,
                     PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,

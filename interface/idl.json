@@ -464,11 +464,18 @@
             },
             {
               "kind": "structFieldTypeNode",
-              "name": "warmupCooldownRate",
+              "name": "reserved",
               "type": {
-                "endian": "le",
-                "format": "f64",
-                "kind": "numberTypeNode"
+                "count": {
+                  "kind": "fixedCountNode",
+                  "value": 8
+                },
+                "item": {
+                  "endian": "le",
+                  "format": "u8",
+                  "kind": "numberTypeNode"
+                },
+                "kind": "arrayTypeNode"
               }
             }
           ],
