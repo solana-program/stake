@@ -16,10 +16,8 @@ use {
         instruction::{self, LockupArgs},
         stake_flags::StakeFlags,
         stake_history::{StakeHistory, StakeHistoryEntry},
-        state::{
-            warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
-            StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
-        },
+        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+        warmup_cooldown_allowance::warmup_cooldown_rate_bps,
     },
     solana_stake_program::{get_minimum_delegation, id},
     solana_svm_log_collector::LogCollector,
@@ -100,10 +98,6 @@ const CUSTODIAN_RIGHT: Pubkey =
 // while also making it easy to write tests involving partial (de)activations
 // if the warmup/cooldown rate changes, this number must be adjusted
 const PERSISTENT_ACTIVE_STAKE: u64 = 100 * LAMPORTS_PER_SOL;
-#[test]
-fn assert_warmup_cooldown_rate() {
-    assert_eq!(warmup_cooldown_rate(0, Some(0)), NEW_WARMUP_COOLDOWN_RATE);
-}
 
 // hardcoded for convenience
 const STAKE_RENT_EXEMPTION: u64 = 2_282_880;
@@ -148,8 +142,9 @@ impl Env {
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
         // backfill stake history
+        let rate_bps = warmup_cooldown_rate_bps(0, Some(0));
         let stake_delta_amount =
-            (PERSISTENT_ACTIVE_STAKE as f64 * NEW_WARMUP_COOLDOWN_RATE).floor() as u64;
+            ((PERSISTENT_ACTIVE_STAKE as u128 * rate_bps as u128) / 10_000) as u64;
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
