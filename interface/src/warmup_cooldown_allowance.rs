@@ -1,4 +1,7 @@
-use {crate::stake_history::StakeHistoryEntry, solana_clock::Epoch};
+use {
+    crate::{emulated_u128::U128, stake_history::StakeHistoryEntry},
+    solana_clock::Epoch,
+};
 
 pub const BASIS_POINTS_PER_UNIT: u64 = 10_000;
 pub const ORIGINAL_WARMUP_COOLDOWN_RATE_BPS: u64 = 2_500; // 25%
@@ -79,17 +82,16 @@ fn rate_limited_stake_change(
     // If the multiplication would overflow, we saturate to u128::MAX. This ensures
     // that even in extreme edge cases, the rate-limiting invariant is maintained
     // (fail-safe) rather than bypassing rate limits entirely (fail-open).
-    let numerator = (account_portion as u128)
-        .saturating_mul(cluster_effective as u128)
-        .saturating_mul(rate_bps as u128);
-    let denominator = (cluster_portion as u128).saturating_mul(BASIS_POINTS_PER_UNIT as u128);
+    let numerator = U128::from_u64(account_portion)
+        .saturating_mul_u64(cluster_effective)
+        .saturating_mul_u64(rate_bps);
 
-    // Safe unwrap as denominator cannot be zero due to early return guards above
-    let delta = numerator.checked_div(denominator).unwrap();
+    let denominator = U128::mul_u64(cluster_portion, BASIS_POINTS_PER_UNIT);
+
     // The calculated delta can be larger than `account_portion` if the network's stake change
     // allowance is greater than the total stake waiting to change. In this case, the account's
     // entire portion is allowed to change.
-    delta.min(account_portion as u128) as u64
+    U128::div_floor_u64_clamped(numerator, denominator, account_portion)
 }
 
 #[cfg(test)]
@@ -382,8 +384,59 @@ mod test {
         (weight * newly_effective_cluster_stake) as u64
     }
 
+    // Integer math implementation using native `u128`.
+    // Kept in tests as an oracle to ensure behavior is unchanged.
+    fn rate_limited_stake_change_native_u128(
+        epoch: Epoch,
+        account_portion: u64,
+        cluster_portion: u64,
+        cluster_effective: u64,
+        new_rate_activation_epoch: Option<Epoch>,
+    ) -> u64 {
+        if account_portion == 0 || cluster_portion == 0 || cluster_effective == 0 {
+            return 0;
+        }
+
+        let rate_bps = warmup_cooldown_rate_bps(epoch, new_rate_activation_epoch);
+
+        let numerator = (account_portion as u128)
+            .saturating_mul(cluster_effective as u128)
+            .saturating_mul(rate_bps as u128);
+        let denominator = (cluster_portion as u128).saturating_mul(BASIS_POINTS_PER_UNIT as u128);
+
+        let delta = numerator.checked_div(denominator).unwrap();
+        delta.min(account_portion as u128) as u64
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10_000))]
+
+        #[test]
+        fn rate_limited_change_matches_native_u128(
+            account_portion in 0u64..=u64::MAX,
+            cluster_portion in 0u64..=u64::MAX,
+            cluster_effective in 0u64..=u64::MAX,
+            current_epoch in 0u64..=2000,
+            new_rate_activation_epoch_option in prop::option::of(0u64..=2000),
+        ) {
+            let new_impl = rate_limited_stake_change(
+                current_epoch,
+                account_portion,
+                cluster_portion,
+                cluster_effective,
+                new_rate_activation_epoch_option,
+            );
+
+            let native_u128 = rate_limited_stake_change_native_u128(
+                current_epoch,
+                account_portion,
+                cluster_portion,
+                cluster_effective,
+                new_rate_activation_epoch_option,
+            );
+
+            prop_assert_eq!(new_impl, native_u128);
+        }
 
         #[test]
         fn rate_limited_change_consistent_with_legacy(
