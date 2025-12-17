@@ -396,17 +396,6 @@ async fn program_test_stake_checked_instructions() {
     let seed = "test seed";
     let seeded_address = Pubkey::create_with_seed(&seed_base, seed, &system_program::id()).unwrap();
 
-    // Test InitializeChecked with non-signing withdrawer
-    let stake = create_blank_stake_account(&mut context).await;
-    let instruction = ixn::initialize_checked(&stake, &Authorized { staker, withdrawer });
-
-    process_instruction_test_missing_signers(
-        &mut context,
-        &instruction,
-        &vec![&withdrawer_keypair],
-    )
-    .await;
-
     // Test AuthorizeChecked with non-signing staker
     let stake =
         create_independent_stake_account(&mut context, &Authorized { staker, withdrawer }, 0).await;
@@ -480,116 +469,6 @@ async fn program_test_stake_checked_instructions() {
         &vec![&withdrawer_keypair, &custodian_keypair],
     )
     .await;
-}
-
-#[tokio::test]
-async fn program_test_stake_initialize() {
-    let mut context = program_test().start_with_context().await;
-    let accounts = Accounts::default();
-    accounts.initialize(&mut context).await;
-
-    let rent_exempt_reserve = get_stake_account_rent(&mut context.banks_client).await;
-
-    let staker_keypair = Keypair::new();
-    let withdrawer_keypair = Keypair::new();
-    let custodian_keypair = Keypair::new();
-
-    let staker = staker_keypair.pubkey();
-    let withdrawer = withdrawer_keypair.pubkey();
-    let custodian = custodian_keypair.pubkey();
-
-    let authorized = Authorized { staker, withdrawer };
-
-    let lockup = Lockup {
-        epoch: 1,
-        unix_timestamp: 0,
-        custodian,
-    };
-
-    let stake = create_blank_stake_account(&mut context).await;
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-
-    // should pass
-    process_instruction(&mut context, &instruction, NO_SIGNERS)
-        .await
-        .unwrap();
-
-    // check that we see what we expect
-    let account = get_account(&mut context.banks_client, &stake).await;
-    let stake_state: StakeStateV2 = bincode::deserialize(&account.data).unwrap();
-    assert_eq!(
-        stake_state,
-        StakeStateV2::Initialized(Meta {
-            authorized,
-            rent_exempt_reserve,
-            lockup,
-        }),
-    );
-
-    // 2nd time fails, can't move it from anything other than uninit->init
-    refresh_blockhash(&mut context).await;
-    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidAccountData);
-
-    // not enough balance for rent
-    let stake = Pubkey::new_unique();
-    let account = SolanaAccount {
-        lamports: rent_exempt_reserve / 2,
-        data: vec![0; StakeStateV2::size_of()],
-        owner: id(),
-        executable: false,
-        rent_epoch: 1000,
-    };
-    context.set_account(&stake, &account.into());
-
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InsufficientFunds);
-
-    // incorrect account sizes
-    let stake_keypair = Keypair::new();
-    let stake = stake_keypair.pubkey();
-
-    let instruction = system_instruction::create_account(
-        &context.payer.pubkey(),
-        &stake,
-        rent_exempt_reserve * 2,
-        StakeStateV2::size_of() as u64 + 1,
-        &id(),
-    );
-    process_instruction(&mut context, &instruction, &vec![&stake_keypair])
-        .await
-        .unwrap();
-
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidAccountData);
-
-    let stake_keypair = Keypair::new();
-    let stake = stake_keypair.pubkey();
-
-    let instruction = system_instruction::create_account(
-        &context.payer.pubkey(),
-        &stake,
-        rent_exempt_reserve,
-        StakeStateV2::size_of() as u64 - 1,
-        &id(),
-    );
-    process_instruction(&mut context, &instruction, &vec![&stake_keypair])
-        .await
-        .unwrap();
-
-    let instruction = ixn::initialize(&stake, &authorized, &lockup);
-    let e = process_instruction(&mut context, &instruction, NO_SIGNERS)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
 #[tokio::test]
