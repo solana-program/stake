@@ -5,6 +5,7 @@
 
 #[allow(deprecated)]
 pub mod config;
+mod emulated_u128;
 pub mod error;
 pub mod instruction;
 pub mod stake_flags;
