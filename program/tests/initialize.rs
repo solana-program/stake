@@ -3,10 +3,7 @@
 mod helpers;
 
 use {
-    helpers::{
-        context::StakeTestContext, instruction_builders::InstructionExecution,
-        lifecycle::StakeLifecycle,
-    },
+    helpers::{context::StakeTestContext, lifecycle::StakeLifecycle},
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
     solana_program_error::ProgramError,
@@ -38,52 +35,6 @@ fn lockup_for(
     }
 }
 
-/// Extension trait for InitializeBuilder to add accounts helper
-trait InitializeBuilderExt {
-    fn with_stake_account(
-        self,
-        stake: &Pubkey,
-        stake_account: &AccountSharedData,
-    ) -> (Self, Vec<(Pubkey, AccountSharedData)>)
-    where
-        Self: Sized;
-}
-
-impl InitializeBuilderExt for InitializeBuilder {
-    fn with_stake_account(
-        mut self,
-        stake: &Pubkey,
-        stake_account: &AccountSharedData,
-    ) -> (Self, Vec<(Pubkey, AccountSharedData)>) {
-        self.stake(*stake);
-        let accounts = vec![(*stake, stake_account.clone())];
-        (self, accounts)
-    }
-}
-
-/// Extension trait for InitializeCheckedBuilder to add accounts helper
-trait InitializeCheckedBuilderExt {
-    fn with_stake_account(
-        self,
-        stake: &Pubkey,
-        stake_account: &AccountSharedData,
-    ) -> (Self, Vec<(Pubkey, AccountSharedData)>)
-    where
-        Self: Sized;
-}
-
-impl InitializeCheckedBuilderExt for InitializeCheckedBuilder {
-    fn with_stake_account(
-        mut self,
-        stake: &Pubkey,
-        stake_account: &AccountSharedData,
-    ) -> (Self, Vec<(Pubkey, AccountSharedData)>) {
-        self.stake(*stake);
-        let accounts = vec![(*stake, stake_account.clone())];
-        (self, accounts)
-    }
-}
-
 #[test_case(InitializeVariant::Initialize; "initialize")]
 #[test_case(InitializeVariant::InitializeChecked; "initialize_checked")]
 fn test_initialize(variant: InitializeVariant) {
@@ -107,39 +58,36 @@ fn test_initialize(variant: InitializeVariant) {
                 .build(),
         ];
 
-        let processor: InstructionExecution = match variant {
-            InitializeVariant::Initialize => {
-                let (mut builder, accounts) =
-                    InitializeBuilder::new().with_stake_account(&stake, &stake_account);
-
-                let instruction = builder
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction();
-
-                ctx.process_with(instruction, accounts)
-            }
-            InitializeVariant::InitializeChecked => {
-                let (mut builder, accounts) =
-                    InitializeCheckedBuilder::new().with_stake_account(&stake, &stake_account);
-
-                let instruction = builder
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction();
-
-                ctx.process_with(instruction, accounts)
-            }
-        };
-
-        processor
-            .checks(&checks)
-            .test_missing_signers(true)
-            .execute()
+        match variant {
+            InitializeVariant::Initialize => ctx
+                .process(
+                    InitializeBuilder::new()
+                        .stake(stake)
+                        .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                        .arg1(solana_stake_client::types::Lockup {
+                            unix_timestamp: lockup.unix_timestamp,
+                            epoch: lockup.epoch,
+                            custodian: lockup.custodian,
+                        })
+                        .instruction(),
+                    &[(&stake, &stake_account)],
+                )
+                .checks(&checks)
+                .test_missing_signers(true)
+                .execute(),
+            InitializeVariant::InitializeChecked => ctx
+                .process(
+                    InitializeCheckedBuilder::new()
+                        .stake(stake)
+                        .stake_authority(staker)
+                        .withdraw_authority(withdrawer)
+                        .instruction(),
+                    &[(&stake, &stake_account)],
+                )
+                .checks(&checks)
+                .test_missing_signers(true)
+                .execute(),
+        }
     };
 
     let resulting_account: AccountSharedData = result.resulting_accounts[0].1.clone().into();
@@ -154,39 +102,36 @@ fn test_initialize(variant: InitializeVariant) {
     );
 
     // Re-initialize should fail
-    let processor: InstructionExecution = match variant {
-        InitializeVariant::Initialize => {
-            let (mut builder, accounts) =
-                InitializeBuilder::new().with_stake_account(&stake, &resulting_account);
-
-            let instruction = builder
-                .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                .arg1(solana_stake_client::types::Lockup {
-                    unix_timestamp: lockup.unix_timestamp,
-                    epoch: lockup.epoch,
-                    custodian: lockup.custodian,
-                })
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
-        InitializeVariant::InitializeChecked => {
-            let (mut builder, accounts) =
-                InitializeCheckedBuilder::new().with_stake_account(&stake, &resulting_account);
-
-            let instruction = builder
-                .stake_authority(staker)
-                .withdraw_authority(withdrawer)
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
+    match variant {
+        InitializeVariant::Initialize => ctx
+            .process(
+                InitializeBuilder::new()
+                    .stake(stake)
+                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                    .arg1(solana_stake_client::types::Lockup {
+                        unix_timestamp: lockup.unix_timestamp,
+                        epoch: lockup.epoch,
+                        custodian: lockup.custodian,
+                    })
+                    .instruction(),
+                &[(&stake, &resulting_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
+        InitializeVariant::InitializeChecked => ctx
+            .process(
+                InitializeCheckedBuilder::new()
+                    .stake(stake)
+                    .stake_authority(staker)
+                    .withdraw_authority(withdrawer)
+                    .instruction(),
+                &[(&stake, &resulting_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
     };
-
-    processor
-        .checks(&[Check::err(ProgramError::InvalidAccountData)])
-        .test_missing_signers(false)
-        .execute();
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -208,39 +153,36 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
     )
     .unwrap();
 
-    let processor: InstructionExecution = match variant {
-        InitializeVariant::Initialize => {
-            let (mut builder, accounts) =
-                InitializeBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                .arg1(solana_stake_client::types::Lockup {
-                    unix_timestamp: lockup.unix_timestamp,
-                    epoch: lockup.epoch,
-                    custodian: lockup.custodian,
-                })
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
-        InitializeVariant::InitializeChecked => {
-            let (mut builder, accounts) =
-                InitializeCheckedBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .stake_authority(staker)
-                .withdraw_authority(withdrawer)
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
+    match variant {
+        InitializeVariant::Initialize => ctx
+            .process(
+                InitializeBuilder::new()
+                    .stake(stake)
+                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                    .arg1(solana_stake_client::types::Lockup {
+                        unix_timestamp: lockup.unix_timestamp,
+                        epoch: lockup.epoch,
+                        custodian: lockup.custodian,
+                    })
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InsufficientFunds)])
+            .test_missing_signers(false)
+            .execute(),
+        InitializeVariant::InitializeChecked => ctx
+            .process(
+                InitializeCheckedBuilder::new()
+                    .stake(stake)
+                    .stake_authority(staker)
+                    .withdraw_authority(withdrawer)
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InsufficientFunds)])
+            .test_missing_signers(false)
+            .execute(),
     };
-
-    processor
-        .checks(&[Check::err(ProgramError::InsufficientFunds)])
-        .test_missing_signers(false)
-        .execute();
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -264,39 +206,36 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
     )
     .unwrap();
 
-    let processor: InstructionExecution = match variant {
-        InitializeVariant::Initialize => {
-            let (mut builder, accounts) =
-                InitializeBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                .arg1(solana_stake_client::types::Lockup {
-                    unix_timestamp: lockup.unix_timestamp,
-                    epoch: lockup.epoch,
-                    custodian: lockup.custodian,
-                })
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
-        InitializeVariant::InitializeChecked => {
-            let (mut builder, accounts) =
-                InitializeCheckedBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .stake_authority(staker)
-                .withdraw_authority(withdrawer)
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
+    match variant {
+        InitializeVariant::Initialize => ctx
+            .process(
+                InitializeBuilder::new()
+                    .stake(stake)
+                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                    .arg1(solana_stake_client::types::Lockup {
+                        unix_timestamp: lockup.unix_timestamp,
+                        epoch: lockup.epoch,
+                        custodian: lockup.custodian,
+                    })
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
+        InitializeVariant::InitializeChecked => ctx
+            .process(
+                InitializeCheckedBuilder::new()
+                    .stake(stake)
+                    .stake_authority(staker)
+                    .withdraw_authority(withdrawer)
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
     };
-
-    processor
-        .checks(&[Check::err(ProgramError::InvalidAccountData)])
-        .test_missing_signers(false)
-        .execute();
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -320,39 +259,36 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
     )
     .unwrap();
 
-    let processor: InstructionExecution = match variant {
-        InitializeVariant::Initialize => {
-            let (mut builder, accounts) =
-                InitializeBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                .arg1(solana_stake_client::types::Lockup {
-                    unix_timestamp: lockup.unix_timestamp,
-                    epoch: lockup.epoch,
-                    custodian: lockup.custodian,
-                })
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
-        InitializeVariant::InitializeChecked => {
-            let (mut builder, accounts) =
-                InitializeCheckedBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .stake_authority(staker)
-                .withdraw_authority(withdrawer)
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
+    match variant {
+        InitializeVariant::Initialize => ctx
+            .process(
+                InitializeBuilder::new()
+                    .stake(stake)
+                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                    .arg1(solana_stake_client::types::Lockup {
+                        unix_timestamp: lockup.unix_timestamp,
+                        epoch: lockup.epoch,
+                        custodian: lockup.custodian,
+                    })
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
+        InitializeVariant::InitializeChecked => ctx
+            .process(
+                InitializeCheckedBuilder::new()
+                    .stake(stake)
+                    .stake_authority(staker)
+                    .withdraw_authority(withdrawer)
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountData)])
+            .test_missing_signers(false)
+            .execute(),
     };
-
-    processor
-        .checks(&[Check::err(ProgramError::InvalidAccountData)])
-        .test_missing_signers(false)
-        .execute();
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -374,37 +310,34 @@ fn test_initialize_wrong_owner(variant: InitializeVariant) {
     )
     .unwrap();
 
-    let processor: InstructionExecution = match variant {
-        InitializeVariant::Initialize => {
-            let (mut builder, accounts) =
-                InitializeBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                .arg1(solana_stake_client::types::Lockup {
-                    unix_timestamp: lockup.unix_timestamp,
-                    epoch: lockup.epoch,
-                    custodian: lockup.custodian,
-                })
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
-        InitializeVariant::InitializeChecked => {
-            let (mut builder, accounts) =
-                InitializeCheckedBuilder::new().with_stake_account(&stake, &stake_account);
-
-            let instruction = builder
-                .stake_authority(staker)
-                .withdraw_authority(withdrawer)
-                .instruction();
-
-            ctx.process_with(instruction, accounts)
-        }
+    match variant {
+        InitializeVariant::Initialize => ctx
+            .process(
+                InitializeBuilder::new()
+                    .stake(stake)
+                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+                    .arg1(solana_stake_client::types::Lockup {
+                        unix_timestamp: lockup.unix_timestamp,
+                        epoch: lockup.epoch,
+                        custodian: lockup.custodian,
+                    })
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
+            .test_missing_signers(false)
+            .execute(),
+        InitializeVariant::InitializeChecked => ctx
+            .process(
+                InitializeCheckedBuilder::new()
+                    .stake(stake)
+                    .stake_authority(staker)
+                    .withdraw_authority(withdrawer)
+                    .instruction(),
+                &[(&stake, &stake_account)],
+            )
+            .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
+            .test_missing_signers(false)
+            .execute(),
     };
-
-    processor
-        .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
-        .test_missing_signers(false)
-        .execute();
 }

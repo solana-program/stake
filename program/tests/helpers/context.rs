@@ -57,13 +57,18 @@ impl StakeTestContext {
         StakeAccountBuilder { lifecycle }
     }
 
-    /// Process an instruction
-    pub fn process_with(
+    /// Process an instruction with account data provided as a slice of (pubkey, data) pairs.
+    /// Sysvars are auto-resolved - only provide data for accounts that need it.
+    pub fn process<'b>(
         &self,
         instruction: Instruction,
-        accounts: Vec<(Pubkey, AccountSharedData)>,
-    ) -> InstructionExecution {
-        InstructionExecution::new(instruction, accounts, self)
+        accounts: &[(&Pubkey, &AccountSharedData)],
+    ) -> InstructionExecution<'_, 'b> {
+        let accounts_vec = accounts
+            .iter()
+            .map(|(pk, data)| (**pk, (*data).clone()))
+            .collect();
+        InstructionExecution::new(instruction, accounts_vec, self)
     }
 
     /// Process an instruction with optional missing signer testing
