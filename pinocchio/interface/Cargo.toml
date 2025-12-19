@@ -1,0 +1,18 @@
+[package]
+name = "p-stake-interface"
+version = "0.1.0"
+edition = "2021"
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+solana-pubkey = "3.0.0"
+wincode = { git = "https://github.com/anza-xyz/wincode", rev = "19a7dc6f56e20ff7978cd4f4b4ae7e0ae74f2457", default-features = false, features = ["alloc", "derive"] }
+solana-clock = "3"
+
+[dev-dependencies]
+bincode = "1.3.3"
+proptest = "1.6.0"
+solana-stake-interface = { path = "../../interface", features = ["bincode"] }
