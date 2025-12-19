@@ -6,12 +6,13 @@ use {
     helpers::{context::StakeTestContext, lifecycle::StakeLifecycle},
     mollusk_svm::result::Check,
     solana_account::{AccountSharedData, ReadableAccount},
+    solana_instruction::Instruction,
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
     solana_sdk_ids::{stake::id, system_program::id as system_program_id},
     solana_stake_client::instructions::{InitializeBuilder, InitializeCheckedBuilder},
-    solana_stake_interface::state::StakeStateV2,
+    solana_stake_interface::state::{Lockup, StakeStateV2},
     test_case::test_case,
 };
 
@@ -21,17 +22,39 @@ enum InitializeVariant {
     InitializeChecked,
 }
 
-fn lockup_for(
-    variant: InitializeVariant,
-    custodian: Pubkey,
-) -> solana_stake_interface::state::Lockup {
+fn lockup_for(variant: InitializeVariant, custodian: Pubkey) -> Lockup {
     match variant {
-        InitializeVariant::Initialize => solana_stake_interface::state::Lockup {
+        InitializeVariant::Initialize => Lockup {
             epoch: 1,
             unix_timestamp: 0,
             custodian,
         },
-        InitializeVariant::InitializeChecked => solana_stake_interface::state::Lockup::default(),
+        InitializeVariant::InitializeChecked => Lockup::default(),
+    }
+}
+
+fn build_initialize_instruction(
+    variant: InitializeVariant,
+    stake: Pubkey,
+    staker: Pubkey,
+    withdrawer: Pubkey,
+    lockup: Lockup,
+) -> Instruction {
+    match variant {
+        InitializeVariant::Initialize => InitializeBuilder::new()
+            .stake(stake)
+            .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
+            .arg1(solana_stake_client::types::Lockup {
+                unix_timestamp: lockup.unix_timestamp,
+                epoch: lockup.epoch,
+                custodian: lockup.custodian,
+            })
+            .instruction(),
+        InitializeVariant::InitializeChecked => InitializeCheckedBuilder::new()
+            .stake(stake)
+            .stake_authority(staker)
+            .withdraw_authority(withdrawer)
+            .instruction(),
     }
 }
 
@@ -58,28 +81,10 @@ fn test_initialize(variant: InitializeVariant) {
                 .build(),
         ];
 
-        match variant {
-            InitializeVariant::Initialize => ctx.checks(&checks).execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-            InitializeVariant::InitializeChecked => ctx.checks(&checks).execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-        }
+        ctx.checks(&checks).execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &stake_account)],
+        )
     };
 
     let resulting_account: AccountSharedData = result.resulting_accounts[0].1.clone().into();
@@ -94,34 +99,12 @@ fn test_initialize(variant: InitializeVariant) {
     );
 
     // Re-initialize should fail
-    match variant {
-        InitializeVariant::Initialize => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &resulting_account)],
-            ),
-        InitializeVariant::InitializeChecked => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &resulting_account)],
-            ),
-    };
+    ctx.checks(&[Check::err(ProgramError::InvalidAccountData)])
+        .test_missing_signers(false)
+        .execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &resulting_account)],
+        );
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -143,34 +126,12 @@ fn test_initialize_insufficient_funds(variant: InitializeVariant) {
     )
     .unwrap();
 
-    match variant {
-        InitializeVariant::Initialize => ctx
-            .checks(&[Check::err(ProgramError::InsufficientFunds)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-        InitializeVariant::InitializeChecked => ctx
-            .checks(&[Check::err(ProgramError::InsufficientFunds)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-    };
+    ctx.checks(&[Check::err(ProgramError::InsufficientFunds)])
+        .test_missing_signers(false)
+        .execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &stake_account)],
+        );
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -194,34 +155,12 @@ fn test_initialize_incorrect_size_larger(variant: InitializeVariant) {
     )
     .unwrap();
 
-    match variant {
-        InitializeVariant::Initialize => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-        InitializeVariant::InitializeChecked => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-    };
+    ctx.checks(&[Check::err(ProgramError::InvalidAccountData)])
+        .test_missing_signers(false)
+        .execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &stake_account)],
+        );
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -245,34 +184,12 @@ fn test_initialize_incorrect_size_smaller(variant: InitializeVariant) {
     )
     .unwrap();
 
-    match variant {
-        InitializeVariant::Initialize => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-        InitializeVariant::InitializeChecked => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountData)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-    };
+    ctx.checks(&[Check::err(ProgramError::InvalidAccountData)])
+        .test_missing_signers(false)
+        .execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &stake_account)],
+        );
 }
 
 #[test_case(InitializeVariant::Initialize; "initialize")]
@@ -294,32 +211,10 @@ fn test_initialize_wrong_owner(variant: InitializeVariant) {
     )
     .unwrap();
 
-    match variant {
-        InitializeVariant::Initialize => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeBuilder::new()
-                    .stake(stake)
-                    .arg0(solana_stake_client::types::Authorized { staker, withdrawer })
-                    .arg1(solana_stake_client::types::Lockup {
-                        unix_timestamp: lockup.unix_timestamp,
-                        epoch: lockup.epoch,
-                        custodian: lockup.custodian,
-                    })
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-        InitializeVariant::InitializeChecked => ctx
-            .checks(&[Check::err(ProgramError::InvalidAccountOwner)])
-            .test_missing_signers(false)
-            .execute(
-                InitializeCheckedBuilder::new()
-                    .stake(stake)
-                    .stake_authority(staker)
-                    .withdraw_authority(withdrawer)
-                    .instruction(),
-                &[(&stake, &stake_account)],
-            ),
-    };
+    ctx.checks(&[Check::err(ProgramError::InvalidAccountOwner)])
+        .test_missing_signers(false)
+        .execute(
+            build_initialize_instruction(variant, stake, staker, withdrawer, lockup),
+            &[(&stake, &stake_account)],
+        );
 }
