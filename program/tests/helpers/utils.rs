@@ -1,11 +1,12 @@
 use {
     mollusk_svm::Mollusk,
-    solana_account::{Account, AccountSharedData},
+    solana_account::{Account, AccountSharedData, WritableAccount},
     solana_instruction::Instruction,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
     solana_stake_interface::{stake_history::StakeHistory, state::StakeStateV2},
     solana_sysvar_id::SysvarId,
+    solana_vote_interface::state::{VoteStateV4, VoteStateVersions},
     std::collections::HashMap,
 };
 
@@ -62,4 +63,14 @@ pub fn add_sysvars(
     }
 
     result
+}
+
+/// Create a vote account with VoteStateV4
+pub fn create_vote_account() -> AccountSharedData {
+    let space = VoteStateV4::size_of();
+    let lamports = Rent::default().minimum_balance(space);
+    let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
+    let data = bincode::serialize(&vote_state).unwrap();
+
+    Account::create(lamports, data, solana_sdk_ids::vote::id(), false, u64::MAX).into()
 }

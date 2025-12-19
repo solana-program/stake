@@ -2,7 +2,7 @@ use {
     super::{
         execution::ExecutionWithChecks,
         lifecycle::StakeLifecycle,
-        utils::{add_sysvars, STAKE_RENT_EXEMPTION},
+        utils::{add_sysvars, create_vote_account, STAKE_RENT_EXEMPTION},
     },
     mollusk_svm::{result::Check, Mollusk},
     solana_account::AccountSharedData,
@@ -65,7 +65,24 @@ impl StakeAccountBuilder<'_> {
     /// Build the stake account and return (pubkey, account_data)
     pub fn build(self) -> (Pubkey, AccountSharedData) {
         let stake_pubkey = self.stake_pubkey.unwrap_or_else(Pubkey::new_unique);
-        let account = self.lifecycle.create_uninitialized_account();
+        let vote_account_ref = self.vote_account.as_ref().unwrap_or_else(|| {
+            self.ctx
+                .vote_account
+                .as_ref()
+                .map(|(pk, _)| pk)
+                .expect("vote_account required for this lifecycle")
+        });
+        let account = self.lifecycle.create_stake_account_fully_specified(
+            &mut self.ctx.mollusk,
+            &stake_pubkey,
+            vote_account_ref,
+            self.staked_amount,
+            self.stake_authority.as_ref().unwrap_or(&self.ctx.staker),
+            self.withdraw_authority
+                .as_ref()
+                .unwrap_or(&self.ctx.withdrawer),
+            self.lockup.as_ref().unwrap_or(&Lockup::default()),
+        );
         (stake_pubkey, account)
     }
 }
@@ -75,6 +92,9 @@ pub struct StakeTestContext {
     pub rent_exempt_reserve: u64,
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
+    pub minimum_delegation: Option<u64>,
+    /// Vote account (pubkey, account_data) for delegation tests
+    pub vote_account: Option<(Pubkey, AccountSharedData)>,
 }
 
 impl StakeTestContext {
@@ -85,6 +105,21 @@ impl StakeTestContext {
             rent_exempt_reserve: STAKE_RENT_EXEMPTION,
             staker: Pubkey::new_unique(),
             withdrawer: Pubkey::new_unique(),
+            minimum_delegation: None,
+            vote_account: None,
+        }
+    }
+
+    pub fn with_delegation() -> Self {
+        let mollusk = Mollusk::new(&id(), "solana_stake_program");
+        let minimum_delegation = solana_stake_program::get_minimum_delegation();
+        Self {
+            mollusk,
+            rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+            staker: Pubkey::new_unique(),
+            withdrawer: Pubkey::new_unique(),
+            minimum_delegation: Some(minimum_delegation),
+            vote_account: Some((Pubkey::new_unique(), create_vote_account())),
         }
     }
 
@@ -93,6 +128,8 @@ impl StakeTestContext {
     /// Example:
     /// ```
     /// let (stake, account) = ctx
+    ///     .stake_account(StakeLifecycle::Active)
+    ///     .staked_amount(1_000_000)
     ///     .stake_account(StakeLifecycle::Active)
     ///     .staked_amount(1_000_000)
     ///     .build();
@@ -115,6 +152,25 @@ impl StakeTestContext {
     /// Usage: `ctx.checks(&checks).execute(instruction, accounts)`
     pub fn checks<'a, 'b>(&'a mut self, checks: &'b [Check<'b>]) -> ExecutionWithChecks<'a, 'b> {
         ExecutionWithChecks::new(self, checks)
+    }
+
+    /// Create a lockup that expires in the future
+    pub fn create_future_lockup(&self, epochs_ahead: u64) -> Lockup {
+        Lockup {
+            unix_timestamp: 0,
+            epoch: self.mollusk.sysvars.clock.epoch + epochs_ahead,
+            custodian: Pubkey::new_unique(),
+        }
+    }
+
+    /// Create a lockup that's currently in force (far future)
+    pub fn create_in_force_lockup(&self) -> Lockup {
+        self.create_future_lockup(1_000_000)
+    }
+
+    /// Create a second vote account (for testing different vote accounts)
+    pub fn create_second_vote_account(&self) -> (Pubkey, AccountSharedData) {
+        (Pubkey::new_unique(), create_vote_account())
     }
 
     /// Execute an instruction with default success checks and missing signer testing
@@ -154,7 +210,7 @@ impl StakeTestContext {
 
 impl Default for StakeTestContext {
     fn default() -> Self {
-        Self::new()
+        Self::with_delegation()
     }
 }
 
