@@ -7,7 +7,7 @@ on:
 
 env:
   JS_PACKAGES: "['clients-js']"
-  RUST_PACKAGES: "['clients-rust', 'interface', 'program']"
+  RUST_PACKAGES: "['clients-rust', 'interface', 'program', 'pinocchio-interface']"
   SBPF_PROGRAM_PACKAGES: "['program']"
   WASM_PACKAGES: "['interface', 'program']"
   IDL_PACKAGES: "['interface']"
