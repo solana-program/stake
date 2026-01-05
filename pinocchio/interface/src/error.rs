@@ -1,39 +1,36 @@
-// TODO: These may not be backward compatible with StakeStakeV2 serialization errs in interface/src/state.rs
-//       Need to think about this.
+//! Error types for stake state parsing.
+
+use crate::state::StakeStateV2Tag;
+
 #[derive(Debug)]
 pub enum StakeStateError {
-    WrongLength { expected: usize, actual: usize },
+    /// Input is shorter than 200 bytes.
+    UnexpectedEof,
+
+    /// The discriminant tag is not a valid variant
+    InvalidTag(u32),
+
+    /// An invalid state transition was attempted.
+    InvalidTransition {
+        from: StakeStateV2Tag,
+        to: StakeStateV2Tag,
+    },
+
+    /// Pass-through for wincode read errors.
     Read(wincode::ReadError),
+
+    /// Pass-through for wincode write errors.
+    Write(wincode::WriteError),
 }
 
 impl From<wincode::ReadError> for StakeStateError {
-    #[inline(always)]
     fn from(e: wincode::ReadError) -> Self {
-        Self::Read(e)
+        StakeStateError::Read(e)
     }
 }
 
-#[inline(always)]
-pub(crate) fn invalid_tag(tag: u32) -> StakeStateError {
-    StakeStateError::Read(wincode::error::invalid_tag_encoding(tag as usize))
-}
-
-#[inline(always)]
-pub(crate) fn slice_as_array<const N: usize>(s: &[u8]) -> Result<&[u8; N], StakeStateError> {
-    s.try_into().map_err(|_| {
-        StakeStateError::Read(wincode::ReadError::Custom(
-            "slice length mismatch for array",
-        ))
-    })
-}
-
-#[inline(always)]
-pub(crate) fn slice_as_array_mut<const N: usize>(
-    s: &mut [u8],
-) -> Result<&mut [u8; N], StakeStateError> {
-    s.try_into().map_err(|_| {
-        StakeStateError::Read(wincode::ReadError::Custom(
-            "slice length mismatch for array",
-        ))
-    })
+impl From<wincode::WriteError> for StakeStateError {
+    fn from(e: wincode::WriteError) -> Self {
+        StakeStateError::Write(e)
+    }
 }
