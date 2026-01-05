@@ -5,6 +5,7 @@ codama
 config
 cooldown
 deallocated
+deserialization
 entrypoint
 fn
 IDL
@@ -16,8 +17,10 @@ redelegate
 redelegated
 redelegation
 rpc
+solana
 staker
 struct
+structs
 sysvar
 sysvars
 undelegate
@@ -25,4 +28,5 @@ undelegated
 unstake
 unstaked
 warmup
+wincode
 withdrawer

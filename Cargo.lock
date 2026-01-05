@@ -3306,7 +3306,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "proptest",
- "solana-clock",
+ "serde",
+ "solana-address",
  "solana-pubkey",
  "solana-stake-interface 2.0.2",
  "wincode",
@@ -8398,8 +8399,8 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "wincode"
-version = "0.2.3"
-source = "git+https://github.com/anza-xyz/wincode?rev=19a7dc6f56e20ff7978cd4f4b4ae7e0ae74f2457#19a7dc6f56e20ff7978cd4f4b4ae7e0ae74f2457"
+version = "0.2.5"
+source = "git+https://github.com/anza-xyz/wincode.git?branch=master#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8409,8 +8410,8 @@ dependencies = [
 
 [[package]]
 name = "wincode-derive"
-version = "0.2.2"
-source = "git+https://github.com/anza-xyz/wincode?rev=19a7dc6f56e20ff7978cd4f4b4ae7e0ae74f2457#19a7dc6f56e20ff7978cd4f4b4ae7e0ae74f2457"
+version = "0.2.3"
+source = "git+https://github.com/anza-xyz/wincode.git?branch=master#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
 dependencies = [
  "darling",
  "proc-macro2",
