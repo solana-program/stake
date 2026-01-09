@@ -1,25 +1,19 @@
-//! Error types for stake state parsing.
-
 use crate::state::StakeStateV2Tag;
 
 #[derive(Debug)]
 pub enum StakeStateError {
-    /// Input is shorter than 200 bytes.
-    UnexpectedEof,
-
-    /// The discriminant tag is not a valid variant
+    /// The discriminant tag is not a valid variant (must be 0-3).
     InvalidTag(u32),
-
     /// An invalid state transition was attempted.
     InvalidTransition {
         from: StakeStateV2Tag,
         to: StakeStateV2Tag,
     },
-
-    /// Pass-through for wincode read errors.
+    /// Pass-through for wincode read errors when borrowing layout structs.
     Read(wincode::ReadError),
-
-    /// Pass-through for wincode write errors.
+    /// Input buffer is shorter than 200 bytes.
+    UnexpectedEof,
+    /// Pass-through for wincode write errors when serializing layout structs.
     Write(wincode::WriteError),
 }
 

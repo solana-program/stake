@@ -3306,10 +3306,9 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "proptest",
- "serde",
- "solana-address",
  "solana-pubkey",
  "solana-stake-interface 2.0.2",
+ "test-case",
  "wincode",
 ]
 

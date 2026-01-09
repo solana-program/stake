@@ -17,8 +17,14 @@ pub struct Authorized {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Lockup {
+    /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
+    ///   transaction is signed by the custodian
     pub unix_timestamp: PodI64,
+    /// epoch height at which this stake will allow withdrawal, unless the
+    ///   transaction is signed by the custodian
     pub epoch: PodU64,
+    /// custodian signature on a transaction exempts the operation from
+    ///  lockup constraints
     pub custodian: PodAddress,
 }
 
@@ -35,10 +41,15 @@ pub struct Meta {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Delegation {
+    /// to whom the stake is delegated
     pub voter_pubkey: PodAddress,
+    /// activated stake amount, set at delegate() time
     pub stake: PodU64,
+    /// epoch at which this stake was activated, `std::u64::MAX` if is a bootstrap stake
     pub activation_epoch: PodU64,
+    /// epoch the stake was deactivated, `std::u64::MAX` if not deactivated
     pub deactivation_epoch: PodU64,
+    /// Legacy bytes from legacy warmup/cooldown rate encoding (deprecated).
     pub _reserved: [u8; 8],
 }
 
@@ -47,12 +58,12 @@ pub struct Delegation {
 #[wincode(assert_zero_copy)]
 pub struct Stake {
     pub delegation: Delegation,
+    /// credits observed is credits from vote account state when delegated or redeemed
     pub credits_observed: PodU64,
 }
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, SchemaRead, SchemaWrite)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[wincode(tag_encoding = "u32")]
 pub enum StakeStateV2Tag {
     #[wincode(tag = 0)]
@@ -91,11 +102,7 @@ impl StakeStateV2Tag {
     }
 }
 
-/// Raw 200-byte stake account data.
-///
-/// # Layout
-///
-/// A stake account is always 200 bytes with this structure:
+/// Raw 200-byte stake account data with this structure:
 ///
 /// ```text
 /// ┌────────┬──────┬────────────┐
