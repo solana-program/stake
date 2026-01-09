@@ -1,4 +1,4 @@
-//! Zero-copy stake state types
+//! Zero-copy stake state types.
 
 mod entrypoint;
 mod layout;

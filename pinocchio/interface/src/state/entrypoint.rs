@@ -1,8 +1,10 @@
+//! High-level entrypoint for reading and writing stake account state.
 use {
     super::{view::StakeStateV2View, writer::StakeStateV2Writer},
     crate::error::StakeStateError,
 };
 
+/// Main entrypoint for parsing stake account data. Provides zero-copy access to the stake account state.
 pub struct StakeStateV2;
 
 impl StakeStateV2 {

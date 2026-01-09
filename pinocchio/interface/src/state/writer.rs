@@ -11,7 +11,8 @@ use {
     wincode::ZeroCopy,
 };
 
-/// Mutable handle to stake account data.
+/// Mutable handle for stake account state transitions.
+#[derive(Debug)]
 pub struct StakeStateV2Writer<'a> {
     data: &'a mut [u8],
 }
