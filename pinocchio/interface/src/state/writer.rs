@@ -105,7 +105,7 @@ pub enum StakeStateV2ViewMut<'a> {
 }
 
 impl<'a> StakeStateV2ViewMut<'a> {
-    pub fn from_bytes_mut(data: &'a mut [u8]) -> Result<Self, StakeStateError> {
+    pub(super) fn from_bytes_mut(data: &'a mut [u8]) -> Result<Self, StakeStateError> {
         if data.len() < size_of::<StakeStateV2Layout>() {
             return Err(StakeStateError::UnexpectedEof);
         }

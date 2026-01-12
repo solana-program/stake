@@ -8399,7 +8399,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "wincode"
 version = "0.2.5"
-source = "git+https://github.com/anza-xyz/wincode.git?branch=master#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
+source = "git+https://github.com/anza-xyz/wincode.git?rev=fa70c7c7c13885085f743e4f01deb1a4de0b64fb#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8410,7 +8410,7 @@ dependencies = [
 [[package]]
 name = "wincode-derive"
 version = "0.2.3"
-source = "git+https://github.com/anza-xyz/wincode.git?branch=master#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
+source = "git+https://github.com/anza-xyz/wincode.git?rev=fa70c7c7c13885085f743e4f01deb1a4de0b64fb#fa70c7c7c13885085f743e4f01deb1a4de0b64fb"
 dependencies = [
  "darling",
  "proc-macro2",
