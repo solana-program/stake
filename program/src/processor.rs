@@ -610,7 +610,6 @@ impl Processor {
                 destination_stake_account_info,
                 split_lamports,
             )?;
-            debug_assert!(source_stake_account_info.lamports() == 0);
 
             return Ok(());
         }
@@ -669,14 +668,16 @@ impl Processor {
                     return Err(StakeError::InsufficientDelegation.into());
                 }
 
+                // sanity check on prior math; this branch is unreachable
                 // minimum delegation is by definition nonzero, and we remove one delegated lamport per split lamport
                 // since the remaining source delegation > 0, it is impossible that we took from its rent-exempt reserve
-                debug_assert!(
-                    source_lamport_balance
-                        .saturating_sub(split_lamports)
-                        .saturating_sub(source_stake.delegation.stake)
-                        >= source_meta.rent_exempt_reserve
-                );
+                if source_lamport_balance
+                    .saturating_sub(split_lamports)
+                    .saturating_sub(source_stake.delegation.stake)
+                    < source_meta.rent_exempt_reserve
+                {
+                    return Err(ProgramError::InsufficientFunds);
+                }
 
                 dest_stake.delegation.stake = split_lamports;
                 if dest_stake.delegation.stake < minimum_delegation {
