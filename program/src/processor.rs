@@ -515,8 +515,6 @@ impl Processor {
             return Err(ProgramError::InsufficientFunds);
         }
 
-        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
-
         let destination_data_len = destination_stake_account_info.data_len();
         if destination_data_len != StakeStateV2::size_of() {
             return Err(ProgramError::InvalidAccountData);
@@ -616,6 +614,9 @@ impl Processor {
 
         // special case: if stake is fully inactive, we only care that both accounts meet rent-exemption
         if !is_active_or_activating {
+            let source_rent_exempt_reserve =
+                rent.minimum_balance(source_stake_account_info.data_len());
+
             let mut destination_stake_state = source_stake_state;
             match (&mut destination_stake_state, option_dest_meta) {
                 (StakeStateV2::Stake(meta, _, _), Some(dest_meta))
