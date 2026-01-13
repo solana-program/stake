@@ -627,9 +627,13 @@ impl Processor {
                 _ => unreachable!(),
             }
 
-            let post_source_lamports = source_lamport_balance.saturating_sub(split_lamports);
-            let post_destination_lamports =
-                destination_lamport_balance.saturating_add(split_lamports);
+            let post_source_lamports = source_lamport_balance
+                .checked_sub(split_lamports)
+                .ok_or(ProgramError::InsufficientFunds)?;
+
+            let post_destination_lamports = destination_lamport_balance
+                .checked_add(split_lamports)
+                .ok_or(ProgramError::ArithmeticOverflow)?;
 
             if post_source_lamports < source_rent_exempt_reserve
                 || post_destination_lamports < destination_rent_exempt_reserve
@@ -662,8 +666,11 @@ impl Processor {
 
                 let mut dest_stake = source_stake;
 
-                source_stake.delegation.stake =
-                    source_stake.delegation.stake.saturating_sub(split_lamports);
+                source_stake.delegation.stake = source_stake
+                    .delegation
+                    .stake
+                    .checked_sub(split_lamports)
+                    .ok_or::<ProgramError>(StakeError::InsufficientDelegation.into())?;
 
                 if source_stake.delegation.stake < minimum_delegation {
                     return Err(StakeError::InsufficientDelegation.into());
