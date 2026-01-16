@@ -31,3 +31,6 @@ test = "nightly-2025-02-16"
 
 [workspace.metadata.spellcheck]
 config = "scripts/spellcheck.toml"
+
+[patch.crates-io]
+solana-stake-interface = { path = "interface" }

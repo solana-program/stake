@@ -27,10 +27,8 @@ use {
         },
         stake_flags::StakeFlags,
         stake_history::{StakeHistory, StakeHistoryEntry},
-        state::{
-            warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
-            StakeStateV2,
-        },
+        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
+        warmup_cooldown_allowance::warmup_cooldown_rate_bps,
         MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION,
     },
     solana_stake_program::{get_minimum_delegation, id},
@@ -230,7 +228,7 @@ fn get_active_stake_for_tests(
     let mut active_stake = 0;
     for account in stake_accounts {
         if let Ok(StakeStateV2::Stake(_meta, stake, _stake_flags)) = account.state() {
-            let stake_status = stake.delegation.stake_activating_and_deactivating(
+            let stake_status = stake.delegation.stake_activating_and_deactivating_v2(
                 clock.epoch,
                 stake_history,
                 None,
@@ -255,7 +253,7 @@ where
     I: Iterator<Item = &'a Delegation>,
 {
     stakes.fold(StakeHistoryEntry::default(), |sum, stake| {
-        sum + stake.stake_activating_and_deactivating(epoch, history, new_rate_activation_epoch)
+        sum + stake.stake_activating_and_deactivating_v2(epoch, history, new_rate_activation_epoch)
     })
 }
 
@@ -6348,10 +6346,9 @@ fn test_merge_active_stake() {
         if clock.epoch == merge_from_activation_epoch {
             activating += merge_from_amount;
         }
-        let delta = activating.min(
-            (effective as f64 * warmup_cooldown_rate(clock.epoch, new_warmup_cooldown_rate_epoch))
-                as u64,
-        );
+        let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_warmup_cooldown_rate_epoch);
+        let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
+        let delta = activating.min(rate_limited);
         effective += delta;
         activating -= delta;
         stake_history.add(
@@ -6367,9 +6364,10 @@ fn test_merge_active_stake() {
             StakeHistory::id(),
             create_account_shared_data_for_test(&stake_history),
         );
-        if stake_amount == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+        if stake_amount
+            == stake.stake_v2(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
             && merge_from_amount
-                == merge_from_stake.stake(
+                == merge_from_stake.stake_v2(
                     clock.epoch,
                     &stake_history,
                     new_warmup_cooldown_rate_epoch,
@@ -6400,10 +6398,9 @@ fn test_merge_active_stake() {
     // active/deactivating and deactivating/inactive mismatches fail
     loop {
         clock.epoch += 1;
-        let delta = deactivating.min(
-            (effective as f64 * warmup_cooldown_rate(clock.epoch, new_warmup_cooldown_rate_epoch))
-                as u64,
-        );
+        let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_warmup_cooldown_rate_epoch);
+        let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
+        let delta = deactivating.min(rate_limited);
         effective -= delta;
         deactivating -= delta;
         if clock.epoch == stake_deactivation_epoch {
@@ -6451,8 +6448,8 @@ fn test_merge_active_stake() {
             StakeHistory::id(),
             create_account_shared_data_for_test(&stake_history),
         );
-        if 0 == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
-            && 0 == merge_from_stake.stake(
+        if 0 == stake.stake_v2(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
+            && 0 == merge_from_stake.stake_v2(
                 clock.epoch,
                 &stake_history,
                 new_warmup_cooldown_rate_epoch,

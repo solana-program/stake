@@ -43,7 +43,7 @@ impl MergeKind {
             StakeStateV2::Stake(meta, stake, stake_flags) => {
                 // stake must not be in a transient state. Transient here meaning
                 // activating or deactivating with non-zero effective stake.
-                let status = stake.delegation.stake_activating_and_deactivating(
+                let status = stake.delegation.stake_activating_and_deactivating_v2(
                     clock.epoch,
                     stake_history,
                     PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
@@ -236,7 +236,10 @@ mod tests {
         solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
         solana_pubkey::Pubkey,
         solana_rent::Rent,
-        solana_stake_interface::stake_history::{StakeHistory, StakeHistoryEntry},
+        solana_stake_interface::{
+            stake_history::{StakeHistory, StakeHistoryEntry},
+            warmup_cooldown_allowance::warmup_cooldown_rate_bps,
+        },
     };
 
     #[test]
@@ -531,10 +534,9 @@ mod tests {
         // all paritially activated, transient epochs fail
         loop {
             clock.epoch += 1;
-            let delta = activating.min(
-                (effective as f64 * warmup_cooldown_rate(clock.epoch, new_rate_activation_epoch))
-                    as u64,
-            );
+            let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_rate_activation_epoch);
+            let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
+            let delta = activating.min(rate_limited);
             effective += delta;
             activating -= delta;
             stake_history.add(
@@ -608,10 +610,9 @@ mod tests {
         // all transient, deactivating epochs fail
         loop {
             clock.epoch += 1;
-            let delta = deactivating.min(
-                (effective as f64 * warmup_cooldown_rate(clock.epoch, new_rate_activation_epoch))
-                    as u64,
-            );
+            let rate_bps = warmup_cooldown_rate_bps(clock.epoch, new_rate_activation_epoch);
+            let rate_limited = ((effective as u128) * rate_bps as u128 / 10_000) as u64;
+            let delta = deactivating.min(rate_limited);
             effective -= delta;
             deactivating -= delta;
             stake_history.add(

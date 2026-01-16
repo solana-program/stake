@@ -143,7 +143,7 @@ dependencies = [
  "solana-secp256k1-recover",
  "solana-sha256-hasher",
  "solana-stable-layout",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-svm-callback",
  "solana-svm-feature-set",
  "solana-svm-log-collector",
@@ -2968,7 +2968,7 @@ dependencies = [
  "solana-rent",
  "solana-sdk-ids",
  "solana-slot-hashes",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-stake-program 3.0.10",
  "solana-svm-callback",
  "solana-svm-log-collector",
@@ -3992,7 +3992,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5851,7 +5851,7 @@ dependencies = [
  "solana-sbpf",
  "solana-sdk-ids",
  "solana-slot-hashes",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-svm-callback",
  "solana-svm-feature-set",
  "solana-svm-log-collector",
@@ -5913,7 +5913,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signer",
  "solana-stable-layout",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-svm",
  "solana-svm-log-collector",
  "solana-svm-timings",
@@ -6247,7 +6247,7 @@ dependencies = [
  "solana-signer",
  "solana-slot-hashes",
  "solana-slot-history",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-stake-program 3.0.10",
  "solana-svm",
  "solana-svm-callback",
@@ -6569,26 +6569,6 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-interface"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6f912ae679b683365348dea482dbd9468d22ff258b554fd36e3d3683c2122e3"
-dependencies = [
- "borsh",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-clock",
- "solana-cpi",
- "solana-instruction",
- "solana-program-error",
- "solana-pubkey",
- "solana-system-interface",
- "solana-sysvar",
- "solana-sysvar-id",
-]
-
-[[package]]
-name = "solana-stake-interface"
 version = "2.0.2"
 dependencies = [
  "anyhow",
@@ -6598,6 +6578,7 @@ dependencies = [
  "codama",
  "codama-macros",
  "num-traits",
+ "proptest",
  "serde",
  "serde_derive",
  "serde_json",
@@ -6613,7 +6594,7 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey",
  "solana-sdk-ids",
- "solana-stake-interface 2.0.2",
+ "solana-stake-interface",
  "solana-system-interface",
  "solana-sysvar",
  "solana-sysvar-id",
@@ -6644,7 +6625,7 @@ dependencies = [
  "solana-pubkey",
  "solana-rent",
  "solana-sdk-ids",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-svm-log-collector",
  "solana-svm-type-overrides",
  "solana-sysvar",
@@ -6684,7 +6665,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signature",
  "solana-signer",
- "solana-stake-interface 2.0.1",
+ "solana-stake-interface",
  "solana-svm-log-collector",
  "solana-system-interface",
  "solana-sysvar",
