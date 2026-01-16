@@ -53,3 +53,24 @@ jobs:
       rustfmt-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       clippy-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       solana-cli-version: ${{ needs.set_env.outputs.SOLANA_CLI_VERSION }}
+
+  miri:
+    needs: set_env
+    runs-on: ubuntu-latest
+    env:
+      RUST_TOOLCHAIN: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: miri
+
+      - name: Setup Miri
+        run: cargo +"$RUST_TOOLCHAIN" miri setup
+
+      - name: Run Miri (pinocchio/interface)
+        run: make miri-pinocchio-interface

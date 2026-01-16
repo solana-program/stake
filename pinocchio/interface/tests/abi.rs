@@ -40,6 +40,7 @@ proptest! {
 
     // legacy bincode == new layout wincode bytes
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_wincode_roundtrips_legacy_bytes(legacy in arb_legacy_state()) {
         let expected = serialize_legacy(&legacy);
         prop_assert_eq!(expected.len(), LAYOUT_LEN);
@@ -52,7 +53,8 @@ proptest! {
     }
 
     // both the legacy decoder and zero-copy view interpret trailing bytes the same
-   #[test]
+    #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_unpadded_legacy_prefix_is_compatible(legacy in arb_legacy_state(), mut tail in any::<[u8; 200]>()) {
         let prefix = serialize_legacy_unpadded(&legacy);
         tail[..prefix.len()].copy_from_slice(&prefix);
@@ -61,6 +63,7 @@ proptest! {
 
     // arbitrary 200-byte blobs with a valid tag must parse identically in legacy bincode and the zero-copy view
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_any_200_bytes_with_valid_tag_legacy_and_new_agree(mut bytes in any::<[u8; 200]>(), tag in 0u32..=3u32) {
         bytes[..4].copy_from_slice(&tag.to_le_bytes());
         assert_legacy_and_view_agree(&bytes[..]);
