@@ -325,12 +325,14 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_short_buffer_returns_unexpected_eof(data in proptest::collection::vec(any::<u8>(), 0..LAYOUT_LEN)) {
         let err = StakeStateV2::from_bytes(&data).unwrap_err();
         prop_assert!(matches!(err, StakeStateError::UnexpectedEof));
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_invalid_tag_when_view_then_invalid_tag(
         mut bytes in any::<[u8; 200]>(),
         invalid in 4u32..=u32::MAX,
@@ -341,6 +343,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_any_200_bytes_with_valid_tag_when_view_then_variant_matches(
         mut bytes in any::<[u8; 200]>(),
         tag in arb_valid_tag(),
@@ -358,6 +361,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_any_200_bytes_with_valid_tag_when_view_then_variant_matches_on_unaligned_slice(
         mut buffer in any::<[u8; 201]>(),
         tag in arb_valid_tag(),
@@ -382,6 +386,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_random_legacy_state_when_view_then_matches_expected(legacy in arb_legacy_state()) {
         let data = serialize_legacy(&legacy);
         prop_assert_eq!(data.len(), 200);

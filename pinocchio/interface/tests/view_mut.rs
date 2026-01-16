@@ -134,6 +134,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_unaligned_variant_matches_and_borrows(
         mut buffer in any::<[u8; 201]>(),
         tag in arb_valid_tag(),
@@ -160,6 +161,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_borrowless_variants_noop(
         mut base in any::<[u8; 200]>(),
         is_rewards_pool in any::<bool>(),
@@ -194,6 +196,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_stake_updates_preserve_untouched_bytes(
         legacy_meta in arb_legacy_meta(),
         legacy_stake in arb_legacy_stake(),

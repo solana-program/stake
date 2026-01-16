@@ -72,6 +72,9 @@ test-js-%:
 test-%:
 	SBF_OUT_DIR=$(PWD)/target/deploy cargo $(nightly) test --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
 
+miri-%:
+	cargo $(nightly) miri test --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
+
 lint-js-%:
 	cd $(call make-path,$*) && pnpm install && pnpm lint $(ARGS)
 

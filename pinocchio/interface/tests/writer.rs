@@ -665,6 +665,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_uninitialized_to_initialized_zeroes_stake_and_tail(
         legacy_meta in arb_legacy_meta(),
         unaligned in any::<bool>(),
@@ -709,6 +710,7 @@ proptest! {
 
     // Stake -> Stake transition must preserve arbitrary stake_flags+padding AND preserve trailing bytes beyond 200
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_stake_to_stake_preserves_flags(
         legacy_meta in arb_legacy_meta(),
         legacy_stake in arb_legacy_stake(),
@@ -796,6 +798,7 @@ proptest! {
 
     // Initialized -> Stake transition must always zero out flag/padding bytes
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn prop_initialized_to_stake_zeroes_tail(
         legacy_meta in arb_legacy_meta(),
         new_meta in arb_legacy_meta(),
