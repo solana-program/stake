@@ -23,11 +23,13 @@ macro_rules! impl_pod_int {
         pub struct $name(pub [u8; $n]);
 
         impl $name {
+            #[inline(always)]
             pub const fn from_primitive(v: $prim) -> Self {
                 Self(v.to_le_bytes())
             }
 
-            pub fn get(self) -> $prim {
+            #[inline(always)]
+            pub const fn get(self) -> $prim {
                 <$prim>::from_le_bytes(self.0)
             }
 
@@ -35,11 +37,13 @@ macro_rules! impl_pod_int {
                 self.0 = v.to_le_bytes();
             }
 
+            #[inline(always)]
             pub fn as_bytes(&self) -> &[u8; $n] {
                 &self.0
             }
 
-            pub fn as_mut_slice(&mut self) -> &mut [u8] {
+            #[inline(always)]
+            pub fn as_slice_mut(&mut self) -> &mut [u8] {
                 &mut self.0
             }
         }

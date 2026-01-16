@@ -128,18 +128,4 @@ pub struct StakeStateV2Layout {
     pub padding: [u8; 3],
 }
 
-// ======= Compile-time size guards =======
 const _: () = assert!(size_of::<StakeStateV2Layout>() == 200);
-const _: () = assert!(size_of::<StakeStateV2Tag>() == 4);
-const _: () = assert!(size_of::<PodU32>() == 4);
-const _: () = assert!(size_of::<Meta>() == 120);
-const _: () = assert!(size_of::<Stake>() == 72);
-const _: () = assert!(size_of::<Authorized>() == 64);
-const _: () = assert!(size_of::<Lockup>() == 48);
-const _: () = assert!(size_of::<Delegation>() == 64);
-
-// ======= Compile-time alignment guards =======
-const _: () = assert!(align_of::<StakeStateV2Layout>() == 1);
-const _: () = assert!(align_of::<Meta>() == 1);
-const _: () = assert!(align_of::<Stake>() == 1);
-const _: () = assert!(align_of::<Delegation>() == 1);

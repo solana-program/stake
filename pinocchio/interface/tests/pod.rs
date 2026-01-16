@@ -72,9 +72,9 @@ macro_rules! pod_int_tests {
             }
 
             #[test]
-            fn as_mut_slice_respects_little_endian_low_byte() {
+            fn as_slice_mut_respects_little_endian_low_byte() {
                 let mut pod = <$pod_ty>::from_primitive(0 as $prim_ty);
-                let s = pod.as_mut_slice();
+                let s = pod.as_slice_mut();
                 assert_eq!(s.len(), $size);
 
                 // Set only the least significant byte.
