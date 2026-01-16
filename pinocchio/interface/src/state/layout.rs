@@ -2,7 +2,7 @@ use {
     super::pod::{PodAddress, PodI64, PodU32, PodU64},
     crate::error::StakeStateError,
     core::mem::size_of,
-    wincode::{Deserialize, ReadError, SchemaRead, SchemaWrite},
+    wincode::{SchemaRead, SchemaWrite},
 };
 
 #[repr(C)]
@@ -90,15 +90,11 @@ impl StakeStateV2Tag {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, StakeStateError> {
-        if bytes.len() < Self::TAG_LEN {
+        if bytes.len() < 4 {
             return Err(StakeStateError::UnexpectedEof);
         }
-
-        let tag_bytes = &bytes[..Self::TAG_LEN];
-        StakeStateV2Tag::deserialize(tag_bytes).map_err(|e| match e {
-            ReadError::InvalidTagEncoding(tag) => StakeStateError::InvalidTag(tag as u32),
-            other => StakeStateError::Read(other),
-        })
+        let raw = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+        Self::from_u32(raw)
     }
 }
 
