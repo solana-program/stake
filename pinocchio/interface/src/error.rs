@@ -2,18 +2,20 @@ use crate::state::StakeStateV2Tag;
 
 #[derive(Debug)]
 pub enum StakeStateError {
-    /// The discriminant tag is not a valid variant (must be 0-3).
+    /// Field access invalid for the current state.
+    InvalidStateAccess(StakeStateV2Tag),
+    /// Tag is not a valid variant (0-3).
     InvalidTag(u32),
-    /// An invalid state transition was attempted.
+    /// Invalid state transition attempted.
     InvalidTransition {
         from: StakeStateV2Tag,
         to: StakeStateV2Tag,
     },
-    /// Pass-through for wincode read errors when borrowing layout structs.
+    /// Wincode deserialization error.
     Read(wincode::ReadError),
-    /// Input buffer is shorter than 200 bytes.
+    /// Buffer shorter than 200 bytes.
     UnexpectedEof,
-    /// Pass-through for wincode write errors when serializing layout structs.
+    /// Wincode serialization error.
     Write(wincode::WriteError),
 }
 

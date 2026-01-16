@@ -5,10 +5,11 @@ mod helpers;
 
 use {
     bincode::Options,
+    core::mem::{align_of, size_of},
     helpers::*,
     p_stake_interface::{
         error::StakeStateError,
-        state::{StakeStateV2, StakeStateV2Tag, StakeStateV2View},
+        state::{Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
     solana_pubkey::Pubkey,
@@ -22,7 +23,7 @@ use {
     test_case::test_case,
 };
 
-// Verifies that the deserialized view is a true zero-copy borrow into the original byte slice.
+// Verifies that the deserialized layout is a true zero-copy borrow into the original byte slice.
 fn assert_borrows_at<T>(borrow: &T, bytes: &[u8], offset: usize) {
     let ptr = borrow as *const T;
     let expected = unsafe { bytes.as_ptr().add(offset) };
@@ -31,27 +32,54 @@ fn assert_borrows_at<T>(borrow: &T, bytes: &[u8], offset: usize) {
 
 fn overwrite_tail(bytes: &mut [u8], stake_flags: u8, padding: [u8; 3]) {
     bytes[FLAGS_OFF] = stake_flags;
-    bytes[PADDING_OFF..LAYOUT_LEN].copy_from_slice(&padding);
+    bytes[PADDING_OFF..STATE_LEN].copy_from_slice(&padding);
 }
 
 #[test]
-fn view_short_buffer_returns_unexpected_eof() {
-    let data = vec![0u8; LAYOUT_LEN - 1];
+fn len_constant_is_200() {
+    assert_eq!(StakeStateV2::LEN, 200);
+    assert_eq!(StakeStateV2::LEN, STATE_LEN);
+}
+
+#[test]
+fn layout_invariants() {
+    // Alignment must be 1 for safe zero-copy from unaligned slices
+    assert_eq!(align_of::<StakeStateV2>(), 1);
+    assert_eq!(align_of::<Meta>(), 1);
+    assert_eq!(align_of::<Stake>(), 1);
+
+    // Struct sizes must match documented layout
+    assert_eq!(size_of::<StakeStateV2>(), 200);
+    assert_eq!(size_of::<Meta>(), 120);
+    assert_eq!(size_of::<Stake>(), 72);
+
+    // Offsets must match documented layout table
+    assert_eq!(TAG_LEN, 4);
+    assert_eq!(META_OFF, 4);
+    assert_eq!(STAKE_OFF, 124); // 4 + 120
+    assert_eq!(FLAGS_OFF, 196); // 4 + 120 + 72
+    assert_eq!(PADDING_OFF, 197); // 4 + 120 + 72 + 1
+}
+
+#[test]
+fn short_buffer_returns_unexpected_eof() {
+    let data = vec![0u8; STATE_LEN - 1];
     let err = StakeStateV2::from_bytes(&data).unwrap_err();
     assert!(matches!(err, StakeStateError::UnexpectedEof));
 }
 
 #[test]
-fn view_buffer_with_trailing_bytes_is_ok() {
+fn buffer_with_trailing_bytes_is_ok() {
     let mut data = empty_state_bytes(StakeStateV2Tag::Uninitialized).to_vec();
     data.extend_from_slice(&[171; 64]);
-    let view = StakeStateV2::from_bytes(&data).unwrap();
-    assert!(matches!(view, StakeStateV2View::Uninitialized));
+    let layout = StakeStateV2::from_bytes(&data).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Uninitialized);
+    assert!(layout.meta().is_none());
 }
 
 #[test]
-fn view_invalid_tag_returns_error() {
-    let mut data = [0u8; LAYOUT_LEN];
+fn invalid_tag_returns_error() {
+    let mut data = [0u8; STATE_LEN];
     data[..4].copy_from_slice(&999u32.to_le_bytes());
     let err = StakeStateV2::from_bytes(&data).unwrap_err();
     assert!(matches!(err, StakeStateError::InvalidTag(999)));
@@ -61,30 +89,34 @@ fn view_invalid_tag_returns_error() {
 #[test_case(StakeStateV2Tag::Initialized)]
 #[test_case(StakeStateV2Tag::Stake)]
 #[test_case(StakeStateV2Tag::RewardsPool)]
-fn view_variants_match_tag_for_empty_layout_bytes(tag: StakeStateV2Tag) {
+fn variants_match_tag_for_empty_state_bytes(tag: StakeStateV2Tag) {
     let data = empty_state_bytes(tag);
     let bytes = &data;
 
-    let view = StakeStateV2::from_bytes(bytes).unwrap();
-    match (tag, view) {
-        (StakeStateV2Tag::Uninitialized, StakeStateV2View::Uninitialized) => {}
-        (StakeStateV2Tag::RewardsPool, StakeStateV2View::RewardsPool) => {}
+    let layout = StakeStateV2::from_bytes(bytes).unwrap();
+    assert_eq!(layout.tag(), tag);
 
-        (StakeStateV2Tag::Initialized, StakeStateV2View::Initialized(meta)) => {
-            assert_borrows_at(meta, bytes, META_OFF);
+    match tag {
+        StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
+            assert!(layout.meta().is_none());
+            assert!(layout.stake().is_none());
         }
-
-        (StakeStateV2Tag::Stake, StakeStateV2View::Stake { meta, stake }) => {
+        StakeStateV2Tag::Initialized => {
+            let meta = layout.meta().expect("expected meta for Initialized");
+            assert_borrows_at(meta, bytes, META_OFF);
+            assert!(layout.stake().is_none());
+        }
+        StakeStateV2Tag::Stake => {
+            let meta = layout.meta().expect("expected meta for Stake");
+            let stake = layout.stake().expect("expected stake for Stake");
             assert_borrows_at(meta, bytes, META_OFF);
             assert_borrows_at(stake, bytes, STAKE_OFF);
         }
-
-        _ => panic!("unexpected variant for tag {tag:?}"),
     }
 }
 
 #[test]
-fn view_initialized_legacy_bytes_borrows_correctly() {
+fn initialized_legacy_bytes_borrows_correctly() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 1234605616436508552,
         authorized: LegacyAuthorized {
@@ -100,21 +132,20 @@ fn view_initialized_legacy_bytes_borrows_correctly() {
     let legacy_state = LegacyStakeStateV2::Initialized(legacy_meta);
     let data = serialize_legacy(&legacy_state);
 
-    let view = StakeStateV2::from_bytes(&data).unwrap();
-    let StakeStateV2View::Initialized(meta) = view else {
-        panic!("expected Initialized");
-    };
+    let layout = StakeStateV2::from_bytes(&data).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
+    let meta = layout.meta().expect("expected meta for Initialized");
     assert_borrows_at(meta, &data, META_OFF);
     assert_meta_compat(meta, &legacy_meta);
 
     // Legacy encoding defaults for these bytes in Initialized.
     assert_eq!(data[FLAGS_OFF], 0);
-    assert_eq!(&data[PADDING_OFF..LAYOUT_LEN], &[0u8; 3]);
+    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0u8; 3]);
 }
 
 #[test]
-fn view_unaligned_initialized_legacy_bytes_borrows_correctly() {
+fn unaligned_initialized_legacy_bytes_borrows_correctly() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 42,
         authorized: LegacyAuthorized {
@@ -130,21 +161,20 @@ fn view_unaligned_initialized_legacy_bytes_borrows_correctly() {
     let legacy_state = LegacyStakeStateV2::Initialized(legacy_meta);
     let aligned = serialize_legacy(&legacy_state);
 
-    let mut buffer = vec![0u8; LAYOUT_LEN + 1];
-    buffer[1..1 + LAYOUT_LEN].copy_from_slice(&aligned);
-    let unaligned = &buffer[1..1 + LAYOUT_LEN];
+    let mut buffer = vec![0u8; STATE_LEN + 1];
+    buffer[1..1 + STATE_LEN].copy_from_slice(&aligned);
+    let unaligned = &buffer[1..1 + STATE_LEN];
 
-    let view = StakeStateV2::from_bytes(unaligned).unwrap();
-    let StakeStateV2View::Initialized(meta) = view else {
-        panic!("expected Initialized");
-    };
+    let layout = StakeStateV2::from_bytes(unaligned).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
+    let meta = layout.meta().expect("expected meta for Initialized");
     assert_borrows_at(meta, unaligned, META_OFF);
     assert_meta_compat(meta, &legacy_meta);
 }
 
 #[test]
-fn view_initialized_legacy_bytes_ignores_tail_bytes() {
+fn initialized_legacy_bytes_ignores_tail_bytes() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 1,
         authorized: LegacyAuthorized {
@@ -162,18 +192,17 @@ fn view_initialized_legacy_bytes_ignores_tail_bytes() {
 
     overwrite_tail(&mut data, 0xDE, [0xAD, 0xBE, 0xEF]);
 
-    let view = StakeStateV2::from_bytes(&data).unwrap();
-    let StakeStateV2View::Initialized(meta) = view else {
-        panic!("expected Initialized");
-    };
+    let layout = StakeStateV2::from_bytes(&data).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
+    let meta = layout.meta().expect("expected meta for Initialized");
     assert_meta_compat(meta, &legacy_meta);
     assert_eq!(data[FLAGS_OFF], 0xDE);
-    assert_eq!(&data[PADDING_OFF..LAYOUT_LEN], &[0xAD, 0xBE, 0xEF]);
+    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0xAD, 0xBE, 0xEF]);
 }
 
 #[test]
-fn view_stake_legacy_bytes_borrows_correctly() {
+fn stake_legacy_bytes_borrows_correctly() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 1,
         authorized: LegacyAuthorized {
@@ -209,10 +238,11 @@ fn view_stake_legacy_bytes_borrows_correctly() {
     let legacy_state = LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, legacy_flags);
     let data = serialize_legacy(&legacy_state);
 
-    let view = StakeStateV2::from_bytes(&data).unwrap();
-    let StakeStateV2View::Stake { meta, stake } = view else {
-        panic!("expected Stake");
-    };
+    let layout = StakeStateV2::from_bytes(&data).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
+
+    let meta = layout.meta().expect("expected meta for Stake");
+    let stake = layout.stake().expect("expected stake for Stake");
 
     assert_borrows_at(meta, &data, META_OFF);
     assert_borrows_at(stake, &data, STAKE_OFF);
@@ -224,7 +254,7 @@ fn view_stake_legacy_bytes_borrows_correctly() {
 }
 
 #[test]
-fn view_unaligned_stake_legacy_bytes_borrows_correctly() {
+fn unaligned_stake_legacy_bytes_borrows_correctly() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 9,
         authorized: LegacyAuthorized {
@@ -255,14 +285,15 @@ fn view_unaligned_stake_legacy_bytes_borrows_correctly() {
         LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, LegacyStakeFlags::empty());
     let aligned = serialize_legacy(&legacy_state);
 
-    let mut buffer = vec![0u8; LAYOUT_LEN + 1];
-    buffer[1..1 + LAYOUT_LEN].copy_from_slice(&aligned);
-    let unaligned = &buffer[1..1 + LAYOUT_LEN];
+    let mut buffer = vec![0u8; STATE_LEN + 1];
+    buffer[1..1 + STATE_LEN].copy_from_slice(&aligned);
+    let unaligned = &buffer[1..1 + STATE_LEN];
 
-    let view = StakeStateV2::from_bytes(unaligned).unwrap();
-    let StakeStateV2View::Stake { meta, stake } = view else {
-        panic!("expected Stake");
-    };
+    let layout = StakeStateV2::from_bytes(unaligned).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
+
+    let meta = layout.meta().expect("expected meta for Stake");
+    let stake = layout.stake().expect("expected stake for Stake");
 
     assert_borrows_at(meta, unaligned, META_OFF);
     assert_borrows_at(stake, unaligned, STAKE_OFF);
@@ -274,7 +305,7 @@ fn view_unaligned_stake_legacy_bytes_borrows_correctly() {
 }
 
 #[test]
-fn view_stake_legacy_bytes_ignores_tail_bytes() {
+fn stake_legacy_bytes_ignores_tail_bytes() {
     let legacy_meta = LegacyMeta {
         rent_exempt_reserve: 111,
         authorized: LegacyAuthorized {
@@ -307,33 +338,32 @@ fn view_stake_legacy_bytes_ignores_tail_bytes() {
 
     overwrite_tail(&mut data, 0xEE, [0xFA, 0xCE, 0xB0]);
 
-    let view = StakeStateV2::from_bytes(&data).unwrap();
-    let StakeStateV2View::Stake { meta, stake } = view else {
-        panic!("expected Stake");
-    };
+    let layout = StakeStateV2::from_bytes(&data).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
+
+    let meta = layout.meta().expect("expected meta for Stake");
+    let stake = layout.stake().expect("expected stake for Stake");
 
     assert_meta_compat(meta, &legacy_meta);
     assert_stake_compat(stake, &legacy_stake);
 
     assert_eq!(data[FLAGS_OFF], 0xEE);
-    assert_eq!(&data[PADDING_OFF..LAYOUT_LEN], &[0xFA, 0xCE, 0xB0]);
+    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0xFA, 0xCE, 0xB0]);
 }
-
-// ----------------------------- property tests --------------------------------
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_short_buffer_returns_unexpected_eof(data in proptest::collection::vec(any::<u8>(), 0..LAYOUT_LEN)) {
+    fn prop_short_buffer_returns_unexpected_eof(data in proptest::collection::vec(any::<u8>(), 0..STATE_LEN)) {
         let err = StakeStateV2::from_bytes(&data).unwrap_err();
         prop_assert!(matches!(err, StakeStateError::UnexpectedEof));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_invalid_tag_when_view_then_invalid_tag(
+    fn prop_invalid_tag_returns_error(
         mut bytes in any::<[u8; 200]>(),
         invalid in 4u32..=u32::MAX,
     ) {
@@ -344,66 +374,96 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_any_200_bytes_with_valid_tag_when_view_then_variant_matches(
+    fn prop_valid_tag_parses_correctly(
         mut bytes in any::<[u8; 200]>(),
         tag in arb_valid_tag(),
     ) {
         write_tag(&mut bytes, tag);
 
-        let view = StakeStateV2::from_bytes(&bytes).unwrap();
-        match (tag, view) {
-            (StakeStateV2Tag::Uninitialized, StakeStateV2View::Uninitialized) => {}
-            (StakeStateV2Tag::Initialized, StakeStateV2View::Initialized(_)) => {}
-            (StakeStateV2Tag::Stake, StakeStateV2View::Stake { .. }) => {}
-            (StakeStateV2Tag::RewardsPool, StakeStateV2View::RewardsPool) => {}
-            _ => prop_assert!(false, "tag/view mismatch"),
+        let layout = StakeStateV2::from_bytes(&bytes).unwrap();
+        prop_assert_eq!(layout.tag(), tag);
+
+        match tag {
+            StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
+                prop_assert!(layout.meta().is_none());
+                prop_assert!(layout.stake().is_none());
+            }
+            StakeStateV2Tag::Initialized => {
+                prop_assert!(layout.meta().is_some());
+                prop_assert!(layout.stake().is_none());
+            }
+            StakeStateV2Tag::Stake => {
+                prop_assert!(layout.meta().is_some());
+                prop_assert!(layout.stake().is_some());
+            }
         }
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_any_200_bytes_with_valid_tag_when_view_then_variant_matches_on_unaligned_slice(
+    fn prop_valid_tag_parses_correctly_unaligned(
         mut buffer in any::<[u8; 201]>(),
         tag in arb_valid_tag(),
     ) {
         // Make an unaligned 200-byte window
-        let unaligned = &mut buffer[1..1 + LAYOUT_LEN];
+        let unaligned = &mut buffer[1..1 + STATE_LEN];
         write_tag(unaligned, tag);
 
-        let view = StakeStateV2::from_bytes(unaligned).unwrap();
-        match (tag, view) {
-            (StakeStateV2Tag::Uninitialized, StakeStateV2View::Uninitialized) => {}
-            (StakeStateV2Tag::Initialized, StakeStateV2View::Initialized(meta)) => {
-                assert_borrows_at(meta, unaligned, META_OFF);
+        let layout = StakeStateV2::from_bytes(unaligned).unwrap();
+        prop_assert_eq!(layout.tag(), tag);
+
+        match tag {
+            StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
+                prop_assert!(layout.meta().is_none());
+                prop_assert!(layout.stake().is_none());
             }
-            (StakeStateV2Tag::Stake, StakeStateV2View::Stake { meta, stake }) => {
+            StakeStateV2Tag::Initialized => {
+                let meta = layout.meta().unwrap();
+                assert_borrows_at(meta, unaligned, META_OFF);
+                prop_assert!(layout.stake().is_none());
+            }
+            StakeStateV2Tag::Stake => {
+                let meta = layout.meta().unwrap();
+                let stake = layout.stake().unwrap();
                 assert_borrows_at(meta, unaligned, META_OFF);
                 assert_borrows_at(stake, unaligned, STAKE_OFF);
             }
-            (StakeStateV2Tag::RewardsPool, StakeStateV2View::RewardsPool) => {}
-            _ => prop_assert!(false, "tag/view mismatch (unaligned)"),
         }
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_random_legacy_state_when_view_then_matches_expected(legacy in arb_legacy_state()) {
+    fn prop_legacy_state_roundtrips(legacy in arb_legacy_state()) {
         let data = serialize_legacy(&legacy);
         prop_assert_eq!(data.len(), 200);
 
-        let view = StakeStateV2::from_bytes(&data).unwrap();
-        match (legacy, view) {
-            (LegacyStakeStateV2::Uninitialized, StakeStateV2View::Uninitialized) => {}
-            (LegacyStakeStateV2::RewardsPool, StakeStateV2View::RewardsPool) => {}
-            (LegacyStakeStateV2::Initialized(legacy_meta), StakeStateV2View::Initialized(meta)) => {
-                assert_meta_compat(meta, &legacy_meta);
+        let layout = StakeStateV2::from_bytes(&data).unwrap();
+
+        match legacy {
+            LegacyStakeStateV2::Uninitialized => {
+                prop_assert_eq!(layout.tag(), StakeStateV2Tag::Uninitialized);
+                prop_assert!(layout.meta().is_none());
+                prop_assert!(layout.stake().is_none());
             }
-            (LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, flags), StakeStateV2View::Stake { meta, stake }) => {
+            LegacyStakeStateV2::RewardsPool => {
+                prop_assert_eq!(layout.tag(), StakeStateV2Tag::RewardsPool);
+                prop_assert!(layout.meta().is_none());
+                prop_assert!(layout.stake().is_none());
+            }
+            LegacyStakeStateV2::Initialized(legacy_meta) => {
+                prop_assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
+                let meta = layout.meta().unwrap();
+                assert_meta_compat(meta, &legacy_meta);
+                prop_assert!(layout.stake().is_none());
+            }
+            LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, flags) => {
+                prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
+                let meta = layout.meta().unwrap();
+                let stake = layout.stake().unwrap();
                 assert_meta_compat(meta, &legacy_meta);
                 assert_stake_compat(stake, &legacy_stake);
                 prop_assert_eq!(data[FLAGS_OFF], stake_flags_byte(&flags));
             }
-            (o, v) => prop_assert!(false, "variant mismatch legacy={o:?} new={v:?}"),
         }
     }
 }

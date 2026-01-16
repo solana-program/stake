@@ -15,10 +15,8 @@ use {
     test_case::test_case,
 };
 
-fn serialize_tag(tag: StakeStateV2Tag) -> [u8; 4] {
-    let mut buf = [0u8; 4];
-    wincode::serialize_into(&mut buf.as_mut_slice(), &tag).unwrap();
-    buf
+fn tag_bytes(tag: StakeStateV2Tag) -> [u8; 4] {
+    (tag as u32).to_le_bytes()
 }
 
 fn legacy_state_for_tag(tag: StakeStateV2Tag) -> LegacyStakeStateV2 {
@@ -83,16 +81,16 @@ fn tag_len_is_4_bytes() {
 #[test_case(StakeStateV2Tag::Stake, 2)]
 #[test_case(StakeStateV2Tag::RewardsPool, 3)]
 fn tag_serializes_to_expected_u32_le_discriminant(tag: StakeStateV2Tag, expected: u32) {
-    let buf = serialize_tag(tag);
+    let buf = tag_bytes(tag);
     assert_eq!(buf, expected.to_le_bytes());
 }
 
 #[test]
-fn from_u32_errors_on_invalid_values() {
-    let err = StakeStateV2Tag::from_u32(4).unwrap_err();
+fn from_bytes_errors_on_invalid_tag() {
+    let err = StakeStateV2Tag::from_bytes(&4u32.to_le_bytes()).unwrap_err();
     assert!(matches!(err, StakeStateError::InvalidTag(4)));
 
-    let err = StakeStateV2Tag::from_u32(u32::MAX).unwrap_err();
+    let err = StakeStateV2Tag::from_bytes(&u32::MAX.to_le_bytes()).unwrap_err();
     assert!(matches!(err, StakeStateError::InvalidTag(u32::MAX)));
 }
 
@@ -118,13 +116,6 @@ fn from_bytes_ignores_trailing_data() {
 }
 
 #[test]
-fn from_bytes_rejects_invalid_discriminant() {
-    let bytes = 999u32.to_le_bytes();
-    let err = StakeStateV2Tag::from_bytes(&bytes[..]).unwrap_err();
-    assert!(matches!(err, StakeStateError::InvalidTag(999)));
-}
-
-#[test]
 fn from_bytes_rejects_short_buffer() {
     let bytes = [0u8; 3];
     let err = StakeStateV2Tag::from_bytes(&bytes[..]).unwrap_err();
@@ -136,14 +127,11 @@ fn from_bytes_rejects_short_buffer() {
 #[test_case(StakeStateV2Tag::Stake)]
 #[test_case(StakeStateV2Tag::RewardsPool)]
 fn tag_encoding_matches_legacy_bincode_discriminant(tag: StakeStateV2Tag) {
-    // This enforces the compatibility requirement: legacy StakeStateV2 (bincode with our opts)
-    // must have the same 4-byte LE u32 discriminant as the wincode-encoded StakeStateV2Tag.
+    // Legacy bincode must produce the same 4-byte LE u32 discriminant as our tag.
     let legacy_state = legacy_state_for_tag(tag);
     let legacy_bytes = serialize_legacy(&legacy_state);
     assert!(legacy_bytes.len() >= StakeStateV2Tag::TAG_LEN);
 
     let legacy_tag = &legacy_bytes[..StakeStateV2Tag::TAG_LEN];
-    let wincode_tag = serialize_tag(tag);
-
-    assert_eq!(legacy_tag, &wincode_tag[..]);
+    assert_eq!(legacy_tag, &tag_bytes(tag));
 }

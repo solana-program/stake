@@ -8,8 +8,7 @@ homepage = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-# TODO: Waiting on 0.3.0 to be released
-wincode = { git = "https://github.com/anza-xyz/wincode.git", rev = "fa70c7c7c13885085f743e4f01deb1a4de0b64fb", default-features = false, features = ["derive"] }
+wincode = { git = "https://github.com/anza-xyz/wincode.git", rev = "6feb75ff4c5b26275b0ee8bc4a12ea906d996a02", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 bincode = "1.3.3"

@@ -1,4 +1,4 @@
-use p_stake_interface::state::{PodAddress, PodI64, PodU32, PodU64};
+use p_stake_interface::pod::{PodAddress, PodI64, PodU32, PodU64};
 
 macro_rules! pod_int_tests {
     ($pod_ty:ty, $prim_ty:ty, $size:expr, $test_value:expr, $mod_name:ident) => {

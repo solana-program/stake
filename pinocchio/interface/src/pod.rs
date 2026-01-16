@@ -10,7 +10,6 @@
 use wincode::{SchemaRead, SchemaWrite};
 
 /// Macro to define an alignment-1 little-endian integer wrapper.
-#[macro_export]
 macro_rules! impl_pod_int {
     (
         $(#[$meta:meta])*
