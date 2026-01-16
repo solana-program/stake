@@ -3,9 +3,9 @@ use {
     super::legacy::bincode_opts,
     bincode::Options,
     core::mem::size_of,
-    p_stake_interface::state::{
-        Authorized, Delegation, Lockup, Meta, PodAddress, PodI64, PodU64, Stake,
-        StakeStateV2Layout, StakeStateV2Tag,
+    p_stake_interface::{
+        pod::{PodAddress, PodI64, PodU64},
+        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
     solana_stake_interface::{
         stake_flags::StakeFlags as LegacyStakeFlags,
@@ -14,7 +14,7 @@ use {
 };
 
 pub const TAG_LEN: usize = StakeStateV2Tag::TAG_LEN;
-pub const LAYOUT_LEN: usize = size_of::<StakeStateV2Layout>();
+pub const STATE_LEN: usize = size_of::<StakeStateV2>();
 
 pub const META_OFF: usize = TAG_LEN;
 pub const STAKE_OFF: usize = TAG_LEN + size_of::<Meta>();
@@ -22,14 +22,12 @@ pub const FLAGS_OFF: usize = TAG_LEN + size_of::<Meta>() + size_of::<Stake>();
 pub const PADDING_OFF: usize = FLAGS_OFF + 1;
 
 pub fn write_tag(bytes: &mut [u8], tag: StakeStateV2Tag) {
-    let mut slice = &mut bytes[..TAG_LEN];
-    wincode::serialize_into(&mut slice, &tag).unwrap();
+    bytes[..TAG_LEN].copy_from_slice(&(tag as u32).to_le_bytes());
 }
 
 pub fn empty_state_bytes(tag: StakeStateV2Tag) -> [u8; 200] {
-    let mut data = [0u8; size_of::<StakeStateV2Layout>()];
-    let mut slice = &mut data[..StakeStateV2Tag::TAG_LEN];
-    wincode::serialize_into(&mut slice, &tag).unwrap();
+    let mut data = [0u8; size_of::<StakeStateV2>()];
+    data[..TAG_LEN].copy_from_slice(&(tag as u32).to_le_bytes());
     data
 }
 

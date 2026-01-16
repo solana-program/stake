@@ -6,8 +6,9 @@ mod helpers;
 use {
     core::mem::size_of,
     helpers::*,
-    p_stake_interface::state::{
-        Delegation, StakeStateV2, StakeStateV2Tag, StakeStateV2View, StakeStateV2ViewMut,
+    p_stake_interface::{
+        error::StakeStateError,
+        state::{Delegation, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
     solana_pubkey::Pubkey,
@@ -31,7 +32,7 @@ fn assert_mut_borrows_at<T>(borrow: &mut T, base_ptr: *mut u8, offset: usize) {
 
 fn overwrite_tail(bytes: &mut [u8], stake_flags: u8, padding: [u8; 3]) -> [u8; 4] {
     bytes[FLAGS_OFF] = stake_flags;
-    bytes[PADDING_OFF..LAYOUT_LEN].copy_from_slice(&padding);
+    bytes[PADDING_OFF..STATE_LEN].copy_from_slice(&padding);
     [stake_flags, padding[0], padding[1], padding[2]]
 }
 
@@ -43,19 +44,41 @@ fn variants_match_tag(tag: StakeStateV2Tag) {
     let mut data = empty_state_bytes(tag);
     let base_ptr = data.as_mut_ptr();
 
-    let mut writer = StakeStateV2::from_bytes_mut(&mut data).unwrap();
-    let view = writer.view_mut().unwrap();
-    match (tag, view) {
-        (StakeStateV2Tag::Uninitialized, StakeStateV2ViewMut::Uninitialized) => {}
-        (StakeStateV2Tag::RewardsPool, StakeStateV2ViewMut::RewardsPool) => {}
-        (StakeStateV2Tag::Initialized, StakeStateV2ViewMut::Initialized(meta)) => {
-            assert_mut_borrows_at(meta, base_ptr, META_OFF);
+    let layout = StakeStateV2::from_bytes_mut(&mut data).unwrap();
+    assert_eq!(layout.tag(), tag);
+
+    match tag {
+        StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
+            assert!(matches!(
+                layout.meta_mut(),
+                Err(StakeStateError::InvalidStateAccess(t)) if t == tag
+            ));
+            assert!(matches!(
+                layout.stake_mut(),
+                Err(StakeStateError::InvalidStateAccess(t)) if t == tag
+            ));
         }
-        (StakeStateV2Tag::Stake, StakeStateV2ViewMut::Stake { meta, stake }) => {
+        StakeStateV2Tag::Initialized => {
+            let meta = layout.meta_mut().unwrap();
             assert_mut_borrows_at(meta, base_ptr, META_OFF);
+            // Re-parse to check stake_mut fails (need fresh layout due to borrow)
+            let layout = StakeStateV2::from_bytes_mut(&mut data).unwrap();
+            assert!(matches!(
+                layout.stake_mut(),
+                Err(StakeStateError::InvalidStateAccess(
+                    StakeStateV2Tag::Initialized
+                ))
+            ));
+        }
+        StakeStateV2Tag::Stake => {
+            let meta = layout.meta_mut().unwrap();
+            assert_mut_borrows_at(meta, base_ptr, META_OFF);
+            // Re-parse for stake_mut - capture base_ptr before borrowing through layout
+            let base_ptr = data.as_mut_ptr();
+            let layout = StakeStateV2::from_bytes_mut(&mut data).unwrap();
+            let stake = layout.stake_mut().unwrap();
             assert_mut_borrows_at(stake, base_ptr, STAKE_OFF);
         }
-        _ => panic!("unexpected view_mut variant for tag {tag:?}"),
     }
 }
 
@@ -82,22 +105,21 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
 
     // Test both aligned and unaligned memory access to ensure POD types handle misalignment
     let offset = if is_unaligned { 1 } else { 0 };
-    let mut buffer = vec![0u8; offset + LAYOUT_LEN];
-    buffer[offset..offset + LAYOUT_LEN].copy_from_slice(&aligned);
+    let mut buffer = vec![0u8; offset + STATE_LEN];
+    buffer[offset..offset + STATE_LEN].copy_from_slice(&aligned);
     let tail_before = overwrite_tail(
-        &mut buffer[offset..offset + LAYOUT_LEN],
+        &mut buffer[offset..offset + STATE_LEN],
         222,
         [173, 190, 239],
     );
 
-    let slice = &mut buffer[offset..offset + LAYOUT_LEN];
+    let slice = &mut buffer[offset..offset + STATE_LEN];
     let base_ptr = slice.as_mut_ptr();
 
-    let mut writer = StakeStateV2::from_bytes_mut(slice).unwrap();
-    let view = writer.view_mut().unwrap();
-    let StakeStateV2ViewMut::Initialized(meta) = view else {
-        panic!("expected Initialized");
-    };
+    let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
+
+    let meta = layout.meta_mut().unwrap();
 
     // Verify mutable view borrows directly into the buffer
     assert_mut_borrows_at(meta, base_ptr, META_OFF);
@@ -106,15 +128,14 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     meta.rent_exempt_reserve.set(new_rent);
     meta.lockup.custodian.0 = new_custodian;
 
-    // Tail bytes (stake_flags + padding) must be untouched by view_mut operations
-    let layout_bytes = &buffer[offset..offset + LAYOUT_LEN];
-    assert_eq!(&layout_bytes[FLAGS_OFF..LAYOUT_LEN], &tail_before);
+    // Tail bytes (stake_flags + padding) must be untouched by meta_mut operations
+    let layout_bytes = &buffer[offset..offset + STATE_LEN];
+    assert_eq!(&layout_bytes[FLAGS_OFF..STATE_LEN], &tail_before);
 
     // Read-only view validates the updates
-    let view = StakeStateV2::from_bytes(layout_bytes).unwrap();
-    let StakeStateV2View::Initialized(meta) = view else {
-        panic!("expected Initialized");
-    };
+    let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
+    assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
+    let meta = layout.meta().unwrap();
     assert_eq!(meta.rent_exempt_reserve.get(), new_rent);
     assert_eq!(meta.lockup.custodian.as_bytes(), &new_custodian);
 
@@ -140,23 +161,32 @@ proptest! {
         tag in arb_valid_tag(),
     ) {
         // Make an unaligned 200-byte window
-        let unaligned = &mut buffer[1..1 + LAYOUT_LEN];
+        let unaligned = &mut buffer[1..1 + STATE_LEN];
         write_tag(unaligned, tag);
         let base_ptr = unaligned.as_mut_ptr();
 
-        let mut writer = StakeStateV2::from_bytes_mut(unaligned).unwrap();
-        let view = writer.view_mut().unwrap();
-        match (tag, view) {
-            (StakeStateV2Tag::Uninitialized, StakeStateV2ViewMut::Uninitialized) => {}
-            (StakeStateV2Tag::RewardsPool, StakeStateV2ViewMut::RewardsPool) => {}
-            (StakeStateV2Tag::Initialized, StakeStateV2ViewMut::Initialized(meta)) => {
+        let layout = StakeStateV2::from_bytes_mut(unaligned).unwrap();
+        prop_assert_eq!(layout.tag(), tag);
+
+        match tag {
+            StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
+                prop_assert!(layout.meta_mut().is_err());
+                prop_assert!(layout.stake_mut().is_err());
+            }
+            StakeStateV2Tag::Initialized => {
+                let meta = layout.meta_mut().unwrap();
                 assert_mut_borrows_at(meta, base_ptr, META_OFF);
             }
-            (StakeStateV2Tag::Stake, StakeStateV2ViewMut::Stake { meta, stake }) => {
+            StakeStateV2Tag::Stake => {
+                let meta = layout.meta_mut().unwrap();
                 assert_mut_borrows_at(meta, base_ptr, META_OFF);
+                // Re-parse for stake_mut - capture base_ptr before borrowing through layout
+                let base_ptr = buffer[1..1 + STATE_LEN].as_mut_ptr();
+                let unaligned = &mut buffer[1..1 + STATE_LEN];
+                let layout = StakeStateV2::from_bytes_mut(unaligned).unwrap();
+                let stake = layout.stake_mut().unwrap();
                 assert_mut_borrows_at(stake, base_ptr, STAKE_OFF);
             }
-            _ => prop_assert!(false, "tag/view mismatch (unaligned)"),
         }
     }
 
@@ -175,21 +205,18 @@ proptest! {
         write_tag(&mut base, tag);
 
         let start = if unaligned { 1 } else { 0 };
-        let mut buffer = vec![238u8; start + LAYOUT_LEN + trailing_len];
-        buffer[start..start + LAYOUT_LEN].copy_from_slice(&base);
-        buffer[start + LAYOUT_LEN..start + LAYOUT_LEN + trailing_len].fill(trailing_byte);
+        let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
+        buffer[start..start + STATE_LEN].copy_from_slice(&base);
+        buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(trailing_byte);
 
         let expected = buffer.clone();
 
         {
-            let slice = &mut buffer[start..start + LAYOUT_LEN + trailing_len];
-            let mut writer = StakeStateV2::from_bytes_mut(slice).unwrap();
-            let view = writer.view_mut().unwrap();
-            match (tag, view) {
-                (StakeStateV2Tag::Uninitialized, StakeStateV2ViewMut::Uninitialized) => {}
-                (StakeStateV2Tag::RewardsPool, StakeStateV2ViewMut::RewardsPool) => {}
-                _ => prop_assert!(false, "unexpected view_mut variant for tag {tag:?}"),
-            }
+            let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+            let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+            prop_assert_eq!(layout.tag(), tag);
+            prop_assert!(layout.meta_mut().is_err());
+            prop_assert!(layout.stake_mut().is_err());
         }
 
         prop_assert_eq!(buffer, expected);
@@ -212,47 +239,56 @@ proptest! {
 
         let legacy_state = LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, LegacyStakeFlags::empty());
         let base = serialize_legacy(&legacy_state);
-        prop_assert_eq!(base.len(), LAYOUT_LEN);
+        prop_assert_eq!(base.len(), STATE_LEN);
 
         let start = if unaligned { 1 } else { 0 };
-        let mut buffer = vec![0u8; start + LAYOUT_LEN + trailing_len];
-        buffer[start..start + LAYOUT_LEN].copy_from_slice(&base);
-        buffer[start + LAYOUT_LEN..].fill(126);
+        let mut buffer = vec![0u8; start + STATE_LEN + trailing_len];
+        buffer[start..start + STATE_LEN].copy_from_slice(&base);
+        buffer[start + STATE_LEN..].fill(126);
 
         // Make tail arbitrary and ensure we preserve it
         buffer[start + FLAGS_OFF] = raw_flags;
-        buffer[start + PADDING_OFF..start + LAYOUT_LEN].copy_from_slice(&raw_padding);
+        buffer[start + PADDING_OFF..start + STATE_LEN].copy_from_slice(&raw_padding);
 
-        let before_layout = buffer[start..start + LAYOUT_LEN].to_vec();
-        let trailing_before = buffer[start + LAYOUT_LEN..start + LAYOUT_LEN + trailing_len].to_vec();
+        let before_layout = buffer[start..start + STATE_LEN].to_vec();
+        let trailing_before = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
 
-        let slice = &mut buffer[start..start + LAYOUT_LEN + trailing_len];
-        let mut writer = StakeStateV2::from_bytes_mut(slice).unwrap();
-        let view = writer.view_mut().unwrap();
-        let StakeStateV2ViewMut::Stake { meta, stake } = view else {
-            prop_assert!(false, "expected Stake");
-            return Ok(());
-        };
+        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+        prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
+        let stake = layout.stake_mut().unwrap();
         // Reserved bytes must not change.
         prop_assert_eq!(stake.delegation._reserved, reserved_bytes);
 
-        meta.rent_exempt_reserve.set(new_rent_exempt_reserve);
-        stake.credits_observed.set(new_credits_observed);
-        stake.delegation.stake.set(new_stake_amount);
+        // Re-parse to mutate more fields
+        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+        layout.meta_mut().unwrap().rent_exempt_reserve.set(new_rent_exempt_reserve);
 
-        prop_assert_eq!(stake.delegation._reserved, reserved_bytes);
+        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+        layout.stake_mut().unwrap().credits_observed.set(new_credits_observed);
+
+        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+        layout.stake_mut().unwrap().delegation.stake.set(new_stake_amount);
+
+        // Verify reserved bytes still unchanged
+        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
+        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
+        prop_assert_eq!(layout.stake_mut().unwrap().delegation._reserved, reserved_bytes);
 
         // Trailing bytes beyond the 200-byte layout must not be modified
         prop_assert_eq!(
-            &buffer[start + LAYOUT_LEN..start + LAYOUT_LEN + trailing_len],
+            &buffer[start + STATE_LEN..start + STATE_LEN + trailing_len],
             trailing_before.as_slice()
         );
         // Tail bytes must remain untouched
         prop_assert_eq!(buffer[start + FLAGS_OFF], before_layout[FLAGS_OFF]);
         prop_assert_eq!(
-            &buffer[start + PADDING_OFF..start + LAYOUT_LEN],
-            &before_layout[PADDING_OFF..LAYOUT_LEN]
+            &buffer[start + PADDING_OFF..start + STATE_LEN],
+            &before_layout[PADDING_OFF..STATE_LEN]
         );
 
         // Only specific byte ranges should have changed
@@ -262,9 +298,9 @@ proptest! {
             (STAKE_OFF + size_of::<Delegation>(), STAKE_OFF + size_of::<Delegation>() + 8),
         ];
 
-        let after_layout = &buffer[start..start + LAYOUT_LEN];
+        let after_layout = &buffer[start..start + STATE_LEN];
 
-        for i in 0..LAYOUT_LEN {
+        for i in 0..STATE_LEN {
             if allowed_ranges
                 .iter()
                 .any(|(start, end)| i >= *start && i < *end)
@@ -275,11 +311,10 @@ proptest! {
         }
 
         // Read-only view sees the updates
-        let view = StakeStateV2::from_bytes(after_layout).unwrap();
-        let StakeStateV2View::Stake { meta, stake } = view else {
-            prop_assert!(false, "expected Stake");
-            return Ok(());
-        };
+        let layout = StakeStateV2::from_bytes(after_layout).unwrap();
+        prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
+        let meta = layout.meta().unwrap();
+        let stake = layout.stake().unwrap();
         prop_assert_eq!(meta.rent_exempt_reserve.get(), new_rent_exempt_reserve);
         prop_assert_eq!(stake.credits_observed.get(), new_credits_observed);
         prop_assert_eq!(stake.delegation.stake.get(), new_stake_amount);
