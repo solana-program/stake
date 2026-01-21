@@ -984,18 +984,7 @@ impl StakeLifecycle {
         }
     }
 
-    // NOTE the program enforces that a deactive stake adheres to the split minimum,
-    // albeit spuriously after solana-program/stake-program #1 is addressed,
-    // Self::Deactive should move to false equivalently this could be combined
-    // with withdraw_minimum_enforced into a function minimum_enforced
-    pub fn split_minimum_enforced(&self) -> bool {
-        match self {
-            Self::Activating | Self::Active | Self::Deactivating | Self::Deactive => true,
-            Self::Uninitialized | Self::Initialized | Self::Closed => false,
-        }
-    }
-
-    pub fn withdraw_minimum_enforced(&self) -> bool {
+    pub fn minimum_delegation_enforced(&self) -> bool {
         match self {
             Self::Activating | Self::Active | Self::Deactivating => true,
             Self::Uninitialized | Self::Initialized | Self::Deactive | Self::Closed => false,
@@ -1031,6 +1020,13 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         _ => vec![&staker_keypair],
     };
 
+    // fail, cannot split zero
+    let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
+    let e = process_instruction(&mut context, instruction, &signers)
+        .await
+        .unwrap_err();
+    assert_eq!(e, ProgramError::InsufficientFunds);
+
     // fail, split more than available (even if not active, would kick source out of
     // rent exemption)
     let instruction = &ixn::split(
@@ -1043,19 +1039,19 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
     let e = process_instruction(&mut context, instruction, &signers)
         .await
         .unwrap_err();
-    assert_eq!(e, ProgramError::InsufficientFunds);
+    assert_eq!(
+        e,
+        if split_source_type.minimum_delegation_enforced() {
+            StakeError::InsufficientDelegation.into()
+        } else {
+            ProgramError::InsufficientFunds
+        }
+    );
 
     // an active or transitioning stake account cannot have less than the minimum
     // delegation note this is NOT dependent on the minimum delegation feature.
     // there was ALWAYS a minimum. it was one lamport!
-    if split_source_type.split_minimum_enforced() {
-        // zero split fails
-        let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
-        let e = process_instruction(&mut context, instruction, &signers)
-            .await
-            .unwrap_err();
-        assert_eq!(e, ProgramError::InsufficientFunds);
-
+    if split_source_type.minimum_delegation_enforced() {
         // underfunded destination fails
         let instruction = &ixn::split(
             &split_source,
@@ -1080,7 +1076,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
-        assert_eq!(e, ProgramError::InsufficientFunds);
+        assert_eq!(e, StakeError::InsufficientDelegation.into());
     }
 
     // split to non-owned account fails
@@ -1209,7 +1205,7 @@ async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
         .unwrap_err();
     assert_eq!(e, ProgramError::InsufficientFunds);
 
-    if withdraw_source_type.withdraw_minimum_enforced() {
+    if withdraw_source_type.minimum_delegation_enforced() {
         // withdraw active or activating stake fails
         let instruction = ixn::withdraw(
             &withdraw_source,
