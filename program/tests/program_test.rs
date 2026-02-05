@@ -31,16 +31,19 @@ use {
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 pub const NO_SIGNERS: &[Keypair] = &[];
 
-pub fn program_test(minimum_delegation_1sol: bool) -> ProgramTest {
-    let program_name = if minimum_delegation_1sol {
-        "solana_stake_program"
-    } else {
-        "solana_stake_program_1lamp"
-    };
+pub fn program_test() -> ProgramTest {
+    program_test_without_features(&[])
+}
 
+pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
     let mut program_test = ProgramTest::default();
     program_test.prefer_bpf(true);
-    program_test.add_upgradeable_program_to_genesis(program_name, &id());
+
+    for feature_id in feature_ids {
+        program_test.deactivate_feature(*feature_id);
+    }
+
+    program_test.add_upgradeable_program_to_genesis("solana_stake_program", &id());
 
     program_test
 }
@@ -372,14 +375,9 @@ pub async fn process_instruction_test_missing_signers(
         .unwrap();
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
 #[tokio::test]
-async fn program_test_stake_checked_instructions(minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_stake_checked_instructions() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -484,14 +482,9 @@ async fn program_test_stake_checked_instructions(minimum_delegation_1sol: bool) 
     .await;
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
 #[tokio::test]
-async fn program_test_stake_initialize(minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_stake_initialize() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -599,14 +592,9 @@ async fn program_test_stake_initialize(minimum_delegation_1sol: bool) {
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
 #[tokio::test]
-async fn program_test_authorize(minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_authorize() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -752,14 +740,9 @@ async fn program_test_authorize(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
 #[tokio::test]
-async fn program_test_stake_delegate(minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_stake_delegate() {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1009,17 +992,15 @@ impl StakeLifecycle {
     }
 }
 
-#[test_matrix(
-    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
-     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
-    [false, true]
-)]
+#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
+#[test_case(StakeLifecycle::Initialized; "initialized")]
+#[test_case(StakeLifecycle::Activating; "activating")]
+#[test_case(StakeLifecycle::Active; "active")]
+#[test_case(StakeLifecycle::Deactivating; "deactivating")]
+#[test_case(StakeLifecycle::Deactive; "deactive")]
 #[tokio::test]
-async fn program_test_split(split_source_type: StakeLifecycle, minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_split(split_source_type: StakeLifecycle) {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1082,15 +1063,7 @@ async fn program_test_split(split_source_type: StakeLifecycle, minimum_delegatio
         let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
-
-        assert_eq!(
-            e,
-            if minimum_delegation_1sol {
-                StakeError::InsufficientDelegation.into()
-            } else {
-                ProgramError::InsufficientFunds
-            }
-        );
+        assert_eq!(e, ProgramError::InsufficientFunds);
 
         // underfunded source fails
         let instruction = &ixn::split(
@@ -1176,20 +1149,16 @@ async fn program_test_split(split_source_type: StakeLifecycle, minimum_delegatio
     }
 }
 
-#[test_matrix(
-    [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
-     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive, StakeLifecycle::Closed],
-    [false, true]
-)]
+#[test_case(StakeLifecycle::Uninitialized; "uninitialized")]
+#[test_case(StakeLifecycle::Initialized; "initialized")]
+#[test_case(StakeLifecycle::Activating; "activating")]
+#[test_case(StakeLifecycle::Active; "active")]
+#[test_case(StakeLifecycle::Deactivating; "deactivating")]
+#[test_case(StakeLifecycle::Deactive; "deactive")]
+#[test_case(StakeLifecycle::Closed; "closed")]
 #[tokio::test]
-async fn program_test_withdraw_stake(
-    withdraw_source_type: StakeLifecycle,
-    minimum_delegation_1sol: bool,
-) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_withdraw_stake(withdraw_source_type: StakeLifecycle) {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1354,16 +1323,11 @@ async fn program_test_withdraw_stake(
     assert_eq!(e, ProgramError::InvalidAccountData);
 }
 
-#[test_case(false, false; "activating_1lamp")]
-#[test_case(false, true; "activating_1sol")]
-#[test_case(true, false; "active_1lamp")]
-#[test_case(true, true; "active_1sol")]
+#[test_case(false; "activating")]
+#[test_case(true; "active")]
 #[tokio::test]
-async fn program_test_deactivate(activate: bool, minimum_delegation_1sol: bool) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_deactivate(activate: bool) {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1434,23 +1398,19 @@ async fn program_test_deactivate(activate: bool, minimum_delegation_1sol: bool) 
     assert_eq!(e, StakeError::AlreadyDeactivated.into());
 }
 
+// XXX the original test_merge is a stupid test
+// the real thing is test_merge_active_stake which actively controls clock and
+// stake_history but im just trying to smoke test rn so lets do something
+// simpler
 #[test_matrix(
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
-     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
-    [false, true]
+     StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive]
 )]
 #[tokio::test]
-async fn program_test_merge(
-    merge_source_type: StakeLifecycle,
-    merge_dest_type: StakeLifecycle,
-    minimum_delegation_1sol: bool,
-) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+async fn program_test_merge(merge_source_type: StakeLifecycle, merge_dest_type: StakeLifecycle) {
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1565,7 +1525,6 @@ async fn program_test_merge(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [false, true],
-    [false, true],
     [false, true]
 )]
 #[tokio::test]
@@ -1574,12 +1533,8 @@ async fn program_test_move_stake(
     move_dest_type: StakeLifecycle,
     full_move: bool,
     has_lockup: bool,
-    minimum_delegation_1sol: bool,
 ) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -1823,7 +1778,6 @@ async fn program_test_move_stake(
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active,
      StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
     [false, true],
-    [false, true],
     [false, true]
 )]
 #[tokio::test]
@@ -1832,12 +1786,8 @@ async fn program_test_move_lamports(
     move_dest_type: StakeLifecycle,
     different_votes: bool,
     has_lockup: bool,
-    minimum_delegation_1sol: bool,
 ) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -2040,19 +1990,14 @@ async fn program_test_move_lamports(
     [(StakeLifecycle::Active, StakeLifecycle::Uninitialized),
      (StakeLifecycle::Uninitialized, StakeLifecycle::Initialized),
      (StakeLifecycle::Uninitialized, StakeLifecycle::Uninitialized)],
-    [false, true],
     [false, true]
 )]
 #[tokio::test]
 async fn program_test_move_uninitialized_fail(
     move_types: (StakeLifecycle, StakeLifecycle),
     move_lamports: bool,
-    minimum_delegation_1sol: bool,
 ) {
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 
@@ -2115,7 +2060,6 @@ async fn program_test_move_uninitialized_fail(
 #[test_matrix(
     [StakeLifecycle::Initialized, StakeLifecycle::Active, StakeLifecycle::Deactive],
     [StakeLifecycle::Initialized, StakeLifecycle::Activating, StakeLifecycle::Active, StakeLifecycle::Deactive],
-    [false, true],
     [false, true]
 )]
 #[tokio::test]
@@ -2123,7 +2067,6 @@ async fn program_test_move_general_fail(
     move_source_type: StakeLifecycle,
     move_dest_type: StakeLifecycle,
     move_lamports: bool,
-    minimum_delegation_1sol: bool,
 ) {
     // the test_matrix includes all valid source/dest combinations for MoveLamports
     // we dont test invalid combinations because they would fail regardless of the
@@ -2137,10 +2080,7 @@ async fn program_test_move_general_fail(
         return;
     }
 
-    let mut context = program_test(minimum_delegation_1sol)
-        .start_with_context()
-        .await;
-
+    let mut context = program_test().start_with_context().await;
     let accounts = Accounts::default();
     accounts.initialize(&mut context).await;
 

@@ -32,7 +32,6 @@ use {
         collections::{HashMap, HashSet},
         sync::LazyLock,
     },
-    test_case::test_case,
 };
 
 // StakeInterface encapsulates every combination of instruction, account states, and input parameters
@@ -141,16 +140,10 @@ struct Env {
 }
 impl Env {
     // set up a test environment with valid stake history, two vote accounts, and two blank stake accounts
-    fn init(minimum_delegation_1sol: bool) -> Self {
-        let program_name = if minimum_delegation_1sol {
-            "solana_stake_program"
-        } else {
-            "solana_stake_program_1lamp"
-        };
-
+    fn init() -> Self {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
-        let mut mollusk = Mollusk::new(&id(), program_name);
+        let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
         mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
@@ -976,33 +969,10 @@ fn fully_configurable_stake(
     }
 }
 
-// sanity check that our test binaries do in fact have the expected minimum delegation
-#[test]
-fn test_minimum_delegation() {
-    for minimum_delegation_1sol in [true, false] {
-        let env = Env::init(minimum_delegation_1sol);
-        let instruction = instruction::get_minimum_delegation();
-
-        let minimum_delegation: [u8; 8] = if minimum_delegation_1sol {
-            LAMPORTS_PER_SOL
-        } else {
-            1
-        }
-        .to_le_bytes();
-
-        env.mollusk.process_and_validate_instruction(
-            &instruction,
-            &[],
-            &[Check::success(), Check::return_data(&minimum_delegation)],
-        );
-    }
-}
-
 // test all unmodified transactions succeed, to ensure other tests test what they purport to test
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_all_success(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_all_success() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let instruction = declaration.to_instruction(&mut env);
@@ -1012,10 +982,9 @@ fn test_all_success(minimum_delegation_1sol: bool) {
 }
 
 // all signers are essential; missing any one signer is a fail
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_no_signer_bypass(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_no_signer_bypass() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let instruction = declaration.to_instruction(&mut env);
@@ -1033,10 +1002,9 @@ fn test_no_signer_bypass(minimum_delegation_1sol: bool) {
 }
 
 // operations that require a custodian fail without it
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_no_custodian_bypass(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_no_custodian_bypass() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         // skip if no lockup
@@ -1097,10 +1065,9 @@ fn test_no_custodian_bypass(minimum_delegation_1sol: bool) {
 
 // the stake program cannot be used during the epoch rewards period
 // the only exception to this is GetMinimumDelegation
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_epoch_rewards_period(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_epoch_rewards_period() {
+    let mut env = Env::init();
     env.mollusk.sysvars.epoch_rewards = EpochRewards {
         active: true,
         ..EpochRewards::default()
@@ -1119,10 +1086,9 @@ fn test_epoch_rewards_period(minimum_delegation_1sol: bool) {
 // other than Withdraw, instructions should fail with a zero-length stake account
 // account data is truncated for instructions that intend to deallocate the account
 // we want to ensure topping up such an account mid-transaction does not allow reuse
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_no_use_dealloc(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_no_use_dealloc() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let is_withdraw = matches!(declaration, StakeInterface::Withdraw { .. });
@@ -1171,10 +1137,9 @@ fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
         || pubkey == solana_sdk_ids::stake::config::id()
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_all_success_new_interface(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_all_success_new_interface() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let mut instruction = declaration.to_instruction(&mut env);
@@ -1188,10 +1153,9 @@ fn test_all_success_new_interface(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_no_signer_bypass_new_interface(minimum_delegation_1sol: bool) {
-    let mut env = Env::init(minimum_delegation_1sol);
+#[test]
+fn test_no_signer_bypass_new_interface() {
+    let mut env = Env::init();
 
     for declaration in &*INSTRUCTION_DECLARATIONS {
         let mut instruction = declaration.to_instruction(&mut env);
@@ -1220,7 +1184,7 @@ fn test_no_signer_bypass_new_interface(minimum_delegation_1sol: bool) {
 #[test]
 #[ignore]
 fn show_compute_usage() {
-    let mut env = Env::init(true);
+    let mut env = Env::init();
     solana_logger::setup_with("");
     env.mollusk.logger = Some(LogCollector::new_ref());
     let mut compute_tracker = ComputeTracker::new();

@@ -1,6 +1,7 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
+    agave_feature_set::stake_raise_minimum_delegation_to_1_sol,
     assert_matches::assert_matches,
     bincode::serialize,
     mollusk_svm::{result::Check, Mollusk},
@@ -12,7 +13,6 @@ use {
     solana_epoch_rewards::EpochRewards,
     solana_epoch_schedule::EpochSchedule,
     solana_instruction::{AccountMeta, Instruction},
-    solana_native_token::LAMPORTS_PER_SOL,
     solana_program_error::ProgramError,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
@@ -33,7 +33,7 @@ use {
         },
         MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION,
     },
-    solana_stake_program::id,
+    solana_stake_program::{get_minimum_delegation, id},
     solana_sysvar::{clock, epoch_rewards, epoch_schedule, rent, rewards},
     solana_sysvar_id::SysvarId,
     solana_vote_interface::state::{VoteStateV4, VoteStateVersions, MAX_EPOCH_CREDITS_HISTORY},
@@ -41,22 +41,12 @@ use {
     test_case::test_case,
 };
 
-fn get_minimum_delegation_for_tests(minimum_delegation_1sol: bool) -> u64 {
-    if minimum_delegation_1sol {
-        LAMPORTS_PER_SOL
-    } else {
-        1
-    }
-}
-
-fn mollusk_bpf(minimum_delegation_1sol: bool) -> Mollusk {
-    let program_name = if minimum_delegation_1sol {
-        "solana_stake_program"
-    } else {
-        "solana_stake_program_1lamp"
-    };
-
-    Mollusk::new(&id(), program_name)
+fn mollusk_bpf() -> Mollusk {
+    let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
+    mollusk
+        .feature_set
+        .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
+    mollusk
 }
 
 fn create_default_account() -> AccountSharedData {
@@ -354,10 +344,9 @@ mod config {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_process_instruction(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_process_instruction() {
+    let mollusk = mollusk_bpf();
 
     process_instruction_as_one_arg(
         &mollusk,
@@ -493,10 +482,9 @@ fn test_stake_process_instruction(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_process_instruction_decode_bail(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_process_instruction_decode_bail() {
+    let mollusk = mollusk_bpf();
 
     // these will not call stake_state, have bogus contents
     let stake_address = Pubkey::new_unique();
@@ -515,7 +503,7 @@ fn test_stake_process_instruction_decode_bail(minimum_delegation_1sol: bool) {
     #[allow(deprecated)]
     let config_account = config::create_account(0, &stake_config::Config::default());
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let withdrawal_amount = rent_exempt_reserve + minimum_delegation;
 
     // gets the "is_empty()" check
@@ -686,10 +674,9 @@ fn test_stake_process_instruction_decode_bail(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_checked_instructions(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_checked_instructions() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = Pubkey::new_unique();
     let staker = Pubkey::new_unique();
@@ -707,7 +694,7 @@ fn test_stake_checked_instructions(minimum_delegation_1sol: bool) {
     let rent_address = rent::id();
     let rent_account = create_account_shared_data_for_test(&rent);
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
 
     // Test InitializeChecked with non-signing withdrawer
     let mut instruction = initialize_checked(&stake_address, &Authorized { staker, withdrawer });
@@ -1049,10 +1036,9 @@ fn test_stake_checked_instructions(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_initialize(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_initialize() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -1154,10 +1140,9 @@ fn test_stake_initialize(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_authorize(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_authorize() {
+    let mollusk = mollusk_bpf();
 
     let authority_address = solana_pubkey::new_rand();
     let authority_address_2 = solana_pubkey::new_rand();
@@ -1341,10 +1326,9 @@ fn test_authorize(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_authorize_override(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_authorize_override() {
+    let mollusk = mollusk_bpf();
 
     let authority_address = solana_pubkey::new_rand();
     let mallory_address = solana_pubkey::new_rand();
@@ -1462,10 +1446,9 @@ fn test_authorize_override(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_authorize_with_seed(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_authorize_with_seed() {
+    let mollusk = mollusk_bpf();
 
     let authority_base_address = solana_pubkey::new_rand();
     let authority_address = solana_pubkey::new_rand();
@@ -1581,14 +1564,13 @@ fn test_authorize_with_seed(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_authorize_delegated_stake(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_authorize_delegated_stake() {
+    let mollusk = mollusk_bpf();
 
     let authority_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -1777,10 +1759,9 @@ fn test_authorize_delegated_stake(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_delegate(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_delegate() {
+    let mollusk = mollusk_bpf();
 
     let mut vote_state = VoteStateV4::default();
     for _ in 0..1000 {
@@ -1798,7 +1779,7 @@ fn test_stake_delegate(minimum_delegation_1sol: bool) {
     vote_account_2
         .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
     let mut stake_account = AccountSharedData::new_data_with_space(
@@ -2022,10 +2003,9 @@ fn test_stake_delegate(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_redelegate_consider_balance_changes(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_redelegate_consider_balance_changes() {
+    let mollusk = mollusk_bpf();
 
     let mut clock = Clock::default();
     let rent = Rent::default();
@@ -2226,10 +2206,9 @@ fn test_redelegate_consider_balance_changes(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split() {
+    let mollusk = mollusk_bpf();
 
     let stake_history = StakeHistory::default();
     let current_epoch = 100;
@@ -2238,7 +2217,7 @@ fn test_split(minimum_delegation_1sol: bool) {
         ..Clock::default()
     };
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation * 2;
     let split_to_address = solana_pubkey::new_rand();
     let split_to_account = AccountSharedData::new_data_with_space(
@@ -2359,16 +2338,15 @@ fn test_split(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_withdraw_stake(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_withdraw_stake() {
+    let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
     let authority_address = solana_pubkey::new_rand();
     let custodian_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -2662,14 +2640,13 @@ fn test_withdraw_stake(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_withdraw_stake_before_warmup(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_withdraw_stake_before_warmup() {
+    let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let total_lamports = stake_lamports + 33;
     let stake_account = AccountSharedData::new_data_with_space(
@@ -2794,10 +2771,9 @@ fn test_withdraw_stake_before_warmup(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_withdraw_lockup(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_withdraw_lockup() {
+    let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
     let custodian_address = solana_pubkey::new_rand();
@@ -2920,17 +2896,16 @@ fn test_withdraw_lockup(minimum_delegation_1sol: bool) {
     assert!(is_closed(&accounts[0]));
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_withdraw_rent_exempt(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_withdraw_rent_exempt() {
+    let mollusk = mollusk_bpf();
 
     let recipient_address = solana_pubkey::new_rand();
     let custodian_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = 7 * minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports + rent_exempt_reserve,
@@ -3018,13 +2993,12 @@ fn test_withdraw_rent_exempt(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_deactivate(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_deactivate() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -3146,15 +3120,14 @@ fn test_deactivate(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_set_lockup(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_set_lockup() {
+    let mollusk = mollusk_bpf();
 
     let custodian_address = solana_pubkey::new_rand();
     let authorized_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -3433,10 +3406,9 @@ fn test_set_lockup(minimum_delegation_1sol: bool) {
 /// Ensure that `initialize()` respects the minimum balance requirements
 /// - Assert 1: accounts with a balance equal-to the rent exemption initialize OK
 /// - Assert 2: accounts with a balance less-than the rent exemption do not initialize
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_initialize_minimum_balance(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_initialize_minimum_balance() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -3491,12 +3463,11 @@ fn test_initialize_minimum_balance(minimum_delegation_1sol: bool) {
 /// withdrawing below the minimum delegation, then re-delegating successfully (see
 /// `test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation()` for
 /// more information.)
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_delegate_minimum_stake_delegation(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_delegate_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = solana_pubkey::new_rand();
@@ -3593,12 +3564,11 @@ fn test_delegate_minimum_stake_delegation(minimum_delegation_1sol: bool) {
 ///  EQ     | LT   | Err
 ///  LT     | EQ   | Err
 ///  LT     | LT   | Err
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_minimum_stake_delegation(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -3632,19 +3602,14 @@ fn test_split_minimum_stake_delegation(minimum_delegation_1sol: bool) {
             is_writable: true,
         },
     ];
-    // with a 1lamp minimum delegation, cases 2 and 4 merely hit the zero split error
+    // NOTE with a 1lamp minimum delegation, cases 2 and 4 merely hit the zero split error
     // these would be InsufficientDelegation if the minimum were 1sol
-    let minimum_minus_1lamp_error = Err(if minimum_delegation_1sol {
-        StakeError::InsufficientDelegation.into()
-    } else {
-        ProgramError::InsufficientFunds
-    });
     for (source_delegation, split_amount, expected_result) in [
         (minimum_delegation * 2, minimum_delegation, Ok(())),
         (
             minimum_delegation * 2,
             minimum_delegation - 1,
-            minimum_minus_1lamp_error.clone(),
+            Err(ProgramError::InsufficientFunds),
         ),
         (
             (minimum_delegation * 2) - 1,
@@ -3654,7 +3619,7 @@ fn test_split_minimum_stake_delegation(minimum_delegation_1sol: bool) {
         (
             (minimum_delegation - 1) * 2,
             minimum_delegation - 1,
-            minimum_minus_1lamp_error.clone(),
+            Err(ProgramError::InsufficientFunds),
         ),
     ] {
         let source_account = AccountSharedData::new_data_with_space(
@@ -3703,12 +3668,11 @@ fn test_split_minimum_stake_delegation(minimum_delegation_1sol: bool) {
 ///   delegation is OK
 /// - Assert 2: splitting the full amount from an account that has less than the minimum
 ///   delegation is not OK
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_full_amount_minimum_stake_delegation(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_full_amount_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
@@ -3799,10 +3763,9 @@ fn test_split_full_amount_minimum_stake_delegation(minimum_delegation_1sol: bool
 /// Ensure that `split()` correctly handles prefunded destination accounts from
 /// initialized stakes.  When a destination account already has funds, ensure
 /// the minimum split amount reduces accordingly.
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_initialized_split_destination_minimum_balance(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_initialized_split_destination_minimum_balance() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -3891,12 +3854,14 @@ fn test_initialized_split_destination_minimum_balance(minimum_delegation_1sol: b
 /// Ensure that `split()` correctly handles prefunded destination accounts from staked stakes.
 /// When a destination account already has funds, ensure the minimum split amount reduces
 /// accordingly.
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_staked_split_destination_minimum_balance(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+// NOTE it is not presently possible to test 1sol minimum delegation
+// #[test_case(feature_set_all_enabled(), &[Err(StakeError::InsufficientDelegation.into()), Err(StakeError::InsufficientDelegation.into())]; "all_enabled")]
+#[test]
+fn test_staked_split_destination_minimum_balance() {
+    let mollusk = mollusk_bpf();
+    let expected_results = &[Ok(()), Ok(())];
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let current_epoch = 100;
@@ -3919,93 +3884,77 @@ fn test_staked_split_destination_minimum_balance(minimum_delegation_1sol: bool) 
         },
     ];
     for (destination_starting_balance, split_amount, expected_result) in [
-        // 0: split amount must be non zero
+        // split amount must be non zero
         (
             rent_exempt_reserve + minimum_delegation,
             0,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 1: destination is fully funded:
+        // destination is fully funded:
         // - old behavior: any split amount is OK
         // - new behavior: split amount must be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation,
             1,
-            if minimum_delegation_1sol {
-                Err(StakeError::InsufficientDelegation.into())
-            } else {
-                Ok(())
-            },
+            expected_results[0].clone(),
         ),
-        // 2: if destination is only short by 1 lamport, then...
+        // if destination is only short by 1 lamport, then...
         // - old behavior: split amount can be 1 lamport
         // - new behavior: split amount must be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation - 1,
             1,
-            if minimum_delegation_1sol {
-                Err(StakeError::InsufficientDelegation.into())
-            } else {
-                Ok(())
-            },
+            expected_results[1].clone(),
         ),
-        // 3: destination short by 2 lamports, so 1 isn't enough (non-zero split amount)
+        // destination short by 2 lamports, so 1 isn't enough (non-zero split amount)
         (
             rent_exempt_reserve + minimum_delegation - 2,
             1,
-            Err(if minimum_delegation_1sol {
-                StakeError::InsufficientDelegation.into()
-            } else {
-                ProgramError::InsufficientFunds
-            }),
+            Err(ProgramError::InsufficientFunds),
         ),
-        // 4: destination is rent exempt, so split enough for minimum delegation
+        // destination is rent exempt, so split enough for minimum delegation
         (rent_exempt_reserve, minimum_delegation, Ok(())),
-        // 5: destination is rent exempt, but split amount less than minimum delegation
+        // destination is rent exempt, but split amount less than minimum delegation
         (
             rent_exempt_reserve,
-            minimum_delegation - 1,
-            Err(if minimum_delegation_1sol {
-                StakeError::InsufficientDelegation.into()
-            } else {
-                ProgramError::InsufficientFunds
-            }),
+            minimum_delegation.saturating_sub(1), // when minimum is 0, this blows up!
+            Err(ProgramError::InsufficientFunds),
         ),
-        // 6: destination is not rent exempt, so any split amount fails, including enough for rent
+        // destination is not rent exempt, so any split amount fails, including enough for rent
         // and minimum delegation
         (
             rent_exempt_reserve - 1,
             minimum_delegation + 1,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 7: destination is not rent exempt, but split amount only for minimum delegation
+        // destination is not rent exempt, but split amount only for minimum delegation
         (
             rent_exempt_reserve - 1,
             minimum_delegation,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 8: destination is not rent exempt, so any split amount fails, including case where
+        // destination is not rent exempt, so any split amount fails, including case where
         // destination has smallest non-zero balance
         (
             1,
             rent_exempt_reserve + minimum_delegation - 1,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 9: destination has smallest non-zero balance, but cannot split less than the minimum
+        // destination has smallest non-zero balance, but cannot split less than the minimum
         // balance requirements minus what destination already has
         (
             1,
             rent_exempt_reserve + minimum_delegation - 2,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 10: destination has zero lamports, so any split amount fails, including at least rent
+        // destination has zero lamports, so any split amount fails, including at least rent
         // exempt reserve plus minimum delegation
         (
             0,
             rent_exempt_reserve + minimum_delegation,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 11: destination has zero lamports, but split amount is less than rent exempt reserve
+        // destination has zero lamports, but split amount is less than rent exempt reserve
         // plus minimum delegation
         (
             0,
@@ -4089,12 +4038,11 @@ fn test_staked_split_destination_minimum_balance(minimum_delegation_1sol: bool) 
 /// Ensure that `withdraw()` respects the minimum delegation requirements
 /// - Assert 1: withdrawing so remaining stake is equal-to the minimum is OK
 /// - Assert 2: withdrawing so remaining stake is less-than the minimum is not OK
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_withdraw_minimum_stake_delegation(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_withdraw_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = solana_pubkey::new_rand();
@@ -4198,14 +4146,11 @@ fn test_withdraw_minimum_stake_delegation(minimum_delegation_1sol: bool) {
 /// 3. Deactives the delegation
 /// 4. Withdraws from the account such that the ending balance is *below* rent + minimum delegation
 /// 5. Re-delegates, now with less than the minimum delegation, but it still succeeds
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation(
-    minimum_delegation_1sol: bool,
-) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegation() {
+    let mollusk = mollusk_bpf();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = solana_pubkey::new_rand();
@@ -4370,14 +4315,13 @@ fn test_behavior_withdrawal_then_redelegate_with_less_than_minimum_stake_delegat
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_source_uninitialized(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_source_uninitialized() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_pubkey::new_rand();
     let stake_account = AccountSharedData::new_data_with_space(
@@ -4487,10 +4431,9 @@ fn test_split_source_uninitialized(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_split_not_uninitialized(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_split_not_uninitialized() {
+    let mollusk = mollusk_bpf();
 
     let stake_lamports = 42;
     let stake_address = solana_pubkey::new_rand();
@@ -4540,16 +4483,15 @@ fn test_split_split_not_uninitialized(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_more_than_staked(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_more_than_staked() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_history = StakeHistory::default();
     let current_epoch = 100;
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_pubkey::new_rand();
     let stake_account = AccountSharedData::new_data_with_space(
@@ -4615,10 +4557,9 @@ fn test_split_more_than_staked(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_with_rent(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_with_rent() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -4628,7 +4569,7 @@ fn test_split_with_rent(minimum_delegation_1sol: bool) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_address = solana_pubkey::new_rand();
     let split_to_address = solana_pubkey::new_rand();
     let split_to_account = AccountSharedData::new_data_with_space(
@@ -4749,10 +4690,9 @@ fn test_split_with_rent(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_to_account_with_rent_exempt_reserve(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_to_account_with_rent_exempt_reserve() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -4761,7 +4701,7 @@ fn test_split_to_account_with_rent_exempt_reserve(minimum_delegation_1sol: bool)
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
@@ -4924,10 +4864,9 @@ fn test_split_to_account_with_rent_exempt_reserve(minimum_delegation_1sol: bool)
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_from_larger_sized_account(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_from_larger_sized_account() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let source_larger_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
@@ -4937,7 +4876,7 @@ fn test_split_from_larger_sized_account(minimum_delegation_1sol: bool) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = (source_larger_rent_exempt_reserve + minimum_delegation) * 2;
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
@@ -5094,10 +5033,9 @@ fn test_split_from_larger_sized_account(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_from_smaller_sized_account(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_from_smaller_sized_account() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let source_smaller_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5189,10 +5127,9 @@ fn test_split_from_smaller_sized_account(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_100_percent_of_source(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_100_percent_of_source() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5202,7 +5139,7 @@ fn test_split_100_percent_of_source(minimum_delegation_1sol: bool) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = rent_exempt_reserve + minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
@@ -5310,10 +5247,9 @@ fn test_split_100_percent_of_source(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_100_percent_of_source_to_account_with_lamports(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_100_percent_of_source_to_account_with_lamports() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5323,7 +5259,7 @@ fn test_split_100_percent_of_source_to_account_with_lamports(minimum_delegation_
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = rent_exempt_reserve + minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
@@ -5431,10 +5367,9 @@ fn test_split_100_percent_of_source_to_account_with_lamports(minimum_delegation_
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_rent_exemptness(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_rent_exemptness() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let source_rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of() + 100);
@@ -5445,7 +5380,7 @@ fn test_split_rent_exemptness(minimum_delegation_1sol: bool) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_lamports = source_rent_exempt_reserve + minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
@@ -5605,10 +5540,9 @@ fn test_split_rent_exemptness(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_split_require_rent_exempt_destination(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_split_require_rent_exempt_destination() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -5617,7 +5551,7 @@ fn test_split_require_rent_exempt_destination(minimum_delegation_1sol: bool) {
         epoch: current_epoch,
         ..Clock::default()
     };
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let delegation_amount = 3 * minimum_delegation;
     let source_lamports = rent_exempt_reserve + delegation_amount;
     let source_address = Pubkey::new_unique();
@@ -5801,10 +5735,9 @@ fn test_split_require_rent_exempt_destination(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let merge_from_address = solana_pubkey::new_rand();
@@ -5938,10 +5871,9 @@ fn test_merge(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge_self_fails(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge_self_fails() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let authorized_address = solana_pubkey::new_rand();
@@ -6017,10 +5949,9 @@ fn test_merge_self_fails(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge_incorrect_authorized_staker(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge_incorrect_authorized_staker() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let merge_from_address = solana_pubkey::new_rand();
@@ -6117,10 +6048,9 @@ fn test_merge_incorrect_authorized_staker(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge_invalid_account_data(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge_invalid_account_data() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let merge_from_address = solana_pubkey::new_rand();
@@ -6204,10 +6134,9 @@ fn test_merge_invalid_account_data(minimum_delegation_1sol: bool) {
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge_fake_stake_source(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge_fake_stake_source() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let merge_from_address = solana_pubkey::new_rand();
@@ -6277,10 +6206,9 @@ fn test_merge_fake_stake_source(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_merge_active_stake(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_merge_active_stake() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = solana_pubkey::new_rand();
     let merge_from_address = solana_pubkey::new_rand();
@@ -6545,14 +6473,13 @@ fn test_merge_active_stake(minimum_delegation_1sol: bool) {
     try_merge(&mollusk, transaction_accounts, instruction_accounts, Ok(()));
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_get_minimum_delegation(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_get_minimum_delegation() {
+    let mollusk = mollusk_bpf();
 
     let stake_address = Pubkey::new_unique();
     let stake_account = create_default_stake_account();
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let instruction_data = serialize(&StakeInstruction::GetMinimumDelegation).unwrap();
     let transaction_accounts = vec![(stake_address, stake_account)]
         .into_iter()
@@ -6585,10 +6512,9 @@ fn test_stake_get_minimum_delegation(minimum_delegation_1sol: bool) {
 // The GetMinimumDelegation instruction does not take any accounts; so when it was added,
 // `process_instruction()` needed to be updated to *not* need a stake account passed in, which
 // changes the error *ordering* conditions.
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_process_instruction_error_ordering(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_process_instruction_error_ordering() {
+    let mollusk = mollusk_bpf();
 
     let rent = Rent::default();
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
@@ -6657,10 +6583,9 @@ fn test_stake_process_instruction_error_ordering(minimum_delegation_1sol: bool) 
     }
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_deactivate_delinquent(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_deactivate_delinquent() {
+    let mollusk = mollusk_bpf();
 
     let reference_vote_address = Pubkey::new_unique();
     let vote_address = Pubkey::new_unique();
@@ -6930,10 +6855,9 @@ fn test_deactivate_delinquent(minimum_delegation_1sol: bool) {
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_stake_process_instruction_with_epoch_rewards_active(minimum_delegation_1sol: bool) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+#[test]
+fn test_stake_process_instruction_with_epoch_rewards_active() {
+    let mollusk = mollusk_bpf();
 
     let process_instruction_as_one_arg = |mollusk: &Mollusk,
                                           instruction: &Instruction,
@@ -7145,14 +7069,13 @@ impl VoteStateVersion {
 
 fn setup_delegate_test_with_vote_account(
     vote_account: AccountSharedData,
-    minimum_delegation_1sol: bool,
 ) -> (Mollusk, Vec<AccountMeta>, Vec<(Pubkey, AccountSharedData)>) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+    let mollusk = mollusk_bpf();
 
     let vote_address = Pubkey::new_unique();
     let stake_address = Pubkey::new_unique();
 
-    let minimum_delegation = get_minimum_delegation_for_tests(minimum_delegation_1sol);
+    let minimum_delegation = crate::get_minimum_delegation();
     let stake_account = AccountSharedData::new_data_with_space(
         minimum_delegation,
         &StakeStateV2::Initialized(Meta {
@@ -7218,9 +7141,8 @@ fn setup_delegate_test_with_vote_account(
 
 fn setup_deactivate_delinquent_test_with_vote_account(
     vote_account: AccountSharedData,
-    minimum_delegation_1sol: bool,
 ) -> (Mollusk, Vec<AccountMeta>, Vec<(Pubkey, AccountSharedData)>) {
-    let mollusk = mollusk_bpf(minimum_delegation_1sol);
+    let mollusk = mollusk_bpf();
 
     let reference_vote_address = Pubkey::new_unique();
     let vote_address = Pubkey::new_unique();
@@ -7293,9 +7215,8 @@ fn setup_deactivate_delinquent_test_with_vote_account(
     (mollusk, instruction_accounts, transaction_accounts)
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_delegate_incorrect_vote_owner(minimum_delegation_1sol: bool) {
+#[test]
+fn test_delegate_incorrect_vote_owner() {
     // Create vote account with incorrect owner.
     let wrong_owner = Pubkey::new_unique();
     let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
@@ -7308,7 +7229,7 @@ fn test_delegate_incorrect_vote_owner(minimum_delegation_1sol: bool) {
     .unwrap();
 
     let (mollusk, instruction_accounts, transaction_accounts) =
-        setup_delegate_test_with_vote_account(vote_account, minimum_delegation_1sol);
+        setup_delegate_test_with_vote_account(vote_account);
 
     process_instruction(
         &mollusk,
@@ -7322,22 +7243,13 @@ fn test_delegate_incorrect_vote_owner(minimum_delegation_1sol: bool) {
 // Just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
 // deserialize with `InvalidAccountData`. In other words, the behavior is
 // unchanged.
-#[test_case(
-    VoteStateVersion::V0_23_5,
-    Err(ProgramError::InvalidAccountData),
-    false
-)]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()), false)]
-#[test_case(VoteStateVersion::V3, Ok(()), false)]
-#[test_case(VoteStateVersion::V4, Ok(()), false)]
-#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData), true)]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()), true)]
-#[test_case(VoteStateVersion::V3, Ok(()), true)]
-#[test_case(VoteStateVersion::V4, Ok(()), true)]
+#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
+#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
+#[test_case(VoteStateVersion::V3, Ok(()))]
+#[test_case(VoteStateVersion::V4, Ok(()))]
 fn test_delegate_deserialize_vote_state(
     vote_state_version: VoteStateVersion,
     expected_result: Result<(), ProgramError>,
-    minimum_delegation_1sol: bool,
 ) {
     let vote_state = vote_state_version.default_vote_state();
     let vote_account = AccountSharedData::new_data_with_space(
@@ -7349,7 +7261,7 @@ fn test_delegate_deserialize_vote_state(
     .unwrap();
 
     let (mollusk, instruction_accounts, transaction_accounts) =
-        setup_delegate_test_with_vote_account(vote_account, minimum_delegation_1sol);
+        setup_delegate_test_with_vote_account(vote_account);
 
     process_instruction(
         &mollusk,
@@ -7360,9 +7272,8 @@ fn test_delegate_deserialize_vote_state(
     );
 }
 
-#[test_case(true; "minimum_delegation_1sol")]
-#[test_case(false; "minimum_delegation_1lamp")]
-fn test_deactivate_delinquent_incorrect_vote_owner(minimum_delegation_1sol: bool) {
+#[test]
+fn test_deactivate_delinquent_incorrect_vote_owner() {
     // Create vote account with incorrect owner.
     let wrong_owner = Pubkey::new_unique();
     let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
@@ -7375,7 +7286,7 @@ fn test_deactivate_delinquent_incorrect_vote_owner(minimum_delegation_1sol: bool
     .unwrap();
 
     let (mollusk, instruction_accounts, transaction_accounts) =
-        setup_deactivate_delinquent_test_with_vote_account(vote_account, minimum_delegation_1sol);
+        setup_deactivate_delinquent_test_with_vote_account(vote_account);
 
     process_instruction(
         &mollusk,
@@ -7388,22 +7299,13 @@ fn test_deactivate_delinquent_incorrect_vote_owner(minimum_delegation_1sol: bool
 
 // Again, just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
 // deserialize with `InvalidAccountData`. Again, the behavior is unchanged.
-#[test_case(
-    VoteStateVersion::V0_23_5,
-    Err(ProgramError::InvalidAccountData),
-    false
-)]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()), false)]
-#[test_case(VoteStateVersion::V3, Ok(()), false)]
-#[test_case(VoteStateVersion::V4, Ok(()), false)]
-#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData), true)]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()), true)]
-#[test_case(VoteStateVersion::V3, Ok(()), true)]
-#[test_case(VoteStateVersion::V4, Ok(()), true)]
+#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
+#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
+#[test_case(VoteStateVersion::V3, Ok(()))]
+#[test_case(VoteStateVersion::V4, Ok(()))]
 fn test_deactivate_delinquent_deserialize_vote_state(
     vote_state_version: VoteStateVersion,
     expected_result: Result<(), ProgramError>,
-    minimum_delegation_1sol: bool,
 ) {
     // Create delinquent vote account with the specified version
     let vote_state = vote_state_version.default_vote_state();
@@ -7416,7 +7318,7 @@ fn test_deactivate_delinquent_deserialize_vote_state(
     .unwrap();
 
     let (mollusk, instruction_accounts, transaction_accounts) =
-        setup_deactivate_delinquent_test_with_vote_account(vote_account, minimum_delegation_1sol);
+        setup_deactivate_delinquent_test_with_vote_account(vote_account);
 
     process_instruction(
         &mollusk,
