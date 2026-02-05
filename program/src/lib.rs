@@ -1,4 +1,3 @@
-#[cfg(feature = "minimum_delegation_1sol")]
 use solana_native_token::LAMPORTS_PER_SOL;
 
 pub mod helpers;
@@ -23,15 +22,8 @@ const PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH: Option<u64> = Some(0);
 /// NOTE: This is also used to calculate the minimum balance of a delegated
 /// stake account, which is the rent exempt reserve _plus_ the minimum stake
 /// delegation.
-#[cfg(feature = "minimum_delegation_1sol")]
 #[inline(always)]
 pub fn get_minimum_delegation() -> u64 {
     const MINIMUM_DELEGATION_SOL: u64 = 1;
     MINIMUM_DELEGATION_SOL * LAMPORTS_PER_SOL
-}
-
-#[cfg(not(feature = "minimum_delegation_1sol"))]
-#[inline(always)]
-pub fn get_minimum_delegation() -> u64 {
-    1
 }
