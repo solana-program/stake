@@ -3602,24 +3602,30 @@ fn test_split_minimum_stake_delegation() {
             is_writable: true,
         },
     ];
-    // NOTE with a 1lamp minimum delegation, cases 2 and 4 merely hit the zero split error
-    // these would be InsufficientDelegation if the minimum were 1sol
     for (source_delegation, split_amount, expected_result) in [
+        // 0: source is twice minimum, we split minimum
+        // success
         (minimum_delegation * 2, minimum_delegation, Ok(())),
+        // 1: source is twice minimum, we split one less than minimum
+        // dest stake becomes underfunded
         (
             minimum_delegation * 2,
             minimum_delegation - 1,
-            Err(ProgramError::InsufficientFunds),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
+        // 2: source is one less than twice minimum, we split minimum
+        // source stake becomes underfunded
         (
             (minimum_delegation * 2) - 1,
             minimum_delegation,
             Err(StakeError::InsufficientDelegation.into()),
         ),
+        // 3: source is two less than twice minimum, we split one less than minimum
+        // both stakes become underfunded
         (
             (minimum_delegation - 1) * 2,
             minimum_delegation - 1,
-            Err(ProgramError::InsufficientFunds),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
     ] {
         let source_account = AccountSharedData::new_data_with_space(
@@ -3854,12 +3860,9 @@ fn test_initialized_split_destination_minimum_balance() {
 /// Ensure that `split()` correctly handles prefunded destination accounts from staked stakes.
 /// When a destination account already has funds, ensure the minimum split amount reduces
 /// accordingly.
-// NOTE it is not presently possible to test 1sol minimum delegation
-// #[test_case(feature_set_all_enabled(), &[Err(StakeError::InsufficientDelegation.into()), Err(StakeError::InsufficientDelegation.into())]; "all_enabled")]
 #[test]
 fn test_staked_split_destination_minimum_balance() {
     let mollusk = mollusk_bpf();
-    let expected_results = &[Ok(()), Ok(())];
 
     let minimum_delegation = crate::get_minimum_delegation();
     let rent = Rent::default();
@@ -3884,77 +3887,77 @@ fn test_staked_split_destination_minimum_balance() {
         },
     ];
     for (destination_starting_balance, split_amount, expected_result) in [
-        // split amount must be non zero
+        // 0: split amount must be non zero
         (
             rent_exempt_reserve + minimum_delegation,
             0,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination is fully funded:
+        // 1: destination is fully funded:
         // - old behavior: any split amount is OK
         // - new behavior: split amount must be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation,
             1,
-            expected_results[0].clone(),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
-        // if destination is only short by 1 lamport, then...
+        // 2: if destination is only short by 1 lamport, then...
         // - old behavior: split amount can be 1 lamport
         // - new behavior: split amount must be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation - 1,
             1,
-            expected_results[1].clone(),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
-        // destination short by 2 lamports, so 1 isn't enough (non-zero split amount)
+        // 3: destination short by 2 lamports, so 1 isn't enough (non-zero split amount)
         (
             rent_exempt_reserve + minimum_delegation - 2,
             1,
-            Err(ProgramError::InsufficientFunds),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
-        // destination is rent exempt, so split enough for minimum delegation
+        // 4: destination is rent exempt, so split enough for minimum delegation
         (rent_exempt_reserve, minimum_delegation, Ok(())),
-        // destination is rent exempt, but split amount less than minimum delegation
+        // 5: destination is rent exempt, but split amount less than minimum delegation
         (
             rent_exempt_reserve,
             minimum_delegation.saturating_sub(1), // when minimum is 0, this blows up!
-            Err(ProgramError::InsufficientFunds),
+            Err(StakeError::InsufficientDelegation.into()),
         ),
-        // destination is not rent exempt, so any split amount fails, including enough for rent
+        // 6: destination is not rent exempt, so any split amount fails, including enough for rent
         // and minimum delegation
         (
             rent_exempt_reserve - 1,
             minimum_delegation + 1,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination is not rent exempt, but split amount only for minimum delegation
+        // 7: destination is not rent exempt, but split amount only for minimum delegation
         (
             rent_exempt_reserve - 1,
             minimum_delegation,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination is not rent exempt, so any split amount fails, including case where
+        // 8: destination is not rent exempt, so any split amount fails, including case where
         // destination has smallest non-zero balance
         (
             1,
             rent_exempt_reserve + minimum_delegation - 1,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination has smallest non-zero balance, but cannot split less than the minimum
+        // 9: destination has smallest non-zero balance, but cannot split less than the minimum
         // balance requirements minus what destination already has
         (
             1,
             rent_exempt_reserve + minimum_delegation - 2,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination has zero lamports, so any split amount fails, including at least rent
+        // 10: destination has zero lamports, so any split amount fails, including at least rent
         // exempt reserve plus minimum delegation
         (
             0,
             rent_exempt_reserve + minimum_delegation,
             Err(ProgramError::InsufficientFunds),
         ),
-        // destination has zero lamports, but split amount is less than rent exempt reserve
+        // 11: destination has zero lamports, but split amount is less than rent exempt reserve
         // plus minimum delegation
         (
             0,
