@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 program-id = "Stake11111111111111111111111111111111111111"
 
 [dependencies]
-borsh = { version = "1.5.7", features = ["derive", "unstable__schema"], optional = true }
+borsh = { version = "1.6.0", features = ["derive", "unstable__schema"], optional = true }
 codama = { version = "0.7.1", optional = true }
 codama-macros = { version = "0.7.2", optional = true }
 num-traits = "0.2"
