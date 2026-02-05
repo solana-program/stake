@@ -3893,23 +3893,22 @@ fn test_staked_split_destination_minimum_balance() {
             0,
             Err(ProgramError::InsufficientFunds),
         ),
-        // 1: destination is fully funded:
-        // - old behavior: any split amount is OK
-        // - new behavior: split amount must be at least the minimum delegation
+        // 1: destination is fully funded
+        // split amount must still be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation,
-            1,
+            minimum_delegation - 1,
             Err(StakeError::InsufficientDelegation.into()),
         ),
-        // 2: if destination is only short by 1 lamport, then...
-        // - old behavior: split amount can be 1 lamport
-        // - new behavior: split amount must be at least the minimum delegation
+        // 2: destination is short by 1 lamport
+        // split amount must still be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation - 1,
             1,
             Err(StakeError::InsufficientDelegation.into()),
         ),
-        // 3: destination short by 2 lamports, so 1 isn't enough (non-zero split amount)
+        // 3: destination short by 2 lamports
+        // split amount must still be at least the minimum delegation
         (
             rent_exempt_reserve + minimum_delegation - 2,
             1,
@@ -3920,7 +3919,7 @@ fn test_staked_split_destination_minimum_balance() {
         // 5: destination is rent exempt, but split amount less than minimum delegation
         (
             rent_exempt_reserve,
-            minimum_delegation.saturating_sub(1), // when minimum is 0, this blows up!
+            minimum_delegation - 1,
             Err(StakeError::InsufficientDelegation.into()),
         ),
         // 6: destination is not rent exempt, so any split amount fails, including enough for rent
