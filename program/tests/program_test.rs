@@ -1048,8 +1048,8 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         }
     );
 
-    // an active or transitioning stake account cannot have less than the minimum
-    // delegation note this is NOT dependent on the minimum delegation feature.
+    // an active or transitioning stake account cannot have less than the minimum delegation
+    // this is NOT dependent on the one sol minimum delegation feature
     // there was ALWAYS a minimum. it was one lamport!
     if split_source_type.minimum_delegation_enforced() {
         // underfunded destination fails
@@ -1063,7 +1063,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
-        assert_eq!(e, ProgramError::InsufficientFunds);
+        assert_eq!(e, StakeError::InsufficientDelegation.into());
 
         // underfunded source fails
         let instruction = &ixn::split(
@@ -1398,10 +1398,6 @@ async fn program_test_deactivate(activate: bool) {
     assert_eq!(e, StakeError::AlreadyDeactivated.into());
 }
 
-// XXX the original test_merge is a stupid test
-// the real thing is test_merge_active_stake which actively controls clock and
-// stake_history but im just trying to smoke test rn so lets do something
-// simpler
 #[test_matrix(
     [StakeLifecycle::Uninitialized, StakeLifecycle::Initialized, StakeLifecycle::Activating,
      StakeLifecycle::Active, StakeLifecycle::Deactivating, StakeLifecycle::Deactive],
