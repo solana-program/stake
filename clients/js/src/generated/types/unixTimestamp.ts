@@ -7,12 +7,12 @@
  */
 
 import {
-  combineCodec,
-  getI64Decoder,
-  getI64Encoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getI64Decoder,
+    getI64Encoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type UnixTimestamp = bigint;
@@ -20,16 +20,13 @@ export type UnixTimestamp = bigint;
 export type UnixTimestampArgs = number | bigint;
 
 export function getUnixTimestampEncoder(): FixedSizeEncoder<UnixTimestampArgs> {
-  return getI64Encoder();
+    return getI64Encoder();
 }
 
 export function getUnixTimestampDecoder(): FixedSizeDecoder<UnixTimestamp> {
-  return getI64Decoder();
+    return getI64Decoder();
 }
 
-export function getUnixTimestampCodec(): FixedSizeCodec<
-  UnixTimestampArgs,
-  UnixTimestamp
-> {
-  return combineCodec(getUnixTimestampEncoder(), getUnixTimestampDecoder());
+export function getUnixTimestampCodec(): FixedSizeCodec<UnixTimestampArgs, UnixTimestamp> {
+    return combineCodec(getUnixTimestampEncoder(), getUnixTimestampDecoder());
 }

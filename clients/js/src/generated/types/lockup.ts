@@ -7,55 +7,47 @@
  */
 
 import {
-  combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
-  getStructDecoder,
-  getStructEncoder,
-  type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getAddressDecoder,
+    getAddressEncoder,
+    getStructDecoder,
+    getStructEncoder,
+    type Address,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 import {
-  getEpochDecoder,
-  getEpochEncoder,
-  getUnixTimestampDecoder,
-  getUnixTimestampEncoder,
-  type Epoch,
-  type EpochArgs,
-  type UnixTimestamp,
-  type UnixTimestampArgs,
+    getEpochDecoder,
+    getEpochEncoder,
+    getUnixTimestampDecoder,
+    getUnixTimestampEncoder,
+    type Epoch,
+    type EpochArgs,
+    type UnixTimestamp,
+    type UnixTimestampArgs,
 } from '.';
 
-export type Lockup = {
-  unixTimestamp: UnixTimestamp;
-  epoch: Epoch;
-  custodian: Address;
-};
+export type Lockup = { unixTimestamp: UnixTimestamp; epoch: Epoch; custodian: Address };
 
-export type LockupArgs = {
-  unixTimestamp: UnixTimestampArgs;
-  epoch: EpochArgs;
-  custodian: Address;
-};
+export type LockupArgs = { unixTimestamp: UnixTimestampArgs; epoch: EpochArgs; custodian: Address };
 
 export function getLockupEncoder(): FixedSizeEncoder<LockupArgs> {
-  return getStructEncoder([
-    ['unixTimestamp', getUnixTimestampEncoder()],
-    ['epoch', getEpochEncoder()],
-    ['custodian', getAddressEncoder()],
-  ]);
+    return getStructEncoder([
+        ['unixTimestamp', getUnixTimestampEncoder()],
+        ['epoch', getEpochEncoder()],
+        ['custodian', getAddressEncoder()],
+    ]);
 }
 
 export function getLockupDecoder(): FixedSizeDecoder<Lockup> {
-  return getStructDecoder([
-    ['unixTimestamp', getUnixTimestampDecoder()],
-    ['epoch', getEpochDecoder()],
-    ['custodian', getAddressDecoder()],
-  ]);
+    return getStructDecoder([
+        ['unixTimestamp', getUnixTimestampDecoder()],
+        ['epoch', getEpochDecoder()],
+        ['custodian', getAddressDecoder()],
+    ]);
 }
 
 export function getLockupCodec(): FixedSizeCodec<LockupArgs, Lockup> {
-  return combineCodec(getLockupEncoder(), getLockupDecoder());
+    return combineCodec(getLockupEncoder(), getLockupDecoder());
 }

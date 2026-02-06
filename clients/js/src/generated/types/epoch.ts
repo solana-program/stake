@@ -7,12 +7,12 @@
  */
 
 import {
-  combineCodec,
-  getU64Decoder,
-  getU64Encoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getU64Decoder,
+    getU64Encoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type Epoch = bigint;
@@ -20,13 +20,13 @@ export type Epoch = bigint;
 export type EpochArgs = number | bigint;
 
 export function getEpochEncoder(): FixedSizeEncoder<EpochArgs> {
-  return getU64Encoder();
+    return getU64Encoder();
 }
 
 export function getEpochDecoder(): FixedSizeDecoder<Epoch> {
-  return getU64Decoder();
+    return getU64Decoder();
 }
 
 export function getEpochCodec(): FixedSizeCodec<EpochArgs, Epoch> {
-  return combineCodec(getEpochEncoder(), getEpochDecoder());
+    return combineCodec(getEpochEncoder(), getEpochDecoder());
 }

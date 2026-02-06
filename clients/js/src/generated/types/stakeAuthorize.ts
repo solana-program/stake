@@ -7,32 +7,29 @@
  */
 
 import {
-  combineCodec,
-  getEnumDecoder,
-  getEnumEncoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getEnumDecoder,
+    getEnumEncoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 
 export enum StakeAuthorize {
-  Staker,
-  Withdrawer,
+    Staker,
+    Withdrawer,
 }
 
 export type StakeAuthorizeArgs = StakeAuthorize;
 
 export function getStakeAuthorizeEncoder(): FixedSizeEncoder<StakeAuthorizeArgs> {
-  return getEnumEncoder(StakeAuthorize);
+    return getEnumEncoder(StakeAuthorize);
 }
 
 export function getStakeAuthorizeDecoder(): FixedSizeDecoder<StakeAuthorize> {
-  return getEnumDecoder(StakeAuthorize);
+    return getEnumDecoder(StakeAuthorize);
 }
 
-export function getStakeAuthorizeCodec(): FixedSizeCodec<
-  StakeAuthorizeArgs,
-  StakeAuthorize
-> {
-  return combineCodec(getStakeAuthorizeEncoder(), getStakeAuthorizeDecoder());
+export function getStakeAuthorizeCodec(): FixedSizeCodec<StakeAuthorizeArgs, StakeAuthorize> {
+    return combineCodec(getStakeAuthorizeEncoder(), getStakeAuthorizeDecoder());
 }

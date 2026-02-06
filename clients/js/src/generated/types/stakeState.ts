@@ -7,125 +7,94 @@
  */
 
 import {
-  combineCodec,
-  getDiscriminatedUnionDecoder,
-  getDiscriminatedUnionEncoder,
-  getStructDecoder,
-  getStructEncoder,
-  getTupleDecoder,
-  getTupleEncoder,
-  getU32Decoder,
-  getU32Encoder,
-  getUnitDecoder,
-  getUnitEncoder,
-  type Codec,
-  type Decoder,
-  type Encoder,
-  type GetDiscriminatedUnionVariant,
-  type GetDiscriminatedUnionVariantContent,
+    combineCodec,
+    getDiscriminatedUnionDecoder,
+    getDiscriminatedUnionEncoder,
+    getStructDecoder,
+    getStructEncoder,
+    getTupleDecoder,
+    getTupleEncoder,
+    getU32Decoder,
+    getU32Encoder,
+    getUnitDecoder,
+    getUnitEncoder,
+    type Codec,
+    type Decoder,
+    type Encoder,
+    type GetDiscriminatedUnionVariant,
+    type GetDiscriminatedUnionVariantContent,
 } from '@solana/kit';
 import {
-  getMetaDecoder,
-  getMetaEncoder,
-  getStakeDecoder,
-  getStakeEncoder,
-  type Meta,
-  type MetaArgs,
-  type Stake,
-  type StakeArgs,
+    getMetaDecoder,
+    getMetaEncoder,
+    getStakeDecoder,
+    getStakeEncoder,
+    type Meta,
+    type MetaArgs,
+    type Stake,
+    type StakeArgs,
 } from '.';
 
 export type StakeState =
-  | { __kind: 'Uninitialized' }
-  | { __kind: 'Initialized'; fields: readonly [Meta] }
-  | { __kind: 'Stake'; fields: readonly [Meta, Stake] }
-  | { __kind: 'RewardsPool' };
+    | { __kind: 'Uninitialized' }
+    | { __kind: 'Initialized'; fields: readonly [Meta] }
+    | { __kind: 'Stake'; fields: readonly [Meta, Stake] }
+    | { __kind: 'RewardsPool' };
 
 export type StakeStateArgs =
-  | { __kind: 'Uninitialized' }
-  | { __kind: 'Initialized'; fields: readonly [MetaArgs] }
-  | { __kind: 'Stake'; fields: readonly [MetaArgs, StakeArgs] }
-  | { __kind: 'RewardsPool' };
+    | { __kind: 'Uninitialized' }
+    | { __kind: 'Initialized'; fields: readonly [MetaArgs] }
+    | { __kind: 'Stake'; fields: readonly [MetaArgs, StakeArgs] }
+    | { __kind: 'RewardsPool' };
 
 export function getStakeStateEncoder(): Encoder<StakeStateArgs> {
-  return getDiscriminatedUnionEncoder(
-    [
-      ['Uninitialized', getUnitEncoder()],
-      [
-        'Initialized',
-        getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]]),
-      ],
-      [
-        'Stake',
-        getStructEncoder([
-          ['fields', getTupleEncoder([getMetaEncoder(), getStakeEncoder()])],
-        ]),
-      ],
-      ['RewardsPool', getUnitEncoder()],
-    ],
-    { size: getU32Encoder() }
-  );
+    return getDiscriminatedUnionEncoder(
+        [
+            ['Uninitialized', getUnitEncoder()],
+            ['Initialized', getStructEncoder([['fields', getTupleEncoder([getMetaEncoder()])]])],
+            ['Stake', getStructEncoder([['fields', getTupleEncoder([getMetaEncoder(), getStakeEncoder()])]])],
+            ['RewardsPool', getUnitEncoder()],
+        ],
+        { size: getU32Encoder() },
+    );
 }
 
 export function getStakeStateDecoder(): Decoder<StakeState> {
-  return getDiscriminatedUnionDecoder(
-    [
-      ['Uninitialized', getUnitDecoder()],
-      [
-        'Initialized',
-        getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]]),
-      ],
-      [
-        'Stake',
-        getStructDecoder([
-          ['fields', getTupleDecoder([getMetaDecoder(), getStakeDecoder()])],
-        ]),
-      ],
-      ['RewardsPool', getUnitDecoder()],
-    ],
-    { size: getU32Decoder() }
-  );
+    return getDiscriminatedUnionDecoder(
+        [
+            ['Uninitialized', getUnitDecoder()],
+            ['Initialized', getStructDecoder([['fields', getTupleDecoder([getMetaDecoder()])]])],
+            ['Stake', getStructDecoder([['fields', getTupleDecoder([getMetaDecoder(), getStakeDecoder()])]])],
+            ['RewardsPool', getUnitDecoder()],
+        ],
+        { size: getU32Decoder() },
+    );
 }
 
 export function getStakeStateCodec(): Codec<StakeStateArgs, StakeState> {
-  return combineCodec(getStakeStateEncoder(), getStakeStateDecoder());
+    return combineCodec(getStakeStateEncoder(), getStakeStateDecoder());
 }
 
 // Data Enum Helpers.
 export function stakeState(
-  kind: 'Uninitialized'
+    kind: 'Uninitialized',
 ): GetDiscriminatedUnionVariant<StakeStateArgs, '__kind', 'Uninitialized'>;
 export function stakeState(
-  kind: 'Initialized',
-  data: GetDiscriminatedUnionVariantContent<
-    StakeStateArgs,
-    '__kind',
-    'Initialized'
-  >['fields']
+    kind: 'Initialized',
+    data: GetDiscriminatedUnionVariantContent<StakeStateArgs, '__kind', 'Initialized'>['fields'],
 ): GetDiscriminatedUnionVariant<StakeStateArgs, '__kind', 'Initialized'>;
 export function stakeState(
-  kind: 'Stake',
-  data: GetDiscriminatedUnionVariantContent<
-    StakeStateArgs,
-    '__kind',
-    'Stake'
-  >['fields']
+    kind: 'Stake',
+    data: GetDiscriminatedUnionVariantContent<StakeStateArgs, '__kind', 'Stake'>['fields'],
 ): GetDiscriminatedUnionVariant<StakeStateArgs, '__kind', 'Stake'>;
-export function stakeState(
-  kind: 'RewardsPool'
-): GetDiscriminatedUnionVariant<StakeStateArgs, '__kind', 'RewardsPool'>;
-export function stakeState<K extends StakeStateArgs['__kind'], Data>(
-  kind: K,
-  data?: Data
-) {
-  return Array.isArray(data)
-    ? { __kind: kind, fields: data }
-    : { __kind: kind, ...(data ?? {}) };
+export function stakeState(kind: 'RewardsPool'): GetDiscriminatedUnionVariant<StakeStateArgs, '__kind', 'RewardsPool'>;
+export function stakeState<K extends StakeStateArgs['__kind'], Data>(kind: K, data?: Data) {
+    return Array.isArray(data) ? { __kind: kind, fields: data } : { __kind: kind, ...(data ?? {}) };
 }
 
 export function isStakeState<K extends StakeState['__kind']>(
-  kind: K,
-  value: StakeState
+    kind: K,
+    value: StakeState,
 ): value is StakeState & { __kind: K } {
-  return value.__kind === kind;
+    return value.__kind === kind;
 }

@@ -7,43 +7,35 @@
  */
 
 import {
-  combineCodec,
-  getStructDecoder,
-  getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getStructDecoder,
+    getStructEncoder,
+    getU64Decoder,
+    getU64Encoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
-import {
-  getDelegationDecoder,
-  getDelegationEncoder,
-  type Delegation,
-  type DelegationArgs,
-} from '.';
+import { getDelegationDecoder, getDelegationEncoder, type Delegation, type DelegationArgs } from '.';
 
 export type Stake = { delegation: Delegation; creditsObserved: bigint };
 
-export type StakeArgs = {
-  delegation: DelegationArgs;
-  creditsObserved: number | bigint;
-};
+export type StakeArgs = { delegation: DelegationArgs; creditsObserved: number | bigint };
 
 export function getStakeEncoder(): FixedSizeEncoder<StakeArgs> {
-  return getStructEncoder([
-    ['delegation', getDelegationEncoder()],
-    ['creditsObserved', getU64Encoder()],
-  ]);
+    return getStructEncoder([
+        ['delegation', getDelegationEncoder()],
+        ['creditsObserved', getU64Encoder()],
+    ]);
 }
 
 export function getStakeDecoder(): FixedSizeDecoder<Stake> {
-  return getStructDecoder([
-    ['delegation', getDelegationDecoder()],
-    ['creditsObserved', getU64Decoder()],
-  ]);
+    return getStructDecoder([
+        ['delegation', getDelegationDecoder()],
+        ['creditsObserved', getU64Decoder()],
+    ]);
 }
 
 export function getStakeCodec(): FixedSizeCodec<StakeArgs, Stake> {
-  return combineCodec(getStakeEncoder(), getStakeDecoder());
+    return combineCodec(getStakeEncoder(), getStakeDecoder());
 }

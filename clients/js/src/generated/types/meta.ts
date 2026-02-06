@@ -7,54 +7,46 @@
  */
 
 import {
-  combineCodec,
-  getStructDecoder,
-  getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getStructDecoder,
+    getStructEncoder,
+    getU64Decoder,
+    getU64Encoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 import {
-  getAuthorizedDecoder,
-  getAuthorizedEncoder,
-  getLockupDecoder,
-  getLockupEncoder,
-  type Authorized,
-  type AuthorizedArgs,
-  type Lockup,
-  type LockupArgs,
+    getAuthorizedDecoder,
+    getAuthorizedEncoder,
+    getLockupDecoder,
+    getLockupEncoder,
+    type Authorized,
+    type AuthorizedArgs,
+    type Lockup,
+    type LockupArgs,
 } from '.';
 
-export type Meta = {
-  rentExemptReserve: bigint;
-  authorized: Authorized;
-  lockup: Lockup;
-};
+export type Meta = { rentExemptReserve: bigint; authorized: Authorized; lockup: Lockup };
 
-export type MetaArgs = {
-  rentExemptReserve: number | bigint;
-  authorized: AuthorizedArgs;
-  lockup: LockupArgs;
-};
+export type MetaArgs = { rentExemptReserve: number | bigint; authorized: AuthorizedArgs; lockup: LockupArgs };
 
 export function getMetaEncoder(): FixedSizeEncoder<MetaArgs> {
-  return getStructEncoder([
-    ['rentExemptReserve', getU64Encoder()],
-    ['authorized', getAuthorizedEncoder()],
-    ['lockup', getLockupEncoder()],
-  ]);
+    return getStructEncoder([
+        ['rentExemptReserve', getU64Encoder()],
+        ['authorized', getAuthorizedEncoder()],
+        ['lockup', getLockupEncoder()],
+    ]);
 }
 
 export function getMetaDecoder(): FixedSizeDecoder<Meta> {
-  return getStructDecoder([
-    ['rentExemptReserve', getU64Decoder()],
-    ['authorized', getAuthorizedDecoder()],
-    ['lockup', getLockupDecoder()],
-  ]);
+    return getStructDecoder([
+        ['rentExemptReserve', getU64Decoder()],
+        ['authorized', getAuthorizedDecoder()],
+        ['lockup', getLockupDecoder()],
+    ]);
 }
 
 export function getMetaCodec(): FixedSizeCodec<MetaArgs, Meta> {
-  return combineCodec(getMetaEncoder(), getMetaDecoder());
+    return combineCodec(getMetaEncoder(), getMetaDecoder());
 }
