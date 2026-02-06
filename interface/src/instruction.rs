@@ -4,7 +4,7 @@
 #![allow(deprecated)]
 
 #[cfg(feature = "codama")]
-use codama_macros::{codama, CodamaInstructions, CodamaType};
+use codama_macros::{CodamaInstructions, CodamaType};
 use {
     crate::state::{Authorized, Lockup, StakeAuthorize},
     solana_clock::{Epoch, UnixTimestamp},

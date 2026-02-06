@@ -326,8 +326,10 @@ pub async fn process_instruction<T: Signers + ?Sized>(
     instruction: &Instruction,
     additional_signers: &T,
 ) -> ProgramResult {
-    let mut transaction =
-        Transaction::new_with_payer(&[instruction.clone()], Some(&context.payer.pubkey()));
+    let mut transaction = Transaction::new_with_payer(
+        core::slice::from_ref(instruction),
+        Some(&context.payer.pubkey()),
+    );
 
     transaction.partial_sign(&[&context.payer], context.last_blockhash);
     transaction.sign(additional_signers, context.last_blockhash);
