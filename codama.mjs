@@ -131,7 +131,7 @@ export default {
                         anchorTraits: false,
                         crateFolder: 'clients/rust',
                         formatCode: true,
-                        toolchain: '+nightly-2025-02-16',
+                        toolchain: '+nightly-2026-01-22',
                         traitOptions: {
                             baseDefaults: [
                                 'borsh::BorshSerialize',
