@@ -54,10 +54,8 @@ export type SetLockupCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountNewAuthority extends
-    | string
-    | AccountMeta<string>
-    | undefined = undefined,
+  TAccountNewAuthority extends string | AccountMeta<string> | undefined =
+    undefined,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &

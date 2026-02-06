@@ -40,9 +40,8 @@ export function getDeactivateDiscriminatorBytes() {
 export type DeactivateInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> =
+    'SysvarC1ock11111111111111111111111111111111',
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &

@@ -37,14 +37,17 @@ export type StakeStateAccount = { state: StakeStateV2 };
 
 export type StakeStateAccountArgs = { state: StakeStateV2Args };
 
+/** Gets the encoder for {@link StakeStateAccountArgs} account data. */
 export function getStakeStateAccountEncoder(): Encoder<StakeStateAccountArgs> {
   return getStructEncoder([['state', getStakeStateV2Encoder()]]);
 }
 
+/** Gets the decoder for {@link StakeStateAccount} account data. */
 export function getStakeStateAccountDecoder(): Decoder<StakeStateAccount> {
   return getStructDecoder([['state', getStakeStateV2Decoder()]]);
 }
 
+/** Gets the codec for {@link StakeStateAccount} account data. */
 export function getStakeStateAccountCodec(): Codec<
   StakeStateAccountArgs,
   StakeStateAccount

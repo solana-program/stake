@@ -41,12 +41,10 @@ export type MergeInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountDestinationStake extends string | AccountMeta<string> = string,
   TAccountSourceStake extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends
-    | string
-    | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> =
+    'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistory extends string | AccountMeta<string> =
+    'SysvarStakeHistory1111111111111111111111111',
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &

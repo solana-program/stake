@@ -7,12 +7,32 @@
  */
 
 import {
+  assertIsInstructionWithAccounts,
   containsBytes,
   getU32Encoder,
   type Address,
+  type Instruction,
+  type InstructionWithData,
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
+  parseAuthorizeCheckedInstruction,
+  parseAuthorizeCheckedWithSeedInstruction,
+  parseAuthorizeInstruction,
+  parseAuthorizeWithSeedInstruction,
+  parseDeactivateDelinquentInstruction,
+  parseDeactivateInstruction,
+  parseDelegateStakeInstruction,
+  parseGetMinimumDelegationInstruction,
+  parseInitializeCheckedInstruction,
+  parseInitializeInstruction,
+  parseMergeInstruction,
+  parseMoveLamportsInstruction,
+  parseMoveStakeInstruction,
+  parseSetLockupCheckedInstruction,
+  parseSetLockupInstruction,
+  parseSplitInstruction,
+  parseWithdrawInstruction,
   type ParsedAuthorizeCheckedInstruction,
   type ParsedAuthorizeCheckedWithSeedInstruction,
   type ParsedAuthorizeInstruction,
@@ -173,3 +193,133 @@ export type ParsedStakeInstruction<
   | ({
       instructionType: StakeInstruction.MoveLamports;
     } & ParsedMoveLamportsInstruction<TProgram>);
+
+export function parseStakeInstruction<TProgram extends string>(
+  instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>
+): ParsedStakeInstruction<TProgram> {
+  const instructionType = identifyStakeInstruction(instruction);
+  switch (instructionType) {
+    case StakeInstruction.Initialize: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Initialize,
+        ...parseInitializeInstruction(instruction),
+      };
+    }
+    case StakeInstruction.Authorize: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Authorize,
+        ...parseAuthorizeInstruction(instruction),
+      };
+    }
+    case StakeInstruction.DelegateStake: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.DelegateStake,
+        ...parseDelegateStakeInstruction(instruction),
+      };
+    }
+    case StakeInstruction.Split: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Split,
+        ...parseSplitInstruction(instruction),
+      };
+    }
+    case StakeInstruction.Withdraw: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Withdraw,
+        ...parseWithdrawInstruction(instruction),
+      };
+    }
+    case StakeInstruction.Deactivate: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Deactivate,
+        ...parseDeactivateInstruction(instruction),
+      };
+    }
+    case StakeInstruction.SetLockup: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.SetLockup,
+        ...parseSetLockupInstruction(instruction),
+      };
+    }
+    case StakeInstruction.Merge: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.Merge,
+        ...parseMergeInstruction(instruction),
+      };
+    }
+    case StakeInstruction.AuthorizeWithSeed: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.AuthorizeWithSeed,
+        ...parseAuthorizeWithSeedInstruction(instruction),
+      };
+    }
+    case StakeInstruction.InitializeChecked: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.InitializeChecked,
+        ...parseInitializeCheckedInstruction(instruction),
+      };
+    }
+    case StakeInstruction.AuthorizeChecked: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.AuthorizeChecked,
+        ...parseAuthorizeCheckedInstruction(instruction),
+      };
+    }
+    case StakeInstruction.AuthorizeCheckedWithSeed: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.AuthorizeCheckedWithSeed,
+        ...parseAuthorizeCheckedWithSeedInstruction(instruction),
+      };
+    }
+    case StakeInstruction.SetLockupChecked: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.SetLockupChecked,
+        ...parseSetLockupCheckedInstruction(instruction),
+      };
+    }
+    case StakeInstruction.GetMinimumDelegation: {
+      return {
+        instructionType: StakeInstruction.GetMinimumDelegation,
+        ...parseGetMinimumDelegationInstruction(instruction),
+      };
+    }
+    case StakeInstruction.DeactivateDelinquent: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.DeactivateDelinquent,
+        ...parseDeactivateDelinquentInstruction(instruction),
+      };
+    }
+    case StakeInstruction.MoveStake: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.MoveStake,
+        ...parseMoveStakeInstruction(instruction),
+      };
+    }
+    case StakeInstruction.MoveLamports: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: StakeInstruction.MoveLamports,
+        ...parseMoveLamportsInstruction(instruction),
+      };
+    }
+    default:
+      throw new Error(
+        `Unrecognized instruction type: ${instructionType as string}`
+      );
+  }
+}

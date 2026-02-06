@@ -40,9 +40,8 @@ export function getInitializeCheckedDiscriminatorBytes() {
 export type InitializeCheckedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
-  TAccountRentSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarRent111111111111111111111111111111111',
+  TAccountRentSysvar extends string | AccountMeta<string> =
+    'SysvarRent111111111111111111111111111111111',
   TAccountStakeAuthority extends string | AccountMeta<string> = string,
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],

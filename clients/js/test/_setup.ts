@@ -19,9 +19,10 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
-  BaseTransactionMessage,
+  TransactionMessage,
   TransactionMessageWithFeePayer,
   assertIsSendableTransaction,
+  assertIsTransactionWithBlockhashLifetime,
 } from '@solana/kit';
 
 type Client = {
@@ -64,7 +65,7 @@ export const createDefaultTransaction = async (
 
 export const signAndSendTransaction = async (
   client: Client,
-  transactionMessage: BaseTransactionMessage &
+  transactionMessage: TransactionMessage &
     TransactionMessageWithFeePayer &
     TransactionMessageWithBlockhashLifetime,
   commitment: Commitment = 'confirmed'
@@ -73,6 +74,7 @@ export const signAndSendTransaction = async (
     await signTransactionMessageWithSigners(transactionMessage);
   const signature = getSignatureFromTransaction(signedTransaction);
   assertIsSendableTransaction(signedTransaction);
+  assertIsTransactionWithBlockhashLifetime(signedTransaction);
   await sendAndConfirmTransactionFactory(client)(signedTransaction, {
     commitment,
   });

@@ -43,17 +43,13 @@ export type WithdrawInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountRecipient extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountStakeHistory extends
-    | string
-    | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
+  TAccountClockSysvar extends string | AccountMeta<string> =
+    'SysvarC1ock11111111111111111111111111111111',
+  TAccountStakeHistory extends string | AccountMeta<string> =
+    'SysvarStakeHistory1111111111111111111111111',
   TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
-  TAccountLockupAuthority extends
-    | string
-    | AccountMeta<string>
-    | undefined = undefined,
+  TAccountLockupAuthority extends string | AccountMeta<string> | undefined =
+    undefined,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &

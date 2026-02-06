@@ -53,13 +53,10 @@ export type AuthorizeWithSeedInstruction<
   TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
   TAccountStake extends string | AccountMeta<string> = string,
   TAccountBase extends string | AccountMeta<string> = string,
-  TAccountClockSysvar extends
-    | string
-    | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-  TAccountLockupAuthority extends
-    | string
-    | AccountMeta<string>
-    | undefined = undefined,
+  TAccountClockSysvar extends string | AccountMeta<string> =
+    'SysvarC1ock11111111111111111111111111111111',
+  TAccountLockupAuthority extends string | AccountMeta<string> | undefined =
+    undefined,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
