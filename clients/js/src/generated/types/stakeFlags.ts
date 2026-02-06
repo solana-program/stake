@@ -7,14 +7,14 @@
  */
 
 import {
-  combineCodec,
-  getStructDecoder,
-  getStructEncoder,
-  getU8Decoder,
-  getU8Encoder,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getStructDecoder,
+    getStructEncoder,
+    getU8Decoder,
+    getU8Encoder,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type StakeFlags = { bits: number };
@@ -22,16 +22,13 @@ export type StakeFlags = { bits: number };
 export type StakeFlagsArgs = StakeFlags;
 
 export function getStakeFlagsEncoder(): FixedSizeEncoder<StakeFlagsArgs> {
-  return getStructEncoder([['bits', getU8Encoder()]]);
+    return getStructEncoder([['bits', getU8Encoder()]]);
 }
 
 export function getStakeFlagsDecoder(): FixedSizeDecoder<StakeFlags> {
-  return getStructDecoder([['bits', getU8Decoder()]]);
+    return getStructDecoder([['bits', getU8Decoder()]]);
 }
 
-export function getStakeFlagsCodec(): FixedSizeCodec<
-  StakeFlagsArgs,
-  StakeFlags
-> {
-  return combineCodec(getStakeFlagsEncoder(), getStakeFlagsDecoder());
+export function getStakeFlagsCodec(): FixedSizeCodec<StakeFlagsArgs, StakeFlags> {
+    return combineCodec(getStakeFlagsEncoder(), getStakeFlagsDecoder());
 }

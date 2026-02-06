@@ -7,95 +7,84 @@
  */
 
 import {
-  combineCodec,
-  getStructDecoder,
-  getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
-  transformEncoder,
-  type AccountMeta,
-  type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
-  type Instruction,
-  type InstructionWithAccounts,
-  type InstructionWithData,
-  type ReadonlyUint8Array,
+    combineCodec,
+    getStructDecoder,
+    getStructEncoder,
+    getU32Decoder,
+    getU32Encoder,
+    transformEncoder,
+    type AccountMeta,
+    type Address,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
+    type Instruction,
+    type InstructionWithAccounts,
+    type InstructionWithData,
+    type ReadonlyUint8Array,
 } from '@solana/kit';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const GET_MINIMUM_DELEGATION_DISCRIMINATOR = 13;
 
 export function getGetMinimumDelegationDiscriminatorBytes() {
-  return getU32Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
+    return getU32Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
 }
 
 export type GetMinimumDelegationInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-  TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> &
-  InstructionWithData<ReadonlyUint8Array> &
-  InstructionWithAccounts<TRemainingAccounts>;
+    TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
+    TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> = Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<TRemainingAccounts>;
 
 export type GetMinimumDelegationInstructionData = { discriminator: number };
 
 export type GetMinimumDelegationInstructionDataArgs = {};
 
 export function getGetMinimumDelegationInstructionDataEncoder(): FixedSizeEncoder<GetMinimumDelegationInstructionDataArgs> {
-  return transformEncoder(
-    getStructEncoder([['discriminator', getU32Encoder()]]),
-    (value) => ({
-      ...value,
-      discriminator: GET_MINIMUM_DELEGATION_DISCRIMINATOR,
-    })
-  );
+    return transformEncoder(getStructEncoder([['discriminator', getU32Encoder()]]), value => ({
+        ...value,
+        discriminator: GET_MINIMUM_DELEGATION_DISCRIMINATOR,
+    }));
 }
 
 export function getGetMinimumDelegationInstructionDataDecoder(): FixedSizeDecoder<GetMinimumDelegationInstructionData> {
-  return getStructDecoder([['discriminator', getU32Decoder()]]);
+    return getStructDecoder([['discriminator', getU32Decoder()]]);
 }
 
 export function getGetMinimumDelegationInstructionDataCodec(): FixedSizeCodec<
-  GetMinimumDelegationInstructionDataArgs,
-  GetMinimumDelegationInstructionData
+    GetMinimumDelegationInstructionDataArgs,
+    GetMinimumDelegationInstructionData
 > {
-  return combineCodec(
-    getGetMinimumDelegationInstructionDataEncoder(),
-    getGetMinimumDelegationInstructionDataDecoder()
-  );
+    return combineCodec(
+        getGetMinimumDelegationInstructionDataEncoder(),
+        getGetMinimumDelegationInstructionDataDecoder(),
+    );
 }
 
 export type GetMinimumDelegationInput = {};
 
 export function getGetMinimumDelegationInstruction<
-  TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
->(config?: {
-  programAddress?: TProgramAddress;
-}): GetMinimumDelegationInstruction<TProgramAddress> {
-  // Program address.
-  const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
+>(config?: { programAddress?: TProgramAddress }): GetMinimumDelegationInstruction<TProgramAddress> {
+    // Program address.
+    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
-  return Object.freeze({
-    data: getGetMinimumDelegationInstructionDataEncoder().encode({}),
-    programAddress,
-  } as GetMinimumDelegationInstruction<TProgramAddress>);
+    return Object.freeze({
+        data: getGetMinimumDelegationInstructionDataEncoder().encode({}),
+        programAddress,
+    } as GetMinimumDelegationInstruction<TProgramAddress>);
 }
 
-export type ParsedGetMinimumDelegationInstruction<
-  TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
-> = {
-  programAddress: Address<TProgram>;
-  data: GetMinimumDelegationInstructionData;
+export type ParsedGetMinimumDelegationInstruction<TProgram extends string = typeof STAKE_PROGRAM_ADDRESS> = {
+    programAddress: Address<TProgram>;
+    data: GetMinimumDelegationInstructionData;
 };
 
 export function parseGetMinimumDelegationInstruction<TProgram extends string>(
-  instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>
+    instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedGetMinimumDelegationInstruction<TProgram> {
-  return {
-    programAddress: instruction.programAddress,
-    data: getGetMinimumDelegationInstructionDataDecoder().decode(
-      instruction.data
-    ),
-  };
+    return {
+        programAddress: instruction.programAddress,
+        data: getGetMinimumDelegationInstructionDataDecoder().decode(instruction.data),
+    };
 }

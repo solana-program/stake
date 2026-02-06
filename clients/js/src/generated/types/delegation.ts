@@ -7,66 +7,58 @@
  */
 
 import {
-  combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
-  getF64Decoder,
-  getF64Encoder,
-  getStructDecoder,
-  getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
-  type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getAddressDecoder,
+    getAddressEncoder,
+    getF64Decoder,
+    getF64Encoder,
+    getStructDecoder,
+    getStructEncoder,
+    getU64Decoder,
+    getU64Encoder,
+    type Address,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
-import {
-  getEpochDecoder,
-  getEpochEncoder,
-  type Epoch,
-  type EpochArgs,
-} from '.';
+import { getEpochDecoder, getEpochEncoder, type Epoch, type EpochArgs } from '.';
 
 export type Delegation = {
-  voterPubkey: Address;
-  stake: bigint;
-  activationEpoch: Epoch;
-  deactivationEpoch: Epoch;
-  warmupCooldownRate: number;
+    voterPubkey: Address;
+    stake: bigint;
+    activationEpoch: Epoch;
+    deactivationEpoch: Epoch;
+    warmupCooldownRate: number;
 };
 
 export type DelegationArgs = {
-  voterPubkey: Address;
-  stake: number | bigint;
-  activationEpoch: EpochArgs;
-  deactivationEpoch: EpochArgs;
-  warmupCooldownRate: number;
+    voterPubkey: Address;
+    stake: number | bigint;
+    activationEpoch: EpochArgs;
+    deactivationEpoch: EpochArgs;
+    warmupCooldownRate: number;
 };
 
 export function getDelegationEncoder(): FixedSizeEncoder<DelegationArgs> {
-  return getStructEncoder([
-    ['voterPubkey', getAddressEncoder()],
-    ['stake', getU64Encoder()],
-    ['activationEpoch', getEpochEncoder()],
-    ['deactivationEpoch', getEpochEncoder()],
-    ['warmupCooldownRate', getF64Encoder()],
-  ]);
+    return getStructEncoder([
+        ['voterPubkey', getAddressEncoder()],
+        ['stake', getU64Encoder()],
+        ['activationEpoch', getEpochEncoder()],
+        ['deactivationEpoch', getEpochEncoder()],
+        ['warmupCooldownRate', getF64Encoder()],
+    ]);
 }
 
 export function getDelegationDecoder(): FixedSizeDecoder<Delegation> {
-  return getStructDecoder([
-    ['voterPubkey', getAddressDecoder()],
-    ['stake', getU64Decoder()],
-    ['activationEpoch', getEpochDecoder()],
-    ['deactivationEpoch', getEpochDecoder()],
-    ['warmupCooldownRate', getF64Decoder()],
-  ]);
+    return getStructDecoder([
+        ['voterPubkey', getAddressDecoder()],
+        ['stake', getU64Decoder()],
+        ['activationEpoch', getEpochDecoder()],
+        ['deactivationEpoch', getEpochDecoder()],
+        ['warmupCooldownRate', getF64Decoder()],
+    ]);
 }
 
-export function getDelegationCodec(): FixedSizeCodec<
-  DelegationArgs,
-  Delegation
-> {
-  return combineCodec(getDelegationEncoder(), getDelegationDecoder());
+export function getDelegationCodec(): FixedSizeCodec<DelegationArgs, Delegation> {
+    return combineCodec(getDelegationEncoder(), getDelegationDecoder());
 }

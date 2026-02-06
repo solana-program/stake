@@ -7,15 +7,15 @@
  */
 
 import {
-  combineCodec,
-  getAddressDecoder,
-  getAddressEncoder,
-  getStructDecoder,
-  getStructEncoder,
-  type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+    combineCodec,
+    getAddressDecoder,
+    getAddressEncoder,
+    getStructDecoder,
+    getStructEncoder,
+    type Address,
+    type FixedSizeCodec,
+    type FixedSizeDecoder,
+    type FixedSizeEncoder,
 } from '@solana/kit';
 
 export type Authorized = { staker: Address; withdrawer: Address };
@@ -23,22 +23,19 @@ export type Authorized = { staker: Address; withdrawer: Address };
 export type AuthorizedArgs = Authorized;
 
 export function getAuthorizedEncoder(): FixedSizeEncoder<AuthorizedArgs> {
-  return getStructEncoder([
-    ['staker', getAddressEncoder()],
-    ['withdrawer', getAddressEncoder()],
-  ]);
+    return getStructEncoder([
+        ['staker', getAddressEncoder()],
+        ['withdrawer', getAddressEncoder()],
+    ]);
 }
 
 export function getAuthorizedDecoder(): FixedSizeDecoder<Authorized> {
-  return getStructDecoder([
-    ['staker', getAddressDecoder()],
-    ['withdrawer', getAddressDecoder()],
-  ]);
+    return getStructDecoder([
+        ['staker', getAddressDecoder()],
+        ['withdrawer', getAddressDecoder()],
+    ]);
 }
 
-export function getAuthorizedCodec(): FixedSizeCodec<
-  AuthorizedArgs,
-  Authorized
-> {
-  return combineCodec(getAuthorizedEncoder(), getAuthorizedDecoder());
+export function getAuthorizedCodec(): FixedSizeCodec<AuthorizedArgs, Authorized> {
+    return combineCodec(getAuthorizedEncoder(), getAuthorizedDecoder());
 }

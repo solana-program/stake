@@ -82,7 +82,7 @@ stop-test-validator:
 	pkill -f solana-test-validator
 
 generate-clients:
-	pnpm generate:clients $(ARGS)
+	pnpm codama run --all $(ARGS)
 
 generate-idl-%:
 	cargo run --manifest-path $(call make-path,$*)/Cargo.toml --features codama --bin generate-idl $(ARGS)

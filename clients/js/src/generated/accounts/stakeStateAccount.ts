@@ -7,113 +7,92 @@
  */
 
 import {
-  assertAccountExists,
-  assertAccountsExist,
-  combineCodec,
-  decodeAccount,
-  fetchEncodedAccount,
-  fetchEncodedAccounts,
-  getStructDecoder,
-  getStructEncoder,
-  type Account,
-  type Address,
-  type Codec,
-  type Decoder,
-  type EncodedAccount,
-  type Encoder,
-  type FetchAccountConfig,
-  type FetchAccountsConfig,
-  type MaybeAccount,
-  type MaybeEncodedAccount,
+    assertAccountExists,
+    assertAccountsExist,
+    combineCodec,
+    decodeAccount,
+    fetchEncodedAccount,
+    fetchEncodedAccounts,
+    getStructDecoder,
+    getStructEncoder,
+    type Account,
+    type Address,
+    type Codec,
+    type Decoder,
+    type EncodedAccount,
+    type Encoder,
+    type FetchAccountConfig,
+    type FetchAccountsConfig,
+    type MaybeAccount,
+    type MaybeEncodedAccount,
 } from '@solana/kit';
-import {
-  getStakeStateV2Decoder,
-  getStakeStateV2Encoder,
-  type StakeStateV2,
-  type StakeStateV2Args,
-} from '../types';
+import { getStakeStateV2Decoder, getStakeStateV2Encoder, type StakeStateV2, type StakeStateV2Args } from '../types';
 
 export type StakeStateAccount = { state: StakeStateV2 };
 
 export type StakeStateAccountArgs = { state: StakeStateV2Args };
 
+/** Gets the encoder for {@link StakeStateAccountArgs} account data. */
 export function getStakeStateAccountEncoder(): Encoder<StakeStateAccountArgs> {
-  return getStructEncoder([['state', getStakeStateV2Encoder()]]);
+    return getStructEncoder([['state', getStakeStateV2Encoder()]]);
 }
 
+/** Gets the decoder for {@link StakeStateAccount} account data. */
 export function getStakeStateAccountDecoder(): Decoder<StakeStateAccount> {
-  return getStructDecoder([['state', getStakeStateV2Decoder()]]);
+    return getStructDecoder([['state', getStakeStateV2Decoder()]]);
 }
 
-export function getStakeStateAccountCodec(): Codec<
-  StakeStateAccountArgs,
-  StakeStateAccount
-> {
-  return combineCodec(
-    getStakeStateAccountEncoder(),
-    getStakeStateAccountDecoder()
-  );
+/** Gets the codec for {@link StakeStateAccount} account data. */
+export function getStakeStateAccountCodec(): Codec<StakeStateAccountArgs, StakeStateAccount> {
+    return combineCodec(getStakeStateAccountEncoder(), getStakeStateAccountDecoder());
 }
 
 export function decodeStakeStateAccount<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress>
+    encodedAccount: EncodedAccount<TAddress>,
 ): Account<StakeStateAccount, TAddress>;
 export function decodeStakeStateAccount<TAddress extends string = string>(
-  encodedAccount: MaybeEncodedAccount<TAddress>
+    encodedAccount: MaybeEncodedAccount<TAddress>,
 ): MaybeAccount<StakeStateAccount, TAddress>;
 export function decodeStakeStateAccount<TAddress extends string = string>(
-  encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>
-):
-  | Account<StakeStateAccount, TAddress>
-  | MaybeAccount<StakeStateAccount, TAddress> {
-  return decodeAccount(
-    encodedAccount as MaybeEncodedAccount<TAddress>,
-    getStakeStateAccountDecoder()
-  );
+    encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<StakeStateAccount, TAddress> | MaybeAccount<StakeStateAccount, TAddress> {
+    return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getStakeStateAccountDecoder());
 }
 
 export async function fetchStakeStateAccount<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig
+    rpc: Parameters<typeof fetchEncodedAccount>[0],
+    address: Address<TAddress>,
+    config?: FetchAccountConfig,
 ): Promise<Account<StakeStateAccount, TAddress>> {
-  const maybeAccount = await fetchMaybeStakeStateAccount(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+    const maybeAccount = await fetchMaybeStakeStateAccount(rpc, address, config);
+    assertAccountExists(maybeAccount);
+    return maybeAccount;
 }
 
-export async function fetchMaybeStakeStateAccount<
-  TAddress extends string = string,
->(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig
+export async function fetchMaybeStakeStateAccount<TAddress extends string = string>(
+    rpc: Parameters<typeof fetchEncodedAccount>[0],
+    address: Address<TAddress>,
+    config?: FetchAccountConfig,
 ): Promise<MaybeAccount<StakeStateAccount, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeStakeStateAccount(maybeAccount);
+    const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+    return decodeStakeStateAccount(maybeAccount);
 }
 
 export async function fetchAllStakeStateAccount(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig
+    rpc: Parameters<typeof fetchEncodedAccounts>[0],
+    addresses: Array<Address>,
+    config?: FetchAccountsConfig,
 ): Promise<Account<StakeStateAccount>[]> {
-  const maybeAccounts = await fetchAllMaybeStakeStateAccount(
-    rpc,
-    addresses,
-    config
-  );
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+    const maybeAccounts = await fetchAllMaybeStakeStateAccount(rpc, addresses, config);
+    assertAccountsExist(maybeAccounts);
+    return maybeAccounts;
 }
 
 export async function fetchAllMaybeStakeStateAccount(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig
+    rpc: Parameters<typeof fetchEncodedAccounts>[0],
+    addresses: Array<Address>,
+    config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<StakeStateAccount>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) =>
-    decodeStakeStateAccount(maybeAccount)
-  );
+    const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+    return maybeAccounts.map(maybeAccount => decodeStakeStateAccount(maybeAccount));
 }
