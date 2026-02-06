@@ -23,6 +23,9 @@ solana-stake-interface = { version = "2", features = ["bincode", "borsh", "sysva
 solana-sysvar = "3.0.0"
 solana-sysvar-id = "3.0.0"
 solana-vote-interface = { version = "4.0.4", features = ["bincode"] }
+serde = "1.0"
+solana-sdk-ids = "3.0.0"
+spherenet-validator-whitelist-interface = { path = "/Volumes/SSD/SPHERE/validator-whitelist/interface" }
 
 [dev-dependencies]
 agave-feature-set = "3.0.0"

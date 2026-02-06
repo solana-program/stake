@@ -21,6 +21,7 @@ use {
     solana_sysvar::{epoch_rewards::EpochRewards, Sysvar},
     solana_sysvar_id::SysvarId,
     solana_vote_interface::{program as solana_vote_program, state::VoteStateV4},
+    spherenet_validator_whitelist_interface::onchain::WhitelistEntryInformation,
     std::{collections::HashSet, mem::MaybeUninit},
 };
 
@@ -393,8 +394,26 @@ impl Processor {
             let branch_account = next_account_info(account_info_iter)?;
             if Clock::check_id(branch_account.key) {
                 let _stake_history_info = next_account_info(account_info_iter)?;
-                let _stake_config_info = next_account_info(account_info_iter)?;
+                let whitelist_entry_info = next_account_info(account_info_iter)?;
                 // let _stake_authority_info = next_account_info(account_info_iter);
+
+                // Validate the validator vote account against whitelist entry
+                let clock = &Clock::get()?;
+                let whitelist_entry_information = WhitelistEntryInformation {
+                    key: whitelist_entry_info.key,
+                    owner: whitelist_entry_info.owner,
+                    data: &whitelist_entry_info.try_borrow_data()?,
+                };
+
+                spherenet_validator_whitelist_interface::onchain::validate_vote_account_solana_program(
+                    whitelist_entry_information,
+                    vote_account_info.key,
+                    &clock.epoch,
+                )
+                .map_err(|e| match e {
+                    solana_instruction_error::InstructionError::Custom(code) => ProgramError::Custom(code),
+                    _ => ProgramError::InvalidInstructionData,
+                })?;
             } else {
                 let stake_authority_info = branch_account;
                 if !stake_authority_info.is_signer {
@@ -1174,16 +1193,12 @@ impl Processor {
         Ok(())
     }
 
-    fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-
-        // invariant
-        let stake_account_info = next_account_info(account_info_iter)?;
-        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
-        let reference_vote_account_info = next_account_info(account_info_iter)?;
-
-        let clock = Clock::get()?;
-
+    fn deactivate_network_delinquent(
+        stake_account_info: &AccountInfo,
+        delinquent_vote_account_info: &AccountInfo,
+        reference_vote_account_info: &AccountInfo,
+        clock: &Clock,
+    ) -> ProgramResult {
         let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
         let reference_vote_state = get_vote_state(reference_vote_account_info)?;
 
@@ -1214,9 +1229,91 @@ impl Processor {
             }
         } else {
             Err(ProgramError::InvalidAccountData)
-        }?;
+        }
+    }
 
-        Ok(())
+    fn deactivate_delisted_delinquent(
+        stake_account_info: &AccountInfo,
+        delisted_vote_account_info: &AccountInfo,
+        whitelist_entry_account_info: &AccountInfo,
+        clock: &Clock,
+    ) -> ProgramResult {
+        // Verify delisted vote account is a vote account
+        if *delisted_vote_account_info.owner != solana_vote_program::id() {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+
+        // Validate whitelist entry
+        let whitelist_entry_information = WhitelistEntryInformation {
+            key: whitelist_entry_account_info.key,
+            owner: whitelist_entry_account_info.owner,
+            data: &whitelist_entry_account_info.try_borrow_data()?,
+        };
+
+        if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
+            get_stake_state(stake_account_info)?
+        {
+            if stake.delegation.voter_pubkey != *delisted_vote_account_info.key {
+                return Err(StakeError::VoteAddressMismatch.into());
+            }
+
+            // Verify validator is delisted (whitelist entry is system-owned tombstone)
+            spherenet_validator_whitelist_interface::onchain::throw_if_not_unlisted(
+                whitelist_entry_information,
+                delisted_vote_account_info.key,
+            )
+            .map_err(|e| match e {
+                solana_instruction_error::InstructionError::Custom(code) => ProgramError::Custom(code),
+                _ => ProgramError::InvalidInstructionData,
+            })?;
+
+            stake.deactivate(clock.epoch)?;
+
+            set_stake_state(
+                stake_account_info,
+                &StakeStateV2::Stake(meta, stake, stake_flags),
+            )
+        } else {
+            Err(ProgramError::InvalidAccountData)
+        }
+    }
+
+    fn process_deactivate_delinquent(accounts: &[AccountInfo]) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+
+        // invariant
+        let stake_account_info = next_account_info(account_info_iter)?;
+        let delinquent_vote_account_info = next_account_info(account_info_iter)?;
+        let support_account_info = next_account_info(account_info_iter)?;
+
+        let clock = Clock::get()?;
+
+        // Dispatch based on support account owner
+        match *support_account_info.owner {
+            owner if owner == solana_vote_program::id() => {
+                // Network delinquent: reference vote account
+                Self::deactivate_network_delinquent(
+                    stake_account_info,
+                    delinquent_vote_account_info,
+                    support_account_info,
+                    &clock,
+                )
+            }
+            owner if owner == spherenet_validator_whitelist_interface::program_solana::id()
+                || owner == solana_sdk_ids::system_program::id() => {
+                // Delisted delinquent: whitelist entry (active or tombstone)
+                Self::deactivate_delisted_delinquent(
+                    stake_account_info,
+                    delinquent_vote_account_info,
+                    support_account_info,
+                    &clock,
+                )
+            }
+            _ => {
+                // Reject unknown account types
+                Err(ProgramError::IncorrectProgramId)
+            }
+        }
     }
 
     fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
