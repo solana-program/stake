@@ -28,6 +28,9 @@ use {
         program as vote_program,
         state::{VoteStateV4, VoteStateVersions},
     },
+    spherenet_validator_whitelist_interface::state::{
+        whitelist_entry::ValidatorWhitelistEntry, AccountState, SizeOf,
+    },
     std::{
         collections::{HashMap, HashSet},
         sync::LazyLock,
@@ -115,6 +118,33 @@ fn assert_stake_rent_exemption() {
     );
 }
 
+// Helper function to create a valid whitelist entry account for a vote account
+fn create_whitelist_entry_account(vote_address: &Pubkey) -> (Pubkey, Account) {
+    use spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey;
+
+    let entry_pubkey = get_whitelist_entry_pubkey(vote_address).unwrap();
+
+    let data = ValidatorWhitelistEntry {
+        pubkey: vote_address.to_bytes(),
+        start_epoch: 0u64.to_le_bytes(),
+        end_epoch: u64::MAX.to_le_bytes(),
+        state: AccountState::Initialized as u8,
+    }
+    .pack();
+
+    let lamports = Rent::default().minimum_balance(<ValidatorWhitelistEntry as SizeOf>::SIZE_OF);
+
+    let account = Account::create(
+        lamports,
+        data.to_vec(),
+        spherenet_validator_whitelist_interface::program_solana::id(),
+        false,
+        u64::MAX,
+    );
+
+    (entry_pubkey, account)
+}
+
 // exhaustive set of all test instruction declarations
 // this is probabilistic but should exceed ten nines
 // implementing it by hand would be extremely annoying
@@ -197,6 +227,14 @@ impl Env {
             u64::MAX,
         );
         base_accounts.insert(VOTE_ACCOUNT_GOLD, vote_account);
+
+        // create whitelist entries for all vote accounts
+        let (whitelist_red, whitelist_red_account) = create_whitelist_entry_account(&VOTE_ACCOUNT_RED);
+        let (whitelist_blue, whitelist_blue_account) = create_whitelist_entry_account(&VOTE_ACCOUNT_BLUE);
+        let (whitelist_gold, whitelist_gold_account) = create_whitelist_entry_account(&VOTE_ACCOUNT_GOLD);
+        base_accounts.insert(whitelist_red, whitelist_red_account);
+        base_accounts.insert(whitelist_blue, whitelist_blue_account);
+        base_accounts.insert(whitelist_gold, whitelist_gold_account);
 
         // create two blank stake accounts
         let stake_account = Account::create(
@@ -534,7 +572,12 @@ impl StakeInterface {
                     minimum_delegation,
                 );
 
-                instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED)
+                // Create instruction and replace stake_config with whitelist entry
+                let mut instruction = instruction::delegate_stake(&STAKE_ACCOUNT_BLACK, &STAKER_BLACK, &VOTE_ACCOUNT_RED);
+                let whitelist_entry_pubkey = spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey(&VOTE_ACCOUNT_RED).unwrap();
+                // Replace account at index 4 (stake_config) with whitelist entry
+                instruction.accounts[4].pubkey = whitelist_entry_pubkey;
+                instruction
             }
             Self::Split {
                 lockup_state,
@@ -1131,10 +1174,23 @@ fn test_no_use_dealloc() {
 // NOTE this function and all `_new_interface` tests can be deleted after the instruction builders are updated
 #[allow(deprecated)]
 fn is_stake_program_sysvar_or_config(pubkey: Pubkey) -> bool {
-    pubkey == Clock::id()
+    // Check if it's a known sysvar or config
+    if pubkey == Clock::id()
         || pubkey == Rent::id()
         || pubkey == StakeHistory::id()
         || pubkey == solana_sdk_ids::stake::config::id()
+    {
+        return true;
+    }
+
+    // Check if it's a whitelist entry for any of our test vote accounts
+    let whitelist_entries = [
+        spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey(&VOTE_ACCOUNT_RED).unwrap(),
+        spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey(&VOTE_ACCOUNT_BLUE).unwrap(),
+        spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey(&VOTE_ACCOUNT_GOLD).unwrap(),
+    ];
+
+    whitelist_entries.contains(&pubkey)
 }
 
 #[test]

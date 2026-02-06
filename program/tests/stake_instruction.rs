@@ -6,8 +6,8 @@ use {
     bincode::serialize,
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{
-        create_account_shared_data_for_test, state_traits::StateMut, AccountSharedData,
-        ReadableAccount, WritableAccount,
+        create_account_shared_data_for_test, state_traits::StateMut, Account,
+        AccountSharedData, ReadableAccount, WritableAccount,
     },
     solana_clock::{Clock, Epoch},
     solana_epoch_rewards::EpochRewards,
@@ -37,6 +37,9 @@ use {
     solana_sysvar::{clock, epoch_rewards, epoch_schedule, rent, rewards},
     solana_sysvar_id::SysvarId,
     solana_vote_interface::state::{VoteStateV4, VoteStateVersions, MAX_EPOCH_CREDITS_HISTORY},
+    spherenet_validator_whitelist_interface::state::{
+        whitelist_entry::ValidatorWhitelistEntry, AccountState, SizeOf,
+    },
     std::{collections::HashSet, str::FromStr},
     test_case::test_case,
 };
@@ -47,6 +50,35 @@ fn mollusk_bpf() -> Mollusk {
         .feature_set
         .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
     mollusk
+}
+
+fn create_default_valid_whitelist_entry_account(
+    vote_address: &Pubkey,
+) -> (Pubkey, AccountSharedData) {
+    use spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey;
+
+    let entry_pubkey = get_whitelist_entry_pubkey(vote_address).unwrap();
+
+    let data = ValidatorWhitelistEntry {
+        pubkey: vote_address.to_bytes(),
+        start_epoch: 0u64.to_le_bytes(),
+        end_epoch: u64::MAX.to_le_bytes(),
+        state: AccountState::Initialized as u8,
+    }
+    .pack();
+
+    let non_zero_rent = Rent::default();
+    let lamports = non_zero_rent.minimum_balance(<ValidatorWhitelistEntry as SizeOf>::SIZE_OF);
+
+    let account = AccountSharedData::from(Account {
+        lamports,
+        data: data.to_vec(),
+        owner: spherenet_validator_whitelist_interface::program_solana::id(),
+        executable: false,
+        rent_epoch: 0,
+    });
+
+    (entry_pubkey, account)
 }
 
 fn create_default_account() -> AccountSharedData {
@@ -1799,6 +1831,10 @@ fn test_stake_delegate() {
         epoch: 1,
         ..Clock::default()
     };
+    let (whitelist_entry_address, whitelist_entry_account) =
+        create_default_valid_whitelist_entry_account(&vote_address);
+    let (whitelist_entry_address_2, whitelist_entry_account_2) =
+        create_default_valid_whitelist_entry_account(&vote_address_2);
     #[allow(deprecated)]
     let mut transaction_accounts = vec![
         (stake_address, stake_account.clone()),
@@ -1806,10 +1842,7 @@ fn test_stake_delegate() {
         (vote_address_2, vote_account_2.clone()),
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (StakeHistory::id(), create_empty_stake_history_for_test()),
-        (
-            stake_config::id(),
-            config::create_account(0, &stake_config::Config::default()),
-        ),
+        (whitelist_entry_address, whitelist_entry_account),
         (
             epoch_schedule::id(),
             create_account_shared_data_for_test(&EpochSchedule::default()),
@@ -1838,7 +1871,7 @@ fn test_stake_delegate() {
             is_writable: false,
         },
         AccountMeta {
-            pubkey: stake_config::id(),
+            pubkey: whitelist_entry_address,
             is_signer: false,
             is_writable: false,
         },
@@ -1914,6 +1947,7 @@ fn test_stake_delegate() {
     // during deactivation
     transaction_accounts[0] = (stake_address, accounts[0].clone());
     instruction_accounts[1].pubkey = vote_address_2;
+    instruction_accounts[4].pubkey = whitelist_entry_address_2;
     process_instruction(
         &mollusk,
         &serialize(&StakeInstruction::DelegateStake).unwrap(),
@@ -1922,6 +1956,7 @@ fn test_stake_delegate() {
         Err(StakeError::TooSoonToRedelegate.into()),
     );
     instruction_accounts[1].pubkey = vote_address;
+    instruction_accounts[4].pubkey = whitelist_entry_address;
 
     // verify that delegate succeeds to same vote account
     // when stake is deactivating
@@ -1940,6 +1975,7 @@ fn test_stake_delegate() {
     // if stake is still active
     transaction_accounts[0] = (stake_address, accounts_2[0].clone());
     instruction_accounts[1].pubkey = vote_address_2;
+    instruction_accounts[4].pubkey = whitelist_entry_address_2;
     process_instruction(
         &mollusk,
         &serialize(&StakeInstruction::DelegateStake).unwrap(),

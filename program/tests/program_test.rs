@@ -25,11 +25,25 @@ use {
         instruction as vote_instruction,
         state::{VoteInit, VoteStateV4},
     },
+    spherenet_validator_whitelist_interface::state::whitelist_entry::get_whitelist_entry_pubkey,
     test_case::{test_case, test_matrix},
 };
 
 pub const USER_STARTING_LAMPORTS: u64 = 10_000_000_000_000; // 10k sol
 pub const NO_SIGNERS: &[Keypair] = &[];
+
+// Helper function to create delegate_stake instruction with whitelist entry
+pub fn delegate_stake_with_whitelist(
+    stake_pubkey: &Pubkey,
+    authorized_pubkey: &Pubkey,
+    vote_pubkey: &Pubkey,
+) -> Instruction {
+    let mut instruction = ixn::delegate_stake(stake_pubkey, authorized_pubkey, vote_pubkey);
+    // Replace account at index 4 (stake_config) with whitelist entry
+    let whitelist_entry_pubkey = get_whitelist_entry_pubkey(vote_pubkey).unwrap();
+    instruction.accounts[4].pubkey = whitelist_entry_pubkey;
+    instruction
+}
 
 pub fn program_test() -> ProgramTest {
     program_test_without_features(&[])
@@ -85,6 +99,36 @@ impl Default for Accounts {
     }
 }
 
+// Helper to create a whitelist entry account for a vote account
+pub async fn create_whitelist_entry(context: &mut ProgramTestContext, vote_pubkey: &Pubkey) {
+    use spherenet_validator_whitelist_interface::state::{
+        whitelist_entry::ValidatorWhitelistEntry, AccountState, SizeOf,
+    };
+
+    let entry_pubkey = get_whitelist_entry_pubkey(vote_pubkey).unwrap();
+
+    let data = ValidatorWhitelistEntry {
+        pubkey: vote_pubkey.to_bytes(),
+        start_epoch: 0u64.to_le_bytes(),
+        end_epoch: u64::MAX.to_le_bytes(),
+        state: AccountState::Initialized as u8,
+    }
+    .pack();
+
+    let rent = context.banks_client.get_rent().await.unwrap();
+    let lamports = rent.minimum_balance(<ValidatorWhitelistEntry as SizeOf>::SIZE_OF);
+
+    let account = SolanaAccount {
+        lamports,
+        data: data.to_vec(),
+        owner: spherenet_validator_whitelist_interface::program_solana::id(),
+        executable: false,
+        rent_epoch: 0,
+    };
+
+    context.set_account(&entry_pubkey, &account.into());
+}
+
 pub async fn create_vote(
     context: &mut ProgramTestContext,
     validator: &Keypair,
@@ -127,6 +171,9 @@ pub async fn create_vote(
 
     // ignore errors for idempotency
     let _ = context.banks_client.process_transaction(transaction).await;
+
+    // Create whitelist entry for this vote account
+    create_whitelist_entry(context, &vote_account.pubkey()).await;
 }
 
 pub async fn transfer(context: &mut ProgramTestContext, recipient: &Pubkey, amount: u64) {
@@ -755,6 +802,7 @@ async fn program_test_stake_delegate() {
         &vote_account2,
     )
     .await;
+    // Note: whitelist entry for vote_account2 is created by create_vote
 
     let staker_keypair = Keypair::new();
     let withdrawer_keypair = Keypair::new();
@@ -770,7 +818,7 @@ async fn program_test_stake_delegate() {
 
     let stake =
         create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
-    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &accounts.vote_account.pubkey());
 
     process_instruction_test_missing_signers(&mut context, &instruction, &vec![&staker_keypair])
         .await;
@@ -794,7 +842,7 @@ async fn program_test_stake_delegate() {
 
     // verify that delegate fails as stake is active and not deactivating
     advance_epoch(&mut context).await;
-    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &accounts.vote_account.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
@@ -807,7 +855,7 @@ async fn program_test_stake_delegate() {
         .unwrap();
 
     // verify that delegate to a different vote account fails during deactivation
-    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &vote_account2.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
@@ -815,7 +863,7 @@ async fn program_test_stake_delegate() {
 
     // verify that delegate succeeds to same vote account when stake is deactivating
     refresh_blockhash(&mut context).await;
-    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &accounts.vote_account.pubkey());
     process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap();
@@ -826,7 +874,7 @@ async fn program_test_stake_delegate() {
 
     // verify that delegate to a different vote account fails if stake is still
     // active
-    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &vote_account2.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
@@ -835,13 +883,15 @@ async fn program_test_stake_delegate() {
     // delegate still fails after stake is fully activated; redelegate is not
     // supported
     advance_epoch(&mut context).await;
-    let instruction = ixn::delegate_stake(&stake, &staker, &vote_account2.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &vote_account2.pubkey());
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
     assert_eq!(e, StakeError::TooSoonToRedelegate.into());
 
-    // delegate to spoofed vote account fails (not owned by vote program)
+    // delegate to spoofed vote account fails (whitelist validation fails first)
+    // NOTE: Previously this returned IncorrectProgramId (vote account not owned by vote program)
+    // but now whitelist validation happens first and returns a whitelist error
     let mut fake_vote_account =
         get_account(&mut context.banks_client, &accounts.vote_account.pubkey()).await;
     fake_vote_account.owner = Pubkey::new_unique();
@@ -850,12 +900,13 @@ async fn program_test_stake_delegate() {
 
     let stake =
         create_independent_stake_account(&mut context, &authorized, minimum_delegation).await;
-    let instruction = ixn::delegate_stake(&stake, &staker, &fake_vote_address);
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &fake_vote_address);
 
     let e = process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap_err();
-    assert_eq!(e, ProgramError::IncorrectProgramId);
+    // Whitelist validation happens first, so we get a whitelist error instead of IncorrectProgramId
+    assert_eq!(e, ProgramError::Custom(0xAAAAAA13));
 
     // delegate stake program-owned non-stake account fails
     let rewards_pool_address = Pubkey::new_unique();
@@ -870,7 +921,7 @@ async fn program_test_stake_delegate() {
     };
     context.set_account(&rewards_pool_address, &rewards_pool.into());
 
-    let instruction = ixn::delegate_stake(
+    let instruction = delegate_stake_with_whitelist(
         &rewards_pool_address,
         &staker,
         &accounts.vote_account.pubkey(),
@@ -954,7 +1005,7 @@ impl StakeLifecycle {
         }
 
         if self >= StakeLifecycle::Activating {
-            let instruction = ixn::delegate_stake(&stake, &staker_keypair.pubkey(), vote_account);
+            let instruction = delegate_stake_with_whitelist(&stake, &staker_keypair.pubkey(), vote_account);
             process_instruction(context, &instruction, &vec![staker_keypair])
                 .await
                 .unwrap();
@@ -1352,7 +1403,7 @@ async fn program_test_deactivate(activate: bool) {
     assert_eq!(e, ProgramError::InvalidAccountData);
 
     // delegate
-    let instruction = ixn::delegate_stake(&stake, &staker, &accounts.vote_account.pubkey());
+    let instruction = delegate_stake_with_whitelist(&stake, &staker, &accounts.vote_account.pubkey());
     process_instruction(&mut context, &instruction, &vec![&staker_keypair])
         .await
         .unwrap();
