@@ -7,7 +7,7 @@
 #[cfg(feature = "borsh")]
 use borsh::{io, BorshDeserialize, BorshSchema, BorshSerialize};
 #[cfg(feature = "codama")]
-use codama_macros::{codama, CodamaType};
+use codama_macros::CodamaType;
 use {
     crate::{
         error::StakeError,
@@ -1514,11 +1514,7 @@ mod tests {
                 })
                 .sum::<u64>();
 
-            let delta = if total_effective_stake > prev_total_effective_stake {
-                total_effective_stake - prev_total_effective_stake
-            } else {
-                prev_total_effective_stake - total_effective_stake
-            };
+            let delta = total_effective_stake.abs_diff(prev_total_effective_stake);
 
             // uncomment and add ! for fun with graphing
             // eprint("{:8} {:8} {:8} ", epoch, total_effective_stake, delta);
