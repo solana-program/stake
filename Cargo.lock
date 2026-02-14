@@ -6685,6 +6685,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signature",
  "solana-signer",
+ "solana-stake-client",
  "solana-stake-interface 2.0.1",
  "solana-svm-log-collector",
  "solana-system-interface",
