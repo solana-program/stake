@@ -2938,9 +2938,9 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fa2a9a8f63c0ba125cbfb934a6180b321f41ee61f1de96b8b6c081aa1772805"
+checksum = "6ed52e82370cbf4f266a65603d7d1cbe7faf94fcf769d068c0b89bb934a882e3"
 dependencies = [
  "agave-feature-set",
  "agave-syscalls",
@@ -2981,9 +2981,9 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-error"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea155b60511338a5a39c077a457baa8268c229629f091e3281f499b0ab3a96b4"
+checksum = "682ad3a990ae8f336ee10f402da2e900a37cff38730e29aa8cda2d82e1b2e9f1"
 dependencies = [
  "solana-pubkey 3.0.0",
  "thiserror 1.0.69",
@@ -2991,9 +2991,9 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-keys"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7849281d0ce4f3894742cf508a98b33c3bb284eb7df9d66476ab2168945f128"
+checksum = "b97ddf2442ea621ea5ae25b0c21ae2861588ea34abce0d059cb601de24cd646f"
 dependencies = [
  "mollusk-svm-error",
  "solana-account 3.2.0",
@@ -3004,9 +3004,9 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm-result"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50b90812979ca5bb440f0a86e970355853d0e9466b939f88ad30af188e20525"
+checksum = "4f23d402bb19bac3b25b02ada2cf1f58dd4bc8e4b12a38fc1f58aef0090ff0f6"
 dependencies = [
  "solana-account 3.2.0",
  "solana-instruction",
