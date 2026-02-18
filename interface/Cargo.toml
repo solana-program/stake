@@ -32,7 +32,7 @@ solana-program-error = "3.0.0"
 solana-pubkey = { version = "4.0.0", default-features = false }
 solana-system-interface = "3.0.0"
 solana-sysvar = { version = "4.0.0", optional = true }
-solana-sysvar-id = { version = "3.0.0", optional = true }
+solana-sysvar-id = { version = "3.1.0", optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
 serde_json = { version = "1.0", optional = true }
