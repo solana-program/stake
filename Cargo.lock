@@ -6536,11 +6536,11 @@ dependencies = [
 
 [[package]]
 name = "solana-short-vec"
-version = "3.0.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b69d029da5428fc1c57f7d49101b2077c61f049d4112cd5fb8456567cc7d2638"
+checksum = "de3bd991c2cc415291c86bb0b6b4d53e93d13bb40344e4c5a2884e0e4f5fa93f"
 dependencies = [
- "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -6757,7 +6757,7 @@ dependencies = [
  "solana-sysvar 3.0.0",
  "solana-sysvar-id",
  "solana-transaction",
- "solana-vote-interface 4.0.4",
+ "solana-vote-interface 5.1.0",
  "test-case",
 ]
 
@@ -7344,9 +7344,9 @@ dependencies = [
 
 [[package]]
 name = "solana-vote-interface"
-version = "4.0.4"
+version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6e123e16bfdd7a81d71b4c4699e0b29580b619f4cd2ef5b6aae1eb85e8979f"
+checksum = "56590ed45c393149100643bd8184c0e56831f576cab8e99fe4088a82aed9ac4b"
 dependencies = [
  "bincode",
  "cfg_eval",
@@ -7356,16 +7356,16 @@ dependencies = [
  "serde_derive",
  "serde_with",
  "solana-clock",
- "solana-hash 3.1.0",
+ "solana-hash 4.2.0",
  "solana-instruction",
  "solana-instruction-error",
- "solana-pubkey 3.0.0",
- "solana-rent 3.0.0",
+ "solana-pubkey 4.1.0",
+ "solana-rent 4.0.0",
  "solana-sdk-ids",
  "solana-serde-varint",
  "solana-serialize-utils",
  "solana-short-vec",
- "solana-system-interface 2.0.0",
+ "solana-system-interface 3.0.0",
 ]
 
 [[package]]
