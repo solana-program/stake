@@ -6656,7 +6656,7 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-interface"
-version = "2.0.2"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -6680,7 +6680,7 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey 4.1.0",
  "solana-sdk-ids",
- "solana-stake-interface 2.0.2",
+ "solana-stake-interface 3.0.0",
  "solana-system-interface 3.0.0",
  "solana-sysvar 4.0.0",
  "solana-sysvar-id",
