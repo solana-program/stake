@@ -13,7 +13,7 @@ solana-account-info = { version = "3.0.0", features = ["bincode"] }
 solana-clock = "3.0.0"
 solana-cpi = "3.0.0"
 solana-instruction-error = "2.2.0"
-solana-msg = "3.0.0"
+solana-msg = "3.1.0"
 solana-native-token = "3.0.0"
 solana-program-entrypoint = "3.0.0"
 solana-program-error = "3.0.0"
