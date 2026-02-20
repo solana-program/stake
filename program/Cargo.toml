@@ -40,7 +40,7 @@ solana-keypair = "3.0.0"
 solana-logger = "3.0.0"
 solana-program-test = "3.0.10"
 solana-sdk-ids = "3.0.0"
-solana-signature = "3.2.0"
+solana-signature = "3.3.0"
 solana-signer = "3.0.0"
 solana-svm-log-collector = "3.0.0"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
