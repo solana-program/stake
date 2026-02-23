@@ -8,11 +8,11 @@ homepage = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-wincode = { git = "https://github.com/anza-xyz/wincode.git", rev = "6feb75ff4c5b26275b0ee8bc4a12ea906d996a02", default-features = false, features = ["derive"] }
+wincode = { version = "0.4.4", features = ["derive"] }
 
 [dev-dependencies]
 bincode = "1.3.3"
-proptest = "1.9.0"
+proptest = "1.10.0"
 solana-pubkey = "3.0.0"
 solana-stake-interface = { path = "../../interface", features = ["bincode"] }
 test-case = "3.3.1"
