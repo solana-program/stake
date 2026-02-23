@@ -83,10 +83,7 @@ impl StakeStateV2Tag {
     #[inline]
     pub(crate) fn from_u32(v: u32) -> Result<Self, StakeStateError> {
         match v {
-            0 => Ok(Self::Uninitialized),
-            1 => Ok(Self::Initialized),
-            2 => Ok(Self::Stake),
-            3 => Ok(Self::RewardsPool),
+            0..=3 => Ok(unsafe { core::mem::transmute::<u32, StakeStateV2Tag>(v) }),
             other => Err(StakeStateError::InvalidTag(other)),
         }
     }
@@ -110,8 +107,7 @@ impl StakeStateV2Tag {
 /// │   0    │  4   │ Tag        │
 /// │   4    │ 120  │ Meta       │
 /// │  124   │  72  │ Stake      │
-/// │  196   │  1   │ StakeFlags │
-/// │  197   │  3   │ Padding    │
+/// │  196   │  4   │ Padding    │
 /// └────────┴──────┴────────────┘
 /// ```
 ///
