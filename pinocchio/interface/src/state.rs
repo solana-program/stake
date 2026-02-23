@@ -139,7 +139,8 @@ impl StakeStateV2 {
         if data.len() < Self::LEN {
             return Err(StakeStateError::UnexpectedEof);
         }
-        let state = <Self as ZeroCopy>::from_bytes(data)?;
+        let state =
+            <Self as ZeroCopy>::from_bytes(data).map_err(|_error| StakeStateError::Decode)?;
         StakeStateV2Tag::from_u32(state.tag.get())?;
         Ok(state)
     }
@@ -149,7 +150,8 @@ impl StakeStateV2 {
         if data.len() < Self::LEN {
             return Err(StakeStateError::UnexpectedEof);
         }
-        let state = <Self as ZeroCopy>::from_bytes_mut(data)?;
+        let state =
+            <Self as ZeroCopy>::from_bytes_mut(data).map_err(|_error| StakeStateError::Decode)?;
         StakeStateV2Tag::from_u32(state.tag.get())?;
         Ok(state)
     }
