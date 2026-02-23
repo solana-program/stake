@@ -3,14 +3,15 @@ use {
     super::legacy::bincode_opts,
     bincode::Options,
     core::mem::size_of,
-    p_stake_interface::{
-        pod::{Address, PodI64, PodU64},
-        state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
+    p_stake_interface::state::{
+        Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag,
     },
+    solana_address::Address,
     solana_stake_interface::{
         stake_flags::StakeFlags as LegacyStakeFlags,
         state::{Meta as LegacyMeta, Stake as LegacyStake},
     },
+    spl_pod::primitives::{PodI64, PodU64},
 };
 
 pub const TAG_LEN: usize = StakeStateV2Tag::TAG_LEN;
@@ -57,7 +58,10 @@ pub fn meta_from_legacy(legacy: &LegacyMeta) -> Meta {
 }
 
 pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {
-    assert_eq!(new.rent_exempt_reserve.get(), legacy.rent_exempt_reserve);
+    assert_eq!(
+        u64::from(new.rent_exempt_reserve),
+        legacy.rent_exempt_reserve
+    );
     assert_eq!(
         new.authorized.staker.to_bytes(),
         legacy.authorized.staker.to_bytes()
@@ -67,10 +71,10 @@ pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {
         legacy.authorized.withdrawer.to_bytes()
     );
     assert_eq!(
-        new.lockup.unix_timestamp.get(),
+        i64::from(new.lockup.unix_timestamp),
         legacy.lockup.unix_timestamp
     );
-    assert_eq!(new.lockup.epoch.get(), legacy.lockup.epoch);
+    assert_eq!(u64::from(new.lockup.epoch), legacy.lockup.epoch);
     assert_eq!(
         new.lockup.custodian.to_bytes(),
         legacy.lockup.custodian.to_bytes()
@@ -82,17 +86,17 @@ pub fn assert_stake_compat(new: &Stake, legacy: &LegacyStake) {
         new.delegation.voter_pubkey.to_bytes(),
         legacy.delegation.voter_pubkey.to_bytes()
     );
-    assert_eq!(new.delegation.stake.get(), legacy.delegation.stake);
+    assert_eq!(u64::from(new.delegation.stake), legacy.delegation.stake);
     assert_eq!(
-        new.delegation.activation_epoch.get(),
+        u64::from(new.delegation.activation_epoch),
         legacy.delegation.activation_epoch
     );
     assert_eq!(
-        new.delegation.deactivation_epoch.get(),
+        u64::from(new.delegation.deactivation_epoch),
         legacy.delegation.deactivation_epoch
     );
     let expected_reserved =
         warmup_reserved_bytes_from_legacy_rate(legacy.delegation.warmup_cooldown_rate);
     assert_eq!(new.delegation._reserved, expected_reserved);
-    assert_eq!(new.credits_observed.get(), legacy.credits_observed);
+    assert_eq!(u64::from(new.credits_observed), legacy.credits_observed);
 }

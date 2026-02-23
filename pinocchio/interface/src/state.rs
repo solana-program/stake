@@ -1,16 +1,15 @@
 //! Zero-copy stake state types.
 
 use {
-    crate::{
-        error::StakeStateError,
-        pod::{Address, PodI64, PodU32, PodU64},
-    },
+    crate::error::StakeStateError,
     core::mem::size_of,
+    solana_address::Address,
+    spl_pod::primitives::{PodI64, PodU32, PodU64},
     wincode::{SchemaRead, SchemaWrite, ZeroCopy},
 };
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Authorized {
     pub staker: Address,
@@ -18,7 +17,7 @@ pub struct Authorized {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Lockup {
     /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
@@ -33,7 +32,7 @@ pub struct Lockup {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
+#[derive(Clone, Debug, PartialEq, SchemaWrite, SchemaRead, Default)]
 #[wincode(assert_zero_copy)]
 pub struct Meta {
     pub rent_exempt_reserve: PodU64,
@@ -42,7 +41,7 @@ pub struct Meta {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Delegation {
     /// To whom the stake is delegated.
@@ -59,7 +58,7 @@ pub struct Delegation {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
+#[derive(Clone, Debug, PartialEq, SchemaWrite, SchemaRead, Default)]
 #[wincode(assert_zero_copy)]
 pub struct Stake {
     pub delegation: Delegation,
@@ -125,7 +124,7 @@ impl StakeStateV2Tag {
 ///
 /// All fields are alignment-1 for safe zero-copy from unaligned byte slices.
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct StakeStateV2 {
     tag: PodU32,
@@ -145,7 +144,7 @@ impl StakeStateV2 {
     /// Parse stake account data into a read-only reference.
     pub fn from_bytes(data: &[u8]) -> Result<&Self, StakeStateError> {
         let state = <Self as ZeroCopy>::from_bytes(data).map_err(|_| StakeStateError::Decode)?;
-        StakeStateV2Tag::assert_valid_tag(state.tag.get())?;
+        StakeStateV2Tag::assert_valid_tag(u32::from(state.tag))?;
         Ok(state)
     }
 
@@ -153,7 +152,7 @@ impl StakeStateV2 {
     pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, StakeStateError> {
         let state =
             <Self as ZeroCopy>::from_bytes_mut(data).map_err(|_| StakeStateError::Decode)?;
-        StakeStateV2Tag::assert_valid_tag(state.tag.get())?;
+        StakeStateV2Tag::assert_valid_tag(u32::from(state.tag))?;
         Ok(state)
     }
 
@@ -161,7 +160,7 @@ impl StakeStateV2 {
     #[inline]
     pub fn tag(&self) -> StakeStateV2Tag {
         // SAFETY: tag validated at construction
-        unsafe { StakeStateV2Tag::from_u32_unchecked(self.tag.get()) }
+        unsafe { StakeStateV2Tag::from_u32_unchecked(u32::from(self.tag)) }
     }
 
     /// Returns a reference to `Meta` if in the `Initialized` or `Stake` state.
@@ -215,7 +214,7 @@ impl StakeStateV2 {
         self.stake_flags = 0;
         self.padding.fill(0);
         self.meta = meta;
-        self.tag.set(StakeStateV2Tag::Initialized as u32);
+        self.tag = PodU32::from(StakeStateV2Tag::Initialized as u32);
 
         Ok(())
     }
@@ -239,7 +238,7 @@ impl StakeStateV2 {
 
         self.meta = meta;
         self.stake = stake;
-        self.tag.set(StakeStateV2Tag::Stake as u32);
+        self.tag = PodU32::from(StakeStateV2Tag::Stake as u32);
 
         Ok(())
     }

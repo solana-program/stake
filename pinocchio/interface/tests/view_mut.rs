@@ -8,10 +8,10 @@ use {
     helpers::*,
     p_stake_interface::{
         error::StakeStateError,
-        pod::Address,
         state::{Delegation, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
+    solana_address::Address,
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         stake_flags::StakeFlags as LegacyStakeFlags,
@@ -20,6 +20,7 @@ use {
             StakeStateV2 as LegacyStakeStateV2,
         },
     },
+    spl_pod::primitives::PodU64,
     test_case::test_case,
 };
 
@@ -126,7 +127,7 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     assert_mut_borrows_at(meta, base_ptr, META_OFF);
 
     // Mutate fields through the view
-    meta.rent_exempt_reserve.set(new_rent);
+    meta.rent_exempt_reserve = PodU64::from(new_rent);
     meta.lockup.custodian = Address::new_from_array(new_custodian);
 
     // Tail bytes (stake_flags + padding) must be untouched by meta_mut operations
@@ -137,7 +138,7 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
     let meta = layout.meta().unwrap();
-    assert_eq!(meta.rent_exempt_reserve.get(), new_rent);
+    assert_eq!(u64::from(meta.rent_exempt_reserve), new_rent);
     assert_eq!(meta.lockup.custodian.to_bytes(), new_custodian);
 
     // Legacy bincode decode still works
@@ -265,15 +266,15 @@ proptest! {
         // Re-parse to mutate more fields
         let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
         let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.meta_mut().unwrap().rent_exempt_reserve.set(new_rent_exempt_reserve);
+        layout.meta_mut().unwrap().rent_exempt_reserve = PodU64::from(new_rent_exempt_reserve);
 
         let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
         let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.stake_mut().unwrap().credits_observed.set(new_credits_observed);
+        layout.stake_mut().unwrap().credits_observed = PodU64::from(new_credits_observed);
 
         let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
         let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.stake_mut().unwrap().delegation.stake.set(new_stake_amount);
+        layout.stake_mut().unwrap().delegation.stake = PodU64::from(new_stake_amount);
 
         // Verify reserved bytes still unchanged
         let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
@@ -316,9 +317,9 @@ proptest! {
         prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
         let meta = layout.meta().unwrap();
         let stake = layout.stake().unwrap();
-        prop_assert_eq!(meta.rent_exempt_reserve.get(), new_rent_exempt_reserve);
-        prop_assert_eq!(stake.credits_observed.get(), new_credits_observed);
-        prop_assert_eq!(stake.delegation.stake.get(), new_stake_amount);
+        prop_assert_eq!(u64::from(meta.rent_exempt_reserve), new_rent_exempt_reserve);
+        prop_assert_eq!(u64::from(stake.credits_observed), new_credits_observed);
+        prop_assert_eq!(u64::from(stake.delegation.stake), new_stake_amount);
 
         // Legacy decode sees the updates and flags/padding are preserved
         let decoded_after = deserialize_legacy(after_layout);

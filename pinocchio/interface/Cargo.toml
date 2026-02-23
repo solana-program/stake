@@ -11,9 +11,14 @@ license = { workspace = true }
 wincode = { version = "0.4.4", features = ["derive"] }
 solana-address = { version = "2.2.0", features = ["wincode"] }
 
+# TODO: Temp until https://github.com/solana-program/libraries/pull/172 is merged
+spl-pod = { git = "https://github.com/solana-program/libraries", branch = "wincode-support", features = ["wincode"] }
+
 [dev-dependencies]
 bincode = "1.3.3"
 proptest = "1.10.0"
+solana-address = { version = "2.2.0", features = ["wincode"] }
 solana-pubkey = "3.0.0"
 solana-stake-interface = { path = "../../interface", features = ["bincode"] }
+spl-pod = { git = "https://github.com/solana-program/libraries", branch = "wincode-support", features = ["wincode"] }
 test-case = "3.3.1"

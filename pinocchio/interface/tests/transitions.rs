@@ -7,10 +7,10 @@ use {
     helpers::*,
     p_stake_interface::{
         error::StakeStateError,
-        pod::{Address, PodI64, PodU64},
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
+    solana_address::Address,
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         stake_flags::StakeFlags as LegacyStakeFlags,
@@ -19,6 +19,7 @@ use {
             Meta as LegacyMeta, Stake as LegacyStake, StakeStateV2 as LegacyStakeStateV2,
         },
     },
+    spl_pod::primitives::{PodI64, PodU64},
     test_case::test_case,
 };
 
@@ -428,8 +429,8 @@ fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
     // Mutate via the layout's mutable accessors
     let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
     let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-    layout.meta_mut().unwrap().rent_exempt_reserve.set(424242);
-    layout.stake_mut().unwrap().credits_observed.set(7777);
+    layout.meta_mut().unwrap().rent_exempt_reserve = PodU64::from(424242u64);
+    layout.stake_mut().unwrap().credits_observed = PodU64::from(7777u64);
 
     // Trailing bytes must remain untouched
     assert_eq!(
@@ -444,8 +445,11 @@ fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
 
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
-    assert_eq!(layout.meta().unwrap().rent_exempt_reserve.get(), 424242);
-    assert_eq!(layout.stake().unwrap().credits_observed.get(), 7777);
+    assert_eq!(
+        u64::from(layout.meta().unwrap().rent_exempt_reserve),
+        424242
+    );
+    assert_eq!(u64::from(layout.stake().unwrap().credits_observed), 7777);
 }
 
 #[test]
