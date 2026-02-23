@@ -10,7 +10,7 @@ use {
 };
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Authorized {
     pub staker: Address,
@@ -18,7 +18,7 @@ pub struct Authorized {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Lockup {
     /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
@@ -33,7 +33,7 @@ pub struct Lockup {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
 #[wincode(assert_zero_copy)]
 pub struct Meta {
     pub rent_exempt_reserve: PodU64,
@@ -42,7 +42,7 @@ pub struct Meta {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Delegation {
     /// To whom the stake is delegated.
@@ -59,7 +59,7 @@ pub struct Delegation {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead, Default)]
 #[wincode(assert_zero_copy)]
 pub struct Stake {
     pub delegation: Delegation,
@@ -82,18 +82,24 @@ impl StakeStateV2Tag {
 
     #[inline]
     pub(crate) fn from_u32(v: u32) -> Result<Self, StakeStateError> {
+        Self::assert_valid_tag(v)?;
+        Ok(unsafe { core::mem::transmute::<u32, StakeStateV2Tag>(v) })
+    }
+
+    #[inline]
+    pub(crate) fn assert_valid_tag(v: u32) -> Result<(), StakeStateError> {
         match v {
-            0..=3 => Ok(unsafe { core::mem::transmute::<u32, StakeStateV2Tag>(v) }),
+            0..=3 => Ok(()),
             other => Err(StakeStateError::InvalidTag(other)),
         }
     }
 
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, StakeStateError> {
-        if bytes.len() < 4 {
+        if bytes.len() < Self::TAG_LEN {
             return Err(StakeStateError::UnexpectedEof);
         }
-        let raw = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+        let raw = u32::from_le_bytes(bytes[..Self::TAG_LEN].try_into().unwrap());
         Self::from_u32(raw)
     }
 }
@@ -113,7 +119,7 @@ impl StakeStateV2Tag {
 ///
 /// All fields are alignment-1 for safe zero-copy from unaligned byte slices.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, SchemaWrite, SchemaRead)]
+#[derive(Clone, Debug, PartialEq, Eq, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct StakeStateV2 {
     tag: PodU32,
@@ -133,7 +139,7 @@ impl StakeStateV2 {
     /// Parse stake account data into a read-only reference.
     pub fn from_bytes(data: &[u8]) -> Result<&Self, StakeStateError> {
         let state = <Self as ZeroCopy>::from_bytes(data).map_err(|_| StakeStateError::Decode)?;
-        StakeStateV2Tag::from_u32(state.tag.get())?;
+        StakeStateV2Tag::assert_valid_tag(state.tag.get())?;
         Ok(state)
     }
 
@@ -141,7 +147,7 @@ impl StakeStateV2 {
     pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, StakeStateError> {
         let state =
             <Self as ZeroCopy>::from_bytes_mut(data).map_err(|_| StakeStateError::Decode)?;
-        StakeStateV2Tag::from_u32(state.tag.get())?;
+        StakeStateV2Tag::assert_valid_tag(state.tag.get())?;
         Ok(state)
     }
 

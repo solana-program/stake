@@ -666,7 +666,7 @@ proptest! {
 
         let slice = &mut buffer[start..end];
         let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.initialize(meta).unwrap();
+        layout.initialize(meta.clone()).unwrap();
 
         prop_assert_eq!(&buffer[start + STATE_LEN..end], trailing_before.as_slice());
 
@@ -681,7 +681,7 @@ proptest! {
 
         let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
         prop_assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
-        prop_assert_eq!(*layout.meta().unwrap(), meta);
+        prop_assert_eq!(layout.meta().unwrap(), &meta);
     }
 
     // Stake -> Stake transition must preserve arbitrary stake_flags+padding AND preserve trailing bytes beyond 200

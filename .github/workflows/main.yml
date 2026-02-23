@@ -45,7 +45,7 @@ jobs:
 
   main:
     needs: set_env
-    uses: solana-program/actions/.github/workflows/main.yml@miri # temp until: https://github.com/solana-program/actions/pull/19
+    uses: solana-program/actions/.github/workflows/main.yml@main
     with:
       js-packages: ${{ needs.set_env.outputs.JS_PACKAGES }}
       sbpf-program-packages: ${{ needs.set_env.outputs.SBPF_PROGRAM_PACKAGES }}
