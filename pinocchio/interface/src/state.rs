@@ -87,6 +87,12 @@ impl StakeStateV2Tag {
     }
 
     #[inline]
+    pub(crate) unsafe fn from_u32_unchecked(v: u32) -> Self {
+        debug_assert!(v <= Self::RewardsPool as u32);
+        core::mem::transmute::<u32, StakeStateV2Tag>(v)
+    }
+
+    #[inline]
     pub(crate) fn assert_valid_tag(v: u32) -> Result<(), StakeStateError> {
         match v {
             0..=3 => Ok(()),
@@ -154,7 +160,8 @@ impl StakeStateV2 {
     /// Returns the state tag (infallible since validated at construction).
     #[inline]
     pub fn tag(&self) -> StakeStateV2Tag {
-        StakeStateV2Tag::from_u32(self.tag.get()).unwrap()
+        // SAFETY: tag validated at construction
+        unsafe { StakeStateV2Tag::from_u32_unchecked(self.tag.get()) }
     }
 
     /// Returns a reference to `Meta` if in the `Initialized` or `Stake` state.
