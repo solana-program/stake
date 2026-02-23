@@ -4,7 +4,7 @@ use {
     bincode::Options,
     core::mem::size_of,
     p_stake_interface::{
-        pod::{PodAddress, PodI64, PodU64},
+        pod::{Address, PodI64, PodU64},
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
     solana_stake_interface::{
@@ -45,22 +45,25 @@ pub fn meta_from_legacy(legacy: &LegacyMeta) -> Meta {
     Meta {
         rent_exempt_reserve: PodU64::from_primitive(legacy.rent_exempt_reserve),
         authorized: Authorized {
-            staker: PodAddress::from_bytes(legacy.authorized.staker.to_bytes()),
-            withdrawer: PodAddress::from_bytes(legacy.authorized.withdrawer.to_bytes()),
+            staker: Address::new_from_array(legacy.authorized.staker.to_bytes()),
+            withdrawer: Address::new_from_array(legacy.authorized.withdrawer.to_bytes()),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(legacy.lockup.unix_timestamp),
             epoch: PodU64::from_primitive(legacy.lockup.epoch),
-            custodian: PodAddress::from_bytes(legacy.lockup.custodian.to_bytes()),
+            custodian: Address::new_from_array(legacy.lockup.custodian.to_bytes()),
         },
     }
 }
 
 pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {
     assert_eq!(new.rent_exempt_reserve.get(), legacy.rent_exempt_reserve);
-    assert_eq!(new.authorized.staker.0, legacy.authorized.staker.to_bytes());
     assert_eq!(
-        new.authorized.withdrawer.0,
+        new.authorized.staker.to_bytes(),
+        legacy.authorized.staker.to_bytes()
+    );
+    assert_eq!(
+        new.authorized.withdrawer.to_bytes(),
         legacy.authorized.withdrawer.to_bytes()
     );
     assert_eq!(
@@ -68,12 +71,15 @@ pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {
         legacy.lockup.unix_timestamp
     );
     assert_eq!(new.lockup.epoch.get(), legacy.lockup.epoch);
-    assert_eq!(new.lockup.custodian.0, legacy.lockup.custodian.to_bytes());
+    assert_eq!(
+        new.lockup.custodian.to_bytes(),
+        legacy.lockup.custodian.to_bytes()
+    );
 }
 
 pub fn assert_stake_compat(new: &Stake, legacy: &LegacyStake) {
     assert_eq!(
-        new.delegation.voter_pubkey.0,
+        new.delegation.voter_pubkey.to_bytes(),
         legacy.delegation.voter_pubkey.to_bytes()
     );
     assert_eq!(new.delegation.stake.get(), legacy.delegation.stake);

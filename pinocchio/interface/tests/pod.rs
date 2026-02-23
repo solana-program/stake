@@ -1,4 +1,4 @@
-use p_stake_interface::pod::{PodAddress, PodI64, PodU32, PodU64};
+use p_stake_interface::pod::{Address, PodI64, PodU32, PodU64};
 
 macro_rules! pod_int_tests {
     ($pod_ty:ty, $prim_ty:ty, $size:expr, $test_value:expr, $mod_name:ident) => {
@@ -96,28 +96,27 @@ pod_int_tests!(PodU64, u64, 8, 9876543210u64, pod_u64);
 pod_int_tests!(PodI64, i64, 8, -1234567890i64, pod_i64);
 
 // =============================================================================
-// PodAddress tests
+// Address tests
 // =============================================================================
 
 #[test]
 fn from_bytes_and_as_bytes_roundtrip() {
     let bytes = [42; 32];
-    let addr = PodAddress::from_bytes(bytes);
-    assert_eq!(addr.as_bytes(), &bytes);
-    assert_eq!(addr.0, bytes);
+    let addr = Address::new_from_array(bytes);
+    assert_eq!(addr.to_bytes(), bytes);
 }
 
 #[test]
 fn default_is_zero() {
-    let addr = PodAddress::default();
-    assert_eq!(addr.as_bytes(), &[0u8; 32]);
+    let addr = Address::default();
+    assert_eq!(addr.to_bytes(), [0u8; 32]);
 }
 
 #[test]
 fn equality() {
-    let a = PodAddress::from_bytes([1; 32]);
-    let b = PodAddress::from_bytes([1; 32]);
-    let c = PodAddress::from_bytes([2; 32]);
+    let a = Address::new_from_array([1; 32]);
+    let b = Address::new_from_array([1; 32]);
+    let c = Address::new_from_array([2; 32]);
     assert_eq!(a, b);
     assert_ne!(a, c);
 }
@@ -125,12 +124,12 @@ fn equality() {
 #[test]
 fn layout_properties() {
     use core::mem::{align_of, needs_drop, size_of};
-    assert_eq!(align_of::<PodAddress>(), 1);
-    assert_eq!(size_of::<PodAddress>(), 32);
-    assert!(!needs_drop::<PodAddress>());
+    assert_eq!(align_of::<Address>(), 1);
+    assert_eq!(size_of::<Address>(), 32);
+    assert!(!needs_drop::<Address>());
 }
 
 #[test]
 fn const_from_bytes_compiles() {
-    const _A: PodAddress = PodAddress::from_bytes([0u8; 32]);
+    const _A: Address = Address::new_from_array([0u8; 32]);
 }

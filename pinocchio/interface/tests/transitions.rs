@@ -7,7 +7,7 @@ use {
     helpers::*,
     p_stake_interface::{
         error::StakeStateError,
-        pod::{PodAddress, PodI64, PodU64},
+        pod::{Address, PodI64, PodU64},
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
@@ -227,13 +227,13 @@ fn uninitialized_to_initialized(unaligned: bool, trailing_len: usize) {
     let meta = Meta {
         rent_exempt_reserve: PodU64::from_primitive(42),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([1; 32]),
-            withdrawer: PodAddress::from_bytes([2; 32]),
+            staker: Address::new_from_array([1; 32]),
+            withdrawer: Address::new_from_array([2; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(-3),
             epoch: PodU64::from_primitive(9),
-            custodian: PodAddress::from_bytes([3; 32]),
+            custodian: Address::new_from_array([3; 32]),
         },
     };
 
@@ -300,19 +300,19 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
     let meta = Meta {
         rent_exempt_reserve: PodU64::from_primitive(7),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([4; 32]),
-            withdrawer: PodAddress::from_bytes([5; 32]),
+            staker: Address::new_from_array([4; 32]),
+            withdrawer: Address::new_from_array([5; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(6),
             epoch: PodU64::from_primitive(8),
-            custodian: PodAddress::from_bytes([6; 32]),
+            custodian: Address::new_from_array([6; 32]),
         },
     };
     let warmup_rate: f64 = 1.0;
     let stake = Stake {
         delegation: Delegation {
-            voter_pubkey: PodAddress::from_bytes([7; 32]),
+            voter_pubkey: Address::new_from_array([7; 32]),
             stake: PodU64::from_primitive(123),
             activation_epoch: PodU64::from_primitive(2),
             deactivation_epoch: PodU64::from_primitive(3),
@@ -400,19 +400,19 @@ fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
     let meta = Meta {
         rent_exempt_reserve: PodU64::from_primitive(7),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([4; 32]),
-            withdrawer: PodAddress::from_bytes([5; 32]),
+            staker: Address::new_from_array([4; 32]),
+            withdrawer: Address::new_from_array([5; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(6),
             epoch: PodU64::from_primitive(8),
-            custodian: PodAddress::from_bytes([6; 32]),
+            custodian: Address::new_from_array([6; 32]),
         },
     };
     let warmup_rate: f64 = 1.0;
     let stake = Stake {
         delegation: Delegation {
-            voter_pubkey: PodAddress::from_bytes([7; 32]),
+            voter_pubkey: Address::new_from_array([7; 32]),
             stake: PodU64::from_primitive(123),
             activation_epoch: PodU64::from_primitive(2),
             deactivation_epoch: PodU64::from_primitive(3),
@@ -453,31 +453,31 @@ fn chained_transitions_uninitialized_to_initialized_to_stake() {
     let meta1 = Meta {
         rent_exempt_reserve: PodU64::from_primitive(4),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([1; 32]),
-            withdrawer: PodAddress::from_bytes([2; 32]),
+            staker: Address::new_from_array([1; 32]),
+            withdrawer: Address::new_from_array([2; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(-5),
             epoch: PodU64::from_primitive(6),
-            custodian: PodAddress::from_bytes([3; 32]),
+            custodian: Address::new_from_array([3; 32]),
         },
     };
     let meta2 = Meta {
         rent_exempt_reserve: PodU64::from_primitive(10),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([7; 32]),
-            withdrawer: PodAddress::from_bytes([8; 32]),
+            staker: Address::new_from_array([7; 32]),
+            withdrawer: Address::new_from_array([8; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(-11),
             epoch: PodU64::from_primitive(12),
-            custodian: PodAddress::from_bytes([9; 32]),
+            custodian: Address::new_from_array([9; 32]),
         },
     };
     let warmup_rate: f64 = 0.75;
     let stake2 = Stake {
         delegation: Delegation {
-            voter_pubkey: PodAddress::from_bytes([13; 32]),
+            voter_pubkey: Address::new_from_array([13; 32]),
             stake: PodU64::from_primitive(14),
             activation_epoch: PodU64::from_primitive(15),
             deactivation_epoch: PodU64::from_primitive(16),
@@ -567,19 +567,19 @@ fn stake_to_stake_preserves_tail(unaligned: bool, trailing_len: usize) {
     let meta = Meta {
         rent_exempt_reserve: PodU64::from_primitive(1),
         authorized: Authorized {
-            staker: PodAddress::from_bytes([9; 32]),
-            withdrawer: PodAddress::from_bytes([8; 32]),
+            staker: Address::new_from_array([9; 32]),
+            withdrawer: Address::new_from_array([8; 32]),
         },
         lockup: Lockup {
             unix_timestamp: PodI64::from_primitive(7),
             epoch: PodU64::from_primitive(11),
-            custodian: PodAddress::from_bytes([7; 32]),
+            custodian: Address::new_from_array([7; 32]),
         },
     };
     let warmup_rate: f64 = 0.5;
     let stake = Stake {
         delegation: Delegation {
-            voter_pubkey: PodAddress::from_bytes([6; 32]),
+            voter_pubkey: Address::new_from_array([6; 32]),
             stake: PodU64::from_primitive(55),
             activation_epoch: PodU64::from_primitive(1),
             deactivation_epoch: PodU64::from_primitive(9),
@@ -716,7 +716,7 @@ proptest! {
         let meta = meta_from_legacy(&new_meta);
         let stake = Stake {
              delegation: Delegation {
-                voter_pubkey: PodAddress::from_bytes(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
+                voter_pubkey: Address::new_from_array(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
                 stake: PodU64::from_primitive(new_legacy_stake.delegation.stake),
                 activation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.activation_epoch),
                 deactivation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.deactivation_epoch),
@@ -806,7 +806,7 @@ proptest! {
         let meta = meta_from_legacy(&new_meta);
         let stake = Stake {
              delegation: Delegation {
-                voter_pubkey: PodAddress::from_bytes(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
+                voter_pubkey: Address::new_from_array(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
                 stake: PodU64::from_primitive(new_legacy_stake.delegation.stake),
                 activation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.activation_epoch),
                 deactivation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.deactivation_epoch),

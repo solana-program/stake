@@ -8,6 +8,7 @@ use {
     helpers::*,
     p_stake_interface::{
         error::StakeStateError,
+        pod::Address,
         state::{Delegation, StakeStateV2, StakeStateV2Tag},
     },
     proptest::prelude::*,
@@ -126,7 +127,7 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
 
     // Mutate fields through the view
     meta.rent_exempt_reserve.set(new_rent);
-    meta.lockup.custodian.0 = new_custodian;
+    meta.lockup.custodian = Address::new_from_array(new_custodian);
 
     // Tail bytes (stake_flags + padding) must be untouched by meta_mut operations
     let layout_bytes = &buffer[offset..offset + STATE_LEN];
@@ -137,7 +138,7 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
     let meta = layout.meta().unwrap();
     assert_eq!(meta.rent_exempt_reserve.get(), new_rent);
-    assert_eq!(meta.lockup.custodian.as_bytes(), &new_custodian);
+    assert_eq!(meta.lockup.custodian.to_bytes(), new_custodian);
 
     // Legacy bincode decode still works
     let decoded = deserialize_legacy(layout_bytes);

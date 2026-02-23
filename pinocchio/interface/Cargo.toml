@@ -9,6 +9,7 @@ license = { workspace = true }
 
 [dependencies]
 wincode = { version = "0.4.4", features = ["derive"] }
+solana-address = { version = "2.2.0", features = ["wincode"] }
 
 [dev-dependencies]
 bincode = "1.3.3"

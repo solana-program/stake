@@ -3292,6 +3292,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "p-stake-interface"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "proptest",
+ "solana-address 2.2.0",
+ "solana-pubkey 3.0.0",
+ "solana-stake-interface 3.0.0",
+ "test-case",
+ "wincode",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

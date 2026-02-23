@@ -54,7 +54,7 @@ proptest! {
 
         let new_layout = StakeStateV2::from_bytes(&expected[..]).unwrap();
         let mut actual = [0u8; 200];
-        wincode::serialize_into(&mut actual.as_mut_slice(), new_layout).unwrap();
+        wincode::serialize_into(actual.as_mut_slice(), new_layout).unwrap();
 
         prop_assert_eq!(expected.as_slice(), &actual);
     }

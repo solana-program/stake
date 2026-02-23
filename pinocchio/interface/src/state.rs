@@ -3,7 +3,7 @@
 use {
     crate::{
         error::StakeStateError,
-        pod::{PodAddress, PodI64, PodU32, PodU64},
+        pod::{Address, PodI64, PodU32, PodU64},
     },
     core::mem::size_of,
     wincode::{SchemaRead, SchemaWrite, ZeroCopy},
@@ -13,8 +13,8 @@ use {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
 #[wincode(assert_zero_copy)]
 pub struct Authorized {
-    pub staker: PodAddress,
-    pub withdrawer: PodAddress,
+    pub staker: Address,
+    pub withdrawer: Address,
 }
 
 #[repr(C)]
@@ -29,7 +29,7 @@ pub struct Lockup {
     pub epoch: PodU64,
     /// Custodian signature on a transaction exempts the operation from
     ///  lockup constraints.
-    pub custodian: PodAddress,
+    pub custodian: Address,
 }
 
 #[repr(C)]
@@ -46,7 +46,7 @@ pub struct Meta {
 #[wincode(assert_zero_copy)]
 pub struct Delegation {
     /// To whom the stake is delegated.
-    pub voter_pubkey: PodAddress,
+    pub voter_pubkey: Address,
     /// Activated stake amount, set at delegate() time.
     pub stake: PodU64,
     /// Epoch at which this stake was activated, `u64::MAX` if is a bootstrap stake.

@@ -7,6 +7,7 @@
 //! These "pod" (plain old data) types wrap byte arrays and provide safe
 //! get/set methods that handle little-endian conversion. They have alignment 1,
 //! so they can be safely referenced from any byte offset.
+pub use solana_address::Address;
 use wincode::{SchemaRead, SchemaWrite};
 
 /// Macro to define an alignment-1 little-endian integer wrapper.
@@ -64,19 +65,3 @@ macro_rules! impl_pod_int {
 impl_pod_int!(PodU32, u32, 4);
 impl_pod_int!(PodU64, u64, 8);
 impl_pod_int!(PodI64, i64, 8);
-
-/// An `Address` stored as 32 bytes with alignment 1.
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, SchemaWrite, SchemaRead)]
-#[wincode(assert_zero_copy)]
-pub struct PodAddress(pub [u8; 32]);
-
-impl PodAddress {
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-
-    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
-        Self(bytes)
-    }
-}
