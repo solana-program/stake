@@ -33,10 +33,10 @@ fn assert_tail(layout_bytes: &[u8], flags: u8, padding: [u8; 3]) {
 }
 
 #[test]
-fn short_buffer_eof() {
+fn short_buffer_decode() {
     let mut data = vec![0u8; STATE_LEN - 1];
     let err = StakeStateV2::from_bytes_mut(&mut data).unwrap_err();
-    assert!(matches!(err, StakeStateError::UnexpectedEof));
+    assert!(matches!(err, StakeStateError::Decode));
 }
 
 #[test]

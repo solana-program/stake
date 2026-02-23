@@ -132,22 +132,15 @@ impl StakeStateV2 {
 
     /// Parse stake account data into a read-only reference.
     pub fn from_bytes(data: &[u8]) -> Result<&Self, StakeStateError> {
-        if data.len() < Self::LEN {
-            return Err(StakeStateError::UnexpectedEof);
-        }
-        let state =
-            <Self as ZeroCopy>::from_bytes(data).map_err(|_error| StakeStateError::Decode)?;
+        let state = <Self as ZeroCopy>::from_bytes(data).map_err(|_| StakeStateError::Decode)?;
         StakeStateV2Tag::from_u32(state.tag.get())?;
         Ok(state)
     }
 
     /// Parse stake account data into a mutable reference.
     pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, StakeStateError> {
-        if data.len() < Self::LEN {
-            return Err(StakeStateError::UnexpectedEof);
-        }
         let state =
-            <Self as ZeroCopy>::from_bytes_mut(data).map_err(|_error| StakeStateError::Decode)?;
+            <Self as ZeroCopy>::from_bytes_mut(data).map_err(|_| StakeStateError::Decode)?;
         StakeStateV2Tag::from_u32(state.tag.get())?;
         Ok(state)
     }

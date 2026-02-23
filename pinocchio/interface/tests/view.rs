@@ -62,10 +62,10 @@ fn layout_invariants() {
 }
 
 #[test]
-fn short_buffer_returns_unexpected_eof() {
+fn short_buffer_returns_decode() {
     let data = vec![0u8; STATE_LEN - 1];
     let err = StakeStateV2::from_bytes(&data).unwrap_err();
-    assert!(matches!(err, StakeStateError::UnexpectedEof));
+    assert!(matches!(err, StakeStateError::Decode));
 }
 
 #[test]
@@ -356,9 +356,9 @@ proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn prop_short_buffer_returns_unexpected_eof(data in proptest::collection::vec(any::<u8>(), 0..STATE_LEN)) {
+    fn prop_short_buffer_returns_decode(data in proptest::collection::vec(any::<u8>(), 0..STATE_LEN)) {
         let err = StakeStateV2::from_bytes(&data).unwrap_err();
-        prop_assert!(matches!(err, StakeStateError::UnexpectedEof));
+        prop_assert!(matches!(err, StakeStateError::Decode));
     }
 
     #[test]
