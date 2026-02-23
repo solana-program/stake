@@ -15,24 +15,24 @@ fn assert_legacy_and_new_layout_agree(bytes: &[u8]) {
     match legacy {
         LegacyStakeStateV2::Uninitialized => {
             assert_eq!(layout.tag(), StakeStateV2Tag::Uninitialized);
-            assert!(layout.meta().is_none());
-            assert!(layout.stake().is_none());
+            assert!(layout.meta().is_err());
+            assert!(layout.stake().is_err());
         }
         LegacyStakeStateV2::RewardsPool => {
             assert_eq!(layout.tag(), StakeStateV2Tag::RewardsPool);
-            assert!(layout.meta().is_none());
-            assert!(layout.stake().is_none());
+            assert!(layout.meta().is_err());
+            assert!(layout.stake().is_err());
         }
         LegacyStakeStateV2::Initialized(legacy_meta) => {
             assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
-            let meta = layout.meta().expect("expected meta for Initialized");
+            let meta = layout.meta().unwrap();
             assert_meta_compat(meta, &legacy_meta);
-            assert!(layout.stake().is_none());
+            assert!(layout.stake().is_err());
         }
         LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, legacy_flags) => {
             assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
-            let meta = layout.meta().expect("expected meta for Stake");
-            let stake = layout.stake().expect("expected stake for Stake");
+            let meta = layout.meta().unwrap();
+            let stake = layout.stake().unwrap();
             assert_meta_compat(meta, &legacy_meta);
             assert_stake_compat(stake, &legacy_stake);
 

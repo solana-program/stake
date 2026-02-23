@@ -166,19 +166,19 @@ impl StakeStateV2 {
 
     /// Returns a reference to `Meta` if in the `Initialized` or `Stake` state.
     #[inline]
-    pub fn meta(&self) -> Option<&Meta> {
+    pub fn meta(&self) -> Result<&Meta, StakeStateError> {
         match self.tag() {
-            StakeStateV2Tag::Initialized | StakeStateV2Tag::Stake => Some(&self.meta),
-            _ => None,
+            StakeStateV2Tag::Initialized | StakeStateV2Tag::Stake => Ok(&self.meta),
+            tag => Err(StakeStateError::InvalidStateAccess(tag)),
         }
     }
 
     /// Returns a reference to `Stake` if in the `Stake` state.
     #[inline]
-    pub fn stake(&self) -> Option<&Stake> {
+    pub fn stake(&self) -> Result<&Stake, StakeStateError> {
         match self.tag() {
-            StakeStateV2Tag::Stake => Some(&self.stake),
-            _ => None,
+            StakeStateV2Tag::Stake => Ok(&self.stake),
+            tag => Err(StakeStateError::InvalidStateAccess(tag)),
         }
     }
 

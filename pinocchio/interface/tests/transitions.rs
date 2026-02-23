@@ -259,7 +259,7 @@ fn uninitialized_to_initialized(unaligned: bool, trailing_len: usize) {
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
-    let view_meta = layout.meta().expect("expected meta for Initialized");
+    let view_meta = layout.meta().unwrap();
 
     let expected_legacy = LegacyMeta {
         rent_exempt_reserve: 42,
@@ -341,8 +341,8 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
-    let view_meta = layout.meta().expect("expected meta for Stake");
-    let view_stake = layout.stake().expect("expected stake for Stake");
+    let view_meta = layout.meta().unwrap();
+    let view_stake = layout.stake().unwrap();
 
     // Expected legacy values matching inputs above
     let expected_legacy = LegacyMeta {
@@ -509,8 +509,8 @@ fn chained_transitions_uninitialized_to_initialized_to_stake() {
     let layout = StakeStateV2::from_bytes(&buffer[start..start + STATE_LEN]).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
-    let view_meta = layout.meta().expect("expected meta for Stake");
-    let view_stake = layout.stake().expect("expected stake for Stake");
+    let view_meta = layout.meta().unwrap();
+    let view_stake = layout.stake().unwrap();
 
     let expected_legacy_meta2 = LegacyMeta {
         rent_exempt_reserve: 10,

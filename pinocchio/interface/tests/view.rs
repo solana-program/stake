@@ -74,7 +74,7 @@ fn buffer_with_trailing_bytes_is_ok() {
     data.extend_from_slice(&[171; 64]);
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Uninitialized);
-    assert!(layout.meta().is_none());
+    assert!(layout.meta().is_err());
 }
 
 #[test]
@@ -98,17 +98,17 @@ fn variants_match_tag_for_empty_state_bytes(tag: StakeStateV2Tag) {
 
     match tag {
         StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
-            assert!(layout.meta().is_none());
-            assert!(layout.stake().is_none());
+            assert!(layout.meta().is_err());
+            assert!(layout.stake().is_err());
         }
         StakeStateV2Tag::Initialized => {
-            let meta = layout.meta().expect("expected meta for Initialized");
+            let meta = layout.meta().unwrap();
             assert_borrows_at(meta, bytes, META_OFF);
-            assert!(layout.stake().is_none());
+            assert!(layout.stake().is_err());
         }
         StakeStateV2Tag::Stake => {
-            let meta = layout.meta().expect("expected meta for Stake");
-            let stake = layout.stake().expect("expected stake for Stake");
+            let meta = layout.meta().unwrap();
+            let stake = layout.stake().unwrap();
             assert_borrows_at(meta, bytes, META_OFF);
             assert_borrows_at(stake, bytes, STAKE_OFF);
         }
@@ -135,7 +135,7 @@ fn initialized_legacy_bytes_borrows_correctly() {
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
-    let meta = layout.meta().expect("expected meta for Initialized");
+    let meta = layout.meta().unwrap();
     assert_borrows_at(meta, &data, META_OFF);
     assert_meta_compat(meta, &legacy_meta);
 
@@ -168,7 +168,7 @@ fn unaligned_initialized_legacy_bytes_borrows_correctly() {
     let layout = StakeStateV2::from_bytes(unaligned).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
-    let meta = layout.meta().expect("expected meta for Initialized");
+    let meta = layout.meta().unwrap();
     assert_borrows_at(meta, unaligned, META_OFF);
     assert_meta_compat(meta, &legacy_meta);
 }
@@ -195,7 +195,7 @@ fn initialized_legacy_bytes_ignores_tail_bytes() {
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
-    let meta = layout.meta().expect("expected meta for Initialized");
+    let meta = layout.meta().unwrap();
     assert_meta_compat(meta, &legacy_meta);
     assert_eq!(data[FLAGS_OFF], 0xDE);
     assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0xAD, 0xBE, 0xEF]);
@@ -241,8 +241,8 @@ fn stake_legacy_bytes_borrows_correctly() {
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
-    let meta = layout.meta().expect("expected meta for Stake");
-    let stake = layout.stake().expect("expected stake for Stake");
+    let meta = layout.meta().unwrap();
+    let stake = layout.stake().unwrap();
 
     assert_borrows_at(meta, &data, META_OFF);
     assert_borrows_at(stake, &data, STAKE_OFF);
@@ -292,8 +292,8 @@ fn unaligned_stake_legacy_bytes_borrows_correctly() {
     let layout = StakeStateV2::from_bytes(unaligned).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
-    let meta = layout.meta().expect("expected meta for Stake");
-    let stake = layout.stake().expect("expected stake for Stake");
+    let meta = layout.meta().unwrap();
+    let stake = layout.stake().unwrap();
 
     assert_borrows_at(meta, unaligned, META_OFF);
     assert_borrows_at(stake, unaligned, STAKE_OFF);
@@ -341,8 +341,8 @@ fn stake_legacy_bytes_ignores_tail_bytes() {
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
 
-    let meta = layout.meta().expect("expected meta for Stake");
-    let stake = layout.stake().expect("expected stake for Stake");
+    let meta = layout.meta().unwrap();
+    let stake = layout.stake().unwrap();
 
     assert_meta_compat(meta, &legacy_meta);
     assert_stake_compat(stake, &legacy_stake);
@@ -385,16 +385,16 @@ proptest! {
 
         match tag {
             StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
-                prop_assert!(layout.meta().is_none());
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.meta().is_err());
+                prop_assert!(layout.stake().is_err());
             }
             StakeStateV2Tag::Initialized => {
-                prop_assert!(layout.meta().is_some());
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.meta().is_ok());
+                prop_assert!(layout.stake().is_err());
             }
             StakeStateV2Tag::Stake => {
-                prop_assert!(layout.meta().is_some());
-                prop_assert!(layout.stake().is_some());
+                prop_assert!(layout.meta().is_ok());
+                prop_assert!(layout.stake().is_ok());
             }
         }
     }
@@ -414,13 +414,13 @@ proptest! {
 
         match tag {
             StakeStateV2Tag::Uninitialized | StakeStateV2Tag::RewardsPool => {
-                prop_assert!(layout.meta().is_none());
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.meta().is_err());
+                prop_assert!(layout.stake().is_err());
             }
             StakeStateV2Tag::Initialized => {
                 let meta = layout.meta().unwrap();
                 assert_borrows_at(meta, unaligned, META_OFF);
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.stake().is_err());
             }
             StakeStateV2Tag::Stake => {
                 let meta = layout.meta().unwrap();
@@ -442,19 +442,19 @@ proptest! {
         match legacy {
             LegacyStakeStateV2::Uninitialized => {
                 prop_assert_eq!(layout.tag(), StakeStateV2Tag::Uninitialized);
-                prop_assert!(layout.meta().is_none());
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.meta().is_err());
+                prop_assert!(layout.stake().is_err());
             }
             LegacyStakeStateV2::RewardsPool => {
                 prop_assert_eq!(layout.tag(), StakeStateV2Tag::RewardsPool);
-                prop_assert!(layout.meta().is_none());
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.meta().is_err());
+                prop_assert!(layout.stake().is_err());
             }
             LegacyStakeStateV2::Initialized(legacy_meta) => {
                 prop_assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
                 let meta = layout.meta().unwrap();
                 assert_meta_compat(meta, &legacy_meta);
-                prop_assert!(layout.stake().is_none());
+                prop_assert!(layout.stake().is_err());
             }
             LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, flags) => {
                 prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
