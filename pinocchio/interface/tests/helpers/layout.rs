@@ -62,6 +62,34 @@ pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {
     );
 }
 
+pub fn overwrite_tail(bytes: &mut [u8], tail: [u8; 4]) -> [u8; 4] {
+    bytes[PADDING_OFFSET..STATE_LEN].copy_from_slice(&tail);
+    tail
+}
+
+pub fn assert_tail(layout_bytes: &[u8], tail: [u8; 4]) {
+    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &tail);
+}
+
+pub fn assert_tail_zeroed(layout_bytes: &[u8]) {
+    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &[0u8; 4]);
+}
+
+/// Verifies that the deserialized layout is a true zero-copy borrow into the original byte slice.
+pub fn assert_borrows_at<T>(borrow: &T, bytes: &[u8], offset: usize) {
+    let ptr = borrow as *const T;
+    let expected = unsafe { bytes.as_ptr().add(offset) };
+    assert_eq!(ptr as *const u8, expected);
+}
+
+/// Verifies that the deserialized mutable view is a true zero-copy borrow into the original
+/// byte slice at the given offset.
+pub fn assert_mut_borrows_at<T>(borrow: &mut T, base_ptr: *mut u8, offset: usize) {
+    let ptr = borrow as *mut T as *mut u8;
+    let expected = unsafe { base_ptr.add(offset) };
+    assert_eq!(ptr, expected);
+}
+
 pub fn assert_stake_compat(new: &Stake, legacy: &LegacyStake) {
     assert_eq!(
         new.delegation.voter_pubkey.to_bytes(),

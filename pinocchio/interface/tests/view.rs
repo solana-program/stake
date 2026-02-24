@@ -23,17 +23,6 @@ use {
     test_case::test_case,
 };
 
-// Verifies that the deserialized layout is a true zero-copy borrow into the original byte slice.
-fn assert_borrows_at<T>(borrow: &T, bytes: &[u8], offset: usize) {
-    let ptr = borrow as *const T;
-    let expected = unsafe { bytes.as_ptr().add(offset) };
-    assert_eq!(ptr as *const u8, expected);
-}
-
-fn overwrite_tail(bytes: &mut [u8], tail: [u8; 4]) {
-    bytes[PADDING_OFFSET..STATE_LEN].copy_from_slice(&tail);
-}
-
 #[test]
 fn len_constant_is_200() {
     assert_eq!(StakeStateV2::LEN, 200);

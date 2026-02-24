@@ -22,27 +22,22 @@ use {
     test_case::test_case,
 };
 
-fn assert_tail_zeroed(layout_bytes: &[u8]) {
-    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &[0u8; 4]);
-}
-
-fn assert_tail(layout_bytes: &[u8], tail: [u8; 4]) {
-    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &tail);
-}
-
-#[test]
-fn short_buffer_decode() {
-    let mut data = vec![0u8; STATE_LEN - 1];
-    let err = StakeStateV2::from_bytes_mut(&mut data).unwrap_err();
-    assert!(matches!(err, StakeStateError::Decode));
-}
-
-#[test]
-fn invalid_tag_err() {
-    let mut data = [0u8; STATE_LEN];
-    data[0..4].copy_from_slice(&999u32.to_le_bytes());
-    let err = StakeStateV2::from_bytes_mut(&mut data).unwrap_err();
-    assert!(matches!(err, StakeStateError::InvalidTag(999)));
+/// Creates a test buffer with the given base bytes placed at an optional 1-byte offset
+/// (for unaligned access testing) and trailing bytes filled with the given value.
+///
+/// Returns `(buffer, start)` where `start` is the offset of the layout bytes.
+fn test_buffer(
+    base: &[u8],
+    unaligned: bool,
+    trailing_len: usize,
+    trailing_fill: u8,
+) -> (Vec<u8>, usize) {
+    assert_eq!(base.len(), STATE_LEN);
+    let start = if unaligned { 1 } else { 0 };
+    let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
+    buffer[start..start + STATE_LEN].copy_from_slice(base);
+    buffer[start + STATE_LEN..].fill(trailing_fill);
+    (buffer, start)
 }
 
 #[test]
@@ -149,16 +144,12 @@ fn invalid_transitions_err(unaligned: bool, trailing_len: usize) {
         StakeStateV2Tag::RewardsPool,
     ];
 
-    let start = if unaligned { 1 } else { 0 };
-
     for from in tags {
         for &op in &[Op::ToInitialized, Op::ToStake] {
             let mut base = empty_state_bytes(from);
             base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&[250, 251, 252, 253]);
 
-            let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-            buffer[start..start + STATE_LEN].copy_from_slice(&base);
-            buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(123);
+            let (mut buffer, start) = test_buffer(&base, unaligned, trailing_len, 123);
 
             let expected_layout = buffer[start..start + STATE_LEN].to_vec();
             let expected_trailing =
@@ -214,10 +205,7 @@ fn uninitialized_to_initialized(unaligned: bool, trailing_len: usize) {
     let mut base = [170u8; STATE_LEN];
     write_tag(&mut base, StakeStateV2Tag::Uninitialized);
 
-    let start = if unaligned { 1 } else { 0 };
-    let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-    buffer[start..start + STATE_LEN].copy_from_slice(&base);
-    buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(124);
+    let (mut buffer, start) = test_buffer(&base, unaligned, trailing_len, 124);
 
     let expected_trailing = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
 
@@ -292,10 +280,7 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
     let preserved_tail: [u8; 4] = [1, 222, 173, 190];
     base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
-    let start = if unaligned { 1 } else { 0 };
-    let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-    buffer[start..start + STATE_LEN].copy_from_slice(&base);
-    buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(125);
+    let (mut buffer, start) = test_buffer(&base, unaligned, trailing_len, 125);
 
     let expected_trailing = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
 
@@ -393,10 +378,7 @@ fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
     let preserved_tail: [u8; 4] = [1, 222, 173, 190];
     base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
-    let start = if unaligned { 1 } else { 0 };
-    let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-    buffer[start..start + STATE_LEN].copy_from_slice(&base);
-    buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(99);
+    let (mut buffer, start) = test_buffer(&base, unaligned, trailing_len, 99);
 
     let trailing_before = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
 
@@ -560,10 +542,7 @@ fn stake_to_stake_preserves_tail(unaligned: bool, trailing_len: usize) {
     let preserved_tail: [u8; 4] = [1, 222, 173, 190];
     base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
-    let start = if unaligned { 1 } else { 0 };
-    let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-    buffer[start..start + STATE_LEN].copy_from_slice(&base);
-    buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(126);
+    let (mut buffer, start) = test_buffer(&base, unaligned, trailing_len, 126);
 
     let expected_trailing = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
 

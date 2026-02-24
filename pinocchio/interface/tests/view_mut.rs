@@ -24,17 +24,19 @@ use {
     test_case::test_case,
 };
 
-// Verifies that the deserialized mutable view is a true zero-copy borrow into the original
-// byte slice at the given offset.
-fn assert_mut_borrows_at<T>(borrow: &mut T, base_ptr: *mut u8, offset: usize) {
-    let ptr = borrow as *mut T as *mut u8;
-    let expected = unsafe { base_ptr.add(offset) };
-    assert_eq!(ptr, expected);
+#[test]
+fn short_buffer_returns_decode() {
+    let mut data = vec![0u8; STATE_LEN - 1];
+    let err = StakeStateV2::from_bytes_mut(&mut data).unwrap_err();
+    assert!(matches!(err, StakeStateError::Decode));
 }
 
-fn overwrite_tail(bytes: &mut [u8], tail: [u8; 4]) -> [u8; 4] {
-    bytes[PADDING_OFFSET..STATE_LEN].copy_from_slice(&tail);
-    tail
+#[test]
+fn invalid_tag_returns_error() {
+    let mut data = [0u8; STATE_LEN];
+    data[0..4].copy_from_slice(&999u32.to_le_bytes());
+    let err = StakeStateV2::from_bytes_mut(&mut data).unwrap_err();
+    assert!(matches!(err, StakeStateError::InvalidTag(999)));
 }
 
 #[test_case(StakeStateV2Tag::Uninitialized)]
