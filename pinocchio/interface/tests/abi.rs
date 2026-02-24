@@ -36,8 +36,8 @@ fn assert_legacy_and_new_layout_agree(bytes: &[u8]) {
             assert_meta_compat(meta, &legacy_meta);
             assert_stake_compat(stake, &legacy_stake);
 
-            // ABI: stake_flags byte must match legacy exactly.
-            assert_eq!(bytes[FLAGS_OFF], stake_flags_byte(&legacy_flags));
+            // ABI: first padding byte must match legacy stake_flags exactly.
+            assert_eq!(bytes[PADDING_OFFSET], stake_flags_byte(&legacy_flags));
         }
     }
 }

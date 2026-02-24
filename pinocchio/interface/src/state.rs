@@ -130,8 +130,7 @@ pub struct StakeStateV2 {
     tag: PodU32,
     meta: Meta,
     stake: Stake,
-    stake_flags: u8,
-    padding: [u8; 3],
+    padding: [u8; 4],
 }
 
 // compile-time size check
@@ -211,7 +210,6 @@ impl StakeStateV2 {
         }
 
         self.stake = Stake::default();
-        self.stake_flags = 0;
         self.padding.fill(0);
         self.meta = meta;
         self.tag = PodU32::from(StakeStateV2Tag::Initialized as u32);
@@ -220,8 +218,6 @@ impl StakeStateV2 {
     }
 
     /// Transition to `Stake` state from `Initialized` or `Stake`.
-    /// - From `Initialized`: clears tail region to zero.
-    /// - From `Stake`: preserves existing tail region.
     pub fn delegate(&mut self, meta: Meta, stake: Stake) -> Result<(), StakeStateError> {
         let from = self.tag();
         if !matches!(from, StakeStateV2Tag::Initialized | StakeStateV2Tag::Stake) {
@@ -229,11 +225,6 @@ impl StakeStateV2 {
                 from,
                 to: StakeStateV2Tag::Stake,
             });
-        }
-
-        if from == StakeStateV2Tag::Initialized {
-            self.stake_flags = 0;
-            self.padding.fill(0);
         }
 
         self.meta = meta;

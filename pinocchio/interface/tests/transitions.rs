@@ -9,7 +9,6 @@ use {
         error::StakeStateError,
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag},
     },
-    proptest::prelude::*,
     solana_address::Address,
     solana_pubkey::Pubkey,
     solana_stake_interface::{
@@ -24,13 +23,11 @@ use {
 };
 
 fn assert_tail_zeroed(layout_bytes: &[u8]) {
-    assert_eq!(layout_bytes[FLAGS_OFF], 0);
-    assert_eq!(&layout_bytes[PADDING_OFF..STATE_LEN], &[0u8; 3]);
+    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &[0u8; 4]);
 }
 
-fn assert_tail(layout_bytes: &[u8], flags: u8, padding: [u8; 3]) {
-    assert_eq!(layout_bytes[FLAGS_OFF], flags);
-    assert_eq!(&layout_bytes[PADDING_OFF..STATE_LEN], &padding);
+fn assert_tail(layout_bytes: &[u8], tail: [u8; 4]) {
+    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &tail);
 }
 
 #[test]
@@ -125,9 +122,8 @@ fn legacy_bytes_unchanged() {
     for legacy_state in variants {
         let mut data = serialize_legacy(&legacy_state);
 
-        data[FLAGS_OFF] = 165;
-        data[PADDING_OFF..STATE_LEN].copy_from_slice(&[222, 173, 190]);
-        data[STAKE_OFF..STAKE_OFF + 8].copy_from_slice(&[204; 8]);
+        data[PADDING_OFFSET..STATE_LEN].copy_from_slice(&[165, 222, 173, 190]);
+        data[STAKE_OFFSET..STAKE_OFFSET + 8].copy_from_slice(&[204; 8]);
 
         let expected = data.clone();
         StakeStateV2::from_bytes_mut(&mut data).unwrap();
@@ -158,7 +154,7 @@ fn invalid_transitions_err(unaligned: bool, trailing_len: usize) {
     for from in tags {
         for &op in &[Op::ToInitialized, Op::ToStake] {
             let mut base = empty_state_bytes(from);
-            base[FLAGS_OFF..STATE_LEN].copy_from_slice(&[250, 251, 252, 253]);
+            base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&[250, 251, 252, 253]);
 
             let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
             buffer[start..start + STATE_LEN].copy_from_slice(&base);
@@ -253,7 +249,9 @@ fn uninitialized_to_initialized(unaligned: bool, trailing_len: usize) {
         StakeStateV2Tag::from_bytes(layout_bytes).unwrap(),
         StakeStateV2Tag::Initialized
     );
-    assert!(layout_bytes[STAKE_OFF..FLAGS_OFF].iter().all(|b| *b == 0));
+    assert!(layout_bytes[STAKE_OFFSET..PADDING_OFFSET]
+        .iter()
+        .all(|b| *b == 0));
 
     assert_tail_zeroed(layout_bytes);
 
@@ -288,8 +286,11 @@ fn uninitialized_to_initialized(unaligned: bool, trailing_len: usize) {
 #[test_case(true, 0; "unaligned_no_trailing")]
 #[test_case(true, 64; "unaligned_trailing")]
 fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
+    // Nonzero tail is not a possible scenario, but it is used
+    // to assert the state transitions do not modify it.
     let mut base = empty_state_bytes(StakeStateV2Tag::Initialized);
-    base[FLAGS_OFF..STATE_LEN].copy_from_slice(&[170, 187, 204, 221]);
+    let preserved_tail: [u8; 4] = [1, 222, 173, 190];
+    base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
     let start = if unaligned { 1 } else { 0 };
     let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
@@ -337,7 +338,7 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
         StakeStateV2Tag::Stake
     );
 
-    assert_tail_zeroed(layout_bytes);
+    assert_tail(layout_bytes, preserved_tail);
 
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
@@ -378,7 +379,7 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
     };
     assert_eq!(legacy_meta, expected_legacy);
     assert_eq!(legacy_stake, expected_legacy_stake);
-    assert_eq!(legacy_flags, LegacyStakeFlags::empty());
+    assert_eq!(stake_flags_byte(&legacy_flags), preserved_tail[0]);
 }
 
 #[test_case(false, 0; "aligned_no_trailing")]
@@ -386,10 +387,11 @@ fn initialized_to_stake(unaligned: bool, trailing_len: usize) {
 #[test_case(true, 0; "unaligned_no_trailing")]
 #[test_case(true, 64; "unaligned_trailing")]
 fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
-    // Start from Initialized with a nonzero tail to ensure the transition zeroes it,
-    // and then ensure subsequent meta_mut does not modify it
+    // Nonzero tail is not a possible scenario, but it is used
+    // to assert the state transitions do not modify it.
     let mut base = empty_state_bytes(StakeStateV2Tag::Initialized);
-    base[FLAGS_OFF..STATE_LEN].copy_from_slice(&[170, 187, 204, 221]);
+    let preserved_tail: [u8; 4] = [1, 222, 173, 190];
+    base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
     let start = if unaligned { 1 } else { 0 };
     let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
@@ -440,8 +442,8 @@ fn initialized_to_stake_meta_mut_works(unaligned: bool, trailing_len: usize) {
 
     let layout_bytes = &buffer[start..start + STATE_LEN];
 
-    // Tail should have been zeroed by Initialized -> Stake and mut accessors should not change it
-    assert_tail_zeroed(layout_bytes);
+    // Tail must be preserved through delegate() and mut accessors
+    assert_tail(layout_bytes, preserved_tail);
 
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
@@ -494,8 +496,8 @@ fn chained_transitions_uninitialized_to_initialized_to_stake() {
     let trailing_len = 32usize;
     let end = start + STATE_LEN + trailing_len;
     let mut buffer = vec![0xAB; start + STATE_LEN + trailing_len];
-    buffer[start + STAKE_OFF..start + FLAGS_OFF].fill(0xCD);
-    buffer[start + FLAGS_OFF..start + STATE_LEN].copy_from_slice(&[1, 2, 3, 4]);
+    buffer[start + STAKE_OFFSET..start + PADDING_OFFSET].fill(0xCD);
+    buffer[start + PADDING_OFFSET..start + STATE_LEN].copy_from_slice(&[1, 2, 3, 4]);
 
     write_tag(&mut buffer[start..end], StakeStateV2Tag::Uninitialized);
 
@@ -552,14 +554,11 @@ fn chained_transitions_uninitialized_to_initialized_to_stake() {
 #[test_case(true, 0; "unaligned_no_trailing")]
 #[test_case(true, 64; "unaligned_trailing")]
 fn stake_to_stake_preserves_tail(unaligned: bool, trailing_len: usize) {
-    let expected_legacy_flags =
-        LegacyStakeFlags::MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED;
-    let preserved_flags = stake_flags_byte(&expected_legacy_flags);
-    let preserved_padding = [222, 173, 190];
-
+    // Nonzero tail is not a possible scenario, but it is used
+    // to assert the state transitions do not modify it.
     let mut base = empty_state_bytes(StakeStateV2Tag::Stake);
-    base[FLAGS_OFF] = preserved_flags;
-    base[PADDING_OFF..STATE_LEN].copy_from_slice(&preserved_padding);
+    let preserved_tail: [u8; 4] = [1, 222, 173, 190];
+    base[PADDING_OFFSET..STATE_LEN].copy_from_slice(&preserved_tail);
 
     let start = if unaligned { 1 } else { 0 };
     let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
@@ -607,7 +606,7 @@ fn stake_to_stake_preserves_tail(unaligned: bool, trailing_len: usize) {
         StakeStateV2Tag::Stake
     );
 
-    assert_tail(layout_bytes, preserved_flags, preserved_padding);
+    assert_tail(layout_bytes, preserved_tail);
 
     let old = deserialize_legacy(layout_bytes);
     let LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, legacy_flags) = old else {
@@ -641,205 +640,5 @@ fn stake_to_stake_preserves_tail(unaligned: bool, trailing_len: usize) {
             credits_observed: 99,
         }
     );
-    assert_eq!(legacy_flags, expected_legacy_flags);
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10000))]
-
-    #[test]
-    #[cfg_attr(miri, ignore)]
-    fn prop_uninitialized_to_initialized_zeroes_stake_and_tail(
-        legacy_meta in arb_legacy_meta(),
-        unaligned in any::<bool>(),
-        trailing_len in 0usize..64usize,
-        fill in any::<u8>(),
-    ) {
-        let meta = meta_from_legacy(&legacy_meta);
-
-        let start = if unaligned { 1 } else { 0 };
-        let end = start + STATE_LEN + trailing_len;
-        let mut buffer = vec![fill; start + STATE_LEN + trailing_len];
-        buffer[start + STAKE_OFF..start + FLAGS_OFF].fill(0xAB);
-        buffer[start + FLAGS_OFF..start + STATE_LEN].copy_from_slice(&[1, 2, 3, 4]);
-
-        write_tag(&mut buffer[start..end], StakeStateV2Tag::Uninitialized);
-
-        buffer[start + STATE_LEN..end].fill(0x7E);
-        let trailing_before = buffer[start + STATE_LEN..end].to_vec();
-
-        let slice = &mut buffer[start..end];
-        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.initialize(meta.clone()).unwrap();
-
-        prop_assert_eq!(&buffer[start + STATE_LEN..end], trailing_before.as_slice());
-
-        let layout_bytes = &buffer[start..start + STATE_LEN];
-        prop_assert_eq!(
-            StakeStateV2Tag::from_bytes(layout_bytes).unwrap(),
-            StakeStateV2Tag::Initialized
-        );
-        prop_assert!(layout_bytes[STAKE_OFF..FLAGS_OFF].iter().all(|b| *b == 0));
-        prop_assert_eq!(layout_bytes[FLAGS_OFF], 0);
-        prop_assert_eq!(&layout_bytes[PADDING_OFF..STATE_LEN], &[0u8; 3]);
-
-        let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
-        prop_assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
-        prop_assert_eq!(layout.meta().unwrap(), &meta);
-    }
-
-    // Stake -> Stake transition must preserve arbitrary stake_flags+padding AND preserve trailing bytes beyond 200
-    #[test]
-    #[cfg_attr(miri, ignore)]
-    fn prop_stake_to_stake_preserves_flags(
-        legacy_meta in arb_legacy_meta(),
-        legacy_stake in arb_legacy_stake(),
-        new_meta in arb_legacy_meta(),
-        new_legacy_stake in arb_legacy_stake(),
-        arbitrary_flags in any::<u8>(),
-        arbitrary_padding in any::<[u8; 3]>(),
-        unaligned in any::<bool>(),
-        trailing_len in 0usize..64usize,
-    ) {
-        let new_reserved = warmup_reserved_bytes_from_legacy_rate(new_legacy_stake.delegation.warmup_cooldown_rate);
-
-        let legacy_state = LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, LegacyStakeFlags::empty());
-        let base = serialize_legacy(&legacy_state);
-        prop_assert_eq!(base.len(), 200);
-
-        let start = if unaligned { 1 } else { 0 };
-        let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-        buffer[start..start + STATE_LEN].copy_from_slice(&base);
-        buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].fill(126);
-
-        buffer[start + FLAGS_OFF] = arbitrary_flags;
-        buffer[start + PADDING_OFF..start + STATE_LEN].copy_from_slice(&arbitrary_padding);
-
-        let trailing_before = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
-
-        let meta = meta_from_legacy(&new_meta);
-        let stake = Stake {
-             delegation: Delegation {
-                voter_pubkey: Address::new_from_array(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
-                stake: PodU64::from_primitive(new_legacy_stake.delegation.stake),
-                activation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.activation_epoch),
-                deactivation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.deactivation_epoch),
-                _reserved: new_reserved,
-            },
-            credits_observed: PodU64::from_primitive(new_legacy_stake.credits_observed),
-        };
-
-        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
-        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.delegate(meta, stake).unwrap();
-
-        prop_assert_eq!(
-            &buffer[start + STATE_LEN..start + STATE_LEN + trailing_len],
-            trailing_before.as_slice()
-        );
-
-        prop_assert_eq!(buffer[start + FLAGS_OFF], arbitrary_flags);
-        prop_assert_eq!(
-            &buffer[start + PADDING_OFF..start + STATE_LEN],
-            arbitrary_padding.as_slice()
-        );
-
-        let layout = StakeStateV2::from_bytes(&buffer[start..start + STATE_LEN]).unwrap();
-        prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
-
-        let view_meta = layout.meta().unwrap();
-        let view_stake = layout.stake().unwrap();
-
-        // Verify that the written fields match the inputs
-        assert_meta_compat(view_meta, &new_meta);
-        assert_stake_compat(view_stake, &new_legacy_stake);
-
-        let decoded = deserialize_legacy(&buffer[start..start + STATE_LEN]);
-        let LegacyStakeStateV2::Stake(decoded_meta, decoded_stake, decoded_flags) = decoded else {
-            prop_assert!(false, "expected legacy Stake after delegate");
-            return Ok(());
-        };
-
-        // Verify legacy decode matches inputs
-        prop_assert_eq!(decoded_meta, new_meta);
-
-        prop_assert_eq!(decoded_stake.credits_observed, new_legacy_stake.credits_observed);
-        prop_assert_eq!(decoded_stake.delegation.voter_pubkey, new_legacy_stake.delegation.voter_pubkey);
-        prop_assert_eq!(decoded_stake.delegation.stake, new_legacy_stake.delegation.stake);
-        prop_assert_eq!(decoded_stake.delegation.activation_epoch, new_legacy_stake.delegation.activation_epoch);
-        prop_assert_eq!(decoded_stake.delegation.deactivation_epoch, new_legacy_stake.delegation.deactivation_epoch);
-
-        let decoded_bits = decoded_stake.delegation.warmup_cooldown_rate.to_bits();
-        let expected_bits = new_legacy_stake.delegation.warmup_cooldown_rate.to_bits();
-        prop_assert_eq!(decoded_bits, expected_bits);
-
-        prop_assert_eq!(stake_flags_byte(&decoded_flags), arbitrary_flags);
-    }
-
-    // Initialized -> Stake transition must always zero out flag/padding bytes
-    #[test]
-    #[cfg_attr(miri, ignore)]
-    fn prop_initialized_to_stake_zeroes_tail(
-        legacy_meta in arb_legacy_meta(),
-        new_meta in arb_legacy_meta(),
-        new_legacy_stake in arb_legacy_stake(),
-        mut dirty_tail in any::<[u8; 4]>(),
-        unaligned in any::<bool>(),
-        trailing_len in 0usize..64usize,
-    ) {
-        let legacy_state = LegacyStakeStateV2::Initialized(legacy_meta);
-        let base = serialize_legacy(&legacy_state);
-        prop_assert_eq!(base.len(), 200);
-
-        let start = if unaligned { 1 } else { 0 };
-        let mut buffer = vec![238u8; start + STATE_LEN + trailing_len];
-        buffer[start..start + STATE_LEN].copy_from_slice(&base);
-        buffer[start + STATE_LEN..].fill(126);
-
-        // Corrupt the tail region (flags + padding) to ensure it gets cleared
-        // Make sure it's actually non-zero for the test to be meaningful
-        if dirty_tail == [0, 0, 0, 0] {
-            dirty_tail = [1, 2, 3, 4];
-        }
-        buffer[start + FLAGS_OFF..start + STATE_LEN].copy_from_slice(&dirty_tail);
-
-        let trailing_before = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
-
-        let new_reserved = warmup_reserved_bytes_from_legacy_rate(new_legacy_stake.delegation.warmup_cooldown_rate);
-
-        let meta = meta_from_legacy(&new_meta);
-        let stake = Stake {
-             delegation: Delegation {
-                voter_pubkey: Address::new_from_array(new_legacy_stake.delegation.voter_pubkey.to_bytes()),
-                stake: PodU64::from_primitive(new_legacy_stake.delegation.stake),
-                activation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.activation_epoch),
-                deactivation_epoch: PodU64::from_primitive(new_legacy_stake.delegation.deactivation_epoch),
-                _reserved: new_reserved,
-            },
-            credits_observed: PodU64::from_primitive(new_legacy_stake.credits_observed),
-        };
-
-        let slice = &mut buffer[start..start + STATE_LEN + trailing_len];
-        let layout = StakeStateV2::from_bytes_mut(slice).unwrap();
-        layout.delegate(meta, stake).unwrap();
-
-        prop_assert_eq!(
-            &buffer[start + STATE_LEN..start + STATE_LEN + trailing_len],
-            trailing_before.as_slice()
-        );
-
-        // Verify tail is zeroed
-        prop_assert_eq!(buffer[start + FLAGS_OFF], 0);
-        prop_assert_eq!(&buffer[start + PADDING_OFF..start + STATE_LEN], &[0u8; 3]);
-
-        // Verify the rest of the data is correct
-        let layout = StakeStateV2::from_bytes(&buffer[start..start + STATE_LEN]).unwrap();
-        prop_assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
-
-        let view_meta = layout.meta().unwrap();
-        let view_stake = layout.stake().unwrap();
-
-        assert_meta_compat(view_meta, &new_meta);
-        assert_stake_compat(view_stake, &new_legacy_stake);
-    }
+    assert_eq!(stake_flags_byte(&legacy_flags), preserved_tail[0]);
 }

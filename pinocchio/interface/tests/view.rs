@@ -30,9 +30,8 @@ fn assert_borrows_at<T>(borrow: &T, bytes: &[u8], offset: usize) {
     assert_eq!(ptr as *const u8, expected);
 }
 
-fn overwrite_tail(bytes: &mut [u8], stake_flags: u8, padding: [u8; 3]) {
-    bytes[FLAGS_OFF] = stake_flags;
-    bytes[PADDING_OFF..STATE_LEN].copy_from_slice(&padding);
+fn overwrite_tail(bytes: &mut [u8], tail: [u8; 4]) {
+    bytes[PADDING_OFFSET..STATE_LEN].copy_from_slice(&tail);
 }
 
 #[test]
@@ -55,10 +54,9 @@ fn layout_invariants() {
 
     // Offsets must match documented layout table
     assert_eq!(TAG_LEN, 4);
-    assert_eq!(META_OFF, 4);
-    assert_eq!(STAKE_OFF, 124); // 4 + 120
-    assert_eq!(FLAGS_OFF, 196); // 4 + 120 + 72
-    assert_eq!(PADDING_OFF, 197); // 4 + 120 + 72 + 1
+    assert_eq!(META_OFFSET, 4);
+    assert_eq!(STAKE_OFFSET, 124); // 4 + 120
+    assert_eq!(PADDING_OFFSET, 196); // 4 + 120 + 72
 }
 
 #[test]
@@ -103,14 +101,14 @@ fn variants_match_tag_for_empty_state_bytes(tag: StakeStateV2Tag) {
         }
         StakeStateV2Tag::Initialized => {
             let meta = layout.meta().unwrap();
-            assert_borrows_at(meta, bytes, META_OFF);
+            assert_borrows_at(meta, bytes, META_OFFSET);
             assert!(layout.stake().is_err());
         }
         StakeStateV2Tag::Stake => {
             let meta = layout.meta().unwrap();
             let stake = layout.stake().unwrap();
-            assert_borrows_at(meta, bytes, META_OFF);
-            assert_borrows_at(stake, bytes, STAKE_OFF);
+            assert_borrows_at(meta, bytes, META_OFFSET);
+            assert_borrows_at(stake, bytes, STAKE_OFFSET);
         }
     }
 }
@@ -136,12 +134,11 @@ fn initialized_legacy_bytes_borrows_correctly() {
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
     let meta = layout.meta().unwrap();
-    assert_borrows_at(meta, &data, META_OFF);
+    assert_borrows_at(meta, &data, META_OFFSET);
     assert_meta_compat(meta, &legacy_meta);
 
     // Legacy encoding defaults for these bytes in Initialized.
-    assert_eq!(data[FLAGS_OFF], 0);
-    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0u8; 3]);
+    assert_eq!(&data[PADDING_OFFSET..STATE_LEN], &[0u8; 4]);
 }
 
 #[test]
@@ -169,7 +166,7 @@ fn unaligned_initialized_legacy_bytes_borrows_correctly() {
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
     let meta = layout.meta().unwrap();
-    assert_borrows_at(meta, unaligned, META_OFF);
+    assert_borrows_at(meta, unaligned, META_OFFSET);
     assert_meta_compat(meta, &legacy_meta);
 }
 
@@ -190,15 +187,14 @@ fn initialized_legacy_bytes_ignores_tail_bytes() {
     let legacy_state = LegacyStakeStateV2::Initialized(legacy_meta);
     let mut data = serialize_legacy(&legacy_state);
 
-    overwrite_tail(&mut data, 0xDE, [0xAD, 0xBE, 0xEF]);
+    overwrite_tail(&mut data, [0xDE, 0xAD, 0xBE, 0xEF]);
 
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Initialized);
 
     let meta = layout.meta().unwrap();
     assert_meta_compat(meta, &legacy_meta);
-    assert_eq!(data[FLAGS_OFF], 0xDE);
-    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0xAD, 0xBE, 0xEF]);
+    assert_eq!(&data[PADDING_OFFSET..STATE_LEN], &[0xDE, 0xAD, 0xBE, 0xEF]);
 }
 
 #[test]
@@ -244,13 +240,13 @@ fn stake_legacy_bytes_borrows_correctly() {
     let meta = layout.meta().unwrap();
     let stake = layout.stake().unwrap();
 
-    assert_borrows_at(meta, &data, META_OFF);
-    assert_borrows_at(stake, &data, STAKE_OFF);
+    assert_borrows_at(meta, &data, META_OFFSET);
+    assert_borrows_at(stake, &data, STAKE_OFFSET);
 
     assert_meta_compat(meta, &legacy_meta);
     assert_stake_compat(stake, &legacy_stake);
 
-    assert_eq!(data[FLAGS_OFF], expected_flags_byte);
+    assert_eq!(data[PADDING_OFFSET], expected_flags_byte);
 }
 
 #[test]
@@ -295,13 +291,13 @@ fn unaligned_stake_legacy_bytes_borrows_correctly() {
     let meta = layout.meta().unwrap();
     let stake = layout.stake().unwrap();
 
-    assert_borrows_at(meta, unaligned, META_OFF);
-    assert_borrows_at(stake, unaligned, STAKE_OFF);
+    assert_borrows_at(meta, unaligned, META_OFFSET);
+    assert_borrows_at(stake, unaligned, STAKE_OFFSET);
 
     assert_meta_compat(meta, &legacy_meta);
     assert_stake_compat(stake, &legacy_stake);
 
-    assert_eq!(aligned[FLAGS_OFF], 0);
+    assert_eq!(aligned[PADDING_OFFSET], 0);
 }
 
 #[test]
@@ -336,7 +332,7 @@ fn stake_legacy_bytes_ignores_tail_bytes() {
         LegacyStakeStateV2::Stake(legacy_meta, legacy_stake, LegacyStakeFlags::empty());
     let mut data = serialize_legacy(&legacy_state);
 
-    overwrite_tail(&mut data, 0xEE, [0xFA, 0xCE, 0xB0]);
+    overwrite_tail(&mut data, [0xEE, 0xFA, 0xCE, 0xB0]);
 
     let layout = StakeStateV2::from_bytes(&data).unwrap();
     assert_eq!(layout.tag(), StakeStateV2Tag::Stake);
@@ -347,8 +343,7 @@ fn stake_legacy_bytes_ignores_tail_bytes() {
     assert_meta_compat(meta, &legacy_meta);
     assert_stake_compat(stake, &legacy_stake);
 
-    assert_eq!(data[FLAGS_OFF], 0xEE);
-    assert_eq!(&data[PADDING_OFF..STATE_LEN], &[0xFA, 0xCE, 0xB0]);
+    assert_eq!(&data[PADDING_OFFSET..STATE_LEN], &[0xEE, 0xFA, 0xCE, 0xB0]);
 }
 
 proptest! {
@@ -419,14 +414,14 @@ proptest! {
             }
             StakeStateV2Tag::Initialized => {
                 let meta = layout.meta().unwrap();
-                assert_borrows_at(meta, unaligned, META_OFF);
+                assert_borrows_at(meta, unaligned, META_OFFSET);
                 prop_assert!(layout.stake().is_err());
             }
             StakeStateV2Tag::Stake => {
                 let meta = layout.meta().unwrap();
                 let stake = layout.stake().unwrap();
-                assert_borrows_at(meta, unaligned, META_OFF);
-                assert_borrows_at(stake, unaligned, STAKE_OFF);
+                assert_borrows_at(meta, unaligned, META_OFFSET);
+                assert_borrows_at(stake, unaligned, STAKE_OFFSET);
             }
         }
     }
@@ -462,7 +457,7 @@ proptest! {
                 let stake = layout.stake().unwrap();
                 assert_meta_compat(meta, &legacy_meta);
                 assert_stake_compat(stake, &legacy_stake);
-                prop_assert_eq!(data[FLAGS_OFF], stake_flags_byte(&flags));
+                prop_assert_eq!(data[PADDING_OFFSET], stake_flags_byte(&flags));
             }
         }
     }

@@ -3,24 +3,20 @@ use {
     super::legacy::bincode_opts,
     bincode::Options,
     core::mem::size_of,
-    p_stake_interface::state::{
-        Authorized, Delegation, Lockup, Meta, Stake, StakeStateV2, StakeStateV2Tag,
-    },
-    solana_address::Address,
+    p_stake_interface::state::{Meta, Stake, StakeStateV2, StakeStateV2Tag},
     solana_stake_interface::{
         stake_flags::StakeFlags as LegacyStakeFlags,
         state::{Meta as LegacyMeta, Stake as LegacyStake},
     },
-    spl_pod::primitives::{PodI64, PodU64},
+    spl_pod::primitives::PodU64,
 };
 
 pub const TAG_LEN: usize = StakeStateV2Tag::TAG_LEN;
 pub const STATE_LEN: usize = size_of::<StakeStateV2>();
 
-pub const META_OFF: usize = TAG_LEN;
-pub const STAKE_OFF: usize = TAG_LEN + size_of::<Meta>();
-pub const FLAGS_OFF: usize = TAG_LEN + size_of::<Meta>() + size_of::<Stake>();
-pub const PADDING_OFF: usize = FLAGS_OFF + 1;
+pub const META_OFFSET: usize = TAG_LEN;
+pub const STAKE_OFFSET: usize = TAG_LEN + size_of::<Meta>();
+pub const PADDING_OFFSET: usize = TAG_LEN + size_of::<Meta>() + size_of::<Stake>();
 
 pub fn write_tag(bytes: &mut [u8], tag: StakeStateV2Tag) {
     bytes[..TAG_LEN].copy_from_slice(&(tag as u32).to_le_bytes());
@@ -40,21 +36,6 @@ pub fn stake_flags_byte(legacy_flags: &LegacyStakeFlags) -> u8 {
 
 pub fn warmup_reserved_bytes_from_legacy_rate(legacy_rate: f64) -> [u8; 8] {
     legacy_rate.to_bits().to_le_bytes()
-}
-
-pub fn meta_from_legacy(legacy: &LegacyMeta) -> Meta {
-    Meta {
-        rent_exempt_reserve: PodU64::from_primitive(legacy.rent_exempt_reserve),
-        authorized: Authorized {
-            staker: Address::new_from_array(legacy.authorized.staker.to_bytes()),
-            withdrawer: Address::new_from_array(legacy.authorized.withdrawer.to_bytes()),
-        },
-        lockup: Lockup {
-            unix_timestamp: PodI64::from_primitive(legacy.lockup.unix_timestamp),
-            epoch: PodU64::from_primitive(legacy.lockup.epoch),
-            custodian: Address::new_from_array(legacy.lockup.custodian.to_bytes()),
-        },
-    }
 }
 
 pub fn assert_meta_compat(new: &Meta, legacy: &LegacyMeta) {

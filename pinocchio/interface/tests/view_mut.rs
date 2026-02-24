@@ -32,10 +32,9 @@ fn assert_mut_borrows_at<T>(borrow: &mut T, base_ptr: *mut u8, offset: usize) {
     assert_eq!(ptr, expected);
 }
 
-fn overwrite_tail(bytes: &mut [u8], stake_flags: u8, padding: [u8; 3]) -> [u8; 4] {
-    bytes[FLAGS_OFF] = stake_flags;
-    bytes[PADDING_OFF..STATE_LEN].copy_from_slice(&padding);
-    [stake_flags, padding[0], padding[1], padding[2]]
+fn overwrite_tail(bytes: &mut [u8], tail: [u8; 4]) -> [u8; 4] {
+    bytes[PADDING_OFFSET..STATE_LEN].copy_from_slice(&tail);
+    tail
 }
 
 #[test_case(StakeStateV2Tag::Uninitialized)]
@@ -62,7 +61,7 @@ fn variants_match_tag(tag: StakeStateV2Tag) {
         }
         StakeStateV2Tag::Initialized => {
             let meta = layout.meta_mut().unwrap();
-            assert_mut_borrows_at(meta, base_ptr, META_OFF);
+            assert_mut_borrows_at(meta, base_ptr, META_OFFSET);
             // Re-parse to check stake_mut fails (need fresh layout due to borrow)
             let layout = StakeStateV2::from_bytes_mut(&mut data).unwrap();
             assert!(matches!(
@@ -74,12 +73,12 @@ fn variants_match_tag(tag: StakeStateV2Tag) {
         }
         StakeStateV2Tag::Stake => {
             let meta = layout.meta_mut().unwrap();
-            assert_mut_borrows_at(meta, base_ptr, META_OFF);
+            assert_mut_borrows_at(meta, base_ptr, META_OFFSET);
             // Re-parse for stake_mut - capture base_ptr before borrowing through layout
             let base_ptr = data.as_mut_ptr();
             let layout = StakeStateV2::from_bytes_mut(&mut data).unwrap();
             let stake = layout.stake_mut().unwrap();
-            assert_mut_borrows_at(stake, base_ptr, STAKE_OFF);
+            assert_mut_borrows_at(stake, base_ptr, STAKE_OFFSET);
         }
     }
 }
@@ -111,8 +110,7 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     buffer[offset..offset + STATE_LEN].copy_from_slice(&aligned);
     let tail_before = overwrite_tail(
         &mut buffer[offset..offset + STATE_LEN],
-        222,
-        [173, 190, 239],
+        [222, 173, 190, 239],
     );
 
     let slice = &mut buffer[offset..offset + STATE_LEN];
@@ -124,15 +122,15 @@ fn initialized_updates_preserve_tail(is_unaligned: bool) {
     let meta = layout.meta_mut().unwrap();
 
     // Verify mutable view borrows directly into the buffer
-    assert_mut_borrows_at(meta, base_ptr, META_OFF);
+    assert_mut_borrows_at(meta, base_ptr, META_OFFSET);
 
     // Mutate fields through the view
     meta.rent_exempt_reserve = PodU64::from(new_rent);
     meta.lockup.custodian = Address::new_from_array(new_custodian);
 
-    // Tail bytes (stake_flags + padding) must be untouched by meta_mut operations
+    // Tail bytes (padding) must be untouched by meta_mut operations
     let layout_bytes = &buffer[offset..offset + STATE_LEN];
-    assert_eq!(&layout_bytes[FLAGS_OFF..STATE_LEN], &tail_before);
+    assert_eq!(&layout_bytes[PADDING_OFFSET..STATE_LEN], &tail_before);
 
     // Read-only view validates the updates
     let layout = StakeStateV2::from_bytes(layout_bytes).unwrap();
@@ -177,17 +175,17 @@ proptest! {
             }
             StakeStateV2Tag::Initialized => {
                 let meta = layout.meta_mut().unwrap();
-                assert_mut_borrows_at(meta, base_ptr, META_OFF);
+                assert_mut_borrows_at(meta, base_ptr, META_OFFSET);
             }
             StakeStateV2Tag::Stake => {
                 let meta = layout.meta_mut().unwrap();
-                assert_mut_borrows_at(meta, base_ptr, META_OFF);
+                assert_mut_borrows_at(meta, base_ptr, META_OFFSET);
                 // Re-parse for stake_mut - capture base_ptr before borrowing through layout
                 let base_ptr = buffer[1..1 + STATE_LEN].as_mut_ptr();
                 let unaligned = &mut buffer[1..1 + STATE_LEN];
                 let layout = StakeStateV2::from_bytes_mut(unaligned).unwrap();
                 let stake = layout.stake_mut().unwrap();
-                assert_mut_borrows_at(stake, base_ptr, STAKE_OFF);
+                assert_mut_borrows_at(stake, base_ptr, STAKE_OFFSET);
             }
         }
     }
@@ -229,8 +227,7 @@ proptest! {
     fn prop_stake_updates_preserve_untouched_bytes(
         legacy_meta in arb_legacy_meta(),
         legacy_stake in arb_legacy_stake(),
-        raw_flags in any::<u8>(),
-        raw_padding in any::<[u8; 3]>(),
+        raw_tail in any::<[u8; 4]>(),
         new_rent_exempt_reserve in any::<u64>(),
         new_credits_observed in any::<u64>(),
         new_stake_amount in any::<u64>(),
@@ -249,8 +246,7 @@ proptest! {
         buffer[start + STATE_LEN..].fill(126);
 
         // Make tail arbitrary and ensure we preserve it
-        buffer[start + FLAGS_OFF] = raw_flags;
-        buffer[start + PADDING_OFF..start + STATE_LEN].copy_from_slice(&raw_padding);
+        buffer[start + PADDING_OFFSET..start + STATE_LEN].copy_from_slice(&raw_tail);
 
         let before_layout = buffer[start..start + STATE_LEN].to_vec();
         let trailing_before = buffer[start + STATE_LEN..start + STATE_LEN + trailing_len].to_vec();
@@ -287,17 +283,16 @@ proptest! {
             trailing_before.as_slice()
         );
         // Tail bytes must remain untouched
-        prop_assert_eq!(buffer[start + FLAGS_OFF], before_layout[FLAGS_OFF]);
         prop_assert_eq!(
-            &buffer[start + PADDING_OFF..start + STATE_LEN],
-            &before_layout[PADDING_OFF..STATE_LEN]
+            &buffer[start + PADDING_OFFSET..start + STATE_LEN],
+            &before_layout[PADDING_OFFSET..STATE_LEN]
         );
 
         // Only specific byte ranges should have changed
         let allowed_ranges = [
-            (META_OFF, META_OFF + 8),
-            (STAKE_OFF + 32, STAKE_OFF + 32 + 8),
-            (STAKE_OFF + size_of::<Delegation>(), STAKE_OFF + size_of::<Delegation>() + 8),
+            (META_OFFSET, META_OFFSET + 8),
+            (STAKE_OFFSET + 32, STAKE_OFFSET + 32 + 8),
+            (STAKE_OFFSET + size_of::<Delegation>(), STAKE_OFFSET + size_of::<Delegation>() + 8),
         ];
 
         let after_layout = &buffer[start..start + STATE_LEN];
