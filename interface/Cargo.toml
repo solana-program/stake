@@ -18,7 +18,7 @@ program-id = "Stake11111111111111111111111111111111111111"
 
 [dependencies]
 borsh = { version = "1.6.0", features = ["derive", "unstable__schema"], optional = true }
-codama = { version = "0.7.2", optional = true }
+codama = { version = "0.7.3", optional = true }
 codama-macros = { version = "0.7.2", optional = true }
 num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
