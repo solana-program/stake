@@ -80,12 +80,6 @@ impl StakeStateV2Tag {
     pub const TAG_LEN: usize = size_of::<PodU32>();
 
     #[inline]
-    pub(crate) fn from_u32(v: u32) -> Result<Self, StakeStateError> {
-        Self::assert_valid_tag(v)?;
-        Ok(unsafe { core::mem::transmute::<u32, StakeStateV2Tag>(v) })
-    }
-
-    #[inline]
     pub(crate) unsafe fn from_u32_unchecked(v: u32) -> Self {
         debug_assert!(v <= Self::RewardsPool as u32);
         core::mem::transmute::<u32, StakeStateV2Tag>(v)
@@ -105,7 +99,17 @@ impl StakeStateV2Tag {
             return Err(StakeStateError::UnexpectedEof);
         }
         let raw = u32::from_le_bytes(bytes[..Self::TAG_LEN].try_into().unwrap());
-        Self::from_u32(raw)
+        Self::try_from(raw)
+    }
+}
+
+impl TryFrom<u32> for StakeStateV2Tag {
+    type Error = StakeStateError;
+
+    #[inline]
+    fn try_from(v: u32) -> Result<Self, Self::Error> {
+        Self::assert_valid_tag(v)?;
+        Ok(unsafe { Self::from_u32_unchecked(v) })
     }
 }
 
