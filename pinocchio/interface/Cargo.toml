@@ -9,7 +9,7 @@ license = { workspace = true }
 
 [dependencies]
 solana-address = { version = "2.2.0", features = ["wincode"] }
-spl-pod = { version = "0.8.0", features = ["wincode"] }
+spl-pod = { version = "0.7.2", features = ["wincode"] }
 wincode = { version = "0.4.4", features = ["derive"] }
 
 [dev-dependencies]
@@ -18,5 +18,4 @@ proptest = "1.10.0"
 solana-address = { version = "2.2.0", features = ["wincode"] }
 solana-pubkey = "3.0.0"
 solana-stake-interface = { path = "../../interface", features = ["bincode"] }
-spl-pod = { version = "0.8.0", features = ["wincode"] }
 test-case = "3.3.1"

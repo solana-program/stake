@@ -7549,9 +7549,9 @@ dependencies = [
 
 [[package]]
 name = "spl-pod"
-version = "0.8.0"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d01b7d2f9167ed4c1ecafd99fdc3ced71bd30f8b8567d707ec0266313fc3019f"
+checksum = "d6f3df240f67bea453d4bc5749761e45436d14b9457ed667e0300555d5c271f3"
 dependencies = [
  "bytemuck",
  "bytemuck_derive",
