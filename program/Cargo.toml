@@ -31,7 +31,7 @@ assert_matches = "1.5.0"
 mollusk-svm = { version = "0.7.2", features = ["all-builtins"] }
 proptest = "1.10.0"
 rand = "0.10.0"
-solana-account = { version = "3.2.0", features = ["bincode"] }
+solana-account = { version = "4.0.0", features = ["bincode"] }
 solana-config-interface = { version = "2", features = ["serde"] }
 solana-epoch-rewards = "3.0.1"
 solana-epoch-schedule = "3.0.0"
