@@ -48,7 +48,7 @@ solana-example-mocks = "4.0.0"
 solana-sdk-ids = "3.0.0"
 solana-stake-interface = { path = ".", features = ["bincode", "borsh", "sysvar"] }
 static_assertions = "1.1.0"
-strum = "0.27"
+strum = "0.28"
 strum_macros = "0.27"
 test-case = "3.3.1"
 
