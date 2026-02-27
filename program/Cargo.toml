@@ -44,7 +44,7 @@ solana-signature = "3.3.0"
 solana-signer = "3.0.0"
 solana-svm-log-collector = "3.0.0"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
-solana-transaction = "3.0.2"
+solana-transaction = "4.0.0"
 test-case = "3.3.1"
 
 [lib]
