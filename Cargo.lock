@@ -3347,6 +3347,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "p-stake-interface"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "proptest",
+ "solana-address 2.2.0",
+ "solana-pubkey 3.0.0",
+ "solana-stake-interface 3.0.0",
+ "spl-pod",
+ "test-case",
+ "wincode",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5939,6 +5953,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-program-option"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e7b4ddb464f274deb4a497712664c3b612e3f5f82471d4e47710fc4ab1c3095"
+
+[[package]]
 name = "solana-program-pack"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7613,6 +7633,25 @@ checksum = "233df81b75ab99b42f002b5cdd6e65a7505ffa930624f7096a7580a56765e9cf"
 dependencies = [
  "bytemuck",
  "solana-pubkey 3.0.0",
+]
+
+[[package]]
+name = "spl-pod"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f3df240f67bea453d4bc5749761e45436d14b9457ed667e0300555d5c271f3"
+dependencies = [
+ "bytemuck",
+ "bytemuck_derive",
+ "num-derive",
+ "num-traits",
+ "num_enum",
+ "solana-program-error",
+ "solana-program-option",
+ "solana-pubkey 3.0.0",
+ "solana-zk-sdk",
+ "thiserror 2.0.18",
+ "wincode",
 ]
 
 [[package]]

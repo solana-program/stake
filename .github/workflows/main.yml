@@ -2,15 +2,16 @@ name: Main
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 env:
   JS_PACKAGES: "['clients-js']"
-  RUST_PACKAGES: "['clients-rust', 'interface', 'program']"
+  RUST_PACKAGES: "['clients-rust', 'interface', 'program', 'pinocchio-interface']"
   SBPF_PROGRAM_PACKAGES: "['program']"
   WASM_PACKAGES: "['interface', 'program']"
   IDL_PACKAGES: "['interface']"
+  MIRI_PACKAGES: "['pinocchio-interface']"
 
 jobs:
   set_env:
@@ -22,6 +23,7 @@ jobs:
       RUST_PACKAGES: ${{ steps.compute.outputs.RUST_PACKAGES }}
       WASM_PACKAGES: ${{ steps.compute.outputs.WASM_PACKAGES }}
       IDL_PACKAGES: ${{ steps.compute.outputs.IDL_PACKAGES }}
+      MIRI_PACKAGES: ${{ steps.compute.outputs.MIRI_PACKAGES }}
       RUST_TOOLCHAIN_NIGHTLY: ${{ steps.compute.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       SOLANA_CLI_VERSION: ${{ steps.compute.outputs.SOLANA_CLI_VERSION }}
     steps:
@@ -37,6 +39,7 @@ jobs:
           echo "RUST_PACKAGES=${{ env.RUST_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "WASM_PACKAGES=${{ env.WASM_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "IDL_PACKAGES=${{ env.IDL_PACKAGES }}" >> $GITHUB_OUTPUT
+          echo "MIRI_PACKAGES=${{ env.MIRI_PACKAGES }}" >> $GITHUB_OUTPUT
           echo "RUST_TOOLCHAIN_NIGHTLY=$(make rust-toolchain-nightly)" >> "$GITHUB_OUTPUT"
           echo "SOLANA_CLI_VERSION=$(make solana-cli-version)" >> "$GITHUB_OUTPUT"
 
@@ -47,6 +50,8 @@ jobs:
       js-packages: ${{ needs.set_env.outputs.JS_PACKAGES }}
       sbpf-program-packages: ${{ needs.set_env.outputs.SBPF_PROGRAM_PACKAGES }}
       rust-packages: ${{ needs.set_env.outputs.RUST_PACKAGES }}
+      miri-packages: ${{ needs.set_env.outputs.MIRI_PACKAGES }}
+      miri-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
       wasm-packages: ${{ needs.set_env.outputs.WASM_PACKAGES }}
       idl-packages: ${{ needs.set_env.outputs.IDL_PACKAGES }}
       wasm-toolchain: ${{ needs.set_env.outputs.RUST_TOOLCHAIN_NIGHTLY }}
