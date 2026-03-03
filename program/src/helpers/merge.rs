@@ -103,6 +103,7 @@ impl MergeKind {
     pub(crate) fn merge(
         self,
         source: Self,
+        source_lamports: u64,
         clock: &Clock,
     ) -> Result<Option<StakeStateV2>, ProgramError> {
         Self::metas_can_merge(self.meta(), source.meta(), clock)?;
@@ -128,12 +129,8 @@ impl MergeKind {
             }
             (
                 Self::ActivationEpoch(meta, mut stake, stake_flags),
-                Self::ActivationEpoch(source_meta, source_stake, source_stake_flags),
+                Self::ActivationEpoch(_, source_stake, source_stake_flags),
             ) => {
-                let source_lamports = checked_add(
-                    source_meta.rent_exempt_reserve,
-                    source_stake.delegation.stake,
-                )?;
                 merge_delegation_stake_and_credits_observed(
                     &mut stake,
                     source_lamports,
