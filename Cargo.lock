@@ -6808,6 +6808,7 @@ dependencies = [
  "assert_matches",
  "bincode",
  "mollusk-svm",
+ "mollusk-svm-result",
  "proptest",
  "rand 0.10.0",
  "solana-account 3.2.0",
