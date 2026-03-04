@@ -418,7 +418,7 @@ pub struct Meta {
     #[deprecated(
         since = "3.0.1",
         note = "Stake account rent must be calculated via the `Rent` sysvar. \
-        This value will cease to be correct once lamports-per-byte is adjusted."
+        This value will cease to be correct once lamports-per-byte-year is adjusted."
     )]
     pub rent_exempt_reserve: u64,
     pub authorized: Authorized,

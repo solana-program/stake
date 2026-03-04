@@ -19,12 +19,12 @@ solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");
 const PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH: Option<u64> = Some(0);
 
 // Historically, `Meta.rent_exempt_reserve` contained the canonical rent
-// reservation for a stake account. This implicitly depended on lamports-per-byte
-// remaining fixed over time. This value will be allowed to fluctuate, which
-// means the stake program must calculate rent from the `Rent` sysvar directly.
-// However, downstream programs may still rely on the `Meta` value being set.
-// For maximum predictability, we set `rent_exempt_reserve` to its
-// historical value unconditionally, but ignore it in the stake program.
+// reservation for a stake account. This implicitly depended on
+// lamports-per-byte-year remaining fixed over time. This value will be allowed
+// to fluctuate, which // means the stake program must calculate rent from the
+// `Rent` sysvar directly. However, downstream programs may still rely on the
+// `Meta` value being set. For maximum predictability, we set `rent_exempt_reserve`
+// to its historical value unconditionally, but ignore it in the stake program.
 const PSEUDO_RENT_EXEMPT_RESERVE: u64 = 2_282_880;
 
 /// The minimum stake amount that can be delegated, in lamports.
