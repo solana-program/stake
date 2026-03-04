@@ -543,7 +543,6 @@ impl Processor {
                 let is_active_or_activating =
                     source_status.effective > 0 || source_status.activating > 0;
 
-                // HANA maybe we can delete, i need to check mainnet stake accounts
                 let mut dest_meta = source_meta;
                 dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
 
@@ -555,7 +554,6 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(to_program_error)?;
 
-                // HANA as above
                 let mut dest_meta = source_meta;
                 dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
 
