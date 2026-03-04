@@ -1205,7 +1205,7 @@ fn test_no_signer_bypass_new_interface() {
 // cluster-wide rent will be lowered in the future
 // test that various different rent values do not interfere with stake program operations
 // also test that the stake program preserves the legacy `Meta.rent_exempt_reserve` value
-// we dont need to parametrize our failure tests because none care about lamport values
+// we dont need to parametrize our failure tests over rent because none care about lamports
 #[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 2; "half_rent")]
 #[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 10; "tenth_rent")]
 #[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR * 2; "twice_rent")]
