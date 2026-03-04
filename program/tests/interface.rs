@@ -312,7 +312,7 @@ impl Env {
         self.override_accounts.clear()
     }
 
-    // calculate rent-exempt reserve via our configured Rent
+    // calculate rent exemption via our configured Rent
     fn minimum_balance(&self, size: usize) -> u64 {
         self.mollusk.sysvars.rent.minimum_balance(size)
     }
