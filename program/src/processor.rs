@@ -953,9 +953,7 @@ impl Processor {
         )?;
 
         msg!("Merging stake accounts");
-        if let Some(merged_state) =
-            destination_merge_kind.merge(source_merge_kind, source_lamports, clock)?
-        {
+        if let Some(merged_state) = destination_merge_kind.merge(source_merge_kind, clock)? {
             set_stake_state(destination_stake_account_info, &merged_state)?;
         }
 
