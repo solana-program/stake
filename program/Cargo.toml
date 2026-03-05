@@ -18,7 +18,7 @@ solana-native-token = "3.0.0"
 solana-program-entrypoint = "3.0.0"
 solana-program-error = "3.0.0"
 solana-pubkey = "3.0.0"
-solana-rent = "3.0.0"
+solana-rent = "4.0.0"
 solana-stake-interface = { version = "2", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "3.0.0"
 solana-sysvar-id = "3.1.0"
