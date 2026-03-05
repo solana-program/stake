@@ -3,6 +3,7 @@
 use {
     arbitrary::{Arbitrary, Unstructured},
     mollusk_svm::{result::Check, Mollusk},
+    mollusk_svm_result::InstructionResult as MolluskResult,
     solana_account::{Account, ReadableAccount, WritableAccount},
     solana_clock::Clock,
     solana_epoch_rewards::EpochRewards,
@@ -10,7 +11,7 @@ use {
     solana_instruction::{AccountMeta, Instruction},
     solana_native_token::LAMPORTS_PER_SOL,
     solana_pubkey::Pubkey,
-    solana_rent::Rent,
+    solana_rent::{Rent, DEFAULT_LAMPORTS_PER_BYTE_YEAR},
     solana_sdk_ids::system_program,
     solana_stake_interface::{
         instruction::{self, LockupArgs},
@@ -32,6 +33,7 @@ use {
         collections::{HashMap, HashSet},
         sync::LazyLock,
     },
+    test_case::test_case,
 };
 
 // StakeInterface encapsulates every combination of instruction, account states, and input parameters
@@ -105,13 +107,19 @@ fn assert_warmup_cooldown_rate() {
     assert_eq!(warmup_cooldown_rate(0, Some(0)), NEW_WARMUP_COOLDOWN_RATE);
 }
 
-// hardcoded for convenience
-const STAKE_RENT_EXEMPTION: u64 = 2_282_880;
+// this mirrors the false const for `Meta.rent_exempt_reserve` in the stake program
+// the stake program uses true `Rent` unconditionally but maintains this field for compatibility
+// assert our consts in case cluster rent changes eventually lead to these values changing
+const PSEUDO_RENT_EXEMPT_RESERVE: u64 = 2_282_880;
 #[test]
-fn assert_stake_rent_exemption() {
+fn assert_pseudo_stake_rent_exemption() {
     assert_eq!(
         Rent::default().minimum_balance(StakeStateV2::size_of()),
-        STAKE_RENT_EXEMPTION
+        PSEUDO_RENT_EXEMPT_RESERVE
+    );
+    assert_eq!(
+        1_000_000_000 / 100 * 365 / (1024 * 1024),
+        DEFAULT_LAMPORTS_PER_BYTE_YEAR,
     );
 }
 
@@ -141,9 +149,14 @@ struct Env {
 impl Env {
     // set up a test environment with valid stake history, two vote accounts, and two blank stake accounts
     fn init() -> Self {
+        Env::with_rent(Rent::default())
+    }
+
+    fn with_rent(rent: Rent) -> Self {
         // create a test environment at the execution epoch
         let mut base_accounts = HashMap::new();
         let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
+        mollusk.sysvars.rent = rent;
         mollusk.warp_to_slot(EXECUTION_EPOCH * mollusk.sysvars.epoch_schedule.slots_per_epoch + 1);
         assert_eq!(mollusk.sysvars.clock.epoch, EXECUTION_EPOCH);
 
@@ -167,7 +180,7 @@ impl Env {
         base_accounts.insert(PAYER, payer_account);
 
         // create two blank vote accounts
-        let vote_rent_exemption = Rent::default().minimum_balance(VoteStateV4::size_of());
+        let vote_rent_exemption = mollusk.sysvars.rent.minimum_balance(VoteStateV4::size_of());
         let vote_state_versions = VoteStateVersions::new_v4(VoteStateV4::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
         let vote_account = Account::create(
@@ -200,7 +213,10 @@ impl Env {
 
         // create two blank stake accounts
         let stake_account = Account::create(
-            STAKE_RENT_EXEMPTION,
+            mollusk
+                .sysvars
+                .rent
+                .minimum_balance(StakeStateV2::size_of()),
             vec![0; StakeStateV2::size_of()],
             id(),
             false,
@@ -278,10 +294,10 @@ impl Env {
     }
 
     // immutable process that should succeed
-    fn process_success(&self, instruction: &Instruction) {
+    fn process_success(&self, instruction: &Instruction) -> MolluskResult {
         let accounts = self.resolve_accounts(&instruction.accounts);
         self.mollusk
-            .process_and_validate_instruction(instruction, &accounts, &[Check::success()]);
+            .process_and_validate_instruction(instruction, &accounts, &[Check::success()])
     }
 
     // immutable process that should fail
@@ -291,8 +307,14 @@ impl Env {
         assert!(result.program_result.is_err());
     }
 
+    // reset Env back to its setup state for reuse
     fn reset(&mut self) {
         self.override_accounts.clear()
+    }
+
+    // calculate rent exemption via our configured Rent
+    fn minimum_balance(&self, size: usize) -> u64 {
+        self.mollusk.sysvars.rent.minimum_balance(size)
     }
 }
 
@@ -388,6 +410,7 @@ impl StakeInterface {
 
     // creates an instruction with the given combination of settings that is guaranteed to succeed
     fn to_instruction(self, env: &mut Env) -> Instruction {
+        let rent_exempt_reserve = env.minimum_balance(StakeStateV2::size_of());
         let minimum_delegation = get_minimum_delegation();
 
         match self {
@@ -542,7 +565,7 @@ impl StakeInterface {
             } => {
                 let delegated_stake = minimum_delegation * 2;
                 let split_amount = if full_split {
-                    delegated_stake + STAKE_RENT_EXEMPTION
+                    delegated_stake + rent_exempt_reserve
                 } else {
                     delegated_stake / 2
                 };
@@ -713,7 +736,7 @@ impl StakeInterface {
                 );
 
                 let withdraw_amount = if full_withdraw && source_status != StakeStatus::Active {
-                    free_lamports + minimum_delegation + STAKE_RENT_EXEMPTION
+                    free_lamports + minimum_delegation + rent_exempt_reserve
                 } else {
                     free_lamports
                 };
@@ -920,7 +943,7 @@ fn fully_configurable_stake(
     };
 
     let meta = Meta {
-        rent_exempt_reserve: STAKE_RENT_EXEMPTION,
+        rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
         authorized,
         lockup,
     };
@@ -1176,6 +1199,47 @@ fn test_no_signer_bypass_new_interface() {
             env.process_fail(&instruction);
             env.reset();
         }
+    }
+}
+
+// cluster-wide rent will be lowered in the future
+// test that various different rent values do not interfere with stake program operations
+// also test that the stake program preserves the legacy `Meta.rent_exempt_reserve` value
+// we dont need to parametrize our failure tests over rent because none care about lamports
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 2; "half_rent")]
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 10; "tenth_rent")]
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR * 2; "twice_rent")]
+fn test_all_success_non_default_rent(lamports_per_byte_year: u64) {
+    let rent = Rent {
+        lamports_per_byte_year,
+        ..Rent::default()
+    };
+
+    let mut env = Env::with_rent(rent);
+
+    for declaration in &*INSTRUCTION_DECLARATIONS {
+        let instruction = declaration.to_instruction(&mut env);
+        let result = env.process_success(&instruction);
+
+        for (pubkey, account) in result.resulting_accounts.into_iter() {
+            if pubkey != STAKE_ACCOUNT_BLACK && pubkey != STAKE_ACCOUNT_WHITE {
+                continue;
+            }
+
+            if account.data().is_empty() {
+                continue;
+            }
+
+            match account.deserialize_data::<StakeStateV2>().unwrap() {
+                StakeStateV2::Initialized(meta) | StakeStateV2::Stake(meta, _, _) => {
+                    assert_eq!(meta.rent_exempt_reserve, PSEUDO_RENT_EXEMPT_RESERVE)
+                }
+                StakeStateV2::Uninitialized => (),
+                StakeStateV2::RewardsPool => unreachable!(),
+            }
+        }
+
+        env.reset();
     }
 }
 

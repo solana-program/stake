@@ -65,6 +65,10 @@ fn create_default_vote_account() -> AccountSharedData {
         .unwrap()
 }
 
+fn default_stake_rent() -> u64 {
+    Rent::default().minimum_balance(StakeStateV2::size_of())
+}
+
 fn invalid_stake_state_pubkey() -> Pubkey {
     Pubkey::from_str("BadStake11111111111111111111111111111111111").unwrap()
 }
@@ -1571,9 +1575,8 @@ fn test_authorize_delegated_stake() {
     let authority_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
-    let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
-        stake_lamports,
+        minimum_delegation + default_stake_rent(),
         &StakeStateV2::Initialized(Meta::auto(&stake_address)),
         StakeStateV2::size_of(),
         &id(),
@@ -1780,10 +1783,10 @@ fn test_stake_delegate() {
         .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     let minimum_delegation = crate::get_minimum_delegation();
-    let stake_lamports = minimum_delegation;
+    let delegated_stake = minimum_delegation;
     let stake_address = solana_pubkey::new_rand();
     let mut stake_account = AccountSharedData::new_data_with_space(
-        stake_lamports,
+        delegated_stake + default_stake_rent(),
         &StakeStateV2::Initialized(Meta {
             authorized: Authorized {
                 staker: stake_address,
@@ -1869,7 +1872,7 @@ fn test_stake_delegate() {
         Stake {
             delegation: Delegation {
                 voter_pubkey: vote_address,
-                stake: stake_lamports,
+                stake: delegated_stake,
                 activation_epoch: clock.epoch,
                 deactivation_epoch: u64::MAX,
                 ..Delegation::default()
@@ -1968,7 +1971,7 @@ fn test_stake_delegate() {
         Stake {
             delegation: Delegation {
                 voter_pubkey: vote_address_2,
-                stake: stake_lamports,
+                stake: delegated_stake,
                 activation_epoch: clock.epoch,
                 deactivation_epoch: u64::MAX,
                 ..Delegation::default()
@@ -2218,10 +2221,11 @@ fn test_split() {
     };
     let stake_address = solana_pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
-    let stake_lamports = minimum_delegation * 2;
+    let delegated_stake = minimum_delegation * 2;
+    let total_lamports = delegated_stake + default_stake_rent();
     let split_to_address = solana_pubkey::new_rand();
     let split_to_account = AccountSharedData::new_data_with_space(
-        0,
+        default_stake_rent(),
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &id(),
@@ -2232,10 +2236,7 @@ fn test_split() {
         (split_to_address, split_to_account.clone()),
         (
             rent::id(),
-            create_account_shared_data_for_test(&Rent {
-                lamports_per_byte_year: 0,
-                ..Rent::default()
-            }),
+            create_account_shared_data_for_test(&Rent::default()),
         ),
         (
             StakeHistory::id(),
@@ -2260,12 +2261,23 @@ fn test_split() {
         },
     ];
 
-    for state in [
-        StakeStateV2::Initialized(Meta::auto(&stake_address)),
-        just_stake(Meta::auto(&stake_address), stake_lamports),
+    let meta = Meta {
+        rent_exempt_reserve: default_stake_rent(),
+        ..Meta::auto(&stake_address)
+    };
+
+    for (state, expected_error) in [
+        (
+            StakeStateV2::Initialized(meta),
+            ProgramError::InsufficientFunds,
+        ),
+        (
+            just_stake(meta, delegated_stake),
+            StakeError::InsufficientDelegation.into(),
+        ),
     ] {
         let stake_account = AccountSharedData::new_data_with_space(
-            stake_lamports,
+            total_lamports,
             &state,
             StakeStateV2::size_of(),
             &id(),
@@ -2281,16 +2293,16 @@ fn test_split() {
         // should fail, split more than available
         process_instruction(
             &mollusk,
-            &serialize(&StakeInstruction::Split(stake_lamports + 1)).unwrap(),
+            &serialize(&StakeInstruction::Split(delegated_stake + 1)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
-            Err(ProgramError::InsufficientFunds),
+            Err(expected_error),
         );
 
         // should pass
         let accounts = process_instruction(
             &mollusk,
-            &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
+            &serialize(&StakeInstruction::Split(delegated_stake / 2)).unwrap(),
             transaction_accounts.clone(),
             instruction_accounts.clone(),
             Ok(()),
@@ -2298,7 +2310,7 @@ fn test_split() {
         // no lamport leakage
         assert_eq!(
             accounts[0].lamports() + accounts[1].lamports(),
-            stake_lamports
+            delegated_stake + default_stake_rent() * 2,
         );
 
         // no deactivated stake
@@ -2314,7 +2326,7 @@ fn test_split() {
             }
             StakeStateV2::Stake(_meta, _stake, _) => {
                 let stake_0 = from(&accounts[0]).unwrap().stake();
-                assert_eq!(stake_0.unwrap().delegation.stake, stake_lamports / 2);
+                assert_eq!(stake_0.unwrap().delegation.stake, delegated_stake / 2);
             }
             _ => unreachable!(),
         }
@@ -2322,7 +2334,7 @@ fn test_split() {
 
     // should fail, fake owner of destination
     let split_to_account = AccountSharedData::new_data_with_space(
-        0,
+        default_stake_rent(),
         &StakeStateV2::Uninitialized,
         StakeStateV2::size_of(),
         &solana_pubkey::new_rand(),
@@ -2331,7 +2343,7 @@ fn test_split() {
     transaction_accounts[1] = (split_to_address, split_to_account);
     process_instruction(
         &mollusk,
-        &serialize(&StakeInstruction::Split(stake_lamports / 2)).unwrap(),
+        &serialize(&StakeInstruction::Split(delegated_stake / 2)).unwrap(),
         transaction_accounts,
         instruction_accounts,
         Err(ProgramError::InvalidAccountOwner),
@@ -2647,8 +2659,8 @@ fn test_withdraw_stake_before_warmup() {
     let recipient_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
-    let stake_lamports = minimum_delegation;
-    let total_lamports = stake_lamports + 33;
+    let delegated_stake = minimum_delegation;
+    let total_lamports = delegated_stake + default_stake_rent() + 33;
     let stake_account = AccountSharedData::new_data_with_space(
         total_lamports,
         &StakeStateV2::Initialized(Meta::auto(&stake_address)),
@@ -2762,7 +2774,7 @@ fn test_withdraw_stake_before_warmup() {
     process_instruction(
         &mollusk,
         &serialize(&StakeInstruction::Withdraw(
-            total_lamports - stake_lamports + 1,
+            total_lamports - delegated_stake + 1,
         ))
         .unwrap(),
         transaction_accounts,
@@ -2999,9 +3011,8 @@ fn test_deactivate() {
 
     let stake_address = solana_pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
-    let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
-        stake_lamports,
+        minimum_delegation + default_stake_rent(),
         &StakeStateV2::Initialized(Meta::auto(&stake_address)),
         StakeStateV2::size_of(),
         &id(),
@@ -4045,8 +4056,7 @@ fn test_withdraw_minimum_stake_delegation() {
     let mollusk = mollusk_bpf();
 
     let minimum_delegation = crate::get_minimum_delegation();
-    let rent = Rent::default();
-    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
+    let rent_exempt_reserve = default_stake_rent();
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         rent_exempt_reserve,
@@ -4115,7 +4125,7 @@ fn test_withdraw_minimum_stake_delegation() {
                     ),
                     (
                         rent::id(),
-                        create_account_shared_data_for_test(&Rent::free()),
+                        create_account_shared_data_for_test(&Rent::default()),
                     ),
                     (
                         StakeHistory::id(),
@@ -7079,7 +7089,7 @@ fn setup_delegate_test_with_vote_account(
 
     let minimum_delegation = crate::get_minimum_delegation();
     let stake_account = AccountSharedData::new_data_with_space(
-        minimum_delegation,
+        minimum_delegation + default_stake_rent(),
         &StakeStateV2::Initialized(Meta {
             authorized: Authorized {
                 staker: stake_address,

@@ -1,5 +1,5 @@
 use {
-    crate::{helpers::*, id, PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH},
+    crate::{helpers::*, id, PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH, PSEUDO_RENT_EXEMPT_RESERVE},
     solana_account_info::{next_account_info, AccountInfo},
     solana_clock::Clock,
     solana_cpi::set_return_data,
@@ -145,9 +145,9 @@ fn do_initialize(
         let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
         if stake_account_info.lamports() >= rent_exempt_reserve {
             let stake_state = StakeStateV2::Initialized(Meta {
-                rent_exempt_reserve,
                 authorized,
                 lockup,
+                rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
             });
 
             set_stake_state(stake_account_info, &stake_state)
@@ -228,7 +228,7 @@ fn do_set_lockup(
 
 fn move_stake_or_lamports_shared_checks(
     source_stake_account_info: &AccountInfo,
-    lamports: u64,
+    move_amount: u64,
     destination_stake_account_info: &AccountInfo,
     stake_authority_info: &AccountInfo,
 ) -> Result<(MergeKind, MergeKind), ProgramError> {
@@ -248,7 +248,7 @@ fn move_stake_or_lamports_shared_checks(
     }
 
     // must move something
-    if lamports == 0 {
+    if move_amount == 0 {
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -403,10 +403,13 @@ impl Processor {
             }
         };
 
+        let rent = &Rent::get()?;
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         let vote_state = get_vote_state(vote_account_info)?;
+
+        let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
 
         match get_stake_state(stake_account_info)? {
             StakeStateV2::Initialized(meta) => {
@@ -415,7 +418,7 @@ impl Processor {
                     .map_err(to_program_error)?;
 
                 let ValidatedDelegatedInfo { stake_amount } =
-                    validate_delegated_amount(stake_account_info, &meta)?;
+                    validate_delegated_amount(stake_account_info, rent_exempt_reserve)?;
 
                 let stake = new_stake(
                     stake_amount,
@@ -437,7 +440,7 @@ impl Processor {
 
                 // Compute the maximum stake allowed to (re)delegate
                 let ValidatedDelegatedInfo { stake_amount } =
-                    validate_delegated_amount(stake_account_info, &meta)?;
+                    validate_delegated_amount(stake_account_info, rent_exempt_reserve)?;
 
                 // Get current activation status at this epoch
                 let effective_stake = stake.delegation.stake(
@@ -515,6 +518,8 @@ impl Processor {
             return Err(ProgramError::InsufficientFunds);
         }
 
+        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
+
         let destination_data_len = destination_stake_account_info.data_len();
         if destination_data_len != StakeStateV2::size_of() {
             return Err(ProgramError::InvalidAccountData);
@@ -539,7 +544,7 @@ impl Processor {
                     source_status.effective > 0 || source_status.activating > 0;
 
                 let mut dest_meta = source_meta;
-                dest_meta.rent_exempt_reserve = destination_rent_exempt_reserve;
+                dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
 
                 (is_active_or_activating, Some(dest_meta))
             }
@@ -550,7 +555,7 @@ impl Processor {
                     .map_err(to_program_error)?;
 
                 let mut dest_meta = source_meta;
-                dest_meta.rent_exempt_reserve = destination_rent_exempt_reserve;
+                dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
 
                 (false, Some(dest_meta))
             }
@@ -614,9 +619,6 @@ impl Processor {
 
         // special case: if stake is fully inactive, we only care that both accounts meet rent-exemption
         if !is_active_or_activating {
-            let source_rent_exempt_reserve =
-                rent.minimum_balance(source_stake_account_info.data_len());
-
             let mut destination_stake_state = source_stake_state;
             match (&mut destination_stake_state, option_dest_meta) {
                 (StakeStateV2::Stake(meta, _, _), Some(dest_meta))
@@ -682,7 +684,7 @@ impl Processor {
                 if source_lamport_balance
                     .saturating_sub(split_lamports)
                     .saturating_sub(source_stake.delegation.stake)
-                    < source_meta.rent_exempt_reserve
+                    < source_rent_exempt_reserve
                 {
                     return Err(ProgramError::InsufficientFunds);
                 }
@@ -739,12 +741,15 @@ impl Processor {
         // converge
         let option_lockup_authority_info = next_account_info(account_info_iter).ok();
 
+        let rent = &Rent::get()?;
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
         if source_stake_account_info.key == destination_info.key {
             return Err(ProgramError::InvalidArgument);
         }
+
+        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
 
         // this is somewhat subtle. for Initialized and Stake, there is a real authority
         // but for Uninitialized, the source account is passed twice, and signed for
@@ -770,7 +775,7 @@ impl Processor {
                     stake.delegation.stake
                 };
 
-                let staked_and_reserve = checked_add(staked, meta.rent_exempt_reserve)?;
+                let staked_and_reserve = checked_add(staked, source_rent_exempt_reserve)?;
                 (meta.lockup, staked_and_reserve, staked != 0)
             }
             Ok(StakeStateV2::Initialized(meta)) => {
@@ -778,7 +783,7 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Withdrawer)
                     .map_err(to_program_error)?;
                 // stake accounts must have a balance >= rent_exempt_reserve
-                (meta.lockup, meta.rent_exempt_reserve, false)
+                (meta.lockup, source_rent_exempt_reserve, false)
             }
             Ok(StakeStateV2::Uninitialized) => {
                 if !signers.contains(source_stake_account_info.key) {
@@ -920,6 +925,8 @@ impl Processor {
             return Err(ProgramError::InvalidArgument);
         }
 
+        let source_lamports = source_stake_account_info.lamports();
+
         msg!("Checking if destination stake is mergeable");
         let destination_merge_kind = MergeKind::get_if_mergeable(
             &get_stake_state(destination_stake_account_info)?,
@@ -938,7 +945,7 @@ impl Processor {
         msg!("Checking if source stake is mergeable");
         let source_merge_kind = MergeKind::get_if_mergeable(
             &get_stake_state(source_stake_account_info)?,
-            source_stake_account_info.lamports(),
+            source_lamports,
             clock,
             stake_history,
         )?;
@@ -955,7 +962,7 @@ impl Processor {
         relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
-            source_stake_account_info.lamports(),
+            source_lamports,
         )?;
 
         Ok(())
@@ -1219,7 +1226,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_move_stake(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
+    fn process_move_stake(accounts: &[AccountInfo], move_amount: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
         // invariant
@@ -1227,16 +1234,22 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
+        let rent = &Rent::get()?;
+
         let (source_merge_kind, destination_merge_kind) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,
-            lamports,
+            move_amount,
             destination_stake_account_info,
             stake_authority_info,
         )?;
 
-        // ensure source and destination are the right size for the current version of
-        // StakeState this a safeguard in case there is a new version of the
-        // struct that cannot fit into an old account
+        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
+
+        let destination_rent_exempt_reserve =
+            rent.minimum_balance(destination_stake_account_info.data_len());
+
+        // ensure source and destination are the right size for the current version of StakeState.
+        // this a safeguard in case there is a new version of the struct that cannot fit into an old account
         if source_stake_account_info.data_len() != StakeStateV2::size_of()
             || destination_stake_account_info.data_len() != StakeStateV2::size_of()
         {
@@ -1251,20 +1264,18 @@ impl Processor {
         let minimum_delegation = crate::get_minimum_delegation();
         let source_effective_stake = source_stake.delegation.stake;
 
-        // source cannot move more stake than it has, regardless of how many lamports it
-        // has
+        // source cannot move more stake than it has, regardless of how many lamports it has
         let source_final_stake = source_effective_stake
-            .checked_sub(lamports)
+            .checked_sub(move_amount)
             .ok_or(ProgramError::InvalidArgument)?;
 
-        // unless all stake is being moved, source must retain at least the minimum
-        // delegation
+        // unless all stake is being moved, source must retain at least the minimum delegation
         if source_final_stake != 0 && source_final_stake < minimum_delegation {
             return Err(ProgramError::InvalidArgument);
         }
 
         // destination must be fully active or fully inactive
-        let destination_meta = match destination_merge_kind {
+        match destination_merge_kind {
             MergeKind::FullyActive(destination_meta, mut destination_stake) => {
                 // if active, destination must be delegated to the same vote account as source
                 if source_stake.delegation.voter_pubkey != destination_stake.delegation.voter_pubkey
@@ -1274,10 +1285,10 @@ impl Processor {
 
                 let destination_effective_stake = destination_stake.delegation.stake;
                 let destination_final_stake = destination_effective_stake
-                    .checked_add(lamports)
+                    .checked_add(move_amount)
                     .ok_or(ProgramError::ArithmeticOverflow)?;
 
-                // ensure destination meets miniumum delegation
+                // ensure destination meets miniumum delegation.
                 // since it is already active, this only really applies if the minimum is raised
                 if destination_final_stake < minimum_delegation {
                     return Err(ProgramError::InvalidArgument);
@@ -1285,7 +1296,7 @@ impl Processor {
 
                 merge_delegation_stake_and_credits_observed(
                     &mut destination_stake,
-                    lamports,
+                    move_amount,
                     source_stake.credits_observed,
                 )?;
 
@@ -1296,17 +1307,15 @@ impl Processor {
                     destination_stake_account_info,
                     &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
                 )?;
-
-                destination_meta
             }
             MergeKind::Inactive(destination_meta, _, _) => {
                 // if destination is inactive, it must be given at least the minimum delegation
-                if lamports < minimum_delegation {
+                if move_amount < minimum_delegation {
                     return Err(ProgramError::InvalidArgument);
                 }
 
                 let mut destination_stake = source_stake;
-                destination_stake.delegation.stake = lamports;
+                destination_stake.delegation.stake = move_amount;
 
                 // StakeFlags::empty() is valid here because the only existing stake flag,
                 // MUST_FULLY_ACTIVATE_BEFORE_DEACTIVATION_IS_PERMITTED, is cleared when a stake
@@ -1315,11 +1324,9 @@ impl Processor {
                     destination_stake_account_info,
                     &StakeStateV2::Stake(destination_meta, destination_stake, StakeFlags::empty()),
                 )?;
-
-                destination_meta
             }
             _ => return Err(ProgramError::InvalidAccountData),
-        };
+        }
 
         if source_final_stake == 0 {
             set_stake_state(
@@ -1341,13 +1348,13 @@ impl Processor {
         relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
-            lamports,
+            move_amount,
         )?;
 
         // this should be impossible, but because we do all our math with delegations,
         // best to guard it
-        if source_stake_account_info.lamports() < source_meta.rent_exempt_reserve
-            || destination_stake_account_info.lamports() < destination_meta.rent_exempt_reserve
+        if source_stake_account_info.lamports() < source_rent_exempt_reserve
+            || destination_stake_account_info.lamports() < destination_rent_exempt_reserve
         {
             msg!("Delegation calculations violated lamport balance assumptions");
             return Err(ProgramError::InvalidArgument);
@@ -1356,7 +1363,7 @@ impl Processor {
         Ok(())
     }
 
-    fn process_move_lamports(accounts: &[AccountInfo], lamports: u64) -> ProgramResult {
+    fn process_move_lamports(accounts: &[AccountInfo], move_amount: u64) -> ProgramResult {
         let account_info_iter = &mut accounts.iter();
 
         // invariant
@@ -1364,32 +1371,36 @@ impl Processor {
         let destination_stake_account_info = next_account_info(account_info_iter)?;
         let stake_authority_info = next_account_info(account_info_iter)?;
 
+        let rent = &Rent::get()?;
+
         let (source_merge_kind, _) = move_stake_or_lamports_shared_checks(
             source_stake_account_info,
-            lamports,
+            move_amount,
             destination_stake_account_info,
             stake_authority_info,
         )?;
 
+        let source_rent_exempt_reserve = rent.minimum_balance(source_stake_account_info.data_len());
+
         let source_free_lamports = match source_merge_kind {
-            MergeKind::FullyActive(source_meta, source_stake) => source_stake_account_info
+            MergeKind::FullyActive(_, source_stake) => source_stake_account_info
                 .lamports()
                 .saturating_sub(source_stake.delegation.stake)
-                .saturating_sub(source_meta.rent_exempt_reserve),
-            MergeKind::Inactive(source_meta, source_lamports, _) => {
-                source_lamports.saturating_sub(source_meta.rent_exempt_reserve)
+                .saturating_sub(source_rent_exempt_reserve),
+            MergeKind::Inactive(_, source_lamports, _) => {
+                source_lamports.saturating_sub(source_rent_exempt_reserve)
             }
             _ => return Err(ProgramError::InvalidAccountData),
         };
 
-        if lamports > source_free_lamports {
+        if move_amount > source_free_lamports {
             return Err(ProgramError::InvalidArgument);
         }
 
         relocate_lamports(
             source_stake_account_info,
             destination_stake_account_info,
-            lamports,
+            move_amount,
         )?;
 
         Ok(())

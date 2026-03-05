@@ -5,7 +5,7 @@ use {
     solana_pubkey::Pubkey,
     solana_stake_interface::{
         error::StakeError,
-        state::{Delegation, Meta, Stake},
+        state::{Delegation, Stake},
     },
 };
 
@@ -32,9 +32,9 @@ pub(crate) fn new_stake(
 /// an error.
 pub(crate) fn validate_delegated_amount(
     account: &AccountInfo,
-    meta: &Meta,
+    rent_exempt_reserve: u64,
 ) -> Result<ValidatedDelegatedInfo, ProgramError> {
-    let stake_amount = account.lamports().saturating_sub(meta.rent_exempt_reserve); // can't stake the rent
+    let stake_amount = account.lamports().saturating_sub(rent_exempt_reserve); // can't stake the rent
 
     // Stake accounts may be initialized with a stake amount below the minimum
     // delegation so check that the minimum is met before delegation.
