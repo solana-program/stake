@@ -11,7 +11,7 @@ use {
     solana_instruction::{AccountMeta, Instruction},
     solana_native_token::LAMPORTS_PER_SOL,
     solana_pubkey::Pubkey,
-    solana_rent::{Rent, DEFAULT_LAMPORTS_PER_BYTE_YEAR},
+    solana_rent::{Rent, DEFAULT_LAMPORTS_PER_BYTE},
     solana_sdk_ids::system_program,
     solana_stake_interface::{
         instruction::{self, LockupArgs},
@@ -117,9 +117,11 @@ fn assert_pseudo_stake_rent_exemption() {
         Rent::default().minimum_balance(StakeStateV2::size_of()),
         PSEUDO_RENT_EXEMPT_RESERVE
     );
+    // `lamports_per_byte` replaced the legacy yearly rate, so the historical
+    // default formula is doubled to preserve the same default minimum balance.
     assert_eq!(
-        1_000_000_000 / 100 * 365 / (1024 * 1024),
-        DEFAULT_LAMPORTS_PER_BYTE_YEAR,
+        2 * (1_000_000_000 / 100 * 365 / (1024 * 1024)),
+        DEFAULT_LAMPORTS_PER_BYTE,
     );
 }
 
@@ -183,13 +185,13 @@ impl Env {
         let vote_rent_exemption = mollusk.sysvars.rent.minimum_balance(VoteStateV4::size_of());
         let vote_state_versions = VoteStateVersions::new_v4(VoteStateV4::default());
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
-        let vote_account = Account::create(
-            vote_rent_exemption,
-            vote_data,
-            vote_program::id(),
-            false,
-            u64::MAX,
-        );
+        let vote_account = Account {
+            lamports: vote_rent_exemption,
+            data: vote_data,
+            owner: vote_program::id(),
+            executable: false,
+            rent_epoch: u64::MAX,
+        };
         base_accounts.insert(VOTE_ACCOUNT_RED, vote_account.clone());
         base_accounts.insert(VOTE_ACCOUNT_BLUE, vote_account);
 
@@ -202,24 +204,23 @@ impl Env {
         }
         let vote_state_versions = VoteStateVersions::new_v4(reference_vote_state);
         let vote_data = bincode::serialize(&vote_state_versions).unwrap();
-        let vote_account = Account::create(
-            vote_rent_exemption,
-            vote_data,
-            vote_program::id(),
-            false,
-            u64::MAX,
-        );
+        let vote_account = Account {
+            lamports: vote_rent_exemption,
+            data: vote_data,
+            owner: vote_program::id(),
+            executable: false,
+            rent_epoch: u64::MAX,
+        };
         base_accounts.insert(VOTE_ACCOUNT_GOLD, vote_account);
 
         // create two blank stake accounts
-        let stake_account = Account::create(
+        let stake_account = Account::new_rent_epoch(
             mollusk
                 .sysvars
                 .rent
                 .minimum_balance(StakeStateV2::size_of()),
-            vec![0; StakeStateV2::size_of()],
-            id(),
-            false,
+            StakeStateV2::size_of(),
+            &id(),
             u64::MAX,
         );
         base_accounts.insert(STAKE_ACCOUNT_BLACK, stake_account.clone());
@@ -1129,7 +1130,7 @@ fn test_no_use_dealloc() {
                     .get(&stake_address)
                     .unwrap_or_else(|| env.base_accounts.get(&stake_address).unwrap())
                     .lamports();
-                let stake_account = Account::create(lamports, vec![], id(), false, u64::MAX);
+                let stake_account = Account::new_rent_epoch(lamports, 0, &id(), u64::MAX);
                 env.override_accounts.insert(stake_address, stake_account);
 
                 if is_withdraw {
@@ -1206,12 +1207,12 @@ fn test_no_signer_bypass_new_interface() {
 // test that various different rent values do not interfere with stake program operations
 // also test that the stake program preserves the legacy `Meta.rent_exempt_reserve` value
 // we dont need to parametrize our failure tests over rent because none care about lamports
-#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 2; "half_rent")]
-#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR / 10; "tenth_rent")]
-#[test_case(DEFAULT_LAMPORTS_PER_BYTE_YEAR * 2; "twice_rent")]
-fn test_all_success_non_default_rent(lamports_per_byte_year: u64) {
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE / 2; "half_rent")]
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE / 10; "tenth_rent")]
+#[test_case(DEFAULT_LAMPORTS_PER_BYTE * 2; "twice_rent")]
+fn test_all_success_non_default_rent(lamports_per_byte: u64) {
     let rent = Rent {
-        lamports_per_byte_year,
+        lamports_per_byte,
         ..Rent::default()
     };
 

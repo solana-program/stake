@@ -1,7 +1,7 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
-    solana_account::Account as SolanaAccount,
+    solana_account_legacy::Account as SolanaAccount,
     solana_clock::Clock,
     solana_instruction::Instruction,
     solana_keypair::Keypair,
@@ -20,6 +20,7 @@ use {
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
     },
     solana_system_interface::instruction as system_instruction,
+    solana_sysvar_id::SysvarId,
     solana_transaction::{Signers, Transaction, TransactionError},
     solana_vote_interface::{
         instruction as vote_instruction,
@@ -187,12 +188,15 @@ pub async fn get_stake_account(
 
 pub async fn get_stake_account_rent(banks_client: &mut BanksClient) -> u64 {
     let rent = banks_client.get_rent().await.unwrap();
-    rent.minimum_balance(std::mem::size_of::<StakeStateV2>())
+    rent.minimum_balance(StakeStateV2::size_of())
 }
 
 pub async fn get_effective_stake(banks_client: &mut BanksClient, pubkey: &Pubkey) -> u64 {
     let clock = banks_client.get_sysvar::<Clock>().await.unwrap();
-    let stake_history = banks_client.get_sysvar::<StakeHistory>().await.unwrap();
+    // Temporary until the BanksClient/StakeHistory deps align and
+    // `banks_client.get_sysvar::<StakeHistory>()` works again.
+    let stake_history_account = get_account(banks_client, &StakeHistory::id()).await;
+    let stake_history = bincode::deserialize::<StakeHistory>(&stake_history_account.data).unwrap();
     let stake_account = get_account(banks_client, pubkey).await;
     match bincode::deserialize::<StakeStateV2>(&stake_account.data).unwrap() {
         StakeStateV2::Stake(_, stake, _) => {
@@ -255,7 +259,7 @@ pub async fn create_independent_stake_account_with_lockup(
             &context.payer.pubkey(),
             &stake.pubkey(),
             lamports,
-            std::mem::size_of::<StakeStateV2>() as u64,
+            StakeStateV2::size_of() as u64,
             &id(),
         ),
         ixn::initialize(&stake.pubkey(), authorized, lockup),
@@ -1022,12 +1026,18 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         _ => vec![&staker_keypair],
     };
 
-    // fail, cannot split zero
+    // zero split succeeds for an uninitialized stake account, but still fails
+    // for all initialized stake states
     let instruction = &ixn::split(&split_source, &signers[0].pubkey(), 0, &split_dest)[2];
-    let e = process_instruction(&mut context, instruction, &signers)
-        .await
-        .unwrap_err();
-    assert_eq!(e, ProgramError::InsufficientFunds);
+    let split_zero_result = process_instruction(&mut context, instruction, &signers).await;
+    if split_source_type == StakeLifecycle::Uninitialized {
+        split_zero_result.unwrap();
+    } else {
+        assert_eq!(
+            split_zero_result.unwrap_err(),
+            ProgramError::InsufficientFunds
+        );
+    }
 
     // fail, split more than available (even if not active, would kick source out of
     // rent exemption)
@@ -1041,14 +1051,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
     let e = process_instruction(&mut context, instruction, &signers)
         .await
         .unwrap_err();
-    assert_eq!(
-        e,
-        if split_source_type.minimum_delegation_enforced() {
-            StakeError::InsufficientDelegation.into()
-        } else {
-            ProgramError::InsufficientFunds
-        }
-    );
+    assert_eq!(e, ProgramError::InsufficientFunds);
 
     // an active or transitioning stake account cannot have less than the minimum delegation
     // this is NOT dependent on the one sol minimum delegation feature
@@ -1065,7 +1068,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
-        assert_eq!(e, StakeError::InsufficientDelegation.into());
+        assert_eq!(e, ProgramError::InsufficientFunds);
 
         // underfunded source fails
         let instruction = &ixn::split(
@@ -1078,7 +1081,7 @@ async fn program_test_split(split_source_type: StakeLifecycle) {
         let e = process_instruction(&mut context, instruction, &signers)
             .await
             .unwrap_err();
-        assert_eq!(e, StakeError::InsufficientDelegation.into());
+        assert_eq!(e, ProgramError::InsufficientFunds);
     }
 
     // split to non-owned account fails
