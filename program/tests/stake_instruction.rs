@@ -246,7 +246,11 @@ fn get_active_stake_for_tests(
 }
 
 fn create_empty_stake_history_for_test() -> AccountSharedData {
-    AccountSharedData::create(1, vec![0; 8], solana_sdk_ids::sysvar::id(), false, u64::MAX)
+    let mut account =
+        AccountSharedData::new_data(1, &StakeHistory::default(), &solana_sdk_ids::sysvar::id())
+            .unwrap();
+    account.set_rent_epoch(u64::MAX);
+    account
 }
 
 fn new_stake_history_entry<'a, I>(
@@ -1110,7 +1114,7 @@ fn test_stake_initialize() {
     transaction_accounts[1] = (
         rent::id(),
         create_account_shared_data_for_test(&Rent {
-            lamports_per_byte_year: rent.lamports_per_byte_year + 1,
+            lamports_per_byte: rent.lamports_per_byte + 1,
             ..rent
         }),
     );
@@ -7068,13 +7072,40 @@ enum VoteStateVersion {
     V4,
 }
 
-impl VoteStateVersion {
-    fn default_vote_state(&self) -> VoteStateVersions {
-        match self {
-            Self::V0_23_5 => VoteStateVersions::V0_23_5(Box::default()),
-            Self::V1_14_11 => VoteStateVersions::V1_14_11(Box::default()),
-            Self::V3 => VoteStateVersions::V3(Box::default()),
-            Self::V4 => VoteStateVersions::V4(Box::default()),
+fn vote_account_for_version(vote_state_version: VoteStateVersion) -> AccountSharedData {
+    let lamports = Rent::default().minimum_balance(VoteStateV4::size_of());
+    match vote_state_version {
+        VoteStateVersion::V1_14_11 => AccountSharedData::new_data_with_space(
+            lamports,
+            &VoteStateVersions::V1_14_11(Box::default()),
+            VoteStateV4::size_of(),
+            &solana_sdk_ids::vote::id(),
+        )
+        .unwrap(),
+        VoteStateVersion::V3 => AccountSharedData::new_data_with_space(
+            lamports,
+            &VoteStateVersions::V3(Box::default()),
+            VoteStateV4::size_of(),
+            &solana_sdk_ids::vote::id(),
+        )
+        .unwrap(),
+        VoteStateVersion::V4 => AccountSharedData::new_data_with_space(
+            lamports,
+            &VoteStateVersions::V4(Box::default()),
+            VoteStateV4::size_of(),
+            &solana_sdk_ids::vote::id(),
+        )
+        .unwrap(),
+        VoteStateVersion::V0_23_5 => {
+            let mut account = AccountSharedData::new_rent_epoch(
+                lamports,
+                VoteStateV4::size_of(),
+                &solana_sdk_ids::vote::id(),
+                u64::MAX,
+            );
+            let zeroed_vote_state = vec![0; VoteStateV4::size_of()];
+            account.set_data_from_slice(&zeroed_vote_state);
+            account
         }
     }
 }
@@ -7263,14 +7294,7 @@ fn test_delegate_deserialize_vote_state(
     vote_state_version: VoteStateVersion,
     expected_result: Result<(), ProgramError>,
 ) {
-    let vote_state = vote_state_version.default_vote_state();
-    let vote_account = AccountSharedData::new_data_with_space(
-        Rent::default().minimum_balance(VoteStateV4::size_of()),
-        &vote_state,
-        VoteStateV4::size_of(),
-        &solana_sdk_ids::vote::id(),
-    )
-    .unwrap();
+    let vote_account = vote_account_for_version(vote_state_version);
 
     let (mollusk, instruction_accounts, transaction_accounts) =
         setup_delegate_test_with_vote_account(vote_account);
@@ -7320,14 +7344,7 @@ fn test_deactivate_delinquent_deserialize_vote_state(
     expected_result: Result<(), ProgramError>,
 ) {
     // Create delinquent vote account with the specified version
-    let vote_state = vote_state_version.default_vote_state();
-    let vote_account = AccountSharedData::new_data_with_space(
-        Rent::default().minimum_balance(VoteStateV4::size_of()),
-        &vote_state,
-        VoteStateV4::size_of(),
-        &solana_sdk_ids::vote::id(),
-    )
-    .unwrap();
+    let vote_account = vote_account_for_version(vote_state_version);
 
     let (mollusk, instruction_accounts, transaction_accounts) =
         setup_deactivate_delinquent_test_with_vote_account(vote_account);
