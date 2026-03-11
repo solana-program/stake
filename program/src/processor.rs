@@ -443,7 +443,7 @@ impl Processor {
                     validate_delegated_amount(stake_account_info, rent_exempt_reserve)?;
 
                 // Get current activation status at this epoch
-                let effective_stake = stake.delegation.stake(
+                let effective_stake = stake.delegation.stake_v2(
                     clock.epoch,
                     stake_history,
                     PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
@@ -535,11 +535,13 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(to_program_error)?;
 
-                let source_status = source_stake.delegation.stake_activating_and_deactivating(
-                    clock.epoch,
-                    stake_history,
-                    PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
-                );
+                let source_status = source_stake
+                    .delegation
+                    .stake_activating_and_deactivating_v2(
+                        clock.epoch,
+                        stake_history,
+                        PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
+                    );
                 let is_active_or_activating =
                     source_status.effective > 0 || source_status.activating > 0;
 
@@ -763,7 +765,7 @@ impl Processor {
                     .map_err(to_program_error)?;
                 // if we have a deactivation epoch and we're in cooldown
                 let staked = if clock.epoch >= stake.delegation.deactivation_epoch {
-                    stake.delegation.stake(
+                    stake.delegation.stake_v2(
                         clock.epoch,
                         stake_history,
                         PERPETUAL_NEW_WARMUP_COOLDOWN_RATE_EPOCH,
