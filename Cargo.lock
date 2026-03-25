@@ -6066,6 +6066,7 @@ version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b06bd918d60111ee1f97de817113e2040ca0cedb740099ee8d646233f6b906c"
 dependencies = [
+ "rand 0.9.2",
  "solana-address 2.2.0",
 ]
 
