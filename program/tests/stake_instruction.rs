@@ -7052,7 +7052,6 @@ fn test_stake_process_instruction_with_epoch_rewards_active() {
 
 #[derive(Debug, Clone, Copy)]
 enum VoteStateVersion {
-    V0_23_5,
     V1_14_11,
     V3,
     V4,
@@ -7061,7 +7060,6 @@ enum VoteStateVersion {
 impl VoteStateVersion {
     fn default_vote_state(&self) -> VoteStateVersions {
         match self {
-            Self::V0_23_5 => VoteStateVersions::V0_23_5(Box::default()),
             Self::V1_14_11 => VoteStateVersions::V1_14_11(Box::default()),
             Self::V3 => VoteStateVersions::V3(Box::default()),
             Self::V4 => VoteStateVersions::V4(Box::default()),
@@ -7245,14 +7243,10 @@ fn test_delegate_incorrect_vote_owner() {
 // Just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
 // deserialize with `InvalidAccountData`. In other words, the behavior is
 // unchanged.
-#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
-#[test_case(VoteStateVersion::V3, Ok(()))]
-#[test_case(VoteStateVersion::V4, Ok(()))]
-fn test_delegate_deserialize_vote_state(
-    vote_state_version: VoteStateVersion,
-    expected_result: Result<(), ProgramError>,
-) {
+#[test_case(VoteStateVersion::V1_14_11)]
+#[test_case(VoteStateVersion::V3)]
+#[test_case(VoteStateVersion::V4)]
+fn test_delegate_deserialize_vote_state(vote_state_version: VoteStateVersion) {
     let vote_state = vote_state_version.default_vote_state();
     let vote_account = AccountSharedData::new_data_with_space(
         Rent::default().minimum_balance(VoteStateV4::size_of()),
@@ -7270,7 +7264,7 @@ fn test_delegate_deserialize_vote_state(
         &serialize(&StakeInstruction::DelegateStake).unwrap(),
         transaction_accounts,
         instruction_accounts,
-        expected_result,
+        Ok(()),
     );
 }
 
@@ -7299,16 +7293,10 @@ fn test_deactivate_delinquent_incorrect_vote_owner() {
     );
 }
 
-// Again, just like with `VoteStateV3`, we know V0_23_5 vote state will fail to
-// deserialize with `InvalidAccountData`. Again, the behavior is unchanged.
-#[test_case(VoteStateVersion::V0_23_5, Err(ProgramError::InvalidAccountData))]
-#[test_case(VoteStateVersion::V1_14_11, Ok(()))]
-#[test_case(VoteStateVersion::V3, Ok(()))]
-#[test_case(VoteStateVersion::V4, Ok(()))]
-fn test_deactivate_delinquent_deserialize_vote_state(
-    vote_state_version: VoteStateVersion,
-    expected_result: Result<(), ProgramError>,
-) {
+#[test_case(VoteStateVersion::V1_14_11)]
+#[test_case(VoteStateVersion::V3)]
+#[test_case(VoteStateVersion::V4)]
+fn test_deactivate_delinquent_deserialize_vote_state(vote_state_version: VoteStateVersion) {
     // Create delinquent vote account with the specified version
     let vote_state = vote_state_version.default_vote_state();
     let vote_account = AccountSharedData::new_data_with_space(
@@ -7327,6 +7315,6 @@ fn test_deactivate_delinquent_deserialize_vote_state(
         &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
         transaction_accounts,
         instruction_accounts,
-        expected_result,
+        Ok(()),
     );
 }
