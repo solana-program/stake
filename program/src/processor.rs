@@ -462,6 +462,7 @@ impl Processor {
                 } else if clock.epoch == stake.delegation.deactivation_epoch
                     && stake.delegation.voter_pubkey == *vote_account_info.key
                 {
+                    // This is a deactivation rescind attempt. Ensure stake is fully backed.
                     if stake_amount < stake.delegation.stake {
                         return Err(StakeError::InsufficientDelegation.into());
                     }
