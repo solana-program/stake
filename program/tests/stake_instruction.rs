@@ -3,7 +3,7 @@
 use {
     agave_feature_set::stake_raise_minimum_delegation_to_1_sol,
     assert_matches::assert_matches,
-    bincode::serialize,
+    bincode::{deserialize, serialize},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{
         create_account_shared_data_for_test, state_traits::StateMut, AccountSharedData,
@@ -4145,6 +4145,391 @@ fn test_withdraw_minimum_stake_delegation() {
             );
         }
     }
+}
+
+#[test]
+fn test_rescind_blocked_when_underfunded() {
+    let mollusk = mollusk_bpf();
+
+    let stake_address = Pubkey::new_unique();
+    let vote_address = Pubkey::new_unique();
+    let recipient_address = Pubkey::new_unique();
+    let delegated_lamports = get_minimum_delegation() * 100;
+
+    let mut tx_accts = vec![
+        (
+            stake_address,
+            AccountSharedData::new_data_with_space(
+                delegated_lamports,
+                &StakeStateV2::Uninitialized,
+                StakeStateV2::size_of(),
+                &id(),
+            )
+            .unwrap(),
+        ),
+        (vote_address, create_default_vote_account()),
+        (
+            recipient_address,
+            AccountSharedData::new(0, 0, &system_program::id()),
+        ),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (
+            rent::id(),
+            create_account_shared_data_for_test(&Rent::free()),
+        ),
+        (
+            StakeHistory::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+        #[allow(deprecated)]
+        (
+            stake_config::id(),
+            config::create_account(0, &stake_config::Config::default()),
+        ),
+    ];
+
+    // Initialize stake
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Initialize(
+            Authorized::auto(&stake_address),
+            Lockup::default(),
+        ))
+        .unwrap(),
+        tx_accts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: rent::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // E1: Delegate
+    tx_accts[3] = (
+        clock::id(),
+        create_account_shared_data_for_test(&Clock {
+            epoch: 1,
+            ..Clock::default()
+        }),
+    );
+    let delegate_ix_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: StakeHistory::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        #[allow(deprecated)]
+        AccountMeta {
+            pubkey: stake_config::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        tx_accts.clone(),
+        delegate_ix_accounts.clone(),
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+    let delegation_history = stake_from(&accounts[0]).unwrap().delegation;
+
+    // E2: Throttle so we have some activating > 0 (and effective > 0)
+    tx_accts[3] = (
+        clock::id(),
+        create_account_shared_data_for_test(&Clock {
+            epoch: 2,
+            ..Clock::default()
+        }),
+    );
+    let throttled_history = create_stake_history_from_delegations(
+        None,
+        0..2, // covers epochs [0, 1]
+        &[delegation_history],
+        Some(0),
+    );
+    tx_accts[5] = (
+        StakeHistory::id(),
+        create_account_shared_data_for_test(&throttled_history),
+    );
+
+    // E2: Deactivate
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        tx_accts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // Compute the currently effective stake at E2, then withdraw the "activating" portion
+    // to underfund the account (lamports < delegation.stake)
+    let sh_acc = &tx_accts[5].1;
+    let stake_history: StakeHistory = deserialize(sh_acc.data()).unwrap();
+    let effective_stake = delegation_history.stake(2, &stake_history, Some(0));
+    let withdraw_amount = delegated_lamports - effective_stake;
+    assert!(withdraw_amount > 0);
+
+    // E2: Withdraw the activating portion
+    let withdraw_ix_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: recipient_address,
+            is_signer: false,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: StakeHistory::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: false,
+        },
+    ];
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Withdraw(withdraw_amount)).unwrap(),
+        tx_accts.clone(),
+        withdraw_ix_accounts,
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // E2: Attempt to rescind (same voter) while underfunded
+    process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        tx_accts.clone(),
+        delegate_ix_accounts,
+        Err(StakeError::InsufficientDelegation.into()),
+    );
+}
+
+#[test]
+fn test_rescind_succeeds_when_fully_backed() {
+    // Verify that a deactivation can be successfully rescinded if the account
+    // is fully funded
+    let mollusk = mollusk_bpf();
+
+    let stake_address = Pubkey::new_unique();
+    let vote_address = Pubkey::new_unique();
+
+    let rent_sys = Rent::default();
+    let rent_exempt_reserve = rent_sys.minimum_balance(StakeStateV2::size_of());
+
+    let delegated = get_minimum_delegation() * 100;
+    let starting_lamports = delegated + rent_exempt_reserve;
+
+    let mut tx_accts = vec![
+        (
+            stake_address,
+            AccountSharedData::new_data_with_space(
+                starting_lamports,
+                &StakeStateV2::Uninitialized,
+                StakeStateV2::size_of(),
+                &id(),
+            )
+            .unwrap(),
+        ),
+        (vote_address, create_default_vote_account()),
+        (
+            clock::id(),
+            create_account_shared_data_for_test(&Clock::default()),
+        ),
+        (rent::id(), create_account_shared_data_for_test(&rent_sys)),
+        (
+            StakeHistory::id(),
+            create_account_shared_data_for_test(&StakeHistory::default()),
+        ),
+        #[allow(deprecated)]
+        (
+            stake_config::id(),
+            config::create_account(0, &stake_config::Config::default()),
+        ),
+    ];
+
+    // Initialize stake
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Initialize(
+            Authorized::auto(&stake_address),
+            Lockup::default(),
+        ))
+        .unwrap(),
+        tx_accts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: rent::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // E1: Delegate
+    tx_accts[2] = (
+        clock::id(),
+        create_account_shared_data_for_test(&Clock {
+            epoch: 1,
+            ..Clock::default()
+        }),
+    );
+    let delegate_ix_accounts = vec![
+        AccountMeta {
+            pubkey: stake_address,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: vote_address,
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: clock::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        AccountMeta {
+            pubkey: StakeHistory::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+        #[allow(deprecated)]
+        AccountMeta {
+            pubkey: stake_config::id(),
+            is_signer: false,
+            is_writable: false,
+        },
+    ];
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        tx_accts.clone(),
+        delegate_ix_accounts.clone(),
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // E2: Keep stake active (effective > 0). Add a very large "effective" entry
+    // for E1 so by E2 the account is certainly active.
+    tx_accts[2] = (
+        clock::id(),
+        create_account_shared_data_for_test(&Clock {
+            epoch: 2,
+            ..Clock::default()
+        }),
+    );
+    let mut stake_hist = StakeHistory::default();
+    stake_hist.add(
+        1,
+        StakeHistoryEntry {
+            effective: 1_000_000_000_000, // ensures active going into E2
+            activating: delegated,
+            deactivating: 0,
+        },
+    );
+    tx_accts[4] = (
+        StakeHistory::id(),
+        create_account_shared_data_for_test(&stake_hist),
+    );
+
+    // E2: Deactivate
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::Deactivate).unwrap(),
+        tx_accts.clone(),
+        vec![
+            AccountMeta {
+                pubkey: stake_address,
+                is_signer: true,
+                is_writable: true,
+            },
+            AccountMeta {
+                pubkey: clock::id(),
+                is_signer: false,
+                is_writable: false,
+            },
+        ],
+        Ok(()),
+    );
+    tx_accts[0] = (stake_address, accounts[0].clone());
+
+    // Still E2: Without withdrawing (lamports - rent == delegated), attempt to rescind
+    let accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DelegateStake).unwrap(),
+        tx_accts.clone(),
+        delegate_ix_accounts,
+        Ok(()),
+    );
+
+    // Rescind keeps the original activation_epoch (E1) and clears deactivation_epoch
+    let final_stake = stake_from(&accounts[0]).unwrap();
+    assert_eq!(final_stake.delegation.deactivation_epoch, u64::MAX);
+    assert_eq!(final_stake.delegation.activation_epoch, 1);
+    assert_eq!(final_stake.delegation.stake, delegated);
+    assert_eq!(final_stake.delegation.voter_pubkey, vote_address);
+    assert_eq!(accounts[0].lamports(), starting_lamports);
 }
 
 /// The stake program's old behavior allowed delegations below the minimum stake delegation
