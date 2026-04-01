@@ -10,8 +10,8 @@ use {
     solana_program_test::*,
     solana_pubkey::Pubkey,
     solana_rent::Rent,
-    solana_sdk_ids::system_program,
-    solana_signer::Signer,
+    solana_sdk_ids::{system_program, sysvar},
+    solana_signer::{signers::Signers, Signer},
     solana_stake_interface::{
         error::StakeError,
         instruction::{self as ixn, LockupArgs},
@@ -20,7 +20,7 @@ use {
         state::{Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize, StakeStateV2},
     },
     solana_system_interface::instruction as system_instruction,
-    solana_transaction::{Signers, Transaction, TransactionError},
+    solana_transaction::{Transaction, TransactionError},
     solana_vote_interface::{
         instruction as vote_instruction,
         state::{VoteInit, VoteStateV4},
@@ -192,7 +192,8 @@ pub async fn get_stake_account_rent(banks_client: &mut BanksClient) -> u64 {
 
 pub async fn get_effective_stake(banks_client: &mut BanksClient, pubkey: &Pubkey) -> u64 {
     let clock = banks_client.get_sysvar::<Clock>().await.unwrap();
-    let stake_history = banks_client.get_sysvar::<StakeHistory>().await.unwrap();
+    let stake_history_account = get_account(banks_client, &sysvar::stake_history::id()).await;
+    let stake_history = bincode::deserialize::<StakeHistory>(&stake_history_account.data).unwrap();
     let stake_account = get_account(banks_client, pubkey).await;
     match bincode::deserialize::<StakeStateV2>(&stake_account.data).unwrap() {
         StakeStateV2::Stake(_, stake, _) => {

@@ -6,10 +6,10 @@ use {
     bincode::{deserialize, serialize},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{
-        create_account_shared_data_for_test, state_traits::StateMut, AccountSharedData,
+        create_account_shared_data_for_test, state_traits::StateMut, Account, AccountSharedData,
         ReadableAccount, WritableAccount,
     },
-    solana_clock::{Clock, Epoch},
+    solana_clock::{Clock, Epoch, INITIAL_RENT_EPOCH},
     solana_epoch_rewards::EpochRewards,
     solana_epoch_schedule::EpochSchedule,
     solana_instruction::{AccountMeta, Instruction},
@@ -148,7 +148,7 @@ fn get_default_transaction_accounts(instruction: &Instruction) -> Vec<(Pubkey, A
                 } else if rewards::check_id(pubkey) {
                     create_account_shared_data_for_test(&rewards::Rewards::new(0.0))
                 } else if StakeHistory::check_id(pubkey) {
-                    create_account_shared_data_for_test(&StakeHistory::default())
+                    create_stake_history_account(&StakeHistory::default())
                 } else if stake_config::check_id(pubkey) {
                     config::create_account(0, &stake_config::Config::default())
                 } else if epoch_schedule::check_id(pubkey) {
@@ -247,6 +247,14 @@ fn get_active_stake_for_tests(
 
 fn create_empty_stake_history_for_test() -> AccountSharedData {
     AccountSharedData::create(1, vec![0; 8], solana_sdk_ids::sysvar::id(), false, u64::MAX)
+}
+
+fn create_stake_history_account(stake_history: &StakeHistory) -> AccountSharedData {
+    let data_len = bincode::serialized_size(stake_history).unwrap() as usize;
+    let mut account = Account::new(1, data_len, &solana_sdk_ids::sysvar::id());
+    bincode::serialize_into(&mut account.data[..], stake_history).unwrap();
+    account.rent_epoch = INITIAL_RENT_EPOCH;
+    AccountSharedData::from(account)
 }
 
 fn new_stake_history_entry<'a, I>(
@@ -497,7 +505,7 @@ fn test_stake_process_instruction_decode_bail() {
     let rent = Rent::default();
     let rent_account = create_account_shared_data_for_test(&rent);
     let stake_history_address = StakeHistory::id();
-    let stake_history_account = create_account_shared_data_for_test(&StakeHistory::default());
+    let stake_history_account = create_stake_history_account(&StakeHistory::default());
     let vote_address = Pubkey::new_unique();
     let vote_account = AccountSharedData::new(0, 0, &solana_sdk_ids::vote::id());
     let clock_address = clock::id();
@@ -1171,7 +1179,7 @@ fn test_authorize() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             epoch_schedule::id(),
@@ -1601,7 +1609,7 @@ fn test_authorize_delegated_stake() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             stake_config::id(),
@@ -2240,7 +2248,7 @@ fn test_split() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&stake_history),
+            create_stake_history_account(&stake_history),
         ),
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (
@@ -2389,7 +2397,7 @@ fn test_withdraw_stake() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             stake_config::id(),
@@ -2682,7 +2690,7 @@ fn test_withdraw_stake_before_warmup() {
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             stake_config::id(),
@@ -2767,7 +2775,7 @@ fn test_withdraw_stake_before_warmup() {
     );
     transaction_accounts[4] = (
         StakeHistory::id(),
-        create_account_shared_data_for_test(&stake_history),
+        create_stake_history_account(&stake_history),
     );
     clock.epoch = 0;
     transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
@@ -2814,7 +2822,7 @@ fn test_withdraw_lockup() {
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             epoch_schedule::id(),
@@ -2939,7 +2947,7 @@ fn test_withdraw_rent_exempt() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             epoch_schedule::id(),
@@ -3030,7 +3038,7 @@ fn test_deactivate() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             stake_config::id(),
@@ -3171,7 +3179,7 @@ fn test_set_lockup() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         (
             stake_config::id(),
@@ -3547,7 +3555,7 @@ fn test_delegate_minimum_stake_delegation() {
                     ),
                     (
                         StakeHistory::id(),
-                        create_account_shared_data_for_test(&StakeHistory::default()),
+                        create_stake_history_account(&StakeHistory::default()),
                     ),
                     (
                         stake_config::id(),
@@ -3660,7 +3668,7 @@ fn test_split_minimum_stake_delegation() {
                 (rent::id(), create_account_shared_data_for_test(&rent)),
                 (
                     StakeHistory::id(),
-                    create_account_shared_data_for_test(&stake_history),
+                    create_stake_history_account(&stake_history),
                 ),
                 (clock::id(), create_account_shared_data_for_test(&clock)),
                 (
@@ -3758,7 +3766,7 @@ fn test_split_full_amount_minimum_stake_delegation() {
                     (rent::id(), create_account_shared_data_for_test(&rent)),
                     (
                         StakeHistory::id(),
-                        create_account_shared_data_for_test(&stake_history),
+                        create_stake_history_account(&stake_history),
                     ),
                     (clock::id(), create_account_shared_data_for_test(&clock)),
                     (
@@ -4129,7 +4137,7 @@ fn test_withdraw_minimum_stake_delegation() {
                     ),
                     (
                         StakeHistory::id(),
-                        create_account_shared_data_for_test(&StakeHistory::default()),
+                        create_stake_history_account(&StakeHistory::default()),
                     ),
                     (
                         stake_config::id(),
@@ -4182,7 +4190,7 @@ fn test_rescind_blocked_when_underfunded() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         #[allow(deprecated)]
         (
@@ -4278,7 +4286,7 @@ fn test_rescind_blocked_when_underfunded() {
     );
     tx_accts[5] = (
         StakeHistory::id(),
-        create_account_shared_data_for_test(&throttled_history),
+        create_stake_history_account(&throttled_history),
     );
 
     // E2: Deactivate
@@ -4391,7 +4399,7 @@ fn test_rescind_succeeds_when_fully_backed() {
         (rent::id(), create_account_shared_data_for_test(&rent_sys)),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
         #[allow(deprecated)]
         (
@@ -4490,7 +4498,7 @@ fn test_rescind_succeeds_when_fully_backed() {
     );
     tx_accts[4] = (
         StakeHistory::id(),
-        create_account_shared_data_for_test(&stake_hist),
+        create_stake_history_account(&stake_hist),
     );
 
     // E2: Deactivate
@@ -4918,7 +4926,7 @@ fn test_split_more_than_staked() {
         (rent::id(), create_account_shared_data_for_test(&rent)),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&stake_history),
+            create_stake_history_account(&stake_history),
         ),
         (
             clock::id(),
@@ -5021,7 +5029,7 @@ fn test_split_with_rent() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
@@ -5489,7 +5497,7 @@ fn test_split_from_smaller_sized_account() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (
                 clock::id(),
@@ -5588,7 +5596,7 @@ fn test_split_100_percent_of_source() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
@@ -5715,7 +5723,7 @@ fn test_split_100_percent_of_source_to_account_with_lamports() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
@@ -5824,7 +5832,7 @@ fn test_split_rent_exemptness() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (clock::id(), create_account_shared_data_for_test(&clock)),
             (
@@ -5867,7 +5875,7 @@ fn test_split_rent_exemptness() {
             (rent::id(), create_account_shared_data_for_test(&rent)),
             (
                 StakeHistory::id(),
-                create_account_shared_data_for_test(&stake_history),
+                create_stake_history_account(&stake_history),
             ),
             (
                 clock::id(),
@@ -6201,7 +6209,7 @@ fn test_merge() {
                 ),
                 (
                     StakeHistory::id(),
-                    create_account_shared_data_for_test(&StakeHistory::default()),
+                    create_stake_history_account(&StakeHistory::default()),
                 ),
                 (
                     epoch_schedule::id(),
@@ -6306,7 +6314,7 @@ fn test_merge_self_fails() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
     ];
     let instruction_accounts = vec![
@@ -6416,7 +6424,7 @@ fn test_merge_incorrect_authorized_staker() {
                 ),
                 (
                     StakeHistory::id(),
-                    create_account_shared_data_for_test(&StakeHistory::default()),
+                    create_stake_history_account(&StakeHistory::default()),
                 ),
                 (
                     epoch_schedule::id(),
@@ -6512,7 +6520,7 @@ fn test_merge_invalid_account_data() {
                 ),
                 (
                     StakeHistory::id(),
-                    create_account_shared_data_for_test(&StakeHistory::default()),
+                    create_stake_history_account(&StakeHistory::default()),
                 ),
                 (
                     epoch_schedule::id(),
@@ -6563,7 +6571,7 @@ fn test_merge_fake_stake_source() {
         ),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&StakeHistory::default()),
+            create_stake_history_account(&StakeHistory::default()),
         ),
     ];
     let instruction_accounts = vec![
@@ -6672,7 +6680,7 @@ fn test_merge_active_stake() {
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&stake_history),
+            create_stake_history_account(&stake_history),
         ),
         (
             epoch_schedule::id(),
@@ -6763,7 +6771,7 @@ fn test_merge_active_stake() {
         transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
         transaction_accounts[4] = (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&stake_history),
+            create_stake_history_account(&stake_history),
         );
         if stake_amount == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
             && merge_from_amount
@@ -6847,7 +6855,7 @@ fn test_merge_active_stake() {
         transaction_accounts[3] = (clock::id(), create_account_shared_data_for_test(&clock));
         transaction_accounts[4] = (
             StakeHistory::id(),
-            create_account_shared_data_for_test(&stake_history),
+            create_stake_history_account(&stake_history),
         );
         if 0 == stake.stake(clock.epoch, &stake_history, new_warmup_cooldown_rate_epoch)
             && 0 == merge_from_stake.stake(
@@ -7047,7 +7055,7 @@ fn test_deactivate_delinquent() {
                     ),
                     (
                         StakeHistory::id(),
-                        create_account_shared_data_for_test(&StakeHistory::default()),
+                        create_stake_history_account(&StakeHistory::default()),
                     ),
                 ],
                 vec![
