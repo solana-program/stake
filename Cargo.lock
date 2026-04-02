@@ -3036,7 +3036,7 @@ dependencies = [
  "bincode",
  "mollusk-svm-error",
  "mollusk-svm-keys",
- "mollusk-svm-result",
+ "mollusk-svm-result 0.7.2",
  "solana-account 3.2.0",
  "solana-bpf-loader-program",
  "solana-clock",
@@ -3102,6 +3102,20 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey 3.0.0",
  "solana-rent 3.0.0",
+]
+
+[[package]]
+name = "mollusk-svm-result"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92376062d0cad8a3b28f86e57b58c8949302aa6eaed518f584fdfc2f75d8face"
+dependencies = [
+ "solana-account 3.2.0",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.1.0",
+ "solana-rent 3.0.0",
+ "solana-transaction-error",
 ]
 
 [[package]]
@@ -6844,7 +6858,7 @@ dependencies = [
  "assert_matches",
  "bincode",
  "mollusk-svm",
- "mollusk-svm-result",
+ "mollusk-svm-result 0.12.0",
  "proptest",
  "rand 0.10.0",
  "solana-account 3.2.0",
