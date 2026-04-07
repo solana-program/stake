@@ -158,6 +158,7 @@ impl StakeState {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 #[allow(clippy::large_enum_variant)]
 pub enum StakeStateV2 {
     #[default]
@@ -282,11 +283,13 @@ impl StakeStateV2 {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,
 }
 
+#[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -299,6 +302,7 @@ pub enum StakeAuthorize {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Lockup {
     /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
@@ -319,6 +323,7 @@ impl Lockup {
     }
 }
 
+#[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -331,6 +336,7 @@ impl Lockup {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Authorized {
     pub staker: Pubkey,
     pub withdrawer: Pubkey,
@@ -402,6 +408,7 @@ impl Authorized {
     }
 }
 
+#[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -414,6 +421,7 @@ impl Authorized {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Meta {
     #[deprecated(
         since = "3.0.1",
@@ -462,6 +470,7 @@ impl Meta {
     }
 }
 
+#[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -474,6 +483,7 @@ impl Meta {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Delegation {
     /// to whom the stake is delegated
     pub voter_pubkey: Pubkey,
@@ -702,6 +712,7 @@ impl Delegation {
     }
 }
 
+#[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
@@ -714,6 +725,7 @@ impl Delegation {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Stake {
     pub delegation: Delegation,
     /// credits observed is credits from vote account state when delegated or redeemed
