@@ -14,8 +14,11 @@ Historically, the Stake Program was built into the Agave validator client as a p
 
 ## Security Audits
 
-The BPF Stake Program has received one external audit:
+The BPF Stake Program has received two external audits:
 
+* Neodyme (2026-04-01)
+    - Review commit hash [`6ed2c60`](https://github.com/solana-program/stake/commit/6ed2c60c7e665e145fb54b272f87092c1791ca3c)
+    - Final report <https://github.com/anza-xyz/security-audits/blob/master/core-bpf/NeodymeStakeProgramAudit-2026-04-10.pdf>
 * Zellic (2025-03-12)
     - Review commit hash [`5ec49ccb`](https://github.com/solana-program/stake/commit/5ec49ccb08c3e588940a2038c99efc7acf563b4a)
     - Final report <https://github.com/anza-xyz/security-audits/blob/master/core-bpf/ZellicStakeProgramAudit-2025-03-12.pdf>
@@ -41,8 +44,6 @@ with:
 ```console
 solana-verify build --library-name solana_stake_program
 ```
-
-It is possible for a solana-verify version mismatch to affect the hash; [BPF Stake Program 1.0.0](https://github.com/solana-program/stake/releases/tag/program%40v1.0.0) was built with solana-verify 0.4.6.
 
 ## Interface
 
