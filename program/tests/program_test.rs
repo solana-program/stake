@@ -43,7 +43,10 @@ pub fn program_test_without_features(feature_ids: &[Pubkey]) -> ProgramTest {
         program_test.deactivate_feature(*feature_id);
     }
 
-    program_test.add_upgradeable_program_to_genesis("solana_stake_program", &id());
+    // `solana-program-test` now seeds Stake111... with a vendored Core BPF stake program.
+    // Load our local `.so` through the late account-override path so the integration tests
+    // execute this repo's program instead of Agave's bundled one.
+    program_test.add_program("solana_stake_program", id(), None);
 
     program_test
 }
