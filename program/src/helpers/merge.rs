@@ -307,13 +307,15 @@ mod tests {
         );
 
         let mismatched_rent_exempt_reserve_ok = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve: 42,
             ..Meta::default()
         };
-        assert_ne!(
-            mismatched_rent_exempt_reserve_ok.rent_exempt_reserve,
-            Meta::default().rent_exempt_reserve,
-        );
+        #[allow(deprecated)]
+        let mismatched_rent_exempt_reserve = mismatched_rent_exempt_reserve_ok.rent_exempt_reserve;
+        #[allow(deprecated)]
+        let default_rent_exempt_reserve = Meta::default().rent_exempt_reserve;
+        assert_ne!(mismatched_rent_exempt_reserve, default_rent_exempt_reserve,);
         assert!(MergeKind::metas_can_merge(
             &Meta::default(),
             &mismatched_rent_exempt_reserve_ok,
@@ -428,6 +430,7 @@ mod tests {
         let new_rate_activation_epoch = Some(0);
 
         let meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::auto(&authority_pubkey)
         };
@@ -658,6 +661,7 @@ mod tests {
         let activating_stake = 4242;
         let inactive_total_lamports = 424242;
         let meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::default()
         };
@@ -742,6 +746,7 @@ mod tests {
         let credits_a = 124_521_000u64;
         let rent_exempt_reserve = 227_000_000u64;
         let meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::default()
         };
@@ -858,6 +863,7 @@ mod tests {
         let credits_b = 100_000_000u64;
         let rent_exempt_reserve = 227_000_000u64;
         let meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::default()
         };
