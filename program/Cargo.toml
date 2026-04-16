@@ -20,7 +20,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = "4.2.0"
 solana-rent = "3.0.0"
 solana-security-txt = "1.1.2"
-solana-stake-interface = { version = "2", features = ["bincode", "borsh", "sysvar"] }
+solana-stake-interface = { path = "../interface", version = "3.1.0", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "3.0.0"
 solana-sysvar-id = "3.1.0"
 solana-vote-interface = { version = "5.0.0", features = ["bincode"] }
@@ -45,6 +45,9 @@ solana-pubkey = { version = "4.2.0", features = ["rand"] }
 solana-sdk-ids = "3.1.0"
 solana-signature = "3.4.0"
 solana-signer = "3.0.0"
+# TODO: Remove after agave/mollusk/stake-program depend on aligned StakeHistory version
+#       Either solana-stake-interface v3 or new solana-stake-history crate
+solana-stake-interface-v2 = { package = "solana-stake-interface", version = "2.0.1" }
 solana-svm-log-collector = "3.0.0"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-transaction = "3.0.2"

@@ -7120,7 +7120,6 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6f912ae679b683365348dea482dbd9468d22ff258b554fd36e3d3683c2122e3"
 dependencies = [
- "borsh",
  "num-traits",
  "serde",
  "serde_derive",
@@ -7205,6 +7204,7 @@ dependencies = [
  "solana-signature",
  "solana-signer",
  "solana-stake-interface 2.0.1",
+ "solana-stake-interface 3.1.0",
  "solana-svm-log-collector",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",

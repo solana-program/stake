@@ -16,12 +16,13 @@ use {
     solana_stake_interface::{
         instruction::{self, LockupArgs},
         stake_flags::StakeFlags,
-        stake_history::{StakeHistory, StakeHistoryEntry},
+        stake_history::StakeHistory,
         state::{
             warmup_cooldown_rate, Authorized, Delegation, Lockup, Meta, Stake, StakeAuthorize,
             StakeStateV2, NEW_WARMUP_COOLDOWN_RATE,
         },
     },
+    solana_stake_interface_v2::stake_history::StakeHistoryEntry as MolluskStakeHistoryEntry,
     solana_stake_program::{get_minimum_delegation, id},
     solana_svm_log_collector::LogCollector,
     solana_sysvar_id::SysvarId,
@@ -166,7 +167,7 @@ impl Env {
         for epoch in 0..EXECUTION_EPOCH {
             mollusk.sysvars.stake_history.add(
                 epoch,
-                StakeHistoryEntry {
+                MolluskStakeHistoryEntry {
                     effective: PERSISTENT_ACTIVE_STAKE,
                     activating: stake_delta_amount,
                     deactivating: stake_delta_amount,
@@ -943,6 +944,7 @@ fn fully_configurable_stake(
     };
 
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
         authorized,
         lockup,
@@ -1232,7 +1234,9 @@ fn test_all_success_non_default_rent(lamports_per_byte_year: u64) {
 
             match account.deserialize_data::<StakeStateV2>().unwrap() {
                 StakeStateV2::Initialized(meta) | StakeStateV2::Stake(meta, _, _) => {
-                    assert_eq!(meta.rent_exempt_reserve, PSEUDO_RENT_EXEMPT_RESERVE)
+                    #[allow(deprecated)]
+                    let rent_exempt_reserve = meta.rent_exempt_reserve;
+                    assert_eq!(rent_exempt_reserve, PSEUDO_RENT_EXEMPT_RESERVE)
                 }
                 StakeStateV2::Uninitialized => (),
                 StakeStateV2::RewardsPool => unreachable!(),

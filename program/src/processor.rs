@@ -147,6 +147,7 @@ fn do_initialize(
             let stake_state = StakeStateV2::Initialized(Meta {
                 authorized,
                 lockup,
+                #[allow(deprecated)]
                 rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
             });
 
@@ -544,8 +545,11 @@ impl Processor {
                 let is_active_or_activating =
                     source_status.effective > 0 || source_status.activating > 0;
 
-                let mut dest_meta = source_meta;
-                dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
+                let dest_meta = Meta {
+                    #[allow(deprecated)]
+                    rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
+                    ..source_meta
+                };
 
                 (is_active_or_activating, Some(dest_meta))
             }
@@ -555,8 +559,11 @@ impl Processor {
                     .check(&signers, StakeAuthorize::Staker)
                     .map_err(to_program_error)?;
 
-                let mut dest_meta = source_meta;
-                dest_meta.rent_exempt_reserve = PSEUDO_RENT_EXEMPT_RESERVE;
+                let dest_meta = Meta {
+                    #[allow(deprecated)]
+                    rent_exempt_reserve: PSEUDO_RENT_EXEMPT_RESERVE,
+                    ..source_meta
+                };
 
                 (false, Some(dest_meta))
             }

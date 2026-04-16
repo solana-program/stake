@@ -1098,6 +1098,7 @@ fn test_stake_initialize() {
         from(&accounts[0]).unwrap(),
         StakeStateV2::Initialized(Meta {
             authorized: Authorized::auto(&stake_address),
+            #[allow(deprecated)]
             rent_exempt_reserve,
             lockup,
         }),
@@ -2031,6 +2032,7 @@ fn test_redelegate_consider_balance_changes() {
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
         &StakeStateV2::Initialized(Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::auto(&authority_address)
         }),
@@ -2270,6 +2272,7 @@ fn test_split() {
     ];
 
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve: default_stake_rent(),
         ..Meta::auto(&stake_address)
     };
@@ -2620,6 +2623,7 @@ fn test_withdraw_stake() {
     let stake_account = AccountSharedData::new_data_with_space(
         1_000_000_000,
         &StakeStateV2::Initialized(Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             authorized: Authorized {
                 staker: authority_address,
@@ -2930,6 +2934,7 @@ fn test_withdraw_rent_exempt() {
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports + rent_exempt_reserve,
         &StakeStateV2::Initialized(Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::auto(&stake_address)
         }),
@@ -3491,6 +3496,7 @@ fn test_delegate_minimum_stake_delegation() {
     let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&stake_address)
     };
@@ -3598,6 +3604,7 @@ fn test_split_minimum_stake_delegation() {
     };
     let source_address = Pubkey::new_unique();
     let source_meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&source_address)
     };
@@ -3708,6 +3715,7 @@ fn test_split_full_amount_minimum_stake_delegation() {
     };
     let source_address = Pubkey::new_unique();
     let source_meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&source_address)
     };
@@ -3844,6 +3852,7 @@ fn test_initialized_split_destination_minimum_balance() {
         // balance meets all the requirements
         let source_balance = rent_exempt_reserve + split_amount;
         let source_meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::auto(&source_address)
         };
@@ -3987,6 +3996,7 @@ fn test_staked_split_destination_minimum_balance() {
         // balance meets all the requirements
         let source_balance = rent_exempt_reserve + minimum_delegation + split_amount;
         let source_meta = Meta {
+            #[allow(deprecated)]
             rent_exempt_reserve,
             ..Meta::auto(&source_address)
         };
@@ -4067,6 +4077,7 @@ fn test_withdraw_minimum_stake_delegation() {
     let rent_exempt_reserve = default_stake_rent();
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&stake_address)
     };
@@ -4903,6 +4914,7 @@ fn test_split_more_than_staked() {
         stake_lamports,
         &just_stake(
             Meta {
+                #[allow(deprecated)]
                 rent_exempt_reserve,
                 ..Meta::auto(&stake_address)
             },
@@ -4998,6 +5010,7 @@ fn test_split_with_rent() {
     ];
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5111,6 +5124,7 @@ fn test_split_to_account_with_rent_exempt_reserve() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5286,6 +5300,7 @@ fn test_split_from_larger_sized_account() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve: source_larger_rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5394,6 +5409,7 @@ fn test_split_from_larger_sized_account() {
         if let StakeStateV2::Stake(meta, stake, stake_flags) = state {
             let expected_split_meta = Meta {
                 authorized: Authorized::auto(&stake_address),
+                #[allow(deprecated)]
                 rent_exempt_reserve: split_rent_exempt_reserve,
                 ..Meta::default()
             };
@@ -5451,6 +5467,7 @@ fn test_split_from_smaller_sized_account() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve: source_smaller_rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5549,6 +5566,7 @@ fn test_split_100_percent_of_source() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5669,6 +5687,7 @@ fn test_split_100_percent_of_source_to_account_with_lamports() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5790,6 +5809,7 @@ fn test_split_rent_exemptness() {
     let stake_address = solana_pubkey::new_rand();
     let meta = Meta {
         authorized: Authorized::auto(&stake_address),
+        #[allow(deprecated)]
         rent_exempt_reserve: source_rent_exempt_reserve,
         ..Meta::default()
     };
@@ -5904,6 +5924,7 @@ fn test_split_rent_exemptness() {
 
         let expected_split_meta = Meta {
             authorized: Authorized::auto(&stake_address),
+            #[allow(deprecated)]
             rent_exempt_reserve: split_rent_exempt_reserve,
             ..Meta::default()
         };
@@ -5963,6 +5984,7 @@ fn test_split_require_rent_exempt_destination() {
     let destination_address = Pubkey::new_unique();
     let meta = Meta {
         authorized: Authorized::auto(&source_address),
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::default()
     };
@@ -6246,14 +6268,14 @@ fn test_merge() {
                     assert_eq!(accounts[0].state(), Ok(StakeStateV2::Initialized(*meta)),);
                 }
                 StakeStateV2::Stake(meta, stake, stake_flags) => {
+                    #[allow(deprecated)]
+                    let merge_from_rent_exempt_reserve =
+                        merge_from_state.meta().unwrap().rent_exempt_reserve;
                     let expected_stake = stake.delegation.stake
                         + merge_from_state
                             .stake()
                             .map(|stake| stake.delegation.stake)
-                            .unwrap_or_else(|| {
-                                stake_lamports
-                                    - merge_from_state.meta().unwrap().rent_exempt_reserve
-                            });
+                            .unwrap_or(stake_lamports - merge_from_rent_exempt_reserve);
                     assert_eq!(
                         accounts[0].state(),
                         Ok(StakeStateV2::Stake(
@@ -6287,6 +6309,7 @@ fn test_merge_self_fails() {
     let stake_amount = 4242424242;
     let stake_lamports = rent_exempt_reserve + stake_amount;
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&authorized_address)
     };
@@ -6626,6 +6649,7 @@ fn test_merge_active_stake() {
     let merge_from_amount = base_lamports;
     let merge_from_lamports = rent_exempt_reserve + merge_from_amount;
     let meta = Meta {
+        #[allow(deprecated)]
         rent_exempt_reserve,
         ..Meta::auto(&authorized_address)
     };
