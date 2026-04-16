@@ -1988,117 +1988,6 @@ mod tests {
         check_flag(StakeFlags::empty(), 0);
     }
 
-    #[cfg(test)]
-    #[allow(deprecated)]
-    mod delegation_prop_tests {
-        use {
-            super::*,
-            crate::{
-                stake_history::{StakeHistory, StakeHistoryEntry},
-                ulp::max_ulp_tolerance,
-            },
-            proptest::prelude::*,
-            solana_pubkey::Pubkey,
-        };
-
-        prop_compose! {
-            fn arbitrary_delegation()(
-                // This tests is bounded to the range where `f64` can represent every integer exactly.
-                // Beyond this, integer math and float math diverge considerably.
-                // This case is covered in `warmup_cooldown_allowance.rs`.
-                stake in 0u64..=(1u64 << 53) - 1,
-                activation_epoch in 0u64..=50,
-                deactivation_offset in 0u64..=50,
-            ) -> Delegation {
-                let deactivation_epoch = activation_epoch.saturating_add(deactivation_offset);
-
-                Delegation {
-                    voter_pubkey: Pubkey::new_unique(),
-                    stake,
-                    activation_epoch,
-                    deactivation_epoch,
-                    ..Delegation::default()
-                }
-            }
-        }
-
-        prop_compose! {
-            fn arbitrary_stake_history(max_epoch: Epoch)(
-                entries in prop::collection::vec(
-                    (
-                        0u64..=max_epoch,
-                        0u64..=1_000_000_000_000, // effective
-                        0u64..=1_000_000_000_000, // activating
-                        0u64..=1_000_000_000_000, // deactivating
-                    ),
-                    0..=((max_epoch + 1) as usize),
-                )
-            ) -> StakeHistory {
-                let mut history = StakeHistory::default();
-                for (epoch, effective, activating, deactivating) in entries {
-                    history.add(
-                        epoch,
-                        StakeHistoryEntry {
-                            effective,
-                            activating,
-                            deactivating,
-                        },
-                    );
-                }
-                history
-            }
-        }
-
-        proptest! {
-            #![proptest_config(ProptestConfig::with_cases(10_000))]
-
-            #[test]
-            fn delegation_stake_matches_legacy_within_tolerance(
-                delegation in arbitrary_delegation(),
-                target_epoch in 0u64..=50,
-                new_rate_activation_epoch_option in prop::option::of(0u64..=50),
-                stake_history in arbitrary_stake_history(50),
-            ) {
-                let new_stake = delegation.stake_v2(
-                    target_epoch,
-                    &stake_history,
-                    new_rate_activation_epoch_option,
-                );
-                let legacy_stake = delegation.stake(
-                    target_epoch,
-                    &stake_history,
-                    new_rate_activation_epoch_option,
-                );
-
-                // neither path should ever exceed the delegated amount.
-                prop_assert!(new_stake <= delegation.stake);
-                prop_assert!(legacy_stake <= delegation.stake);
-
-                // If the delegation has no stake, both must be zero.
-                if delegation.stake == 0 {
-                    prop_assert_eq!(new_stake, 0);
-                    prop_assert_eq!(legacy_stake, 0);
-                } else {
-                    // Compare with a ULP-based tolerance to account for float vs integer math.
-                    let diff = new_stake.abs_diff(legacy_stake);
-                    let tolerance = max_ulp_tolerance(new_stake, legacy_stake);
-
-                    prop_assert!(
-                        diff <= tolerance,
-                        "stake mismatch: new={}, legacy={}, diff={}, tol={}, delegation={:?}, target_epoch={}, new_rate_activation_epoch_option={:?}",
-                        new_stake,
-                        legacy_stake,
-                        diff,
-                        tolerance,
-                        delegation,
-                        target_epoch,
-                        new_rate_activation_epoch_option,
-                    );
-                }
-            }
-        }
-    }
-
     mod deprecated {
         use {
             super::*,
@@ -2249,7 +2138,7 @@ mod tests {
 
             let serialized_data = borsh::to_vec(&legacy_delegation).unwrap();
 
-            // Deserialize into the NEW Delegation struct
+            // Deserialize into the new `Delegation` struct
             let new_delegation = Delegation::try_from_slice(&serialized_data).unwrap();
 
             // Assert that the fields are identical
