@@ -13,6 +13,7 @@ use {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub enum StakeError {
     // 0
     /// Not enough credits to redeem.
