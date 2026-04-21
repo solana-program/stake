@@ -56,7 +56,7 @@ build-sbf-%:
 	cargo build-sbf --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
 
 build-wasm-%:
-	cargo $(nightly) build --target wasm32-unknown-unknown --manifest-path $(call make-path,$*)/Cargo.toml --all-features $(ARGS)
+	cargo $(nightly) build --target wasm32-unknown-unknown --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
 
 build-doc-%:
 	RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo $(nightly) doc --all-features --no-deps --manifest-path $(call make-path,$*)/Cargo.toml $(ARGS)
