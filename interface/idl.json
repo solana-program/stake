@@ -606,6 +606,7 @@
         "name": "epochRewardsActive"
       }
     ],
+    "events": [],
     "instructions": [
       {
         "accounts": [
