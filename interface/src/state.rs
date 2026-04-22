@@ -29,15 +29,18 @@ pub type StakeActivationStatus = StakeHistoryEntry;
 // Means that no more than RATE of current effective stake may be added or subtracted per
 // epoch.
 #[deprecated(
-    since = "3.1.0",
-    note = "Use ORIGINAL_WARMUP_COOLDOWN_RATE_BPS instead"
+    since = "3.2.0",
+    note = "Use `warmup_cooldown_allowance::ORIGINAL_WARMUP_COOLDOWN_RATE_BPS` instead"
 )]
 pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
-#[deprecated(since = "3.1.0", note = "Use TOWER_WARMUP_COOLDOWN_RATE_BPS instead")]
+#[deprecated(
+    since = "3.2.0",
+    note = "Use `warmup_cooldown_allowance::TOWER_WARMUP_COOLDOWN_RATE_BPS` instead"
+)]
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
 
-#[deprecated(since = "3.1.0", note = "Use warmup_cooldown_rate_bps() instead")]
+#[deprecated(since = "3.2.0", note = "Use warmup_cooldown_rate_bps() instead")]
 pub fn warmup_cooldown_rate(current_epoch: Epoch, new_rate_activation_epoch: Option<Epoch>) -> f64 {
     if current_epoch < new_rate_activation_epoch.unwrap_or(u64::MAX) {
         DEFAULT_WARMUP_COOLDOWN_RATE
@@ -534,7 +537,7 @@ impl Delegation {
 
     /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
     /// rate-limiting. New `stake_v2()` uses integers (upstream eBPF-compatible).
-    #[deprecated(since = "3.1.0", note = "Use stake_v2() instead")]
+    #[deprecated(since = "3.2.0", note = "Use stake_v2() instead")]
     pub fn stake<T: StakeHistoryGetEntry>(
         &self,
         epoch: Epoch,
@@ -548,7 +551,7 @@ impl Delegation {
     /// Previous implementation that uses floats under the hood to calculate warmup/cooldown
     /// rate-limiting. New `stake_activating_and_deactivating_v2()` uses integers (upstream eBPF-compatible).
     #[deprecated(
-        since = "3.1.0",
+        since = "3.2.0",
         note = "Use stake_activating_and_deactivating_v2() instead"
     )]
     pub fn stake_activating_and_deactivating<T: StakeHistoryGetEntry>(
@@ -638,7 +641,7 @@ impl Delegation {
     }
 
     // returned tuple is (effective, activating) stake
-    #[deprecated(since = "3.1.0", note = "Use stake_and_activating_v2() instead")]
+    #[deprecated(since = "3.2.0", note = "Use stake_and_activating_v2() instead")]
     fn stake_and_activating<T: StakeHistoryGetEntry>(
         &self,
         target_epoch: Epoch,
@@ -940,7 +943,7 @@ pub struct Stake {
 }
 
 impl Stake {
-    #[deprecated(since = "3.1.0", note = "Use stake_v2() instead")]
+    #[deprecated(since = "3.2.0", note = "Use stake_v2() instead")]
     pub fn stake<T: StakeHistoryGetEntry>(
         &self,
         epoch: Epoch,
