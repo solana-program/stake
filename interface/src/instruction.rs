@@ -565,6 +565,7 @@ pub struct LockupCheckedArgs {
 pub struct AuthorizeWithSeedArgs {
     pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
+    #[cfg_attr(feature = "codama", codama(size_prefix = number(u64)))]
     pub authority_seed: String,
     pub authority_owner: Pubkey,
 }
@@ -581,6 +582,7 @@ pub struct AuthorizeWithSeedArgs {
 )]
 pub struct AuthorizeCheckedWithSeedArgs {
     pub stake_authorize: StakeAuthorize,
+    #[cfg_attr(feature = "codama", codama(size_prefix = number(u64)))]
     pub authority_seed: String,
     pub authority_owner: Pubkey,
 }

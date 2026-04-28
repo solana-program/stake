@@ -10,6 +10,8 @@ import {
     combineCodec,
     getEnumDecoder,
     getEnumEncoder,
+    getU32Decoder,
+    getU32Encoder,
     type FixedSizeCodec,
     type FixedSizeDecoder,
     type FixedSizeEncoder,
@@ -23,11 +25,11 @@ export enum StakeAuthorize {
 export type StakeAuthorizeArgs = StakeAuthorize;
 
 export function getStakeAuthorizeEncoder(): FixedSizeEncoder<StakeAuthorizeArgs> {
-    return getEnumEncoder(StakeAuthorize);
+    return getEnumEncoder(StakeAuthorize, { size: getU32Encoder() });
 }
 
 export function getStakeAuthorizeDecoder(): FixedSizeDecoder<StakeAuthorize> {
-    return getEnumDecoder(StakeAuthorize);
+    return getEnumDecoder(StakeAuthorize, { size: getU32Decoder() });
 }
 
 export function getStakeAuthorizeCodec(): FixedSizeCodec<StakeAuthorizeArgs, StakeAuthorize> {
