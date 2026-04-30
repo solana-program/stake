@@ -8,6 +8,7 @@
 use {
     crate::generated::types::StakeAuthorize,
     borsh::{BorshDeserialize, BorshSerialize},
+    kaigan::types::U64PrefixString,
     solana_pubkey::Pubkey,
 };
 
@@ -97,7 +98,7 @@ impl Default for AuthorizeWithSeedInstructionData {
 pub struct AuthorizeWithSeedInstructionArgs {
     pub new_authorized_pubkey: Pubkey,
     pub stake_authorize: StakeAuthorize,
-    pub authority_seed: String,
+    pub authority_seed: U64PrefixString,
     pub authority_owner: Pubkey,
 }
 
@@ -123,7 +124,7 @@ pub struct AuthorizeWithSeedBuilder {
     lockup_authority: Option<solana_pubkey::Pubkey>,
     new_authorized_pubkey: Option<Pubkey>,
     stake_authorize: Option<StakeAuthorize>,
-    authority_seed: Option<String>,
+    authority_seed: Option<U64PrefixString>,
     authority_owner: Option<Pubkey>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
@@ -172,7 +173,7 @@ impl AuthorizeWithSeedBuilder {
         self
     }
     #[inline(always)]
-    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+    pub fn authority_seed(&mut self, authority_seed: U64PrefixString) -> &mut Self {
         self.authority_seed = Some(authority_seed);
         self
     }
@@ -420,7 +421,7 @@ impl<'a, 'b> AuthorizeWithSeedCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn authority_seed(&mut self, authority_seed: String) -> &mut Self {
+    pub fn authority_seed(&mut self, authority_seed: U64PrefixString) -> &mut Self {
         self.instruction.authority_seed = Some(authority_seed);
         self
     }
@@ -516,7 +517,7 @@ struct AuthorizeWithSeedCpiBuilderInstruction<'a, 'b> {
     lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     new_authorized_pubkey: Option<Pubkey>,
     stake_authorize: Option<StakeAuthorize>,
-    authority_seed: Option<String>,
+    authority_seed: Option<U64PrefixString>,
     authority_owner: Option<Pubkey>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,

@@ -16,6 +16,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    getU64Decoder,
+    getU64Encoder,
     getUtf8Decoder,
     getUtf8Encoder,
     transformEncoder,
@@ -97,7 +99,7 @@ export function getAuthorizeWithSeedInstructionDataEncoder(): Encoder<AuthorizeW
             ['discriminator', getU32Encoder()],
             ['newAuthorizedPubkey', getAddressEncoder()],
             ['stakeAuthorize', getStakeAuthorizeEncoder()],
-            ['authoritySeed', addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
+            ['authoritySeed', addEncoderSizePrefix(getUtf8Encoder(), getU64Encoder())],
             ['authorityOwner', getAddressEncoder()],
         ]),
         value => ({ ...value, discriminator: AUTHORIZE_WITH_SEED_DISCRIMINATOR }),
@@ -109,7 +111,7 @@ export function getAuthorizeWithSeedInstructionDataDecoder(): Decoder<AuthorizeW
         ['discriminator', getU32Decoder()],
         ['newAuthorizedPubkey', getAddressDecoder()],
         ['stakeAuthorize', getStakeAuthorizeDecoder()],
-        ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
+        ['authoritySeed', addDecoderSizePrefix(getUtf8Decoder(), getU64Decoder())],
         ['authorityOwner', getAddressDecoder()],
     ]);
 }

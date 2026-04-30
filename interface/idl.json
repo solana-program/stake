@@ -128,7 +128,7 @@
                 "kind": "sizePrefixTypeNode",
                 "prefix": {
                   "endian": "le",
-                  "format": "u32",
+                  "format": "u64",
                   "kind": "numberTypeNode"
                 },
                 "type": {
@@ -168,7 +168,7 @@
                 "kind": "sizePrefixTypeNode",
                 "prefix": {
                   "endian": "le",
-                  "format": "u32",
+                  "format": "u64",
                   "kind": "numberTypeNode"
                 },
                 "type": {
@@ -213,7 +213,7 @@
           "kind": "enumTypeNode",
           "size": {
             "endian": "le",
-            "format": "u8",
+            "format": "u32",
             "kind": "numberTypeNode"
           },
           "variants": [
@@ -265,7 +265,7 @@
           "kind": "enumTypeNode",
           "size": {
             "endian": "le",
-            "format": "u8",
+            "format": "u32",
             "kind": "numberTypeNode"
           },
           "variants": [
@@ -321,7 +321,7 @@
           "kind": "enumTypeNode",
           "size": {
             "endian": "le",
-            "format": "u8",
+            "format": "u32",
             "kind": "numberTypeNode"
           },
           "variants": [
@@ -1854,7 +1854,7 @@
     "name": "solanaStakeInterface",
     "pdas": [],
     "publicKey": "Stake11111111111111111111111111111111111111",
-    "version": "3.1.0"
+    "version": "4.0.0"
   },
   "standard": "codama",
   "version": "1.0.0"
