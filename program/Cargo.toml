@@ -19,7 +19,7 @@ solana-program-entrypoint = "3.0.0"
 solana-program-error = "3.0.1"
 solana-pubkey = "4.2.0"
 solana-rent = "3.0.0"
-solana-security-txt = "1.1.2"
+solana-security-txt = "1.1.3"
 solana-stake-interface = { path = "../interface", version = "4.0.0", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "3.0.0"
 solana-sysvar-id = "3.1.0"
