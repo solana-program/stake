@@ -1854,7 +1854,7 @@
     "name": "solanaStakeInterface",
     "pdas": [],
     "publicKey": "Stake11111111111111111111111111111111111111",
-    "version": "4.0.0"
+    "version": "4.1.0"
   },
   "standard": "codama",
   "version": "1.0.0"
