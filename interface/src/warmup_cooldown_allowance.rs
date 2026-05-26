@@ -359,6 +359,43 @@ mod test {
         (weight * newly_effective_cluster_stake) as u64
     }
 
+    #[test]
+    fn high_ulp_case() {
+        // Differs by 5 ULPs (difficult to find a higher diff)
+        let account_portion = 342_898_401_157_885_026;
+        let cluster_portion = 2_426_138_261_763_124_479;
+        let cluster_effective = 708_104_488_956_562_499;
+        let current_epoch = 10;
+        let rate_change_activation_epoch = Some(0);
+
+        let integer_math_result = calculate_stake_change_allowance(
+            current_epoch,
+            account_portion,
+            cluster_portion,
+            cluster_effective,
+            rate_change_activation_epoch,
+        );
+        let float_math_result = calculate_stake_delta_f64_legacy(
+            account_portion,
+            cluster_portion,
+            cluster_effective,
+            current_epoch,
+            rate_change_activation_epoch,
+        )
+        .min(account_portion);
+
+        assert_eq!(integer_math_result, 9_007_199_253_579_461);
+        assert_eq!(float_math_result, 9_007_199_253_579_466);
+
+        let diff = integer_math_result.abs_diff(float_math_result);
+        let tolerance = max_ulp_tolerance(integer_math_result, float_math_result);
+        let ulp = tolerance / 10;
+
+        assert_eq!(ulp, 1);
+        assert_eq!(diff, 5 * ulp);
+        assert!(diff <= tolerance);
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10_000))]
 
