@@ -10,8 +10,11 @@ pub const MAX_ENTRIES: usize = 512; // it should never take as many as 512 epoch
 /// Serialized size of a single `(Epoch, StakeHistoryEntry)` tuple
 pub(crate) const EPOCH_AND_ENTRY_SERIALIZED_SIZE: usize = 32;
 
+const LEN_PREFIX: usize = size_of::<u64>();
+
 /// Serialized size of `StakeHistory` sysvar account
-pub const SIZE: usize = size_of::<u64>() + MAX_ENTRIES * EPOCH_AND_ENTRY_SERIALIZED_SIZE;
+pub const SIZE: usize = LEN_PREFIX + MAX_ENTRIES * EPOCH_AND_ENTRY_SERIALIZED_SIZE;
+const _: () = assert!(SIZE == 16_392);
 
 #[repr(C)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
