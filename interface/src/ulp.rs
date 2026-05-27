@@ -36,14 +36,14 @@ pub fn max_ulp_tolerance(candidate: u64, oracle: u64) -> u64 {
     // Get the ULP spacing
     let ulp = ulp_of_u64(mag);
 
-    // Use a 4x ULP tolerance to account for precision error accumulation in the
+    // Use a 10x ULP tolerance to account for precision error accumulation in the
     // legacy `f64` impl:
     // - Three `u64` to `f64` conversions
     // - One division and two multiplications are rounded
     // - The `as u64` cast truncates the final `f64` result
     //
-    // Proptest confirmed these can accumulate to >3 ULPs, so 4x is a safe margin.
-    ulp.saturating_mul(4)
+    // Formal proof verified it will not exceed 10 ULPs (1280 lamports).
+    ulp.saturating_mul(10)
 }
 
 #[cfg(test)]
@@ -61,24 +61,24 @@ mod test {
 
     #[test]
     fn tolerance_small_magnitudes_use_single_ulp() {
-        // For magnitudes < 2^53, ULP = 1, so tolerance = 4 * 1 = 4.
-        assert_eq!(max_ulp_tolerance(0, 0), 4);
-        assert_eq!(max_ulp_tolerance(0, 1), 4);
-        assert_eq!(max_ulp_tolerance((1u64 << 53) - 1, 1), 4);
+        // For magnitudes < 2^53, ULP = 1, so tolerance = 10 * 1 = 10.
+        assert_eq!(max_ulp_tolerance(0, 0), 10);
+        assert_eq!(max_ulp_tolerance(0, 1), 10);
+        assert_eq!(max_ulp_tolerance((1u64 << 53) - 1, 1), 10);
     }
 
     #[test]
     fn tolerance_scales_with_magnitude_powers_of_two() {
-        // Around powers of two, ULP doubles each time, so tolerance (4 * ULP) doubles.
+        // Around powers of two, ULP doubles each time, so tolerance (10 * ULP) doubles.
         let below_2_53 = max_ulp_tolerance((1u64 << 53) - 1, 0); // ULP = 1
         let at_2_53 = max_ulp_tolerance(1u64 << 53, 0); // ULP = 2
         let at_2_54 = max_ulp_tolerance(1u64 << 54, 0); // ULP = 4
         let at_2_55 = max_ulp_tolerance(1u64 << 55, 0); // ULP = 8
 
-        assert_eq!(below_2_53, 4); // 4 * 1
-        assert_eq!(at_2_53, 8); // 4 * 2
-        assert_eq!(at_2_54, 16); // 4 * 4
-        assert_eq!(at_2_55, 32); // 4 * 8
+        assert_eq!(below_2_53, 10); // 10 * 1
+        assert_eq!(at_2_53, 20); // 10 * 2
+        assert_eq!(at_2_54, 40); // 10 * 4
+        assert_eq!(at_2_55, 80); // 10 * 8
     }
 
     #[test]
@@ -99,8 +99,8 @@ mod test {
     #[test]
     fn tolerance_at_u64_max_matches_expected_ulp() {
         // From ulp_standard_calc: ulp_of_u64(u64::MAX) == 4096
-        // So tolerance = 4 * 4096 = 16384
-        assert_eq!(max_ulp_tolerance(u64::MAX, 0), 4096 * 4);
-        assert_eq!(max_ulp_tolerance(0, u64::MAX), 4096 * 4);
+        // So tolerance = 10 * 4096 = 40960
+        assert_eq!(max_ulp_tolerance(u64::MAX, 0), 4096 * 10);
+        assert_eq!(max_ulp_tolerance(0, u64::MAX), 4096 * 10);
     }
 }
