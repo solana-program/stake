@@ -7,6 +7,12 @@ use std::ops::Deref;
 
 pub const MAX_ENTRIES: usize = 512; // it should never take as many as 512 epochs to warm up or cool down
 
+/// Serialized size of a single `(Epoch, StakeHistoryEntry)` tuple
+pub(crate) const EPOCH_AND_ENTRY_SERIALIZED_SIZE: usize = 32;
+
+/// Serialized size of `StakeHistory` sysvar account
+pub const SIZE: usize = size_of::<u64>() + MAX_ENTRIES * EPOCH_AND_ENTRY_SERIALIZED_SIZE;
+
 #[repr(C)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
