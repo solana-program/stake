@@ -9,6 +9,8 @@ pub const MAX_ENTRIES: usize = 512; // it should never take as many as 512 epoch
 
 /// Serialized size of a single `(Epoch, StakeHistoryEntry)` tuple
 pub(crate) const EPOCH_AND_ENTRY_SERIALIZED_SIZE: usize = 32;
+const _: () =
+    assert!(EPOCH_AND_ENTRY_SERIALIZED_SIZE == size_of::<u64>() + size_of::<StakeHistoryEntry>());
 
 const LEN_PREFIX: usize = size_of::<u64>();
 
