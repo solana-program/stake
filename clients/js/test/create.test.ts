@@ -1,10 +1,10 @@
-import test from 'ava';
+import { expect, it } from 'vitest';
 import { createDefaultSolanaClient, generateKeyPairSignerWithSol } from './_setup';
 
-test('it creates a keypair', async t => {
+it('creates a keypair', async () => {
     // Given an authority key pair with some SOL.
     const client = createDefaultSolanaClient();
     const authority = await generateKeyPairSignerWithSol(client);
 
-    t.true(authority.address.length > 0);
+    expect(authority.address.length > 0).toBe(true);
 });
