@@ -7246,7 +7246,7 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-program"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "agave-feature-set",
  "arbitrary",
