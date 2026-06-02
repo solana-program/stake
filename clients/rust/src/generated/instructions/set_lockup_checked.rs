@@ -16,11 +16,11 @@ pub const SET_LOCKUP_CHECKED_DISCRIMINATOR: u32 = 12;
 #[derive(Debug)]
 pub struct SetLockupChecked {
     /// Initialized stake account
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Lockup authority or withdraw authority
-    pub authority: solana_pubkey::Pubkey,
+    pub authority: solana_address::Address,
     /// New lockup authority
-    pub new_authority: Option<solana_pubkey::Pubkey>,
+    pub new_authority: Option<solana_address::Address>,
 }
 
 impl SetLockupChecked {
@@ -63,7 +63,6 @@ impl SetLockupChecked {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionData {
     discriminator: u32,
 }
@@ -85,7 +84,6 @@ impl Default for SetLockupCheckedInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupCheckedInstructionArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
@@ -106,9 +104,9 @@ impl SetLockupCheckedInstructionArgs {
 ///   2. `[signer, optional]` new_authority
 #[derive(Clone, Debug, Default)]
 pub struct SetLockupCheckedBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    authority: Option<solana_pubkey::Pubkey>,
-    new_authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    authority: Option<solana_address::Address>,
+    new_authority: Option<solana_address::Address>,
     unix_timestamp: Option<UnixTimestamp>,
     epoch: Option<Epoch>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
@@ -120,20 +118,20 @@ impl SetLockupCheckedBuilder {
     }
     /// Initialized stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Lockup authority or withdraw authority
     #[inline(always)]
-    pub fn authority(&mut self, authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn authority(&mut self, authority: solana_address::Address) -> &mut Self {
         self.authority = Some(authority);
         self
     }
     /// `[optional account]`
     /// New lockup authority
     #[inline(always)]
-    pub fn new_authority(&mut self, new_authority: Option<solana_pubkey::Pubkey>) -> &mut Self {
+    pub fn new_authority(&mut self, new_authority: Option<solana_address::Address>) -> &mut Self {
         self.new_authority = new_authority;
         self
     }

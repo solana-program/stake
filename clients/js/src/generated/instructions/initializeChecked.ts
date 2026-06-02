@@ -12,6 +12,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -28,12 +30,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const INITIALIZE_CHECKED_DISCRIMINATOR = 9;
 
-export function getInitializeCheckedDiscriminatorBytes() {
+export function getInitializeCheckedDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(INITIALIZE_CHECKED_DISCRIMINATOR);
 }
 
@@ -122,7 +124,7 @@ export function getInitializeCheckedInstruction<
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
         withdrawAuthority: { value: input.withdrawAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Resolve default values.
     if (!accounts.rentSysvar.value) {
@@ -133,10 +135,10 @@ export function getInitializeCheckedInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.rentSysvar),
-            getAccountMeta(accounts.stakeAuthority),
-            getAccountMeta(accounts.withdrawAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('rentSysvar', accounts.rentSysvar),
+            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
+            getAccountMeta('withdrawAuthority', accounts.withdrawAuthority),
         ],
         data: getInitializeCheckedInstructionDataEncoder().encode({}),
         programAddress,
@@ -176,8 +178,10 @@ export function parseInitializeCheckedInstruction<
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeCheckedInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 4) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 4,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

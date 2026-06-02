@@ -14,6 +14,8 @@ import {
     getU32Encoder,
     getU64Decoder,
     getU64Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -30,12 +32,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const WITHDRAW_DISCRIMINATOR = 4;
 
-export function getWithdrawDiscriminatorBytes() {
+export function getWithdrawDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(WITHDRAW_DISCRIMINATOR);
 }
 
@@ -160,7 +162,7 @@ export function getWithdrawInstruction<
         withdrawAuthority: { value: input.withdrawAuthority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -178,12 +180,12 @@ export function getWithdrawInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.recipient),
-            getAccountMeta(accounts.clockSysvar),
-            getAccountMeta(accounts.stakeHistory),
-            getAccountMeta(accounts.withdrawAuthority),
-            getAccountMeta(accounts.lockupAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('recipient', accounts.recipient),
+            getAccountMeta('clockSysvar', accounts.clockSysvar),
+            getAccountMeta('stakeHistory', accounts.stakeHistory),
+            getAccountMeta('withdrawAuthority', accounts.withdrawAuthority),
+            getAccountMeta('lockupAuthority', accounts.lockupAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getWithdrawInstructionDataEncoder().encode(args as WithdrawInstructionDataArgs),
         programAddress,
@@ -226,8 +228,10 @@ export function parseWithdrawInstruction<TProgram extends string, TAccountMetas 
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 5) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 5,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

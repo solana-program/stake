@@ -13,11 +13,11 @@ pub const MOVE_STAKE_DISCRIMINATOR: u32 = 16;
 #[derive(Debug)]
 pub struct MoveStake {
     /// Active source stake account
-    pub source_stake: solana_pubkey::Pubkey,
+    pub source_stake: solana_address::Address,
     /// Active or inactive destination stake account
-    pub destination_stake: solana_pubkey::Pubkey,
+    pub destination_stake: solana_address::Address,
     /// Stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
 }
 
 impl MoveStake {
@@ -58,7 +58,6 @@ impl MoveStake {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionData {
     discriminator: u32,
 }
@@ -80,7 +79,6 @@ impl Default for MoveStakeInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveStakeInstructionArgs {
     pub args: u64,
 }
@@ -100,9 +98,9 @@ impl MoveStakeInstructionArgs {
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MoveStakeBuilder {
-    source_stake: Option<solana_pubkey::Pubkey>,
-    destination_stake: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
+    source_stake: Option<solana_address::Address>,
+    destination_stake: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
     args: Option<u64>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
@@ -113,19 +111,19 @@ impl MoveStakeBuilder {
     }
     /// Active source stake account
     #[inline(always)]
-    pub fn source_stake(&mut self, source_stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn source_stake(&mut self, source_stake: solana_address::Address) -> &mut Self {
         self.source_stake = Some(source_stake);
         self
     }
     /// Active or inactive destination stake account
     #[inline(always)]
-    pub fn destination_stake(&mut self, destination_stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn destination_stake(&mut self, destination_stake: solana_address::Address) -> &mut Self {
         self.destination_stake = Some(destination_stake);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }

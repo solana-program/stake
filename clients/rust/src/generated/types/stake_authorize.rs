@@ -13,7 +13,6 @@ use {
 #[derive(
     BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Copy, PartialOrd, Hash, FromPrimitive,
 )]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StakeAuthorize {
     Staker,
     Withdrawer,

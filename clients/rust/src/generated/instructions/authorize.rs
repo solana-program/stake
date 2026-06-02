@@ -8,7 +8,7 @@
 use {
     crate::generated::types::StakeAuthorize,
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_pubkey::Pubkey,
+    solana_address::Address,
 };
 
 pub const AUTHORIZE_DISCRIMINATOR: u32 = 1;
@@ -17,13 +17,13 @@ pub const AUTHORIZE_DISCRIMINATOR: u32 = 1;
 #[derive(Debug)]
 pub struct Authorize {
     /// Stake account to be updated
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Clock sysvar
-    pub clock_sysvar: solana_pubkey::Pubkey,
+    pub clock_sysvar: solana_address::Address,
     /// The stake or withdraw authority
-    pub authority: solana_pubkey::Pubkey,
+    pub authority: solana_address::Address,
     /// Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration
-    pub lockup_authority: Option<solana_pubkey::Pubkey>,
+    pub lockup_authority: Option<solana_address::Address>,
 }
 
 impl Authorize {
@@ -67,7 +67,6 @@ impl Authorize {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeInstructionData {
     discriminator: u32,
 }
@@ -89,9 +88,8 @@ impl Default for AuthorizeInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuthorizeInstructionArgs {
-    pub arg0: Pubkey,
+    pub arg0: Address,
     pub arg1: StakeAuthorize,
 }
 
@@ -111,11 +109,11 @@ impl AuthorizeInstructionArgs {
 ///   3. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
 pub struct AuthorizeBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    clock_sysvar: Option<solana_pubkey::Pubkey>,
-    authority: Option<solana_pubkey::Pubkey>,
-    lockup_authority: Option<solana_pubkey::Pubkey>,
-    arg0: Option<Pubkey>,
+    stake: Option<solana_address::Address>,
+    clock_sysvar: Option<solana_address::Address>,
+    authority: Option<solana_address::Address>,
+    lockup_authority: Option<solana_address::Address>,
+    arg0: Option<Address>,
     arg1: Option<StakeAuthorize>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
@@ -126,20 +124,20 @@ impl AuthorizeBuilder {
     }
     /// Stake account to be updated
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_address::Address) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// The stake or withdraw authority
     #[inline(always)]
-    pub fn authority(&mut self, authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn authority(&mut self, authority: solana_address::Address) -> &mut Self {
         self.authority = Some(authority);
         self
     }
@@ -148,13 +146,13 @@ impl AuthorizeBuilder {
     #[inline(always)]
     pub fn lockup_authority(
         &mut self,
-        lockup_authority: Option<solana_pubkey::Pubkey>,
+        lockup_authority: Option<solana_address::Address>,
     ) -> &mut Self {
         self.lockup_authority = lockup_authority;
         self
     }
     #[inline(always)]
-    pub fn arg0(&mut self, arg0: Pubkey) -> &mut Self {
+    pub fn arg0(&mut self, arg0: Address) -> &mut Self {
         self.arg0 = Some(arg0);
         self
     }
@@ -182,7 +180,7 @@ impl AuthorizeBuilder {
     pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = Authorize {
             stake: self.stake.expect("stake is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_pubkey::pubkey!(
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_address::address!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
             authority: self.authority.expect("authority is not set"),
@@ -374,7 +372,7 @@ impl<'a, 'b> AuthorizeCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn arg0(&mut self, arg0: Pubkey) -> &mut Self {
+    pub fn arg0(&mut self, arg0: Address) -> &mut Self {
         self.instruction.arg0 = Some(arg0);
         self
     }
@@ -450,7 +448,7 @@ struct AuthorizeCpiBuilderInstruction<'a, 'b> {
     clock_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
     authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
-    arg0: Option<Pubkey>,
+    arg0: Option<Address>,
     arg1: Option<StakeAuthorize>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,

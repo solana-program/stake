@@ -52,7 +52,7 @@ export type StakeError =
     | typeof STAKE_ERROR__VOTE_ADDRESS_MISMATCH;
 
 let stakeErrorMessages: Record<StakeError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
+if (process.env['NODE_ENV'] !== 'production') {
     stakeErrorMessages = {
         [STAKE_ERROR__ALREADY_DEACTIVATED]: `Stake already deactivated`,
         [STAKE_ERROR__CUSTODIAN_MISSING]: `Custodian address not present`,
@@ -75,7 +75,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function getStakeErrorMessage(code: StakeError): string {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env['NODE_ENV'] !== 'production') {
         return (stakeErrorMessages as Record<StakeError, string>)[code];
     }
 

@@ -7,20 +7,11 @@
 
 use {
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_pubkey::Pubkey,
+    solana_address::Address,
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Authorized {
-    #[cfg_attr(
-        feature = "serde",
-        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
-    )]
-    pub staker: Pubkey,
-    #[cfg_attr(
-        feature = "serde",
-        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
-    )]
-    pub withdrawer: Pubkey,
+    pub staker: Address,
+    pub withdrawer: Address,
 }

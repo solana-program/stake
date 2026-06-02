@@ -13,13 +13,13 @@ pub const INITIALIZE_CHECKED_DISCRIMINATOR: u32 = 9;
 #[derive(Debug)]
 pub struct InitializeChecked {
     /// Uninitialized stake account
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Rent sysvar
-    pub rent_sysvar: solana_pubkey::Pubkey,
+    pub rent_sysvar: solana_address::Address,
     /// The stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
     /// The withdraw authority
-    pub withdraw_authority: solana_pubkey::Pubkey,
+    pub withdraw_authority: solana_address::Address,
 }
 
 impl InitializeChecked {
@@ -60,7 +60,6 @@ impl InitializeChecked {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InitializeCheckedInstructionData {
     discriminator: u32,
 }
@@ -91,10 +90,10 @@ impl Default for InitializeCheckedInstructionData {
 ///   3. `[signer]` withdraw_authority
 #[derive(Clone, Debug, Default)]
 pub struct InitializeCheckedBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    rent_sysvar: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
-    withdraw_authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    rent_sysvar: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
+    withdraw_authority: Option<solana_address::Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
@@ -104,26 +103,26 @@ impl InitializeCheckedBuilder {
     }
     /// Uninitialized stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
     /// Rent sysvar
     #[inline(always)]
-    pub fn rent_sysvar(&mut self, rent_sysvar: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn rent_sysvar(&mut self, rent_sysvar: solana_address::Address) -> &mut Self {
         self.rent_sysvar = Some(rent_sysvar);
         self
     }
     /// The stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }
     /// The withdraw authority
     #[inline(always)]
-    pub fn withdraw_authority(&mut self, withdraw_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn withdraw_authority(&mut self, withdraw_authority: solana_address::Address) -> &mut Self {
         self.withdraw_authority = Some(withdraw_authority);
         self
     }
@@ -146,7 +145,7 @@ impl InitializeCheckedBuilder {
     pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = InitializeChecked {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_pubkey::pubkey!(
+            rent_sysvar: self.rent_sysvar.unwrap_or(solana_address::address!(
                 "SysvarRent111111111111111111111111111111111"
             )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),

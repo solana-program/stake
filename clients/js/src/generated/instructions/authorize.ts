@@ -14,6 +14,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -30,8 +32,8 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
     getStakeAuthorizeDecoder,
     getStakeAuthorizeEncoder,
@@ -41,7 +43,7 @@ import {
 
 export const AUTHORIZE_DISCRIMINATOR = 1;
 
-export function getAuthorizeDiscriminatorBytes() {
+export function getAuthorizeDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(AUTHORIZE_DISCRIMINATOR);
 }
 
@@ -146,7 +148,7 @@ export function getAuthorizeInstruction<
         authority: { value: input.authority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -160,10 +162,10 @@ export function getAuthorizeInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.clockSysvar),
-            getAccountMeta(accounts.authority),
-            getAccountMeta(accounts.lockupAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('clockSysvar', accounts.clockSysvar),
+            getAccountMeta('authority', accounts.authority),
+            getAccountMeta('lockupAuthority', accounts.lockupAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getAuthorizeInstructionDataEncoder().encode(args as AuthorizeInstructionDataArgs),
         programAddress,
@@ -200,8 +202,10 @@ export function parseAuthorizeInstruction<TProgram extends string, TAccountMetas
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAuthorizeInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 3) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 3,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

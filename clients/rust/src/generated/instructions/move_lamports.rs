@@ -13,11 +13,11 @@ pub const MOVE_LAMPORTS_DISCRIMINATOR: u32 = 17;
 #[derive(Debug)]
 pub struct MoveLamports {
     /// Active or inactive source stake account
-    pub source_stake: solana_pubkey::Pubkey,
+    pub source_stake: solana_address::Address,
     /// Mergeable destination stake account
-    pub destination_stake: solana_pubkey::Pubkey,
+    pub destination_stake: solana_address::Address,
     /// Stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
 }
 
 impl MoveLamports {
@@ -61,7 +61,6 @@ impl MoveLamports {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveLamportsInstructionData {
     discriminator: u32,
 }
@@ -83,7 +82,6 @@ impl Default for MoveLamportsInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MoveLamportsInstructionArgs {
     pub args: u64,
 }
@@ -103,9 +101,9 @@ impl MoveLamportsInstructionArgs {
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct MoveLamportsBuilder {
-    source_stake: Option<solana_pubkey::Pubkey>,
-    destination_stake: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
+    source_stake: Option<solana_address::Address>,
+    destination_stake: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
     args: Option<u64>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
@@ -116,19 +114,19 @@ impl MoveLamportsBuilder {
     }
     /// Active or inactive source stake account
     #[inline(always)]
-    pub fn source_stake(&mut self, source_stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn source_stake(&mut self, source_stake: solana_address::Address) -> &mut Self {
         self.source_stake = Some(source_stake);
         self
     }
     /// Mergeable destination stake account
     #[inline(always)]
-    pub fn destination_stake(&mut self, destination_stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn destination_stake(&mut self, destination_stake: solana_address::Address) -> &mut Self {
         self.destination_stake = Some(destination_stake);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }

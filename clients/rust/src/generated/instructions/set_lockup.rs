@@ -8,7 +8,7 @@
 use {
     crate::generated::types::{Epoch, UnixTimestamp},
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_pubkey::Pubkey,
+    solana_address::Address,
 };
 
 pub const SET_LOCKUP_DISCRIMINATOR: u32 = 6;
@@ -17,9 +17,9 @@ pub const SET_LOCKUP_DISCRIMINATOR: u32 = 6;
 #[derive(Debug)]
 pub struct SetLockup {
     /// Initialized stake account
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Lockup authority or withdraw authority
-    pub authority: solana_pubkey::Pubkey,
+    pub authority: solana_address::Address,
 }
 
 impl SetLockup {
@@ -53,7 +53,6 @@ impl SetLockup {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupInstructionData {
     discriminator: u32,
 }
@@ -75,11 +74,10 @@ impl Default for SetLockupInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SetLockupInstructionArgs {
     pub unix_timestamp: Option<UnixTimestamp>,
     pub epoch: Option<Epoch>,
-    pub custodian: Option<Pubkey>,
+    pub custodian: Option<Address>,
 }
 
 impl SetLockupInstructionArgs {
@@ -96,11 +94,11 @@ impl SetLockupInstructionArgs {
 ///   1. `[signer]` authority
 #[derive(Clone, Debug, Default)]
 pub struct SetLockupBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    authority: Option<solana_address::Address>,
     unix_timestamp: Option<UnixTimestamp>,
     epoch: Option<Epoch>,
-    custodian: Option<Pubkey>,
+    custodian: Option<Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
@@ -110,13 +108,13 @@ impl SetLockupBuilder {
     }
     /// Initialized stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Lockup authority or withdraw authority
     #[inline(always)]
-    pub fn authority(&mut self, authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn authority(&mut self, authority: solana_address::Address) -> &mut Self {
         self.authority = Some(authority);
         self
     }
@@ -134,7 +132,7 @@ impl SetLockupBuilder {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn custodian(&mut self, custodian: Pubkey) -> &mut Self {
+    pub fn custodian(&mut self, custodian: Address) -> &mut Self {
         self.custodian = Some(custodian);
         self
     }
@@ -313,7 +311,7 @@ impl<'a, 'b> SetLockupCpiBuilder<'a, 'b> {
     }
     /// `[optional argument]`
     #[inline(always)]
-    pub fn custodian(&mut self, custodian: Pubkey) -> &mut Self {
+    pub fn custodian(&mut self, custodian: Address) -> &mut Self {
         self.instruction.custodian = Some(custodian);
         self
     }
@@ -378,7 +376,7 @@ struct SetLockupCpiBuilderInstruction<'a, 'b> {
     authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     unix_timestamp: Option<UnixTimestamp>,
     epoch: Option<Epoch>,
-    custodian: Option<Pubkey>,
+    custodian: Option<Address>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b solana_account_info::AccountInfo<'a>, bool, bool)>,
 }

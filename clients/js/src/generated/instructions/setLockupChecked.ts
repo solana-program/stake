@@ -14,6 +14,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -31,8 +33,8 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
     getEpochDecoder,
     getEpochEncoder,
@@ -46,7 +48,7 @@ import {
 
 export const SET_LOCKUP_CHECKED_DISCRIMINATOR = 12;
 
-export function getSetLockupCheckedDiscriminatorBytes() {
+export function getSetLockupCheckedDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(SET_LOCKUP_CHECKED_DISCRIMINATOR);
 }
 
@@ -145,7 +147,7 @@ export function getSetLockupCheckedInstruction<
         authority: { value: input.authority ?? null, isWritable: false },
         newAuthority: { value: input.newAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -153,9 +155,9 @@ export function getSetLockupCheckedInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.authority),
-            getAccountMeta(accounts.newAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('authority', accounts.authority),
+            getAccountMeta('newAuthority', accounts.newAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getSetLockupCheckedInstructionDataEncoder().encode(args as SetLockupCheckedInstructionDataArgs),
         programAddress,
@@ -184,8 +186,10 @@ export function parseSetLockupCheckedInstruction<TProgram extends string, TAccou
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetLockupCheckedInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 2) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 2,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

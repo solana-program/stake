@@ -5,7 +5,7 @@
 //! <https://github.com/codama-idl/codama>
 //!
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_address::{address, Address};
 
 /// `stake` program ID.
-pub const STAKE_ID: Pubkey = pubkey!("Stake11111111111111111111111111111111111111");
+pub const STAKE_ID: Address = address!("Stake11111111111111111111111111111111111111");

@@ -13,17 +13,17 @@ pub const DELEGATE_STAKE_DISCRIMINATOR: u32 = 2;
 #[derive(Debug)]
 pub struct DelegateStake {
     /// Initialized stake account to be delegated
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Vote account to which this stake will be delegated
-    pub vote: solana_pubkey::Pubkey,
+    pub vote: solana_address::Address,
     /// Clock sysvar
-    pub clock_sysvar: solana_pubkey::Pubkey,
+    pub clock_sysvar: solana_address::Address,
     /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history: solana_pubkey::Pubkey,
+    pub stake_history: solana_address::Address,
     /// Unused account, formerly the stake config
-    pub unused: solana_pubkey::Pubkey,
+    pub unused: solana_address::Address,
     /// Stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
 }
 
 impl DelegateStake {
@@ -69,7 +69,6 @@ impl DelegateStake {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DelegateStakeInstructionData {
     discriminator: u32,
 }
@@ -102,12 +101,12 @@ impl Default for DelegateStakeInstructionData {
 ///   5. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DelegateStakeBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    vote: Option<solana_pubkey::Pubkey>,
-    clock_sysvar: Option<solana_pubkey::Pubkey>,
-    stake_history: Option<solana_pubkey::Pubkey>,
-    unused: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    vote: Option<solana_address::Address>,
+    clock_sysvar: Option<solana_address::Address>,
+    stake_history: Option<solana_address::Address>,
+    unused: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
@@ -117,39 +116,39 @@ impl DelegateStakeBuilder {
     }
     /// Initialized stake account to be delegated
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Vote account to which this stake will be delegated
     #[inline(always)]
-    pub fn vote(&mut self, vote: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn vote(&mut self, vote: solana_address::Address) -> &mut Self {
         self.vote = Some(vote);
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_address::Address) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
     /// Stake history sysvar that carries stake warmup/cooldown history
     #[inline(always)]
-    pub fn stake_history(&mut self, stake_history: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_history(&mut self, stake_history: solana_address::Address) -> &mut Self {
         self.stake_history = Some(stake_history);
         self
     }
     /// Unused account, formerly the stake config
     #[inline(always)]
-    pub fn unused(&mut self, unused: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn unused(&mut self, unused: solana_address::Address) -> &mut Self {
         self.unused = Some(unused);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }
@@ -173,10 +172,10 @@ impl DelegateStakeBuilder {
         let accounts = DelegateStake {
             stake: self.stake.expect("stake is not set"),
             vote: self.vote.expect("vote is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_pubkey::pubkey!(
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_address::address!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
-            stake_history: self.stake_history.unwrap_or(solana_pubkey::pubkey!(
+            stake_history: self.stake_history.unwrap_or(solana_address::address!(
                 "SysvarStakeHistory1111111111111111111111111"
             )),
             unused: self.unused.expect("unused is not set"),
