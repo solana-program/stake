@@ -5,7 +5,7 @@
         "@codama/renderers-rust": "^3.1.0",
         "@solana/prettier-config-solana": "0.0.6",
         "codama": "^1.6.0",
-        "typescript": "^5.9.3"
+        "typescript": "^6.0.3"
     },
     "engines": {
         "node": ">=v20.0.0"
