@@ -14,6 +14,8 @@ import {
     getU32Encoder,
     getU64Decoder,
     getU64Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -29,12 +31,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const SPLIT_DISCRIMINATOR = 3;
 
-export function getSplitDiscriminatorBytes() {
+export function getSplitDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(SPLIT_DISCRIMINATOR);
 }
 
@@ -114,7 +116,7 @@ export function getSplitInstruction<
         splitStake: { value: input.splitStake ?? null, isWritable: true },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -122,9 +124,9 @@ export function getSplitInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.splitStake),
-            getAccountMeta(accounts.stakeAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('splitStake', accounts.splitStake),
+            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
         ],
         data: getSplitInstructionDataEncoder().encode(args as SplitInstructionDataArgs),
         programAddress,
@@ -153,8 +155,10 @@ export function parseSplitInstruction<TProgram extends string, TAccountMetas ext
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSplitInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 3) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 3,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

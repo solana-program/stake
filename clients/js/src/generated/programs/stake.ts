@@ -9,13 +9,46 @@
 import {
     assertIsInstructionWithAccounts,
     containsBytes,
+    extendClient,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+    SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+    SolanaError,
     type Address,
+    type ClientWithRpc,
+    type ClientWithTransactionPlanning,
+    type ClientWithTransactionSending,
+    type GetAccountInfoApi,
+    type GetMultipleAccountsApi,
     type Instruction,
     type InstructionWithData,
     type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
+    addSelfFetchFunctions,
+    addSelfPlanAndSendFunctions,
+    type SelfFetchFunctions,
+    type SelfPlanAndSendFunctions,
+} from '@solana/kit/program-client-core';
+import { getStakeStateAccountCodec, type StakeStateAccount, type StakeStateAccountArgs } from '../accounts';
+import {
+    getAuthorizeCheckedInstruction,
+    getAuthorizeCheckedWithSeedInstruction,
+    getAuthorizeInstruction,
+    getAuthorizeWithSeedInstruction,
+    getDeactivateDelinquentInstruction,
+    getDeactivateInstruction,
+    getDelegateStakeInstruction,
+    getGetMinimumDelegationInstruction,
+    getInitializeCheckedInstruction,
+    getInitializeInstruction,
+    getMergeInstruction,
+    getMoveLamportsInstruction,
+    getMoveStakeInstruction,
+    getSetLockupCheckedInstruction,
+    getSetLockupInstruction,
+    getSplitInstruction,
+    getWithdrawInstruction,
     parseAuthorizeCheckedInstruction,
     parseAuthorizeCheckedWithSeedInstruction,
     parseAuthorizeInstruction,
@@ -33,6 +66,19 @@ import {
     parseSetLockupInstruction,
     parseSplitInstruction,
     parseWithdrawInstruction,
+    type AuthorizeCheckedInput,
+    type AuthorizeCheckedWithSeedInput,
+    type AuthorizeInput,
+    type AuthorizeWithSeedInput,
+    type DeactivateDelinquentInput,
+    type DeactivateInput,
+    type DelegateStakeInput,
+    type GetMinimumDelegationInput,
+    type InitializeCheckedInput,
+    type InitializeInput,
+    type MergeInput,
+    type MoveLamportsInput,
+    type MoveStakeInput,
     type ParsedAuthorizeCheckedInstruction,
     type ParsedAuthorizeCheckedWithSeedInstruction,
     type ParsedAuthorizeInstruction,
@@ -50,6 +96,10 @@ import {
     type ParsedSetLockupInstruction,
     type ParsedSplitInstruction,
     type ParsedWithdrawInstruction,
+    type SetLockupCheckedInput,
+    type SetLockupInput,
+    type SplitInput,
+    type WithdrawInput,
 } from '../instructions';
 
 export const STAKE_PROGRAM_ADDRESS =
@@ -134,7 +184,10 @@ export function identifyStakeInstruction(
     if (containsBytes(data, getU32Encoder().encode(17), 0)) {
         return StakeInstruction.MoveLamports;
     }
-    throw new Error('The provided instruction could not be identified as a stake instruction.');
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, {
+        instructionData: data,
+        programName: 'stake',
+    });
 }
 
 export type ParsedStakeInstruction<TProgram extends string = 'Stake11111111111111111111111111111111111111'> =
@@ -252,6 +305,94 @@ export function parseStakeInstruction<TProgram extends string>(
             return { instructionType: StakeInstruction.MoveLamports, ...parseMoveLamportsInstruction(instruction) };
         }
         default:
-            throw new Error(`Unrecognized instruction type: ${instructionType as string}`);
+            throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, {
+                instructionType: instructionType as string,
+                programName: 'stake',
+            });
     }
+}
+
+export type StakePlugin = { accounts: StakePluginAccounts; instructions: StakePluginInstructions };
+
+export type StakePluginAccounts = {
+    stakeStateAccount: ReturnType<typeof getStakeStateAccountCodec> &
+        SelfFetchFunctions<StakeStateAccountArgs, StakeStateAccount>;
+};
+
+export type StakePluginInstructions = {
+    initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+    authorize: (input: AuthorizeInput) => ReturnType<typeof getAuthorizeInstruction> & SelfPlanAndSendFunctions;
+    delegateStake: (
+        input: DelegateStakeInput,
+    ) => ReturnType<typeof getDelegateStakeInstruction> & SelfPlanAndSendFunctions;
+    split: (input: SplitInput) => ReturnType<typeof getSplitInstruction> & SelfPlanAndSendFunctions;
+    withdraw: (input: WithdrawInput) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
+    deactivate: (input: DeactivateInput) => ReturnType<typeof getDeactivateInstruction> & SelfPlanAndSendFunctions;
+    setLockup: (input: SetLockupInput) => ReturnType<typeof getSetLockupInstruction> & SelfPlanAndSendFunctions;
+    merge: (input: MergeInput) => ReturnType<typeof getMergeInstruction> & SelfPlanAndSendFunctions;
+    authorizeWithSeed: (
+        input: AuthorizeWithSeedInput,
+    ) => ReturnType<typeof getAuthorizeWithSeedInstruction> & SelfPlanAndSendFunctions;
+    initializeChecked: (
+        input: InitializeCheckedInput,
+    ) => ReturnType<typeof getInitializeCheckedInstruction> & SelfPlanAndSendFunctions;
+    authorizeChecked: (
+        input: AuthorizeCheckedInput,
+    ) => ReturnType<typeof getAuthorizeCheckedInstruction> & SelfPlanAndSendFunctions;
+    authorizeCheckedWithSeed: (
+        input: AuthorizeCheckedWithSeedInput,
+    ) => ReturnType<typeof getAuthorizeCheckedWithSeedInstruction> & SelfPlanAndSendFunctions;
+    setLockupChecked: (
+        input: SetLockupCheckedInput,
+    ) => ReturnType<typeof getSetLockupCheckedInstruction> & SelfPlanAndSendFunctions;
+    getMinimumDelegation: (
+        input: GetMinimumDelegationInput,
+    ) => ReturnType<typeof getGetMinimumDelegationInstruction> & SelfPlanAndSendFunctions;
+    deactivateDelinquent: (
+        input: DeactivateDelinquentInput,
+    ) => ReturnType<typeof getDeactivateDelinquentInstruction> & SelfPlanAndSendFunctions;
+    moveStake: (input: MoveStakeInput) => ReturnType<typeof getMoveStakeInstruction> & SelfPlanAndSendFunctions;
+    moveLamports: (
+        input: MoveLamportsInput,
+    ) => ReturnType<typeof getMoveLamportsInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type StakePluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> &
+    ClientWithTransactionPlanning &
+    ClientWithTransactionSending;
+
+export function stakeProgram() {
+    return <T extends StakePluginRequirements>(client: T): Omit<T, 'stake'> & { stake: StakePlugin } => {
+        return extendClient(client, {
+            stake: <StakePlugin>{
+                accounts: { stakeStateAccount: addSelfFetchFunctions(client, getStakeStateAccountCodec()) },
+                instructions: {
+                    initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)),
+                    authorize: input => addSelfPlanAndSendFunctions(client, getAuthorizeInstruction(input)),
+                    delegateStake: input => addSelfPlanAndSendFunctions(client, getDelegateStakeInstruction(input)),
+                    split: input => addSelfPlanAndSendFunctions(client, getSplitInstruction(input)),
+                    withdraw: input => addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
+                    deactivate: input => addSelfPlanAndSendFunctions(client, getDeactivateInstruction(input)),
+                    setLockup: input => addSelfPlanAndSendFunctions(client, getSetLockupInstruction(input)),
+                    merge: input => addSelfPlanAndSendFunctions(client, getMergeInstruction(input)),
+                    authorizeWithSeed: input =>
+                        addSelfPlanAndSendFunctions(client, getAuthorizeWithSeedInstruction(input)),
+                    initializeChecked: input =>
+                        addSelfPlanAndSendFunctions(client, getInitializeCheckedInstruction(input)),
+                    authorizeChecked: input =>
+                        addSelfPlanAndSendFunctions(client, getAuthorizeCheckedInstruction(input)),
+                    authorizeCheckedWithSeed: input =>
+                        addSelfPlanAndSendFunctions(client, getAuthorizeCheckedWithSeedInstruction(input)),
+                    setLockupChecked: input =>
+                        addSelfPlanAndSendFunctions(client, getSetLockupCheckedInstruction(input)),
+                    getMinimumDelegation: input =>
+                        addSelfPlanAndSendFunctions(client, getGetMinimumDelegationInstruction(input)),
+                    deactivateDelinquent: input =>
+                        addSelfPlanAndSendFunctions(client, getDeactivateDelinquentInstruction(input)),
+                    moveStake: input => addSelfPlanAndSendFunctions(client, getMoveStakeInstruction(input)),
+                    moveLamports: input => addSelfPlanAndSendFunctions(client, getMoveLamportsInstruction(input)),
+                },
+            },
+        });
+    };
 }

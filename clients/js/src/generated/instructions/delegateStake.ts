@@ -12,6 +12,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -28,12 +30,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const DELEGATE_STAKE_DISCRIMINATOR = 2;
 
-export function getDelegateStakeDiscriminatorBytes() {
+export function getDelegateStakeDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(DELEGATE_STAKE_DISCRIMINATOR);
 }
 
@@ -145,7 +147,7 @@ export function getDelegateStakeInstruction<
         unused: { value: input.unused ?? null, isWritable: false },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Resolve default values.
     if (!accounts.clockSysvar.value) {
@@ -160,12 +162,12 @@ export function getDelegateStakeInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.vote),
-            getAccountMeta(accounts.clockSysvar),
-            getAccountMeta(accounts.stakeHistory),
-            getAccountMeta(accounts.unused),
-            getAccountMeta(accounts.stakeAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('vote', accounts.vote),
+            getAccountMeta('clockSysvar', accounts.clockSysvar),
+            getAccountMeta('stakeHistory', accounts.stakeHistory),
+            getAccountMeta('unused', accounts.unused),
+            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
         ],
         data: getDelegateStakeInstructionDataEncoder().encode({}),
         programAddress,
@@ -208,8 +210,10 @@ export function parseDelegateStakeInstruction<TProgram extends string, TAccountM
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDelegateStakeInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 6) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 6,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

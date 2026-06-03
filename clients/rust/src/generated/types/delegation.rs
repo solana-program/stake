@@ -8,17 +8,12 @@
 use {
     crate::generated::types::Epoch,
     borsh::{BorshDeserialize, BorshSerialize},
-    solana_pubkey::Pubkey,
+    solana_address::Address,
 };
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Delegation {
-    #[cfg_attr(
-        feature = "serde",
-        serde(with = "serde_with::As::<serde_with::DisplayFromStr>")
-    )]
-    pub voter_pubkey: Pubkey,
+    pub voter_pubkey: Address,
     pub stake: u64,
     pub activation_epoch: Epoch,
     pub deactivation_epoch: Epoch,

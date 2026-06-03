@@ -27,7 +27,7 @@ import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const GET_MINIMUM_DELEGATION_DISCRIMINATOR = 13;
 
-export function getGetMinimumDelegationDiscriminatorBytes() {
+export function getGetMinimumDelegationDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(GET_MINIMUM_DELEGATION_DISCRIMINATOR);
 }
 

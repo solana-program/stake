@@ -111,9 +111,9 @@ export default {
         js: {
             from: '@codama/renderers-js',
             args: [
-                'clients/js/src/generated',
+                'clients/js',
                 {
-                    packageFolder: 'clients/js',
+                    kitImportStrategy: 'rootOnly',
                     syncPackageJson: true,
                 },
             ],
@@ -126,18 +126,15 @@ export default {
             {
                 from: '@codama/renderers-rust',
                 args: [
-                    'clients/rust/src/generated',
+                    'clients/rust',
                     {
                         anchorTraits: false,
-                        crateFolder: 'clients/rust',
                         formatCode: true,
                         toolchain: '+nightly-2026-01-22',
                         traitOptions: {
                             baseDefaults: [
                                 'borsh::BorshSerialize',
                                 'borsh::BorshDeserialize',
-                                'serde::Serialize',
-                                'serde::Deserialize',
                                 'Clone',
                                 'Debug',
                                 // 'Eq', <- Remove 'Eq' from the default traits.

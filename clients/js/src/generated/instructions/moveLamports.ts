@@ -14,6 +14,8 @@ import {
     getU32Encoder,
     getU64Decoder,
     getU64Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -29,12 +31,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const MOVE_LAMPORTS_DISCRIMINATOR = 17;
 
-export function getMoveLamportsDiscriminatorBytes() {
+export function getMoveLamportsDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(MOVE_LAMPORTS_DISCRIMINATOR);
 }
 
@@ -119,7 +121,7 @@ export function getMoveLamportsInstruction<
         destinationStake: { value: input.destinationStake ?? null, isWritable: true },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -127,9 +129,9 @@ export function getMoveLamportsInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.sourceStake),
-            getAccountMeta(accounts.destinationStake),
-            getAccountMeta(accounts.stakeAuthority),
+            getAccountMeta('sourceStake', accounts.sourceStake),
+            getAccountMeta('destinationStake', accounts.destinationStake),
+            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
         ],
         data: getMoveLamportsInstructionDataEncoder().encode(args as MoveLamportsInstructionDataArgs),
         programAddress,
@@ -163,8 +165,10 @@ export function parseMoveLamportsInstruction<TProgram extends string, TAccountMe
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMoveLamportsInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 3) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 3,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

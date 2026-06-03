@@ -13,11 +13,11 @@ pub const SPLIT_DISCRIMINATOR: u32 = 3;
 #[derive(Debug)]
 pub struct Split {
     /// Stake account to be split; must be in the Initialized or Stake state
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Uninitialized stake account that will take the split-off amount
-    pub split_stake: solana_pubkey::Pubkey,
+    pub split_stake: solana_address::Address,
     /// Stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
 }
 
 impl Split {
@@ -55,7 +55,6 @@ impl Split {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SplitInstructionData {
     discriminator: u32,
 }
@@ -77,7 +76,6 @@ impl Default for SplitInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SplitInstructionArgs {
     pub args: u64,
 }
@@ -97,9 +95,9 @@ impl SplitInstructionArgs {
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct SplitBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    split_stake: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    split_stake: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
     args: Option<u64>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
@@ -110,19 +108,19 @@ impl SplitBuilder {
     }
     /// Stake account to be split; must be in the Initialized or Stake state
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Uninitialized stake account that will take the split-off amount
     #[inline(always)]
-    pub fn split_stake(&mut self, split_stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn split_stake(&mut self, split_stake: solana_address::Address) -> &mut Self {
         self.split_stake = Some(split_stake);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }

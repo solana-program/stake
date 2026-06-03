@@ -20,6 +20,8 @@ import {
     getU64Encoder,
     getUtf8Decoder,
     getUtf8Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -36,8 +38,8 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 import {
     getStakeAuthorizeDecoder,
     getStakeAuthorizeEncoder,
@@ -47,7 +49,7 @@ import {
 
 export const AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR = 11;
 
-export function getAuthorizeCheckedWithSeedDiscriminatorBytes() {
+export function getAuthorizeCheckedWithSeedDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(AUTHORIZE_CHECKED_WITH_SEED_DISCRIMINATOR);
 }
 
@@ -183,7 +185,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
         newAuthority: { value: input.newAuthority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
@@ -197,11 +199,11 @@ export function getAuthorizeCheckedWithSeedInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.stake),
-            getAccountMeta(accounts.base),
-            getAccountMeta(accounts.clockSysvar),
-            getAccountMeta(accounts.newAuthority),
-            getAccountMeta(accounts.lockupAuthority),
+            getAccountMeta('stake', accounts.stake),
+            getAccountMeta('base', accounts.base),
+            getAccountMeta('clockSysvar', accounts.clockSysvar),
+            getAccountMeta('newAuthority', accounts.newAuthority),
+            getAccountMeta('lockupAuthority', accounts.lockupAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getAuthorizeCheckedWithSeedInstructionDataEncoder().encode(
             args as AuthorizeCheckedWithSeedInstructionDataArgs,
@@ -246,8 +248,10 @@ export function parseAuthorizeCheckedWithSeedInstruction<
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAuthorizeCheckedWithSeedInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 4) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 4,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {

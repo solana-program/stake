@@ -13,11 +13,11 @@ pub const DEACTIVATE_DISCRIMINATOR: u32 = 5;
 #[derive(Debug)]
 pub struct Deactivate {
     /// Delegated stake account to be deactivated
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Clock sysvar
-    pub clock_sysvar: solana_pubkey::Pubkey,
+    pub clock_sysvar: solana_address::Address,
     /// Stake authority
-    pub stake_authority: solana_pubkey::Pubkey,
+    pub stake_authority: solana_address::Address,
 }
 
 impl Deactivate {
@@ -52,7 +52,6 @@ impl Deactivate {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeactivateInstructionData {
     discriminator: u32,
 }
@@ -82,9 +81,9 @@ impl Default for DeactivateInstructionData {
 ///   2. `[signer]` stake_authority
 #[derive(Clone, Debug, Default)]
 pub struct DeactivateBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    clock_sysvar: Option<solana_pubkey::Pubkey>,
-    stake_authority: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    clock_sysvar: Option<solana_address::Address>,
+    stake_authority: Option<solana_address::Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
@@ -94,20 +93,20 @@ impl DeactivateBuilder {
     }
     /// Delegated stake account to be deactivated
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
     /// Clock sysvar
     #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn clock_sysvar(&mut self, clock_sysvar: solana_address::Address) -> &mut Self {
         self.clock_sysvar = Some(clock_sysvar);
         self
     }
     /// Stake authority
     #[inline(always)]
-    pub fn stake_authority(&mut self, stake_authority: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake_authority(&mut self, stake_authority: solana_address::Address) -> &mut Self {
         self.stake_authority = Some(stake_authority);
         self
     }
@@ -130,7 +129,7 @@ impl DeactivateBuilder {
     pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = Deactivate {
             stake: self.stake.expect("stake is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_pubkey::pubkey!(
+            clock_sysvar: self.clock_sysvar.unwrap_or(solana_address::address!(
                 "SysvarC1ock11111111111111111111111111111111"
             )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),

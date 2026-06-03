@@ -13,11 +13,11 @@ pub const DEACTIVATE_DELINQUENT_DISCRIMINATOR: u32 = 14;
 #[derive(Debug)]
 pub struct DeactivateDelinquent {
     /// Delegated stake account
-    pub stake: solana_pubkey::Pubkey,
+    pub stake: solana_address::Address,
     /// Delinquent vote account for the delegated stake account
-    pub delinquent_vote: solana_pubkey::Pubkey,
+    pub delinquent_vote: solana_address::Address,
     /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
-    pub reference_vote: solana_pubkey::Pubkey,
+    pub reference_vote: solana_address::Address,
 }
 
 impl DeactivateDelinquent {
@@ -54,7 +54,6 @@ impl DeactivateDelinquent {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeactivateDelinquentInstructionData {
     discriminator: u32,
 }
@@ -84,9 +83,9 @@ impl Default for DeactivateDelinquentInstructionData {
 ///   2. `[]` reference_vote
 #[derive(Clone, Debug, Default)]
 pub struct DeactivateDelinquentBuilder {
-    stake: Option<solana_pubkey::Pubkey>,
-    delinquent_vote: Option<solana_pubkey::Pubkey>,
-    reference_vote: Option<solana_pubkey::Pubkey>,
+    stake: Option<solana_address::Address>,
+    delinquent_vote: Option<solana_address::Address>,
+    reference_vote: Option<solana_address::Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
 }
 
@@ -96,19 +95,19 @@ impl DeactivateDelinquentBuilder {
     }
     /// Delegated stake account
     #[inline(always)]
-    pub fn stake(&mut self, stake: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
         self
     }
     /// Delinquent vote account for the delegated stake account
     #[inline(always)]
-    pub fn delinquent_vote(&mut self, delinquent_vote: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn delinquent_vote(&mut self, delinquent_vote: solana_address::Address) -> &mut Self {
         self.delinquent_vote = Some(delinquent_vote);
         self
     }
     /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     #[inline(always)]
-    pub fn reference_vote(&mut self, reference_vote: solana_pubkey::Pubkey) -> &mut Self {
+    pub fn reference_vote(&mut self, reference_vote: solana_address::Address) -> &mut Self {
         self.reference_vote = Some(reference_vote);
         self
     }

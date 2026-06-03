@@ -12,6 +12,8 @@ import {
     getStructEncoder,
     getU32Decoder,
     getU32Encoder,
+    SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+    SolanaError,
     transformEncoder,
     type AccountMeta,
     type AccountSignerMeta,
@@ -28,12 +30,12 @@ import {
     type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
-import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const MERGE_DISCRIMINATOR = 7;
 
-export function getMergeDiscriminatorBytes() {
+export function getMergeDiscriminatorBytes(): ReadonlyUint8Array {
     return getU32Encoder().encode(MERGE_DISCRIMINATOR);
 }
 
@@ -135,7 +137,7 @@ export function getMergeInstruction<
         stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
-    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedAccount>;
+    const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Resolve default values.
     if (!accounts.clockSysvar.value) {
@@ -150,11 +152,11 @@ export function getMergeInstruction<
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
-            getAccountMeta(accounts.destinationStake),
-            getAccountMeta(accounts.sourceStake),
-            getAccountMeta(accounts.clockSysvar),
-            getAccountMeta(accounts.stakeHistory),
-            getAccountMeta(accounts.stakeAuthority),
+            getAccountMeta('destinationStake', accounts.destinationStake),
+            getAccountMeta('sourceStake', accounts.sourceStake),
+            getAccountMeta('clockSysvar', accounts.clockSysvar),
+            getAccountMeta('stakeHistory', accounts.stakeHistory),
+            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
         ],
         data: getMergeInstructionDataEncoder().encode({}),
         programAddress,
@@ -194,8 +196,10 @@ export function parseMergeInstruction<TProgram extends string, TAccountMetas ext
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMergeInstruction<TProgram, TAccountMetas> {
     if (instruction.accounts.length < 5) {
-        // TODO: Coded error.
-        throw new Error('Not enough accounts');
+        throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
+            actualAccountMetas: instruction.accounts.length,
+            expectedAccountMetas: 5,
+        });
     }
     let accountIndex = 0;
     const getNextAccount = () => {
