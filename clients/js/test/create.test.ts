@@ -1,10 +1,15 @@
 import { expect, it } from 'vitest';
-import { createDefaultSolanaClient, generateKeyPairSignerWithSol } from './_setup';
 
-it('creates a keypair', async () => {
-    // Given an authority key pair with some SOL.
-    const client = createDefaultSolanaClient();
-    const authority = await generateKeyPairSignerWithSol(client);
+import { createTestClient } from './_setup';
 
-    expect(authority.address.length > 0).toBe(true);
+it('sets up a LiteSVM client with the stake program', async () => {
+    // Given a test client whose payer is funded with SOL.
+    const client = await createTestClient();
+
+    // Then the client exposes the stake program plugin.
+    expect(client.stake).toBeDefined();
+
+    // And the payer was funded via LiteSVM.
+    const { value: balance } = await client.rpc.getBalance(client.payer.address).send();
+    expect(balance).toBe(1_000_000_000n);
 });
