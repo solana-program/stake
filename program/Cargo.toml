@@ -44,7 +44,7 @@ solana-program-test = { version = "3.1.3", features = ["agave-unstable-api"] }
 solana-pubkey = { version = "4.2.0", features = ["rand"] }
 solana-sdk-ids = "3.1.0"
 solana-signature = "3.4.1"
-solana-signer = "3.0.0"
+solana-signer = "3.0.1"
 # TODO: Remove after agave/mollusk/stake-program depend on aligned StakeHistory version
 #       Either solana-stake-interface v3 or new solana-stake-history crate
 solana-stake-interface-v2 = { package = "solana-stake-interface", version = "2.0.1" }
