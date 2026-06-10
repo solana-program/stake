@@ -18,8 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut formatted_json = serde_json::to_string_pretty(&parsed)?;
     formatted_json.push('\n');
 
-    // Write IDL file.
-    let idl_path = Path::new(&manifest_dir).join("idl.json");
+    // Write the IDL file at the workspace root (the parent of this crate).
+    let idl_path = crate_path
+        .parent()
+        .ok_or("could not determine workspace root")?
+        .join("idl.json");
     fs::write(&idl_path, formatted_json)?;
 
     println!("IDL written to: {}", idl_path.display());

@@ -1,7 +1,7 @@
 import * as c from 'codama';
 
 export default {
-    idl: 'interface/idl.json',
+    idl: 'idl.json',
     before: [
         {
             from: 'codama#updateProgramsVisitor',
