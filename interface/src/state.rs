@@ -99,7 +99,14 @@ macro_rules! impl_borsh_stake_state {
     codama(enum_discriminator(size = number(u32)))
 )]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -165,7 +172,14 @@ impl StakeState {
     codama(enum_discriminator(size = number(u32)))
 )]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -290,7 +304,14 @@ impl StakeStateV2 {
     codama(enum_discriminator(size = number(u32)))
 )]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
@@ -304,7 +325,14 @@ pub enum StakeAuthorize {
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -338,7 +366,14 @@ impl Lockup {
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -423,7 +458,14 @@ impl Authorized {
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -485,7 +527,14 @@ impl Meta {
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Debug, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
@@ -925,7 +974,14 @@ impl Delegation {
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
