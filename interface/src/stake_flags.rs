@@ -5,7 +5,14 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 #[repr(transparent)]
 #[cfg_attr(feature = "codama", derive(codama_macros::CodamaType))]
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Debug)]
-#[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
+#[cfg_attr(
+    feature = "frozen-abi",
+    derive(
+        solana_frozen_abi_macro::AbiExample,
+        solana_frozen_abi_macro::StableAbi,
+        solana_frozen_abi_macro::StableAbiSample
+    )
+)]
 #[cfg_attr(
     feature = "borsh",
     derive(BorshSerialize, BorshDeserialize, BorshSchema),
