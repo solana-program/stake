@@ -2,7 +2,15 @@
     "name": "@solana-program/stake",
     "version": "0.6.1",
     "description": "JavaScript client for the Stake program",
+    "homepage": "https://github.com/solana-program/stake#readme",
+    "bugs": {
+        "url": "https://github.com/solana-program/stake/issues"
+    },
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/solana-program/stake.git"
+    },
     "files": [
         "./dist/src",
         "./dist/types",
