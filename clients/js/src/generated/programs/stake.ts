@@ -18,6 +18,7 @@ import {
     type ClientWithRpc,
     type ClientWithTransactionPlanning,
     type ClientWithTransactionSending,
+    type ExtendedClient,
     type GetAccountInfoApi,
     type GetMultipleAccountsApi,
     type Instruction,
@@ -312,7 +313,12 @@ export function parseStakeInstruction<TProgram extends string>(
     }
 }
 
-export type StakePlugin = { accounts: StakePluginAccounts; instructions: StakePluginInstructions };
+export type StakePlugin = {
+    accounts: StakePluginAccounts;
+    instructions: StakePluginInstructions;
+    identifyInstruction: typeof identifyStakeInstruction;
+    parseInstruction: typeof parseStakeInstruction;
+};
 
 export type StakePluginAccounts = {
     stakeStateAccount: ReturnType<typeof getStakeStateAccountCodec> &
@@ -362,7 +368,7 @@ export type StakePluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMulti
     ClientWithTransactionSending;
 
 export function stakeProgram() {
-    return <T extends StakePluginRequirements>(client: T): Omit<T, 'stake'> & { stake: StakePlugin } => {
+    return <T extends StakePluginRequirements>(client: T): ExtendedClient<T, { stake: StakePlugin }> => {
         return extendClient(client, {
             stake: <StakePlugin>{
                 accounts: { stakeStateAccount: addSelfFetchFunctions(client, getStakeStateAccountCodec()) },
@@ -392,6 +398,8 @@ export function stakeProgram() {
                     moveStake: input => addSelfPlanAndSendFunctions(client, getMoveStakeInstruction(input)),
                     moveLamports: input => addSelfPlanAndSendFunctions(client, getMoveLamportsInstruction(input)),
                 },
+                identifyInstruction: identifyStakeInstruction,
+                parseInstruction: parseStakeInstruction,
             },
         });
     };
