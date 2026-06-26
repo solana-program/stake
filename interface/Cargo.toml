@@ -30,9 +30,8 @@ solana-frozen-abi-macro = { version = "3.6.0", features = ["frozen-abi"], option
 solana-instruction = "3.4.0"
 solana-program-error = "3.0.1"
 solana-pubkey = { version = "4.2.0", default-features = false }
+solana-stake-history = "1.0.0"
 solana-system-interface = "3.0.0"
-solana-sysvar = { version = "4.0.0", optional = true }
-solana-sysvar-id = { version = "3.1.0", optional = true }
 wincode = { version = "0.5.5", features = ["derive"],  optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
@@ -65,7 +64,6 @@ bincode = [
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
-    "solana-sysvar/bincode",
     "serde"
 ]
 borsh = [
@@ -80,8 +78,8 @@ frozen-abi = [
     "dep:solana-frozen-abi-macro",
     "solana-instruction/frozen-abi",
     "solana-pubkey/frozen-abi",
-    "solana-sysvar/frozen-abi",
+    "solana-stake-history/frozen-abi",
 ]
-serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde", "solana-sysvar/serde"]
-sysvar = ["dep:solana-sysvar", "dep:solana-sysvar-id"]
-wincode = ["dep:wincode", "solana-pubkey/wincode"]
+serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde", "solana-stake-history/serde"]
+sysvar = ["solana-stake-history/sysvar"]
+wincode = ["dep:wincode", "solana-pubkey/wincode", "solana-stake-history/wincode"]
