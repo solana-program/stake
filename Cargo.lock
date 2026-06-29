@@ -7092,7 +7092,7 @@ dependencies = [
 
 [[package]]
 name = "solana-stake-interface"
-version = "4.3.0"
+version = "4.3.1"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -7118,7 +7118,7 @@ dependencies = [
  "solana-pubkey 4.2.0",
  "solana-sdk-ids",
  "solana-stake-history",
- "solana-stake-interface 4.3.0",
+ "solana-stake-interface 4.3.1",
  "solana-system-interface 3.0.0",
  "static_assertions",
  "strum 0.28.0",
@@ -7162,7 +7162,7 @@ dependencies = [
  "solana-signature",
  "solana-signer",
  "solana-stake-interface 2.0.1",
- "solana-stake-interface 4.3.0",
+ "solana-stake-interface 4.3.1",
  "solana-svm-log-collector",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",
