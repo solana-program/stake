@@ -40,6 +40,14 @@ on:
         required: true
         type: boolean
         default: true
+      run-semver:
+        description: |
+          Run semver checks.
+          Only disable checks if you are sure of the semver impact of your change and have a good reason
+          to skip it.
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   set_env:
@@ -81,4 +89,5 @@ jobs:
       version: ${{ inputs.version }}
       create-release: ${{ inputs['create-release'] }}
       dry-run: ${{ inputs['dry-run'] }}
+      run-semver: ${{ inputs['run-semver'] }}
     secrets: inherit
