@@ -203,7 +203,7 @@ dependencies = [
  "solana-stake-interface 2.0.1",
  "solana-svm-callback",
  "solana-svm-feature-set",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-measure",
  "solana-svm-timings",
  "solana-svm-type-overrides",
@@ -3324,7 +3324,7 @@ dependencies = [
  "solana-slot-hashes",
  "solana-stake-interface 2.0.1",
  "solana-svm-callback",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-timings",
  "solana-svm-transaction",
  "solana-system-program",
@@ -5257,7 +5257,7 @@ dependencies = [
  "solana-sbpf",
  "solana-sdk-ids",
  "solana-svm-feature-set",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-measure",
  "solana-svm-type-overrides",
  "solana-system-interface 2.0.0",
@@ -6002,7 +6002,7 @@ dependencies = [
  "solana-pubkey 3.0.0",
  "solana-sbpf",
  "solana-sdk-ids",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-measure",
  "solana-svm-type-overrides",
  "solana-transaction-context",
@@ -6308,7 +6308,7 @@ dependencies = [
  "solana-stake-interface 2.0.1",
  "solana-svm-callback",
  "solana-svm-feature-set",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-measure",
  "solana-svm-timings",
  "solana-svm-transaction",
@@ -6371,7 +6371,7 @@ dependencies = [
  "solana-stable-layout",
  "solana-stake-interface 2.0.1",
  "solana-svm",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-timings",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",
@@ -7163,7 +7163,7 @@ dependencies = [
  "solana-signer",
  "solana-stake-interface 2.0.1",
  "solana-stake-interface 4.3.1",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 4.1.1",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",
  "solana-sysvar-id",
@@ -7250,7 +7250,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-svm-callback",
  "solana-svm-feature-set",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-measure",
  "solana-svm-timings",
  "solana-svm-transaction",
@@ -7286,6 +7286,15 @@ name = "solana-svm-log-collector"
 version = "3.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93afa0242ccc1ec642845f75773ba5aaf63a3cd0953dd2d09d47beb2ca4e8fe2"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "solana-svm-log-collector"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afdf3074910afe016266bf73606724543b6829b5656221c8060ebcfcc844b39a"
 dependencies = [
  "log",
 ]
@@ -7379,7 +7388,7 @@ dependencies = [
  "solana-program-runtime",
  "solana-pubkey 3.0.0",
  "solana-sdk-ids",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-svm-type-overrides",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",
@@ -7827,7 +7836,7 @@ dependencies = [
  "solana-instruction",
  "solana-program-runtime",
  "solana-sdk-ids",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-zk-sdk",
 ]
 
@@ -7881,7 +7890,7 @@ dependencies = [
  "solana-instruction",
  "solana-program-runtime",
  "solana-sdk-ids",
- "solana-svm-log-collector",
+ "solana-svm-log-collector 3.1.3",
  "solana-zk-token-sdk",
 ]
 
