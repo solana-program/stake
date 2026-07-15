@@ -1,6 +1,6 @@
 {
     "name": "@solana-program/stake",
-    "version": "0.7.2",
+    "version": "0.8.0",
     "description": "JavaScript client for the Stake program",
     "homepage": "https://github.com/solana-program/stake#readme",
     "bugs": {
