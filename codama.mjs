@@ -37,8 +37,13 @@ export default {
                                 definedTypes: [
                                     // Add Epoch type alias
                                     c.definedTypeNode({ name: 'epoch', type: c.numberTypeNode('u64') }),
-                                    // Add UnixTimestamp type alias
-                                    c.definedTypeNode({ name: 'unixTimestamp', type: c.numberTypeNode('i64') }),
+                                    // Add UnixTimestamp type alias, displayed as a date-time
+                                    c.definedTypeNode({
+                                        name: 'unixTimestamp',
+                                        type: c.numberTypeNode('i64', 'le', {
+                                            display: c.dateTimeNumberDisplayNode({}),
+                                        }),
+                                    }),
                                     ...node.definedTypes,
                                 ],
                             };
@@ -58,7 +63,7 @@ export default {
                             return {
                                 ...node,
                                 accounts: [
-                                    ...node.accounts,
+                                    ...(node.accounts ?? []),
                                     // Stake account wrapper for client convenience
                                     c.accountNode({
                                         name: 'stakeStateAccount',
@@ -96,6 +101,9 @@ export default {
                             c.assertIsNode(node, 'instructionNode');
                             return {
                                 ...node,
+                                // The Rust-generated IDL omits empty account lists, which some
+                                // renderers still expect to be present.
+                                accounts: node.accounts ?? [],
                                 optionalAccountStrategy: 'omitted',
                                 arguments: node.arguments.map(arg =>
                                     arg.name === 'discriminator' ? { ...arg, type: c.numberTypeNode('u32') } : arg,
@@ -129,6 +137,22 @@ export default {
             {
                 from: 'codama#updateAccountsVisitor',
                 args: [{ stakeStateAccount: { delete: true } }],
+            },
+            {
+                // Codama node helpers omit empty account lists when rebuilding nodes,
+                // but the Rust renderer templates expect them to be present.
+                from: 'codama#bottomUpTransformerVisitor',
+                args: [
+                    [
+                        {
+                            select: '[instructionNode]',
+                            transform: node => {
+                                c.assertIsNode(node, 'instructionNode');
+                                return { ...node, accounts: node.accounts ?? [] };
+                            },
+                        },
+                    ],
+                ],
             },
             {
                 from: '@codama/renderers-rust',
