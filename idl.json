@@ -1,8 +1,6 @@
 {
-  "additionalPrograms": [],
   "kind": "rootNode",
   "program": {
-    "accounts": [],
     "definedTypes": [
       {
         "kind": "definedTypeNode",
@@ -10,6 +8,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
+              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
@@ -26,6 +28,10 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
+              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
@@ -66,6 +72,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
+              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
@@ -82,6 +92,10 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
+              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
@@ -107,6 +121,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "New Authority"
+              },
               "kind": "structFieldTypeNode",
               "name": "newAuthorizedPubkey",
               "type": {
@@ -114,6 +132,10 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
+              },
               "kind": "structFieldTypeNode",
               "name": "stakeAuthorize",
               "type": {
@@ -154,6 +176,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
+              },
               "kind": "structFieldTypeNode",
               "name": "stakeAuthorize",
               "type": {
@@ -342,6 +368,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
+              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
@@ -350,6 +380,10 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
+              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
@@ -400,6 +434,17 @@
               "kind": "structFieldTypeNode",
               "name": "rentExemptReserve",
               "type": {
+                "display": {
+                  "decimals": {
+                    "kind": "numberValueNode",
+                    "number": 9
+                  },
+                  "kind": "amountNumberDisplayNode",
+                  "unit": {
+                    "kind": "stringValueNode",
+                    "string": "SOL"
+                  }
+                },
                 "endian": "le",
                 "format": "u64",
                 "kind": "numberTypeNode"
@@ -431,6 +476,10 @@
         "type": {
           "fields": [
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Vote Account"
+              },
               "kind": "structFieldTypeNode",
               "name": "voterPubkey",
               "type": {
@@ -438,9 +487,24 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Delegated Amount"
+              },
               "kind": "structFieldTypeNode",
               "name": "stake",
               "type": {
+                "display": {
+                  "decimals": {
+                    "kind": "numberValueNode",
+                    "number": 9
+                  },
+                  "kind": "amountNumberDisplayNode",
+                  "unit": {
+                    "kind": "stringValueNode",
+                    "string": "SOL"
+                  }
+                },
                 "endian": "le",
                 "format": "u64",
                 "kind": "numberTypeNode"
@@ -463,6 +527,10 @@
               }
             },
             {
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "skip": "always"
+              },
               "kind": "structFieldTypeNode",
               "name": "reserved",
               "type": {
@@ -613,11 +681,14 @@
         "name": "epochRewardsActive"
       }
     ],
-    "events": [],
     "instructions": [
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Uninitialized stake account"
             ],
@@ -630,6 +701,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Rent sysvar"
@@ -647,6 +722,10 @@
               "number": 0
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -656,6 +735,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -664,6 +747,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg1",
             "type": {
@@ -679,12 +766,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Initialize stake account",
+          "interpolatedIntent": "Initialize stake account ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "initialize"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account to be updated"
             ],
@@ -697,6 +793,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -733,6 +833,10 @@
               "number": 1
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -742,6 +846,10 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "New Authority"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -749,6 +857,10 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Authority Type"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg1",
             "type": {
@@ -764,12 +876,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${data.arg0}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "authorize"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Initialized stake account to be delegated"
             ],
@@ -779,6 +900,10 @@
             "name": "stake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Vote Account"
+            },
             "docs": [
               "Vote account to which this stake will be delegated"
             ],
@@ -791,6 +916,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -805,6 +934,10 @@
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarStakeHistory1111111111111111111111111"
             },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -814,6 +947,10 @@
             "name": "stakeHistory"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            },
             "docs": [
               "Unused account, formerly the stake config"
             ],
@@ -839,6 +976,10 @@
               "number": 2
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -855,12 +996,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Delegate stake",
+          "interpolatedIntent": "Delegate ${accounts.stake} to vote account ${accounts.vote}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "delegateStake"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account to be split; must be in the Initialized or Stake state"
             ],
@@ -870,6 +1020,10 @@
             "name": "stake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "New Stake Account"
+            },
             "docs": [
               "Uninitialized stake account that will take the split-off amount"
             ],
@@ -895,6 +1049,10 @@
               "number": 3
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -904,9 +1062,24 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            },
             "kind": "instructionArgumentNode",
             "name": "args",
             "type": {
+              "display": {
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "kind": "amountNumberDisplayNode",
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              },
               "endian": "le",
               "format": "u64",
               "kind": "numberTypeNode"
@@ -920,12 +1093,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Split stake",
+          "interpolatedIntent": "Split ${data.args} from ${accounts.stake} into ${accounts.splitStake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "split"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account from which to withdraw"
             ],
@@ -948,6 +1130,10 @@
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
             },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -960,6 +1146,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
@@ -996,6 +1186,10 @@
               "number": 4
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1005,9 +1199,24 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            },
             "kind": "instructionArgumentNode",
             "name": "args",
             "type": {
+              "display": {
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "kind": "amountNumberDisplayNode",
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              },
               "endian": "le",
               "format": "u64",
               "kind": "numberTypeNode"
@@ -1021,12 +1230,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Withdraw stake",
+          "interpolatedIntent": "Withdraw ${data.args} from ${accounts.stake} to ${accounts.recipient}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "withdraw"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Delegated stake account to be deactivated"
             ],
@@ -1039,6 +1257,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -1065,6 +1287,10 @@
               "number": 5
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1081,12 +1307,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Deactivate stake",
+          "interpolatedIntent": "Deactivate ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "deactivate"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Initialized stake account"
             ],
@@ -1112,6 +1347,10 @@
               "number": 6
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1121,6 +1360,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -1136,12 +1379,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Set stake lockup",
+          "interpolatedIntent": "Update the lockup of ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "setLockup"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            },
             "docs": [
               "Destination stake account for the merge"
             ],
@@ -1151,6 +1403,10 @@
             "name": "destinationStake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            },
             "docs": [
               "Source stake account for to merge.  This account will be drained"
             ],
@@ -1164,6 +1420,10 @@
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
             },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            },
             "docs": [
               "Clock sysvar"
             ],
@@ -1176,6 +1436,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
@@ -1202,6 +1466,10 @@
               "number": 7
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1218,12 +1486,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Merge stake accounts",
+          "interpolatedIntent": "Merge ${accounts.sourceStake} into ${accounts.destinationStake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "merge"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account to be updated"
             ],
@@ -1233,6 +1510,10 @@
             "name": "stake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Base Key"
+            },
             "docs": [
               "Base key of stake or withdraw authority"
             ],
@@ -1245,6 +1526,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -1272,6 +1557,10 @@
               "number": 8
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1281,6 +1570,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -1296,12 +1589,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Change an authority of ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "authorizeWithSeed"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Uninitialized stake account"
             ],
@@ -1314,6 +1616,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Rent sysvar"
@@ -1349,6 +1655,10 @@
               "number": 9
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1365,12 +1675,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Initialize stake account",
+          "interpolatedIntent": "Initialize stake account ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "initializeChecked"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account to be updated"
             ],
@@ -1383,6 +1702,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -1428,6 +1751,10 @@
               "number": 10
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1437,6 +1764,10 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Authority Type"
+            },
             "kind": "instructionArgumentNode",
             "name": "stakeAuthorize",
             "type": {
@@ -1452,12 +1783,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${accounts.newAuthority}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "authorizeChecked"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Stake account to be updated"
             ],
@@ -1467,6 +1807,10 @@
             "name": "stake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Base Key"
+            },
             "docs": [
               "Base key of stake or withdraw authority"
             ],
@@ -1479,6 +1823,10 @@
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
             },
             "docs": [
               "Clock sysvar"
@@ -1515,6 +1863,10 @@
               "number": 11
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1524,6 +1876,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -1539,12 +1895,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${accounts.newAuthority}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "authorizeCheckedWithSeed"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Initialized stake account"
             ],
@@ -1580,6 +1945,10 @@
               "number": 12
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1589,6 +1958,10 @@
             }
           },
           {
+            "display": {
+              "flatten": true,
+              "kind": "structFieldDisplayNode"
+            },
             "kind": "instructionArgumentNode",
             "name": "arg0",
             "type": {
@@ -1604,11 +1977,15 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Set stake lockup",
+          "interpolatedIntent": "Update the lockup of ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "setLockupChecked"
       },
       {
-        "accounts": [],
         "arguments": [
           {
             "defaultValue": {
@@ -1616,6 +1993,10 @@
               "number": 13
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1632,12 +2013,20 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Get minimum stake delegation",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "getMinimumDelegation"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            },
             "docs": [
               "Delegated stake account"
             ],
@@ -1647,6 +2036,10 @@
             "name": "stake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Delinquent Vote Account"
+            },
             "docs": [
               "Delinquent vote account for the delegated stake account"
             ],
@@ -1656,6 +2049,10 @@
             "name": "delinquentVote"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Reference Vote Account"
+            },
             "docs": [
               "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
             ],
@@ -1672,6 +2069,10 @@
               "number": 14
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1688,11 +2089,15 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Deactivate delinquent stake",
+          "interpolatedIntent": "Deactivate delinquent stake ${accounts.stake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "deactivateDelinquent"
       },
       {
-        "accounts": [],
         "arguments": [
           {
             "defaultValue": {
@@ -1700,6 +2105,10 @@
               "number": 15
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1722,6 +2131,10 @@
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            },
             "docs": [
               "Active source stake account"
             ],
@@ -1731,6 +2144,10 @@
             "name": "sourceStake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            },
             "docs": [
               "Active or inactive destination stake account"
             ],
@@ -1756,6 +2173,10 @@
               "number": 16
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1765,9 +2186,24 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            },
             "kind": "instructionArgumentNode",
             "name": "args",
             "type": {
+              "display": {
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "kind": "amountNumberDisplayNode",
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              },
               "endian": "le",
               "format": "u64",
               "kind": "numberTypeNode"
@@ -1781,12 +2217,21 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Move stake",
+          "interpolatedIntent": "Move ${data.args} of active stake from ${accounts.sourceStake} to ${accounts.destinationStake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "moveStake"
       },
       {
         "accounts": [
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            },
             "docs": [
               "Active or inactive source stake account"
             ],
@@ -1796,6 +2241,10 @@
             "name": "sourceStake"
           },
           {
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            },
             "docs": [
               "Mergeable destination stake account"
             ],
@@ -1821,6 +2270,10 @@
               "number": 17
             },
             "defaultValueStrategy": "omitted",
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            },
             "kind": "instructionArgumentNode",
             "name": "discriminator",
             "type": {
@@ -1830,9 +2283,24 @@
             }
           },
           {
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            },
             "kind": "instructionArgumentNode",
             "name": "args",
             "type": {
+              "display": {
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "kind": "amountNumberDisplayNode",
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              },
               "endian": "le",
               "format": "u64",
               "kind": "numberTypeNode"
@@ -1846,16 +2314,20 @@
             "offset": 0
           }
         ],
+        "display": {
+          "intent": "Move unstaked SOL",
+          "interpolatedIntent": "Move ${data.args} from ${accounts.sourceStake} to ${accounts.destinationStake}",
+          "kind": "instructionDisplayNode"
+        },
         "kind": "instructionNode",
         "name": "moveLamports"
       }
     ],
     "kind": "programNode",
     "name": "solanaStakeInterface",
-    "pdas": [],
     "publicKey": "Stake11111111111111111111111111111111111111",
     "version": "4.4.0"
   },
   "standard": "codama",
-  "version": "1.0.0"
+  "version": "1.8.0"
 }

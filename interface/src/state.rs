@@ -346,9 +346,11 @@ pub enum StakeAuthorize {
 pub struct Lockup {
     /// `UnixTimestamp` at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
+    #[cfg_attr(feature = "codama", codama(display(label = "Locked Until")))]
     pub unix_timestamp: UnixTimestamp,
     /// epoch height at which this stake will allow withdrawal, unless the
     ///   transaction is signed by the custodian
+    #[cfg_attr(feature = "codama", codama(display(label = "Locked Until Epoch")))]
     pub epoch: Epoch,
     /// custodian signature on a transaction exempts the operation from
     ///  lockup constraints
@@ -482,6 +484,10 @@ pub struct Meta {
         note = "Stake account rent must be calculated via the `Rent` sysvar. \
         This value will cease to be correct once lamports-per-byte is adjusted."
     )]
+    #[cfg_attr(
+        feature = "codama",
+        codama(display(amount(decimals = 9, unit = "SOL")))
+    )]
     pub rent_exempt_reserve: u64,
     pub authorized: Authorized,
     pub lockup: Lockup,
@@ -547,8 +553,13 @@ impl Meta {
 #[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct Delegation {
     /// to whom the stake is delegated
+    #[cfg_attr(feature = "codama", codama(display(label = "Vote Account")))]
     pub voter_pubkey: Pubkey,
     /// activated stake amount, set at delegate() time
+    #[cfg_attr(
+        feature = "codama",
+        codama(display(label = "Delegated Amount", amount(decimals = 9, unit = "SOL")))
+    )]
     pub stake: u64,
     /// epoch at which this stake was activated, `std::u64::MAX` if is a bootstrap stake
     pub activation_epoch: Epoch,
@@ -556,6 +567,7 @@ pub struct Delegation {
     pub deactivation_epoch: Epoch,
     /// Formerly the `warmup_cooldown_rate: f64`, but floats are not eBPF-compatible.
     /// It is unused, but this field is now reserved to maintain layout compatibility.
+    #[cfg_attr(feature = "codama", codama(display(skip = always)))]
     pub _reserved: [u8; 8],
 }
 
