@@ -878,7 +878,7 @@
         ],
         "display": {
           "intent": "Update stake authority",
-          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${data.arg0}",
+          "interpolatedIntent": "Set the ${data.arg1} authority of ${accounts.stake} to ${data.arg0}",
           "kind": "instructionDisplayNode"
         },
         "kind": "instructionNode",
@@ -1785,7 +1785,7 @@
         ],
         "display": {
           "intent": "Update stake authority",
-          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${accounts.newAuthority}",
+          "interpolatedIntent": "Set the ${data.stakeAuthorize} authority of ${accounts.stake} to ${accounts.newAuthority}",
           "kind": "instructionDisplayNode"
         },
         "kind": "instructionNode",

@@ -87,7 +87,7 @@ pub enum StakeInstruction {
         feature = "codama",
         codama(display(
             intent = "Update stake authority",
-            interpolated_intent = "Set an authority of ${accounts.stake} to ${data.arg0}"
+            interpolated_intent = "Set the ${data.arg1} authority of ${accounts.stake} to ${data.arg0}"
         )),
         codama(account(
             name = "stake",
@@ -460,7 +460,7 @@ pub enum StakeInstruction {
         feature = "codama",
         codama(display(
             intent = "Update stake authority",
-            interpolated_intent = "Set an authority of ${accounts.stake} to ${accounts.newAuthority}"
+            interpolated_intent = "Set the ${data.stakeAuthorize} authority of ${accounts.stake} to ${accounts.newAuthority}"
         )),
         codama(account(
             name = "stake",
