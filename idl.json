@@ -1,146 +1,1795 @@
 {
   "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
   "program": {
+    "kind": "programNode",
+    "name": "solanaStakeInterface",
+    "publicKey": "Stake11111111111111111111111111111111111111",
+    "version": "4.4.0",
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "initialize",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Uninitialized stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "rentSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Rent sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "authorized"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg1",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "lockup"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Initialize stake account",
+          "interpolatedIntent": "Initialize stake account ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "authorize",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account to be updated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The stake or withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "publicKeyTypeNode"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "New Authority"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg1",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "stakeAuthorize"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Authority Type"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set the ${data.arg1} authority of ${accounts.stake} to ${data.arg0}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "delegateStake",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Initialized stake account to be delegated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "vote",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Vote account to which this stake will be delegated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Vote Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeHistory",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Stake history sysvar that carries stake warmup/cooldown history"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "unused",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Unused account, formerly the stake config"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 2
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Delegate stake",
+          "interpolatedIntent": "Delegate ${accounts.stake} to vote account ${accounts.vote}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "split",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account to be split; must be in the Initialized or Stake state"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "splitStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Uninitialized stake account that will take the split-off amount"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "New Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 3
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le",
+              "display": {
+                "kind": "amountNumberDisplayNode",
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              }
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Split stake",
+          "interpolatedIntent": "Split ${data.args} from ${accounts.stake} into ${accounts.splitStake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "withdraw",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account from which to withdraw"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "recipient",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Recipient account"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeHistory",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Stake history sysvar that carries stake warmup/cooldown history"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "withdrawAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "Lockup authority, if before lockup expiration"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 4
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le",
+              "display": {
+                "kind": "amountNumberDisplayNode",
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              }
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Withdraw stake",
+          "interpolatedIntent": "Withdraw ${data.args} from ${accounts.stake} to ${accounts.recipient}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "deactivate",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Delegated stake account to be deactivated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 5
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Deactivate stake",
+          "interpolatedIntent": "Deactivate ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "setLockup",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Initialized stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Lockup authority or withdraw authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 6
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "lockupArgs"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Set stake lockup",
+          "interpolatedIntent": "Update the lockup of ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "merge",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "destinationStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Destination stake account for the merge"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "sourceStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Source stake account for to merge.  This account will be drained"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeHistory",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Stake history sysvar that carries stake warmup/cooldown history"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarStakeHistory1111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 7
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Merge stake accounts",
+          "interpolatedIntent": "Merge ${accounts.sourceStake} into ${accounts.destinationStake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "authorizeWithSeed",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account to be updated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "base",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Base key of stake or withdraw authority"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Base Key"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 8
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "authorizeWithSeedArgs"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Change an authority of ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "initializeChecked",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Uninitialized stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "rentSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Rent sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarRent111111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "The stake authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "withdrawAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The withdraw authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 9
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Initialize stake account",
+          "interpolatedIntent": "Initialize stake account ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "authorizeChecked",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account to be updated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The stake or withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "newAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The new stake or withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 10
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "stakeAuthorize",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "stakeAuthorize"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Authority Type"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set the ${data.stakeAuthorize} authority of ${accounts.stake} to ${accounts.newAuthority}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "authorizeCheckedWithSeed",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Stake account to be updated"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "base",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Base key of stake or withdraw authority"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Base Key"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "clockSysvar",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Clock sysvar"
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "SysvarC1ock11111111111111111111111111111111"
+            },
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "newAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The new stake or withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "lockupAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 11
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "authorizeCheckedWithSeedArgs"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Update stake authority",
+          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${accounts.newAuthority}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "setLockupChecked",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Initialized stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Lockup authority or withdraw authority"
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "newAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": true,
+            "docs": [
+              "New lockup authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 12
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "arg0",
+            "type": {
+              "kind": "definedTypeLinkNode",
+              "name": "lockupCheckedArgs"
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "flatten": true
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Set stake lockup",
+          "interpolatedIntent": "Update the lockup of ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "getMinimumDelegation",
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 13
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Get minimum stake delegation"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "deactivateDelinquent",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "stake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Delegated stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Stake Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "delinquentVote",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Delinquent vote account for the delegated stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Delinquent Vote Account"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "referenceVote",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "Reference Vote Account"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 14
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Deactivate delinquent stake",
+          "interpolatedIntent": "Deactivate delinquent stake ${accounts.stake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "redelegate",
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 15
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "moveStake",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "sourceStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Active source stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "destinationStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Active or inactive destination stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 16
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le",
+              "display": {
+                "kind": "amountNumberDisplayNode",
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              }
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Move stake",
+          "interpolatedIntent": "Move ${data.args} of active stake from ${accounts.sourceStake} to ${accounts.destinationStake}"
+        }
+      },
+      {
+        "kind": "instructionNode",
+        "name": "moveLamports",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "sourceStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Active or inactive source stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "From"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "destinationStake",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "Mergeable destination stake account"
+            ],
+            "display": {
+              "kind": "instructionAccountDisplayNode",
+              "label": "To"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "stakeAuthority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "Stake authority"
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 17
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "args",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le",
+              "display": {
+                "kind": "amountNumberDisplayNode",
+                "decimals": {
+                  "kind": "numberValueNode",
+                  "number": 9
+                },
+                "unit": {
+                  "kind": "stringValueNode",
+                  "string": "SOL"
+                }
+              }
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "label": "Amount"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ],
+        "display": {
+          "kind": "instructionDisplayNode",
+          "intent": "Move unstaked SOL",
+          "interpolatedIntent": "Move ${data.args} from ${accounts.sourceStake} to ${accounts.destinationStake}"
+        }
+      }
+    ],
     "definedTypes": [
       {
         "kind": "definedTypeNode",
         "name": "lockupParams",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until"
-              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
+                "kind": "optionTypeNode",
                 "item": {
                   "kind": "definedTypeLinkNode",
                   "name": "unixTimestamp"
                 },
-                "kind": "optionTypeNode",
                 "prefix": {
-                  "endian": "le",
+                  "kind": "numberTypeNode",
                   "format": "u8",
-                  "kind": "numberTypeNode"
+                  "endian": "le"
                 }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until Epoch"
-              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
+                "kind": "optionTypeNode",
                 "item": {
                   "kind": "definedTypeLinkNode",
                   "name": "epoch"
                 },
-                "kind": "optionTypeNode",
                 "prefix": {
-                  "endian": "le",
+                  "kind": "numberTypeNode",
                   "format": "u8",
-                  "kind": "numberTypeNode"
+                  "endian": "le"
                 }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
               }
             },
             {
               "kind": "structFieldTypeNode",
               "name": "custodian",
               "type": {
+                "kind": "optionTypeNode",
                 "item": {
                   "kind": "publicKeyTypeNode"
                 },
-                "kind": "optionTypeNode",
                 "prefix": {
-                  "endian": "le",
+                  "kind": "numberTypeNode",
                   "format": "u8",
-                  "kind": "numberTypeNode"
+                  "endian": "le"
                 }
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "lockupCheckedParams",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until"
-              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
+                "kind": "optionTypeNode",
                 "item": {
                   "kind": "definedTypeLinkNode",
                   "name": "unixTimestamp"
                 },
-                "kind": "optionTypeNode",
                 "prefix": {
-                  "endian": "le",
+                  "kind": "numberTypeNode",
                   "format": "u8",
-                  "kind": "numberTypeNode"
+                  "endian": "le"
                 }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until Epoch"
-              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
+                "kind": "optionTypeNode",
                 "item": {
                   "kind": "definedTypeLinkNode",
                   "name": "epoch"
                 },
-                "kind": "optionTypeNode",
                 "prefix": {
-                  "endian": "le",
+                  "kind": "numberTypeNode",
                   "format": "u8",
-                  "kind": "numberTypeNode"
+                  "endian": "le"
                 }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "authorizeWithSeedParams",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "New Authority"
-              },
               "kind": "structFieldTypeNode",
               "name": "newAuthorizedPubkey",
               "type": {
                 "kind": "publicKeyTypeNode"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "New Authority"
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Authority Type"
-              },
               "kind": "structFieldTypeNode",
               "name": "stakeAuthorize",
               "type": {
                 "kind": "definedTypeLinkNode",
                 "name": "stakeAuthorize"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
               }
             },
             {
@@ -148,14 +1797,14 @@
               "name": "authoritySeed",
               "type": {
                 "kind": "sizePrefixTypeNode",
-                "prefix": {
-                  "endian": "le",
-                  "format": "u64",
-                  "kind": "numberTypeNode"
-                },
                 "type": {
-                  "encoding": "utf8",
-                  "kind": "stringTypeNode"
+                  "kind": "stringTypeNode",
+                  "encoding": "utf8"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
                 }
               }
             },
@@ -166,25 +1815,25 @@
                 "kind": "publicKeyTypeNode"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "authorizeCheckedWithSeedParams",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Authority Type"
-              },
               "kind": "structFieldTypeNode",
               "name": "stakeAuthorize",
               "type": {
                 "kind": "definedTypeLinkNode",
                 "name": "stakeAuthorize"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
               }
             },
             {
@@ -192,14 +1841,14 @@
               "name": "authoritySeed",
               "type": {
                 "kind": "sizePrefixTypeNode",
-                "prefix": {
-                  "endian": "le",
-                  "format": "u64",
-                  "kind": "numberTypeNode"
-                },
                 "type": {
-                  "encoding": "utf8",
-                  "kind": "stringTypeNode"
+                  "kind": "stringTypeNode",
+                  "encoding": "utf8"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
                 }
               }
             },
@@ -210,26 +1859,25 @@
                 "kind": "publicKeyTypeNode"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "stakeFlags",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
               "kind": "structFieldTypeNode",
               "name": "bits",
               "type": {
-                "endian": "le",
+                "kind": "numberTypeNode",
                 "format": "u8",
-                "kind": "numberTypeNode"
+                "endian": "le"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
@@ -237,11 +1885,6 @@
         "name": "stakeState",
         "type": {
           "kind": "enumTypeNode",
-          "size": {
-            "endian": "le",
-            "format": "u32",
-            "kind": "numberTypeNode"
-          },
           "variants": [
             {
               "kind": "enumEmptyVariantTypeNode",
@@ -251,19 +1894,20 @@
               "kind": "enumTupleVariantTypeNode",
               "name": "initialized",
               "tuple": {
+                "kind": "tupleTypeNode",
                 "items": [
                   {
                     "kind": "definedTypeLinkNode",
                     "name": "meta"
                   }
-                ],
-                "kind": "tupleTypeNode"
+                ]
               }
             },
             {
               "kind": "enumTupleVariantTypeNode",
               "name": "stake",
               "tuple": {
+                "kind": "tupleTypeNode",
                 "items": [
                   {
                     "kind": "definedTypeLinkNode",
@@ -273,15 +1917,19 @@
                     "kind": "definedTypeLinkNode",
                     "name": "stake"
                   }
-                ],
-                "kind": "tupleTypeNode"
+                ]
               }
             },
             {
               "kind": "enumEmptyVariantTypeNode",
               "name": "rewardsPool"
             }
-          ]
+          ],
+          "size": {
+            "kind": "numberTypeNode",
+            "format": "u32",
+            "endian": "le"
+          }
         }
       },
       {
@@ -289,11 +1937,6 @@
         "name": "stakeStateV2",
         "type": {
           "kind": "enumTypeNode",
-          "size": {
-            "endian": "le",
-            "format": "u32",
-            "kind": "numberTypeNode"
-          },
           "variants": [
             {
               "kind": "enumEmptyVariantTypeNode",
@@ -303,19 +1946,20 @@
               "kind": "enumTupleVariantTypeNode",
               "name": "initialized",
               "tuple": {
+                "kind": "tupleTypeNode",
                 "items": [
                   {
                     "kind": "definedTypeLinkNode",
                     "name": "meta"
                   }
-                ],
-                "kind": "tupleTypeNode"
+                ]
               }
             },
             {
               "kind": "enumTupleVariantTypeNode",
               "name": "stake",
               "tuple": {
+                "kind": "tupleTypeNode",
                 "items": [
                   {
                     "kind": "definedTypeLinkNode",
@@ -329,15 +1973,19 @@
                     "kind": "definedTypeLinkNode",
                     "name": "stakeFlags"
                   }
-                ],
-                "kind": "tupleTypeNode"
+                ]
               }
             },
             {
               "kind": "enumEmptyVariantTypeNode",
               "name": "rewardsPool"
             }
-          ]
+          ],
+          "size": {
+            "kind": "numberTypeNode",
+            "format": "u32",
+            "endian": "le"
+          }
         }
       },
       {
@@ -345,11 +1993,6 @@
         "name": "stakeAuthorize",
         "type": {
           "kind": "enumTypeNode",
-          "size": {
-            "endian": "le",
-            "format": "u32",
-            "kind": "numberTypeNode"
-          },
           "variants": [
             {
               "kind": "enumEmptyVariantTypeNode",
@@ -359,36 +2002,42 @@
               "kind": "enumEmptyVariantTypeNode",
               "name": "withdrawer"
             }
-          ]
+          ],
+          "size": {
+            "kind": "numberTypeNode",
+            "format": "u32",
+            "endian": "le"
+          }
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "lockup",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until"
-              },
               "kind": "structFieldTypeNode",
               "name": "unixTimestamp",
               "type": {
                 "kind": "definedTypeLinkNode",
                 "name": "unixTimestamp"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Locked Until Epoch"
-              },
               "kind": "structFieldTypeNode",
               "name": "epoch",
               "type": {
                 "kind": "definedTypeLinkNode",
                 "name": "epoch"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
               }
             },
             {
@@ -398,14 +2047,14 @@
                 "kind": "publicKeyTypeNode"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "authorized",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
               "kind": "structFieldTypeNode",
@@ -421,33 +2070,33 @@
                 "kind": "publicKeyTypeNode"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "meta",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
               "kind": "structFieldTypeNode",
               "name": "rentExemptReserve",
               "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le",
                 "display": {
+                  "kind": "amountNumberDisplayNode",
                   "decimals": {
                     "kind": "numberValueNode",
                     "number": 9
                   },
-                  "kind": "amountNumberDisplayNode",
                   "unit": {
                     "kind": "stringValueNode",
                     "string": "SOL"
                   }
-                },
-                "endian": "le",
-                "format": "u64",
-                "kind": "numberTypeNode"
+                }
               }
             },
             {
@@ -466,48 +2115,48 @@
                 "name": "lockup"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "delegation",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Vote Account"
-              },
               "kind": "structFieldTypeNode",
               "name": "voterPubkey",
               "type": {
                 "kind": "publicKeyTypeNode"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Vote Account"
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "label": "Delegated Amount"
-              },
               "kind": "structFieldTypeNode",
               "name": "stake",
               "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le",
                 "display": {
+                  "kind": "amountNumberDisplayNode",
                   "decimals": {
                     "kind": "numberValueNode",
                     "number": 9
                   },
-                  "kind": "amountNumberDisplayNode",
                   "unit": {
                     "kind": "stringValueNode",
                     "string": "SOL"
                   }
-                },
-                "endian": "le",
-                "format": "u64",
-                "kind": "numberTypeNode"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Delegated Amount"
               }
             },
             {
@@ -527,33 +2176,33 @@
               }
             },
             {
-              "display": {
-                "kind": "structFieldDisplayNode",
-                "skip": "always"
-              },
               "kind": "structFieldTypeNode",
               "name": "reserved",
               "type": {
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                },
                 "count": {
                   "kind": "fixedCountNode",
                   "value": 8
-                },
-                "item": {
-                  "endian": "le",
-                  "format": "u8",
-                  "kind": "numberTypeNode"
-                },
-                "kind": "arrayTypeNode"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "skip": "always"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
         "name": "stake",
         "type": {
+          "kind": "structTypeNode",
           "fields": [
             {
               "kind": "structFieldTypeNode",
@@ -567,1767 +2216,118 @@
               "kind": "structFieldTypeNode",
               "name": "creditsObserved",
               "type": {
-                "endian": "le",
+                "kind": "numberTypeNode",
                 "format": "u64",
-                "kind": "numberTypeNode"
+                "endian": "le"
               }
             }
-          ],
-          "kind": "structTypeNode"
+          ]
         }
       }
     ],
     "errors": [
       {
+        "kind": "errorNode",
+        "name": "noCreditsToRedeem",
         "code": 0,
-        "kind": "errorNode",
-        "message": "Not enough credits to redeem",
-        "name": "noCreditsToRedeem"
+        "message": "Not enough credits to redeem"
       },
       {
+        "kind": "errorNode",
+        "name": "lockupInForce",
         "code": 1,
-        "kind": "errorNode",
-        "message": "Lockup has not yet expired",
-        "name": "lockupInForce"
+        "message": "Lockup has not yet expired"
       },
       {
+        "kind": "errorNode",
+        "name": "alreadyDeactivated",
         "code": 2,
-        "kind": "errorNode",
-        "message": "Stake already deactivated",
-        "name": "alreadyDeactivated"
+        "message": "Stake already deactivated"
       },
       {
+        "kind": "errorNode",
+        "name": "tooSoonToRedelegate",
         "code": 3,
-        "kind": "errorNode",
-        "message": "One re-delegation permitted per epoch",
-        "name": "tooSoonToRedelegate"
+        "message": "One re-delegation permitted per epoch"
       },
       {
+        "kind": "errorNode",
+        "name": "insufficientStake",
         "code": 4,
-        "kind": "errorNode",
-        "message": "Split amount is more than is staked",
-        "name": "insufficientStake"
+        "message": "Split amount is more than is staked"
       },
       {
+        "kind": "errorNode",
+        "name": "mergeTransientStake",
         "code": 5,
-        "kind": "errorNode",
-        "message": "Stake account with transient stake cannot be merged",
-        "name": "mergeTransientStake"
+        "message": "Stake account with transient stake cannot be merged"
       },
       {
+        "kind": "errorNode",
+        "name": "mergeMismatch",
         "code": 6,
-        "kind": "errorNode",
-        "message": "Stake account merge failed due to different authority, lockups or state",
-        "name": "mergeMismatch"
+        "message": "Stake account merge failed due to different authority, lockups or state"
       },
       {
+        "kind": "errorNode",
+        "name": "custodianMissing",
         "code": 7,
-        "kind": "errorNode",
-        "message": "Custodian address not present",
-        "name": "custodianMissing"
+        "message": "Custodian address not present"
       },
       {
+        "kind": "errorNode",
+        "name": "custodianSignatureMissing",
         "code": 8,
-        "kind": "errorNode",
-        "message": "Custodian signature not present",
-        "name": "custodianSignatureMissing"
+        "message": "Custodian signature not present"
       },
       {
+        "kind": "errorNode",
+        "name": "insufficientReferenceVotes",
         "code": 9,
-        "kind": "errorNode",
-        "message": "Insufficient voting activity in the reference vote account",
-        "name": "insufficientReferenceVotes"
+        "message": "Insufficient voting activity in the reference vote account"
       },
       {
+        "kind": "errorNode",
+        "name": "voteAddressMismatch",
         "code": 10,
-        "kind": "errorNode",
-        "message": "Stake account is not delegated to the provided vote account",
-        "name": "voteAddressMismatch"
+        "message": "Stake account is not delegated to the provided vote account"
       },
       {
+        "kind": "errorNode",
+        "name": "minimumDelinquentEpochsForDeactivationNotMet",
         "code": 11,
-        "kind": "errorNode",
-        "message": "Stake account has not been delinquent for the minimum epochs required for deactivation",
-        "name": "minimumDelinquentEpochsForDeactivationNotMet"
+        "message": "Stake account has not been delinquent for the minimum epochs required for deactivation"
       },
       {
+        "kind": "errorNode",
+        "name": "insufficientDelegation",
         "code": 12,
-        "kind": "errorNode",
-        "message": "Delegation amount is less than the minimum",
-        "name": "insufficientDelegation"
+        "message": "Delegation amount is less than the minimum"
       },
       {
+        "kind": "errorNode",
+        "name": "redelegateTransientOrInactiveStake",
         "code": 13,
-        "kind": "errorNode",
-        "message": "Stake account with transient or inactive stake cannot be redelegated",
-        "name": "redelegateTransientOrInactiveStake"
+        "message": "Stake account with transient or inactive stake cannot be redelegated"
       },
       {
+        "kind": "errorNode",
+        "name": "redelegateToSameVoteAccount",
         "code": 14,
-        "kind": "errorNode",
-        "message": "Stake redelegation to the same vote account is not permitted",
-        "name": "redelegateToSameVoteAccount"
+        "message": "Stake redelegation to the same vote account is not permitted"
       },
       {
+        "kind": "errorNode",
+        "name": "redelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted",
         "code": 15,
-        "kind": "errorNode",
-        "message": "Redelegated stake must be fully activated before deactivation",
-        "name": "redelegatedStakeMustFullyActivateBeforeDeactivationIsPermitted"
+        "message": "Redelegated stake must be fully activated before deactivation"
       },
       {
+        "kind": "errorNode",
+        "name": "epochRewardsActive",
         "code": 16,
-        "kind": "errorNode",
-        "message": "Stake action is not permitted while the epoch rewards period is active",
-        "name": "epochRewardsActive"
+        "message": "Stake action is not permitted while the epoch rewards period is active"
       }
-    ],
-    "instructions": [
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Uninitialized stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarRent111111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Rent sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "rentSysvar"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 0
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "authorized"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg1",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "lockup"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Initialize stake account",
-          "interpolatedIntent": "Initialize stake account ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "initialize"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account to be updated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "docs": [
-              "The stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "authority"
-          },
-          {
-            "docs": [
-              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 1
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "New Authority"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "publicKeyTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Authority Type"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg1",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "stakeAuthorize"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Update stake authority",
-          "interpolatedIntent": "Set the ${data.arg1} authority of ${accounts.stake} to ${data.arg0}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "authorize"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Initialized stake account to be delegated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Vote Account"
-            },
-            "docs": [
-              "Vote account to which this stake will be delegated"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "vote"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Unused account, formerly the stake config"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "unused"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 2
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Delegate stake",
-          "interpolatedIntent": "Delegate ${accounts.stake} to vote account ${accounts.vote}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "delegateStake"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account to be split; must be in the Initialized or Stake state"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "New Stake Account"
-            },
-            "docs": [
-              "Uninitialized stake account that will take the split-off amount"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "splitStake"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 3
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Amount"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "args",
-            "type": {
-              "display": {
-                "decimals": {
-                  "kind": "numberValueNode",
-                  "number": 9
-                },
-                "kind": "amountNumberDisplayNode",
-                "unit": {
-                  "kind": "stringValueNode",
-                  "string": "SOL"
-                }
-              },
-              "endian": "le",
-              "format": "u64",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Split stake",
-          "interpolatedIntent": "Split ${data.args} from ${accounts.stake} into ${accounts.splitStake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "split"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account from which to withdraw"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "docs": [
-              "Recipient account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "recipient"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory"
-          },
-          {
-            "docs": [
-              "Withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "withdrawAuthority"
-          },
-          {
-            "docs": [
-              "Lockup authority, if before lockup expiration"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 4
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Amount"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "args",
-            "type": {
-              "display": {
-                "decimals": {
-                  "kind": "numberValueNode",
-                  "number": 9
-                },
-                "kind": "amountNumberDisplayNode",
-                "unit": {
-                  "kind": "stringValueNode",
-                  "string": "SOL"
-                }
-              },
-              "endian": "le",
-              "format": "u64",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Withdraw stake",
-          "interpolatedIntent": "Withdraw ${data.args} from ${accounts.stake} to ${accounts.recipient}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "withdraw"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Delegated stake account to be deactivated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 5
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Deactivate stake",
-          "interpolatedIntent": "Deactivate ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "deactivate"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Initialized stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "docs": [
-              "Lockup authority or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "authority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 6
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "lockupArgs"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Set stake lockup",
-          "interpolatedIntent": "Update the lockup of ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "setLockup"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "To"
-            },
-            "docs": [
-              "Destination stake account for the merge"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "destinationStake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "From"
-            },
-            "docs": [
-              "Source stake account for to merge.  This account will be drained"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "sourceStake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 7
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Merge stake accounts",
-          "interpolatedIntent": "Merge ${accounts.sourceStake} into ${accounts.destinationStake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "merge"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account to be updated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Base Key"
-            },
-            "docs": [
-              "Base key of stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "base"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "docs": [
-              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 8
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "authorizeWithSeedArgs"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Update stake authority",
-          "interpolatedIntent": "Change an authority of ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "authorizeWithSeed"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Uninitialized stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarRent111111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Rent sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "rentSysvar"
-          },
-          {
-            "docs": [
-              "The stake authority"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          },
-          {
-            "docs": [
-              "The withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "withdrawAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 9
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Initialize stake account",
-          "interpolatedIntent": "Initialize stake account ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "initializeChecked"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account to be updated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "docs": [
-              "The stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "authority"
-          },
-          {
-            "docs": [
-              "The new stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "newAuthority"
-          },
-          {
-            "docs": [
-              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 10
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Authority Type"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "stakeAuthorize",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "stakeAuthorize"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Update stake authority",
-          "interpolatedIntent": "Set the ${data.stakeAuthorize} authority of ${accounts.stake} to ${accounts.newAuthority}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "authorizeChecked"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Stake account to be updated"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Base Key"
-            },
-            "docs": [
-              "Base key of stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "base"
-          },
-          {
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            },
-            "docs": [
-              "Clock sysvar"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar"
-          },
-          {
-            "docs": [
-              "The new stake or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "newAuthority"
-          },
-          {
-            "docs": [
-              "Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "lockupAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 11
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "authorizeCheckedWithSeedArgs"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Update stake authority",
-          "interpolatedIntent": "Set an authority of ${accounts.stake} to ${accounts.newAuthority}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "authorizeCheckedWithSeed"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Initialized stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "docs": [
-              "Lockup authority or withdraw authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "authority"
-          },
-          {
-            "docs": [
-              "New lockup authority"
-            ],
-            "isOptional": true,
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "newAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 12
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "flatten": true,
-              "kind": "structFieldDisplayNode"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "arg0",
-            "type": {
-              "kind": "definedTypeLinkNode",
-              "name": "lockupCheckedArgs"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Set stake lockup",
-          "interpolatedIntent": "Update the lockup of ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "setLockupChecked"
-      },
-      {
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 13
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Get minimum stake delegation",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "getMinimumDelegation"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Stake Account"
-            },
-            "docs": [
-              "Delegated stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "stake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Delinquent Vote Account"
-            },
-            "docs": [
-              "Delinquent vote account for the delegated stake account"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "delinquentVote"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "Reference Vote Account"
-            },
-            "docs": [
-              "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
-            ],
-            "isSigner": false,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "referenceVote"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 14
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Deactivate delinquent stake",
-          "interpolatedIntent": "Deactivate delinquent stake ${accounts.stake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "deactivateDelinquent"
-      },
-      {
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 15
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "kind": "instructionNode",
-        "name": "redelegate"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "From"
-            },
-            "docs": [
-              "Active source stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "sourceStake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "To"
-            },
-            "docs": [
-              "Active or inactive destination stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "destinationStake"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 16
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Amount"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "args",
-            "type": {
-              "display": {
-                "decimals": {
-                  "kind": "numberValueNode",
-                  "number": 9
-                },
-                "kind": "amountNumberDisplayNode",
-                "unit": {
-                  "kind": "stringValueNode",
-                  "string": "SOL"
-                }
-              },
-              "endian": "le",
-              "format": "u64",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Move stake",
-          "interpolatedIntent": "Move ${data.args} of active stake from ${accounts.sourceStake} to ${accounts.destinationStake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "moveStake"
-      },
-      {
-        "accounts": [
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "From"
-            },
-            "docs": [
-              "Active or inactive source stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "sourceStake"
-          },
-          {
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "label": "To"
-            },
-            "docs": [
-              "Mergeable destination stake account"
-            ],
-            "isSigner": false,
-            "isWritable": true,
-            "kind": "instructionAccountNode",
-            "name": "destinationStake"
-          },
-          {
-            "docs": [
-              "Stake authority"
-            ],
-            "isSigner": true,
-            "isWritable": false,
-            "kind": "instructionAccountNode",
-            "name": "stakeAuthority"
-          }
-        ],
-        "arguments": [
-          {
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 17
-            },
-            "defaultValueStrategy": "omitted",
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "skip": "always"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "discriminator",
-            "type": {
-              "endian": "le",
-              "format": "u8",
-              "kind": "numberTypeNode"
-            }
-          },
-          {
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Amount"
-            },
-            "kind": "instructionArgumentNode",
-            "name": "args",
-            "type": {
-              "display": {
-                "decimals": {
-                  "kind": "numberValueNode",
-                  "number": 9
-                },
-                "kind": "amountNumberDisplayNode",
-                "unit": {
-                  "kind": "stringValueNode",
-                  "string": "SOL"
-                }
-              },
-              "endian": "le",
-              "format": "u64",
-              "kind": "numberTypeNode"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "fieldDiscriminatorNode",
-            "name": "discriminator",
-            "offset": 0
-          }
-        ],
-        "display": {
-          "intent": "Move unstaked SOL",
-          "interpolatedIntent": "Move ${data.args} from ${accounts.sourceStake} to ${accounts.destinationStake}",
-          "kind": "instructionDisplayNode"
-        },
-        "kind": "instructionNode",
-        "name": "moveLamports"
-      }
-    ],
-    "kind": "programNode",
-    "name": "solanaStakeInterface",
-    "publicKey": "Stake11111111111111111111111111111111111111",
-    "version": "4.4.0"
-  },
-  "standard": "codama",
-  "version": "1.8.0"
+    ]
+  }
 }
