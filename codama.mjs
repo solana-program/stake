@@ -4,10 +4,6 @@ export default {
     idl: 'idl.json',
     before: [
         {
-            from: 'codama#updateProgramsVisitor',
-            args: [{ solanaStakeInterface: { name: 'stake' } }],
-        },
-        {
             from: 'codama#updateInstructionsVisitor',
             args: [{ redelegate: { delete: true } }],
         },

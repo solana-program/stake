@@ -4,7 +4,7 @@
   "version": "1.8.0",
   "program": {
     "kind": "programNode",
-    "name": "solanaStakeInterface",
+    "name": "stake",
     "publicKey": "Stake11111111111111111111111111111111111111",
     "version": "4.4.0",
     "instructions": [

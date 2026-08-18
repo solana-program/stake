@@ -17,12 +17,12 @@ pub mod tools;
 mod ulp;
 pub mod warmup_cooldown_allowance;
 
-#[cfg(feature = "codama")]
-use codama_macros::codama;
-#[cfg_attr(feature = "codama", codama(name = "stake"))]
 pub mod program {
     solana_pubkey::declare_id!("Stake11111111111111111111111111111111111111");
 }
+
+#[cfg(feature = "codama")]
+codama_macros::codama_program!(name = "stake");
 
 /// The minimum number of epochs before stake account that is delegated to a delinquent vote
 /// account may be unstaked with `StakeInstruction::DeactivateDelinquent`
