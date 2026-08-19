@@ -11,6 +11,7 @@
       {
         "kind": "instructionNode",
         "name": "initialize",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -50,7 +51,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -103,6 +104,7 @@
       {
         "kind": "instructionNode",
         "name": "authorize",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -161,7 +163,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -213,6 +215,7 @@
       {
         "kind": "instructionNode",
         "name": "delegateStake",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -304,7 +307,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -333,6 +336,7 @@
       {
         "kind": "instructionNode",
         "name": "split",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -377,7 +381,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -430,6 +434,7 @@
       {
         "kind": "instructionNode",
         "name": "withdraw",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -514,7 +519,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -567,6 +572,7 @@
       {
         "kind": "instructionNode",
         "name": "deactivate",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -615,7 +621,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -644,6 +650,7 @@
       {
         "kind": "instructionNode",
         "name": "setLockup",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -675,7 +682,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -692,7 +699,7 @@
             "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "lockupArgs"
+              "name": "lockupParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
@@ -716,6 +723,7 @@
       {
         "kind": "instructionNode",
         "name": "merge",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -794,7 +802,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -823,6 +831,7 @@
       {
         "kind": "instructionNode",
         "name": "authorizeWithSeed",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -885,7 +894,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -902,7 +911,7 @@
             "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "authorizeWithSeedArgs"
+              "name": "authorizeWithSeedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
@@ -926,6 +935,7 @@
       {
         "kind": "instructionNode",
         "name": "initializeChecked",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -983,7 +993,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1012,6 +1022,7 @@
       {
         "kind": "instructionNode",
         "name": "authorizeChecked",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1079,7 +1090,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1120,6 +1131,7 @@
       {
         "kind": "instructionNode",
         "name": "authorizeCheckedWithSeed",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1191,7 +1203,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1208,7 +1220,7 @@
             "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "authorizeCheckedWithSeedArgs"
+              "name": "authorizeCheckedWithSeedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
@@ -1232,6 +1244,7 @@
       {
         "kind": "instructionNode",
         "name": "setLockupChecked",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1273,7 +1286,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1290,7 +1303,7 @@
             "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "lockupCheckedArgs"
+              "name": "lockupCheckedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
@@ -1314,6 +1327,7 @@
       {
         "kind": "instructionNode",
         "name": "getMinimumDelegation",
+        "optionalAccountStrategy": "omitted",
         "arguments": [
           {
             "kind": "instructionArgumentNode",
@@ -1321,7 +1335,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1349,6 +1363,7 @@
       {
         "kind": "instructionNode",
         "name": "deactivateDelinquent",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1397,7 +1412,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1426,6 +1441,7 @@
       {
         "kind": "instructionNode",
         "name": "redelegate",
+        "optionalAccountStrategy": "omitted",
         "arguments": [
           {
             "kind": "instructionArgumentNode",
@@ -1433,7 +1449,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1457,6 +1473,7 @@
       {
         "kind": "instructionNode",
         "name": "moveStake",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1501,7 +1518,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
@@ -1554,6 +1571,7 @@
       {
         "kind": "instructionNode",
         "name": "moveLamports",
+        "optionalAccountStrategy": "omitted",
         "accounts": [
           {
             "kind": "instructionAccountNode",
@@ -1598,7 +1616,7 @@
             "defaultValueStrategy": "omitted",
             "type": {
               "kind": "numberTypeNode",
-              "format": "u8",
+              "format": "u32",
               "endian": "le"
             },
             "defaultValue": {
