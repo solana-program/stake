@@ -18,7 +18,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Uninitialized stake account"
             ],
@@ -32,7 +31,6 @@
             "name": "rentSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Rent sysvar"
             ],
@@ -113,7 +111,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account to be updated"
             ],
@@ -127,7 +124,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -145,7 +141,6 @@
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "The stake or withdraw authority"
             ]
@@ -227,7 +222,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Initialized stake account to be delegated"
             ],
@@ -241,7 +235,6 @@
             "name": "vote",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Vote account to which this stake will be delegated"
             ],
@@ -255,7 +248,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -273,7 +265,6 @@
             "name": "stakeHistory",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -291,7 +282,6 @@
             "name": "unused",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Unused account, formerly the stake config"
             ],
@@ -305,7 +295,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -354,7 +343,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account to be split; must be in the Initialized or Stake state"
             ],
@@ -368,7 +356,6 @@
             "name": "splitStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Uninitialized stake account that will take the split-off amount"
             ],
@@ -382,7 +369,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -455,7 +441,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account from which to withdraw"
             ],
@@ -469,7 +454,6 @@
             "name": "recipient",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Recipient account"
             ]
@@ -479,7 +463,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -497,7 +480,6 @@
             "name": "stakeHistory",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -515,7 +497,6 @@
             "name": "withdrawAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Withdraw authority"
             ]
@@ -598,7 +579,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Delegated stake account to be deactivated"
             ],
@@ -612,7 +592,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -630,7 +609,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -679,7 +657,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Initialized stake account"
             ],
@@ -693,7 +670,6 @@
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Lockup authority or withdraw authority"
             ]
@@ -720,60 +696,14 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "unixTimestamp",
+            "name": "arg0",
             "type": {
-              "kind": "optionTypeNode",
-              "fixed": false,
-              "item": {
-                "kind": "definedTypeLinkNode",
-                "name": "unixTimestamp"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
+              "kind": "definedTypeLinkNode",
+              "name": "lockupParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
-              "label": "Locked Until"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "epoch",
-            "type": {
-              "kind": "optionTypeNode",
-              "fixed": false,
-              "item": {
-                "kind": "definedTypeLinkNode",
-                "name": "epoch"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
-            },
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Locked Until Epoch"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "custodian",
-            "type": {
-              "kind": "optionTypeNode",
-              "fixed": false,
-              "item": {
-                "kind": "publicKeyTypeNode"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
+              "flatten": true
             }
           }
         ],
@@ -800,7 +730,6 @@
             "name": "destinationStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Destination stake account for the merge"
             ],
@@ -814,7 +743,6 @@
             "name": "sourceStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Source stake account for to merge.  This account will be drained"
             ],
@@ -828,7 +756,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -846,7 +773,6 @@
             "name": "stakeHistory",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake history sysvar that carries stake warmup/cooldown history"
             ],
@@ -864,7 +790,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -913,7 +838,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account to be updated"
             ],
@@ -927,7 +851,6 @@
             "name": "base",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Base key of stake or withdraw authority"
             ],
@@ -941,7 +864,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -986,48 +908,14 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "newAuthorizedPubkey",
-            "type": {
-              "kind": "publicKeyTypeNode"
-            },
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "New Authority"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "stakeAuthorize",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "stakeAuthorize"
+              "name": "authorizeWithSeedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
-              "label": "Authority Type"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "authoritySeed",
-            "type": {
-              "kind": "sizePrefixTypeNode",
-              "type": {
-                "kind": "stringTypeNode",
-                "encoding": "utf8"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u64",
-                "endian": "le"
-              }
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "authorityOwner",
-            "type": {
-              "kind": "publicKeyTypeNode"
+              "flatten": true
             }
           }
         ],
@@ -1054,7 +942,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Uninitialized stake account"
             ],
@@ -1068,7 +955,6 @@
             "name": "rentSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Rent sysvar"
             ],
@@ -1086,7 +972,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "The stake authority"
             ]
@@ -1096,7 +981,6 @@
             "name": "withdrawAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "The withdraw authority"
             ]
@@ -1145,7 +1029,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account to be updated"
             ],
@@ -1159,7 +1042,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -1177,7 +1059,6 @@
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "The stake or withdraw authority"
             ]
@@ -1187,7 +1068,6 @@
             "name": "newAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "The new stake or withdraw authority"
             ]
@@ -1258,7 +1138,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Stake account to be updated"
             ],
@@ -1272,7 +1151,6 @@
             "name": "base",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Base key of stake or withdraw authority"
             ],
@@ -1286,7 +1164,6 @@
             "name": "clockSysvar",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Clock sysvar"
             ],
@@ -1304,7 +1181,6 @@
             "name": "newAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "The new stake or withdraw authority"
             ]
@@ -1341,37 +1217,14 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "stakeAuthorize",
+            "name": "arg0",
             "type": {
               "kind": "definedTypeLinkNode",
-              "name": "stakeAuthorize"
+              "name": "authorizeCheckedWithSeedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
-              "label": "Authority Type"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "authoritySeed",
-            "type": {
-              "kind": "sizePrefixTypeNode",
-              "type": {
-                "kind": "stringTypeNode",
-                "encoding": "utf8"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u64",
-                "endian": "le"
-              }
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "authorityOwner",
-            "type": {
-              "kind": "publicKeyTypeNode"
+              "flatten": true
             }
           }
         ],
@@ -1398,7 +1251,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Initialized stake account"
             ],
@@ -1412,7 +1264,6 @@
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Lockup authority or withdraw authority"
             ]
@@ -1449,44 +1300,14 @@
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "unixTimestamp",
+            "name": "arg0",
             "type": {
-              "kind": "optionTypeNode",
-              "fixed": false,
-              "item": {
-                "kind": "definedTypeLinkNode",
-                "name": "unixTimestamp"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
+              "kind": "definedTypeLinkNode",
+              "name": "lockupCheckedParams"
             },
             "display": {
               "kind": "structFieldDisplayNode",
-              "label": "Locked Until"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "epoch",
-            "type": {
-              "kind": "optionTypeNode",
-              "fixed": false,
-              "item": {
-                "kind": "definedTypeLinkNode",
-                "name": "epoch"
-              },
-              "prefix": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
-            },
-            "display": {
-              "kind": "structFieldDisplayNode",
-              "label": "Locked Until Epoch"
+              "flatten": true
             }
           }
         ],
@@ -1549,7 +1370,6 @@
             "name": "stake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Delegated stake account"
             ],
@@ -1563,7 +1383,6 @@
             "name": "delinquentVote",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Delinquent vote account for the delegated stake account"
             ],
@@ -1577,7 +1396,6 @@
             "name": "referenceVote",
             "isWritable": false,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
             ],
@@ -1622,6 +1440,38 @@
       },
       {
         "kind": "instructionNode",
+        "name": "redelegate",
+        "optionalAccountStrategy": "omitted",
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u32",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 15
+            },
+            "display": {
+              "kind": "structFieldDisplayNode",
+              "skip": "always"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
         "name": "moveStake",
         "optionalAccountStrategy": "omitted",
         "accounts": [
@@ -1630,7 +1480,6 @@
             "name": "sourceStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Active source stake account"
             ],
@@ -1644,7 +1493,6 @@
             "name": "destinationStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Active or inactive destination stake account"
             ],
@@ -1658,7 +1506,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -1731,7 +1578,6 @@
             "name": "sourceStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Active or inactive source stake account"
             ],
@@ -1745,7 +1591,6 @@
             "name": "destinationStake",
             "isWritable": true,
             "isSigner": false,
-            "isOptional": false,
             "docs": [
               "Mergeable destination stake account"
             ],
@@ -1759,7 +1604,6 @@
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
-            "isOptional": false,
             "docs": [
               "Stake authority"
             ]
@@ -1826,23 +1670,214 @@
     "definedTypes": [
       {
         "kind": "definedTypeNode",
-        "name": "epoch",
+        "name": "lockupParams",
         "type": {
-          "kind": "numberTypeNode",
-          "format": "u64",
-          "endian": "le"
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "unixTimestamp",
+              "type": {
+                "kind": "optionTypeNode",
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "unixTimestamp"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "epoch",
+              "type": {
+                "kind": "optionTypeNode",
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "epoch"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "custodian",
+              "type": {
+                "kind": "optionTypeNode",
+                "item": {
+                  "kind": "publicKeyTypeNode"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              }
+            }
+          ]
         }
       },
       {
         "kind": "definedTypeNode",
-        "name": "unixTimestamp",
+        "name": "lockupCheckedParams",
         "type": {
-          "kind": "numberTypeNode",
-          "format": "i64",
-          "endian": "le",
-          "display": {
-            "kind": "dateTimeNumberDisplayNode"
-          }
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "unixTimestamp",
+              "type": {
+                "kind": "optionTypeNode",
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "unixTimestamp"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "epoch",
+              "type": {
+                "kind": "optionTypeNode",
+                "item": {
+                  "kind": "definedTypeLinkNode",
+                  "name": "epoch"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Locked Until Epoch"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "authorizeWithSeedParams",
+        "type": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "newAuthorizedPubkey",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "New Authority"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "stakeAuthorize",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "stakeAuthorize"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authoritySeed",
+              "type": {
+                "kind": "sizePrefixTypeNode",
+                "type": {
+                  "kind": "stringTypeNode",
+                  "encoding": "utf8"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authorityOwner",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "definedTypeNode",
+        "name": "authorizeCheckedWithSeedParams",
+        "type": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "stakeAuthorize",
+              "type": {
+                "kind": "definedTypeLinkNode",
+                "name": "stakeAuthorize"
+              },
+              "display": {
+                "kind": "structFieldDisplayNode",
+                "label": "Authority Type"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authoritySeed",
+              "type": {
+                "kind": "sizePrefixTypeNode",
+                "type": {
+                  "kind": "stringTypeNode",
+                  "encoding": "utf8"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "authorityOwner",
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            }
+          ]
         }
       },
       {
@@ -2310,25 +2345,6 @@
         "name": "epochRewardsActive",
         "code": 16,
         "message": "Stake action is not permitted while the epoch rewards period is active"
-      }
-    ],
-    "accounts": [
-      {
-        "kind": "accountNode",
-        "name": "stakeStateAccount",
-        "data": {
-          "kind": "structTypeNode",
-          "fields": [
-            {
-              "kind": "structFieldTypeNode",
-              "name": "state",
-              "type": {
-                "kind": "definedTypeLinkNode",
-                "name": "stakeStateV2"
-              }
-            }
-          ]
-        }
       }
     ]
   }

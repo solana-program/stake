@@ -78,7 +78,8 @@ generate-clients:
 
 generate-idl-%:
 	@cargo install --locked --version =0.13.1 codama-cli
-	codama-rs generate-idl $(call make-path,$*) -o idl.json --pretty $(ARGS)
+	codama-rs generate-idl $(call make-path,$*) -o interface-idl.json --pretty $(ARGS)
+	pnpm codama run idl
 
 # Helpers for publishing
 tag-name = $(lastword $(subst /, ,$(call make-path,$1)))
