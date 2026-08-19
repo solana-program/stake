@@ -7,17 +7,6 @@ export default {
             from: 'codama#updateInstructionsVisitor',
             args: [{ redelegate: { delete: true } }],
         },
-        {
-            from: 'codama#updateDefinedTypesVisitor',
-            args: [
-                {
-                    lockupArgs: { name: 'lockupParams' },
-                    lockupCheckedArgs: { name: 'lockupCheckedParams' },
-                    authorizeWithSeedArgs: { name: 'authorizeWithSeedParams' },
-                    authorizeCheckedWithSeedArgs: { name: 'authorizeCheckedWithSeedParams' },
-                },
-            ],
-        },
         'codama#unwrapInstructionArgsDefinedTypesVisitor',
         'codama#flattenInstructionDataArgumentsVisitor',
         {
@@ -71,39 +60,6 @@ export default {
                                         ]),
                                     }),
                                 ],
-                            };
-                        },
-                    },
-                    {
-                        // enum discriminator -> u32
-                        select: '[definedTypeNode]stakeState.[enumTypeNode]',
-                        transform: node => {
-                            c.assertIsNode(node, 'enumTypeNode');
-                            return { ...node, size: c.numberTypeNode('u32') };
-                        },
-                    },
-                    {
-                        // enum discriminator -> u32
-                        select: '[definedTypeNode]stakeStateV2.[enumTypeNode]',
-                        transform: node => {
-                            c.assertIsNode(node, 'enumTypeNode');
-                            return { ...node, size: c.numberTypeNode('u32') };
-                        },
-                    },
-                    {
-                        // Use omitted optional account strategy for all instructions.
-                        select: '[instructionNode]',
-                        transform: node => {
-                            c.assertIsNode(node, 'instructionNode');
-                            return {
-                                ...node,
-                                // The Rust-generated IDL omits empty account lists, which some
-                                // renderers still expect to be present.
-                                accounts: node.accounts ?? [],
-                                optionalAccountStrategy: 'omitted',
-                                arguments: node.arguments.map(arg =>
-                                    arg.name === 'discriminator' ? { ...arg, type: c.numberTypeNode('u32') } : arg,
-                                ),
                             };
                         },
                     },

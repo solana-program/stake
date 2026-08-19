@@ -40,6 +40,8 @@ const STAKE_HISTORY_ID: Pubkey =
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
 #[cfg_attr(feature = "codama", derive(CodamaInstructions))]
+#[cfg_attr(feature = "codama", codama(enum_discriminator(size = number(u32))))]
+#[cfg_attr(feature = "codama", codama(optional_account_strategy = omitted))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
@@ -308,7 +310,14 @@ pub enum StakeInstruction {
             docs = "Lockup authority or withdraw authority"
         ))
     )]
-    SetLockup(#[cfg_attr(feature = "codama", codama(display(flatten = true)))] LockupArgs),
+    SetLockup(
+        #[cfg_attr(
+            feature = "codama",
+            codama(type = link("lockupParams")),
+            codama(display(flatten = true))
+        )]
+        LockupArgs,
+    ),
 
     /// Merge two stake accounts.
     ///
@@ -408,7 +417,12 @@ pub enum StakeInstruction {
         ))
     )]
     AuthorizeWithSeed(
-        #[cfg_attr(feature = "codama", codama(display(flatten = true)))] AuthorizeWithSeedArgs,
+        #[cfg_attr(
+            feature = "codama",
+            codama(type = link("authorizeWithSeedParams")),
+            codama(display(flatten = true))
+        )]
+        AuthorizeWithSeedArgs,
     ),
 
     /// Initialize a stake with authorization information
@@ -545,7 +559,11 @@ pub enum StakeInstruction {
         ))
     )]
     AuthorizeCheckedWithSeed(
-        #[cfg_attr(feature = "codama", codama(display(flatten = true)))]
+        #[cfg_attr(
+            feature = "codama",
+            codama(type = link("authorizeCheckedWithSeedParams")),
+            codama(display(flatten = true))
+        )]
         AuthorizeCheckedWithSeedArgs,
     ),
 
@@ -586,7 +604,12 @@ pub enum StakeInstruction {
         ))
     )]
     SetLockupChecked(
-        #[cfg_attr(feature = "codama", codama(display(flatten = true)))] LockupCheckedArgs,
+        #[cfg_attr(
+            feature = "codama",
+            codama(type = link("lockupCheckedParams")),
+            codama(display(flatten = true))
+        )]
+        LockupCheckedArgs,
     ),
 
     /// Get the minimum stake delegation, in lamports
