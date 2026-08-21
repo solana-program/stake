@@ -1,7 +1,7 @@
 import * as c from 'codama';
 
 export default {
-    idl: 'idl.json',
+    idl: 'interface-idl.json',
     before: [
         {
             from: 'codama#updateInstructionsVisitor',
@@ -68,6 +68,10 @@ export default {
         },
     ],
     scripts: {
+        idl: {
+            from: '@codama/renderers-core#writeIdlVisitor',
+            args: ['idl.json'],
+        },
         js: {
             from: '@codama/renderers-js',
             args: [
