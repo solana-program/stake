@@ -7940,9 +7940,9 @@ dependencies = [
 
 [[package]]
 name = "spl-collections"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32f0cbfc37c8bc4f36b42e54a4728fe8d43f9801c723cd4a9b541b6455438ea6"
+checksum = "c92cbf30dd74a1aaedc93d1c4f8c08ed8b520103d27cdd8e646606a253839c86"
 dependencies = [
  "borsh",
 ]
