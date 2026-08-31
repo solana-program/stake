@@ -708,7 +708,7 @@ fn test_stake_checked_instructions() {
 
     // Test InitializeChecked with non-signing withdrawer
     let mut instruction = initialize_checked(&stake_address, &Authorized { staker, withdrawer });
-    instruction.accounts[3] = AccountMeta::new_readonly(withdrawer, false);
+    instruction.accounts[2] = AccountMeta::new_readonly(withdrawer, false);
     process_instruction_as_one_arg(
         &mollusk,
         &instruction,
@@ -763,7 +763,7 @@ fn test_stake_checked_instructions() {
         StakeAuthorize::Staker,
         None,
     );
-    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    instruction.accounts[2] = AccountMeta::new_readonly(staker, false);
     process_instruction_as_one_arg(
         &mollusk,
         &instruction,
@@ -777,7 +777,7 @@ fn test_stake_checked_instructions() {
         StakeAuthorize::Withdrawer,
         None,
     );
-    instruction.accounts[3] = AccountMeta::new_readonly(withdrawer, false);
+    instruction.accounts[2] = AccountMeta::new_readonly(withdrawer, false);
     process_instruction_as_one_arg(
         &mollusk,
         &instruction,
@@ -877,7 +877,7 @@ fn test_stake_checked_instructions() {
         StakeAuthorize::Staker,
         None,
     );
-    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    instruction.accounts[2] = AccountMeta::new_readonly(staker, false);
     process_instruction_as_one_arg(
         &mollusk,
         &instruction,
@@ -893,7 +893,7 @@ fn test_stake_checked_instructions() {
         StakeAuthorize::Withdrawer,
         None,
     );
-    instruction.accounts[3] = AccountMeta::new_readonly(staker, false);
+    instruction.accounts[2] = AccountMeta::new_readonly(staker, false);
     process_instruction_as_one_arg(
         &mollusk,
         &instruction,
