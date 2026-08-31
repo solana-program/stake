@@ -16,10 +16,6 @@ pub struct Withdraw {
     pub stake: solana_address::Address,
     /// Recipient account
     pub recipient: solana_address::Address,
-    /// Clock sysvar
-    pub clock_sysvar: solana_address::Address,
-    /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history: solana_address::Address,
     /// Withdraw authority
     pub withdraw_authority: solana_address::Address,
     /// Lockup authority, if before lockup expiration
@@ -37,17 +33,9 @@ impl Withdraw {
         args: WithdrawInstructionArgs,
         remaining_accounts: &[solana_instruction::AccountMeta],
     ) -> solana_instruction::Instruction {
-        let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
         accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            self.clock_sysvar,
-            false,
-        ));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            self.stake_history,
-            false,
-        ));
         accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.withdraw_authority,
             true,
@@ -109,16 +97,12 @@ impl WithdrawInstructionArgs {
 ///
 ///   0. `[writable]` stake
 ///   1. `[writable]` recipient
-///   2. `[optional]` clock_sysvar (default to `SysvarC1ock11111111111111111111111111111111`)
-///   3. `[optional]` stake_history (default to `SysvarStakeHistory1111111111111111111111111`)
-///   4. `[signer]` withdraw_authority
-///   5. `[signer, optional]` lockup_authority
+///   2. `[signer]` withdraw_authority
+///   3. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug, Default)]
 pub struct WithdrawBuilder {
     stake: Option<solana_address::Address>,
     recipient: Option<solana_address::Address>,
-    clock_sysvar: Option<solana_address::Address>,
-    stake_history: Option<solana_address::Address>,
     withdraw_authority: Option<solana_address::Address>,
     lockup_authority: Option<solana_address::Address>,
     args: Option<u64>,
@@ -139,20 +123,6 @@ impl WithdrawBuilder {
     #[inline(always)]
     pub fn recipient(&mut self, recipient: solana_address::Address) -> &mut Self {
         self.recipient = Some(recipient);
-        self
-    }
-    /// `[optional account, default to 'SysvarC1ock11111111111111111111111111111111']`
-    /// Clock sysvar
-    #[inline(always)]
-    pub fn clock_sysvar(&mut self, clock_sysvar: solana_address::Address) -> &mut Self {
-        self.clock_sysvar = Some(clock_sysvar);
-        self
-    }
-    /// `[optional account, default to 'SysvarStakeHistory1111111111111111111111111']`
-    /// Stake history sysvar that carries stake warmup/cooldown history
-    #[inline(always)]
-    pub fn stake_history(&mut self, stake_history: solana_address::Address) -> &mut Self {
-        self.stake_history = Some(stake_history);
         self
     }
     /// Withdraw authority
@@ -196,12 +166,6 @@ impl WithdrawBuilder {
         let accounts = Withdraw {
             stake: self.stake.expect("stake is not set"),
             recipient: self.recipient.expect("recipient is not set"),
-            clock_sysvar: self.clock_sysvar.unwrap_or(solana_address::address!(
-                "SysvarC1ock11111111111111111111111111111111"
-            )),
-            stake_history: self.stake_history.unwrap_or(solana_address::address!(
-                "SysvarStakeHistory1111111111111111111111111"
-            )),
             withdraw_authority: self
                 .withdraw_authority
                 .expect("withdraw_authority is not set"),
@@ -221,10 +185,6 @@ pub struct WithdrawCpiAccounts<'a, 'b> {
     pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Recipient account
     pub recipient: &'b solana_account_info::AccountInfo<'a>,
-    /// Clock sysvar
-    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
-    /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Withdraw authority
     pub withdraw_authority: &'b solana_account_info::AccountInfo<'a>,
     /// Lockup authority, if before lockup expiration
@@ -239,10 +199,6 @@ pub struct WithdrawCpi<'a, 'b> {
     pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Recipient account
     pub recipient: &'b solana_account_info::AccountInfo<'a>,
-    /// Clock sysvar
-    pub clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
-    /// Stake history sysvar that carries stake warmup/cooldown history
-    pub stake_history: &'b solana_account_info::AccountInfo<'a>,
     /// Withdraw authority
     pub withdraw_authority: &'b solana_account_info::AccountInfo<'a>,
     /// Lockup authority, if before lockup expiration
@@ -261,8 +217,6 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             __program: program,
             stake: accounts.stake,
             recipient: accounts.recipient,
-            clock_sysvar: accounts.clock_sysvar,
-            stake_history: accounts.stake_history,
             withdraw_authority: accounts.withdraw_authority,
             lockup_authority: accounts.lockup_authority,
             __args: args,
@@ -291,18 +245,10 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> solana_program_error::ProgramResult {
-        let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
         accounts.push(solana_instruction::AccountMeta::new(
             *self.recipient.key,
-            false,
-        ));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            *self.clock_sysvar.key,
-            false,
-        ));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            *self.stake_history.key,
             false,
         ));
         accounts.push(solana_instruction::AccountMeta::new_readonly(
@@ -331,12 +277,10 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(7 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(5 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.stake.clone());
         account_infos.push(self.recipient.clone());
-        account_infos.push(self.clock_sysvar.clone());
-        account_infos.push(self.stake_history.clone());
         account_infos.push(self.withdraw_authority.clone());
         if let Some(lockup_authority) = self.lockup_authority {
             account_infos.push(lockup_authority.clone());
@@ -359,10 +303,8 @@ impl<'a, 'b> WithdrawCpi<'a, 'b> {
 ///
 ///   0. `[writable]` stake
 ///   1. `[writable]` recipient
-///   2. `[]` clock_sysvar
-///   3. `[]` stake_history
-///   4. `[signer]` withdraw_authority
-///   5. `[signer, optional]` lockup_authority
+///   2. `[signer]` withdraw_authority
+///   3. `[signer, optional]` lockup_authority
 #[derive(Clone, Debug)]
 pub struct WithdrawCpiBuilder<'a, 'b> {
     instruction: Box<WithdrawCpiBuilderInstruction<'a, 'b>>,
@@ -374,8 +316,6 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
             __program: program,
             stake: None,
             recipient: None,
-            clock_sysvar: None,
-            stake_history: None,
             withdraw_authority: None,
             lockup_authority: None,
             args: None,
@@ -393,24 +333,6 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn recipient(&mut self, recipient: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.recipient = Some(recipient);
-        self
-    }
-    /// Clock sysvar
-    #[inline(always)]
-    pub fn clock_sysvar(
-        &mut self,
-        clock_sysvar: &'b solana_account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.clock_sysvar = Some(clock_sysvar);
-        self
-    }
-    /// Stake history sysvar that carries stake warmup/cooldown history
-    #[inline(always)]
-    pub fn stake_history(
-        &mut self,
-        stake_history: &'b solana_account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.stake_history = Some(stake_history);
         self
     }
     /// Withdraw authority
@@ -481,16 +403,6 @@ impl<'a, 'b> WithdrawCpiBuilder<'a, 'b> {
 
             recipient: self.instruction.recipient.expect("recipient is not set"),
 
-            clock_sysvar: self
-                .instruction
-                .clock_sysvar
-                .expect("clock_sysvar is not set"),
-
-            stake_history: self
-                .instruction
-                .stake_history
-                .expect("stake_history is not set"),
-
             withdraw_authority: self
                 .instruction
                 .withdraw_authority
@@ -511,8 +423,6 @@ struct WithdrawCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_account_info::AccountInfo<'a>,
     stake: Option<&'b solana_account_info::AccountInfo<'a>>,
     recipient: Option<&'b solana_account_info::AccountInfo<'a>>,
-    clock_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
-    stake_history: Option<&'b solana_account_info::AccountInfo<'a>>,
     withdraw_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     lockup_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     args: Option<u64>,

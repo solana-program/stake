@@ -17,8 +17,6 @@ pub const INITIALIZE_DISCRIMINATOR: u32 = 0;
 pub struct Initialize {
     /// Uninitialized stake account
     pub stake: solana_address::Address,
-    /// Rent sysvar
-    pub rent_sysvar: solana_address::Address,
 }
 
 impl Initialize {
@@ -32,12 +30,8 @@ impl Initialize {
         args: InitializeInstructionArgs,
         remaining_accounts: &[solana_instruction::AccountMeta],
     ) -> solana_instruction::Instruction {
-        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(1 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            self.rent_sysvar,
-            false,
-        ));
         accounts.extend_from_slice(remaining_accounts);
         let mut data = InitializeInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
@@ -89,11 +83,9 @@ impl InitializeInstructionArgs {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
 #[derive(Clone, Debug, Default)]
 pub struct InitializeBuilder {
     stake: Option<solana_address::Address>,
-    rent_sysvar: Option<solana_address::Address>,
     arg0: Option<Authorized>,
     arg1: Option<Lockup>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
@@ -107,13 +99,6 @@ impl InitializeBuilder {
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
-        self
-    }
-    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
-    /// Rent sysvar
-    #[inline(always)]
-    pub fn rent_sysvar(&mut self, rent_sysvar: solana_address::Address) -> &mut Self {
-        self.rent_sysvar = Some(rent_sysvar);
         self
     }
     #[inline(always)]
@@ -145,9 +130,6 @@ impl InitializeBuilder {
     pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = Initialize {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_address::address!(
-                "SysvarRent111111111111111111111111111111111"
-            )),
         };
         let args = InitializeInstructionArgs {
             arg0: self.arg0.clone().expect("arg0 is not set"),
@@ -162,8 +144,6 @@ impl InitializeBuilder {
 pub struct InitializeCpiAccounts<'a, 'b> {
     /// Uninitialized stake account
     pub stake: &'b solana_account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
 }
 
 /// `initialize` CPI instruction.
@@ -172,8 +152,6 @@ pub struct InitializeCpi<'a, 'b> {
     pub __program: &'b solana_account_info::AccountInfo<'a>,
     /// Uninitialized stake account
     pub stake: &'b solana_account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: InitializeInstructionArgs,
 }
@@ -187,7 +165,6 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
         Self {
             __program: program,
             stake: accounts.stake,
-            rent_sysvar: accounts.rent_sysvar,
             __args: args,
         }
     }
@@ -214,12 +191,8 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> solana_program_error::ProgramResult {
-        let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(1 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            *self.rent_sysvar.key,
-            false,
-        ));
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(solana_instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
@@ -236,10 +209,9 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(2 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.stake.clone());
-        account_infos.push(self.rent_sysvar.clone());
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -257,7 +229,6 @@ impl<'a, 'b> InitializeCpi<'a, 'b> {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[]` rent_sysvar
 #[derive(Clone, Debug)]
 pub struct InitializeCpiBuilder<'a, 'b> {
     instruction: Box<InitializeCpiBuilderInstruction<'a, 'b>>,
@@ -268,7 +239,6 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
         let instruction = Box::new(InitializeCpiBuilderInstruction {
             __program: program,
             stake: None,
-            rent_sysvar: None,
             arg0: None,
             arg1: None,
             __remaining_accounts: Vec::new(),
@@ -279,15 +249,6 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
-        self
-    }
-    /// Rent sysvar
-    #[inline(always)]
-    pub fn rent_sysvar(
-        &mut self,
-        rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.rent_sysvar = Some(rent_sysvar);
         self
     }
     #[inline(always)]
@@ -342,11 +303,6 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
             __program: self.instruction.__program,
 
             stake: self.instruction.stake.expect("stake is not set"),
-
-            rent_sysvar: self
-                .instruction
-                .rent_sysvar
-                .expect("rent_sysvar is not set"),
             __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -360,7 +316,6 @@ impl<'a, 'b> InitializeCpiBuilder<'a, 'b> {
 struct InitializeCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_account_info::AccountInfo<'a>,
     stake: Option<&'b solana_account_info::AccountInfo<'a>>,
-    rent_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
     arg0: Option<Authorized>,
     arg1: Option<Lockup>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.

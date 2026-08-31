@@ -32,7 +32,6 @@ import {
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
-    type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
     type TransactionSigner,
@@ -57,7 +56,6 @@ export type AuthorizeCheckedWithSeedInstruction<
     TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
     TAccountStake extends string | AccountMeta<string> = string,
     TAccountBase extends string | AccountMeta<string> = string,
-    TAccountClockSysvar extends string | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
     TAccountNewAuthority extends string | AccountMeta<string> = string,
     TAccountLockupAuthority extends string | AccountMeta<string> | undefined = undefined,
     TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -69,7 +67,6 @@ export type AuthorizeCheckedWithSeedInstruction<
             TAccountBase extends string
                 ? ReadonlySignerAccount<TAccountBase> & AccountSignerMeta<TAccountBase>
                 : TAccountBase,
-            TAccountClockSysvar extends string ? ReadonlyAccount<TAccountClockSysvar> : TAccountClockSysvar,
             TAccountNewAuthority extends string
                 ? ReadonlySignerAccount<TAccountNewAuthority> & AccountSignerMeta<TAccountNewAuthority>
                 : TAccountNewAuthority,
@@ -131,7 +128,6 @@ export function getAuthorizeCheckedWithSeedInstructionDataCodec(): Codec<
 export type AuthorizeCheckedWithSeedInput<
     TAccountStake extends string = string,
     TAccountBase extends string = string,
-    TAccountClockSysvar extends string = string,
     TAccountNewAuthority extends string = string,
     TAccountLockupAuthority extends string = string,
 > = {
@@ -139,8 +135,6 @@ export type AuthorizeCheckedWithSeedInput<
     stake: Address<TAccountStake>;
     /** Base key of stake or withdraw authority */
     base: TransactionSigner<TAccountBase>;
-    /** Clock sysvar */
-    clockSysvar?: Address<TAccountClockSysvar>;
     /** The new stake or withdraw authority */
     newAuthority: TransactionSigner<TAccountNewAuthority>;
     /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
@@ -153,24 +147,16 @@ export type AuthorizeCheckedWithSeedInput<
 export function getAuthorizeCheckedWithSeedInstruction<
     TAccountStake extends string,
     TAccountBase extends string,
-    TAccountClockSysvar extends string,
     TAccountNewAuthority extends string,
     TAccountLockupAuthority extends string,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-    input: AuthorizeCheckedWithSeedInput<
-        TAccountStake,
-        TAccountBase,
-        TAccountClockSysvar,
-        TAccountNewAuthority,
-        TAccountLockupAuthority
-    >,
+    input: AuthorizeCheckedWithSeedInput<TAccountStake, TAccountBase, TAccountNewAuthority, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
 ): AuthorizeCheckedWithSeedInstruction<
     TProgramAddress,
     TAccountStake,
     TAccountBase,
-    TAccountClockSysvar,
     TAccountNewAuthority,
     TAccountLockupAuthority
 > {
@@ -181,7 +167,6 @@ export function getAuthorizeCheckedWithSeedInstruction<
     const originalAccounts = {
         stake: { value: input.stake ?? null, isWritable: true },
         base: { value: input.base ?? null, isWritable: false },
-        clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
         newAuthority: { value: input.newAuthority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
     };
@@ -190,18 +175,11 @@ export function getAuthorizeCheckedWithSeedInstruction<
     // Original args.
     const args = { ...input };
 
-    // Resolve default values.
-    if (!accounts.clockSysvar.value) {
-        accounts.clockSysvar.value =
-            'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-    }
-
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
             getAccountMeta('base', accounts.base),
-            getAccountMeta('clockSysvar', accounts.clockSysvar),
             getAccountMeta('newAuthority', accounts.newAuthority),
             getAccountMeta('lockupAuthority', accounts.lockupAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
@@ -213,7 +191,6 @@ export function getAuthorizeCheckedWithSeedInstruction<
         TProgramAddress,
         TAccountStake,
         TAccountBase,
-        TAccountClockSysvar,
         TAccountNewAuthority,
         TAccountLockupAuthority
     >);
@@ -229,12 +206,10 @@ export type ParsedAuthorizeCheckedWithSeedInstruction<
         stake: TAccountMetas[0];
         /** Base key of stake or withdraw authority */
         base: TAccountMetas[1];
-        /** Clock sysvar */
-        clockSysvar: TAccountMetas[2];
         /** The new stake or withdraw authority */
-        newAuthority: TAccountMetas[3];
+        newAuthority: TAccountMetas[2];
         /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
-        lockupAuthority?: TAccountMetas[4] | undefined;
+        lockupAuthority?: TAccountMetas[3] | undefined;
     };
     data: AuthorizeCheckedWithSeedInstructionData;
 };
@@ -247,10 +222,10 @@ export function parseAuthorizeCheckedWithSeedInstruction<
         InstructionWithAccounts<TAccountMetas> &
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAuthorizeCheckedWithSeedInstruction<TProgram, TAccountMetas> {
-    if (instruction.accounts.length < 4) {
+    if (instruction.accounts.length < 3) {
         throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
             actualAccountMetas: instruction.accounts.length,
-            expectedAccountMetas: 4,
+            expectedAccountMetas: 3,
         });
     }
     let accountIndex = 0;
@@ -259,7 +234,7 @@ export function parseAuthorizeCheckedWithSeedInstruction<
         accountIndex += 1;
         return accountMeta;
     };
-    let optionalAccountsRemaining = instruction.accounts.length - 4;
+    let optionalAccountsRemaining = instruction.accounts.length - 3;
     const getNextOptionalAccount = () => {
         if (optionalAccountsRemaining === 0) return undefined;
         optionalAccountsRemaining -= 1;
@@ -270,7 +245,6 @@ export function parseAuthorizeCheckedWithSeedInstruction<
         accounts: {
             stake: getNextAccount(),
             base: getNextAccount(),
-            clockSysvar: getNextAccount(),
             newAuthority: getNextAccount(),
             lockupAuthority: getNextOptionalAccount(),
         },

@@ -1140,7 +1140,7 @@ fn test_no_use_dealloc() {
                 if is_withdraw {
                     // truncating source account data makes this a self-signed withdraw
                     if instruction.accounts[0].pubkey == stake_address {
-                        instruction.accounts[4].pubkey = stake_address;
+                        instruction.accounts[2].pubkey = stake_address;
                     }
                     env.process_success(&instruction);
                 } else {

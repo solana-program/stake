@@ -26,7 +26,6 @@ import {
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
-    type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
     type TransactionSigner,
@@ -45,8 +44,6 @@ export type WithdrawInstruction<
     TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
     TAccountStake extends string | AccountMeta<string> = string,
     TAccountRecipient extends string | AccountMeta<string> = string,
-    TAccountClockSysvar extends string | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-    TAccountStakeHistory extends string | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
     TAccountWithdrawAuthority extends string | AccountMeta<string> = string,
     TAccountLockupAuthority extends string | AccountMeta<string> | undefined = undefined,
     TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -56,8 +53,6 @@ export type WithdrawInstruction<
         [
             TAccountStake extends string ? WritableAccount<TAccountStake> : TAccountStake,
             TAccountRecipient extends string ? WritableAccount<TAccountRecipient> : TAccountRecipient,
-            TAccountClockSysvar extends string ? ReadonlyAccount<TAccountClockSysvar> : TAccountClockSysvar,
-            TAccountStakeHistory extends string ? ReadonlyAccount<TAccountStakeHistory> : TAccountStakeHistory,
             TAccountWithdrawAuthority extends string
                 ? ReadonlySignerAccount<TAccountWithdrawAuthority> & AccountSignerMeta<TAccountWithdrawAuthority>
                 : TAccountWithdrawAuthority,
@@ -103,8 +98,6 @@ export function getWithdrawInstructionDataCodec(): FixedSizeCodec<
 export type WithdrawInput<
     TAccountStake extends string = string,
     TAccountRecipient extends string = string,
-    TAccountClockSysvar extends string = string,
-    TAccountStakeHistory extends string = string,
     TAccountWithdrawAuthority extends string = string,
     TAccountLockupAuthority extends string = string,
 > = {
@@ -112,10 +105,6 @@ export type WithdrawInput<
     stake: Address<TAccountStake>;
     /** Recipient account */
     recipient: Address<TAccountRecipient>;
-    /** Clock sysvar */
-    clockSysvar?: Address<TAccountClockSysvar>;
-    /** Stake history sysvar that carries stake warmup/cooldown history */
-    stakeHistory?: Address<TAccountStakeHistory>;
     /** Withdraw authority */
     withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
     /** Lockup authority, if before lockup expiration */
@@ -126,27 +115,16 @@ export type WithdrawInput<
 export function getWithdrawInstruction<
     TAccountStake extends string,
     TAccountRecipient extends string,
-    TAccountClockSysvar extends string,
-    TAccountStakeHistory extends string,
     TAccountWithdrawAuthority extends string,
     TAccountLockupAuthority extends string,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-    input: WithdrawInput<
-        TAccountStake,
-        TAccountRecipient,
-        TAccountClockSysvar,
-        TAccountStakeHistory,
-        TAccountWithdrawAuthority,
-        TAccountLockupAuthority
-    >,
+    input: WithdrawInput<TAccountStake, TAccountRecipient, TAccountWithdrawAuthority, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
 ): WithdrawInstruction<
     TProgramAddress,
     TAccountStake,
     TAccountRecipient,
-    TAccountClockSysvar,
-    TAccountStakeHistory,
     TAccountWithdrawAuthority,
     TAccountLockupAuthority
 > {
@@ -157,8 +135,6 @@ export function getWithdrawInstruction<
     const originalAccounts = {
         stake: { value: input.stake ?? null, isWritable: true },
         recipient: { value: input.recipient ?? null, isWritable: true },
-        clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-        stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
         withdrawAuthority: { value: input.withdrawAuthority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
     };
@@ -167,23 +143,11 @@ export function getWithdrawInstruction<
     // Original args.
     const args = { ...input };
 
-    // Resolve default values.
-    if (!accounts.clockSysvar.value) {
-        accounts.clockSysvar.value =
-            'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-    }
-    if (!accounts.stakeHistory.value) {
-        accounts.stakeHistory.value =
-            'SysvarStakeHistory1111111111111111111111111' as Address<'SysvarStakeHistory1111111111111111111111111'>;
-    }
-
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
             getAccountMeta('recipient', accounts.recipient),
-            getAccountMeta('clockSysvar', accounts.clockSysvar),
-            getAccountMeta('stakeHistory', accounts.stakeHistory),
             getAccountMeta('withdrawAuthority', accounts.withdrawAuthority),
             getAccountMeta('lockupAuthority', accounts.lockupAuthority),
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
@@ -193,8 +157,6 @@ export function getWithdrawInstruction<
         TProgramAddress,
         TAccountStake,
         TAccountRecipient,
-        TAccountClockSysvar,
-        TAccountStakeHistory,
         TAccountWithdrawAuthority,
         TAccountLockupAuthority
     >);
@@ -210,14 +172,10 @@ export type ParsedWithdrawInstruction<
         stake: TAccountMetas[0];
         /** Recipient account */
         recipient: TAccountMetas[1];
-        /** Clock sysvar */
-        clockSysvar: TAccountMetas[2];
-        /** Stake history sysvar that carries stake warmup/cooldown history */
-        stakeHistory: TAccountMetas[3];
         /** Withdraw authority */
-        withdrawAuthority: TAccountMetas[4];
+        withdrawAuthority: TAccountMetas[2];
         /** Lockup authority, if before lockup expiration */
-        lockupAuthority?: TAccountMetas[5] | undefined;
+        lockupAuthority?: TAccountMetas[3] | undefined;
     };
     data: WithdrawInstructionData;
 };
@@ -227,10 +185,10 @@ export function parseWithdrawInstruction<TProgram extends string, TAccountMetas 
         InstructionWithAccounts<TAccountMetas> &
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedWithdrawInstruction<TProgram, TAccountMetas> {
-    if (instruction.accounts.length < 5) {
+    if (instruction.accounts.length < 3) {
         throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
             actualAccountMetas: instruction.accounts.length,
-            expectedAccountMetas: 5,
+            expectedAccountMetas: 3,
         });
     }
     let accountIndex = 0;
@@ -239,7 +197,7 @@ export function parseWithdrawInstruction<TProgram extends string, TAccountMetas 
         accountIndex += 1;
         return accountMeta;
     };
-    let optionalAccountsRemaining = instruction.accounts.length - 5;
+    let optionalAccountsRemaining = instruction.accounts.length - 3;
     const getNextOptionalAccount = () => {
         if (optionalAccountsRemaining === 0) return undefined;
         optionalAccountsRemaining -= 1;
@@ -250,8 +208,6 @@ export function parseWithdrawInstruction<TProgram extends string, TAccountMetas 
         accounts: {
             stake: getNextAccount(),
             recipient: getNextAccount(),
-            clockSysvar: getNextAccount(),
-            stakeHistory: getNextAccount(),
             withdrawAuthority: getNextAccount(),
             lockupAuthority: getNextOptionalAccount(),
         },

@@ -24,7 +24,6 @@ import {
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
-    type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
     type TransactionSigner,
@@ -42,7 +41,6 @@ export function getDeactivateDiscriminatorBytes(): ReadonlyUint8Array {
 export type DeactivateInstruction<
     TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
     TAccountStake extends string | AccountMeta<string> = string,
-    TAccountClockSysvar extends string | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
     TAccountStakeAuthority extends string | AccountMeta<string> = string,
     TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -50,7 +48,6 @@ export type DeactivateInstruction<
     InstructionWithAccounts<
         [
             TAccountStake extends string ? WritableAccount<TAccountStake> : TAccountStake,
-            TAccountClockSysvar extends string ? ReadonlyAccount<TAccountClockSysvar> : TAccountClockSysvar,
             TAccountStakeAuthority extends string
                 ? ReadonlySignerAccount<TAccountStakeAuthority> & AccountSignerMeta<TAccountStakeAuthority>
                 : TAccountStakeAuthority,
@@ -80,55 +77,37 @@ export function getDeactivateInstructionDataCodec(): FixedSizeCodec<
     return combineCodec(getDeactivateInstructionDataEncoder(), getDeactivateInstructionDataDecoder());
 }
 
-export type DeactivateInput<
-    TAccountStake extends string = string,
-    TAccountClockSysvar extends string = string,
-    TAccountStakeAuthority extends string = string,
-> = {
+export type DeactivateInput<TAccountStake extends string = string, TAccountStakeAuthority extends string = string> = {
     /** Delegated stake account to be deactivated */
     stake: Address<TAccountStake>;
-    /** Clock sysvar */
-    clockSysvar?: Address<TAccountClockSysvar>;
     /** Stake authority */
     stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
 
 export function getDeactivateInstruction<
     TAccountStake extends string,
-    TAccountClockSysvar extends string,
     TAccountStakeAuthority extends string,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-    input: DeactivateInput<TAccountStake, TAccountClockSysvar, TAccountStakeAuthority>,
+    input: DeactivateInput<TAccountStake, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): DeactivateInstruction<TProgramAddress, TAccountStake, TAccountClockSysvar, TAccountStakeAuthority> {
+): DeactivateInstruction<TProgramAddress, TAccountStake, TAccountStakeAuthority> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
     // Original accounts.
     const originalAccounts = {
         stake: { value: input.stake ?? null, isWritable: true },
-        clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    // Resolve default values.
-    if (!accounts.clockSysvar.value) {
-        accounts.clockSysvar.value =
-            'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-    }
-
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
-        accounts: [
-            getAccountMeta('stake', accounts.stake),
-            getAccountMeta('clockSysvar', accounts.clockSysvar),
-            getAccountMeta('stakeAuthority', accounts.stakeAuthority),
-        ],
+        accounts: [getAccountMeta('stake', accounts.stake), getAccountMeta('stakeAuthority', accounts.stakeAuthority)],
         data: getDeactivateInstructionDataEncoder().encode({}),
         programAddress,
-    } as DeactivateInstruction<TProgramAddress, TAccountStake, TAccountClockSysvar, TAccountStakeAuthority>);
+    } as DeactivateInstruction<TProgramAddress, TAccountStake, TAccountStakeAuthority>);
 }
 
 export type ParsedDeactivateInstruction<
@@ -139,10 +118,8 @@ export type ParsedDeactivateInstruction<
     accounts: {
         /** Delegated stake account to be deactivated */
         stake: TAccountMetas[0];
-        /** Clock sysvar */
-        clockSysvar: TAccountMetas[1];
         /** Stake authority */
-        stakeAuthority: TAccountMetas[2];
+        stakeAuthority: TAccountMetas[1];
     };
     data: DeactivateInstructionData;
 };
@@ -152,10 +129,10 @@ export function parseDeactivateInstruction<TProgram extends string, TAccountMeta
         InstructionWithAccounts<TAccountMetas> &
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDeactivateInstruction<TProgram, TAccountMetas> {
-    if (instruction.accounts.length < 3) {
+    if (instruction.accounts.length < 2) {
         throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
             actualAccountMetas: instruction.accounts.length,
-            expectedAccountMetas: 3,
+            expectedAccountMetas: 2,
         });
     }
     let accountIndex = 0;
@@ -166,7 +143,7 @@ export function parseDeactivateInstruction<TProgram extends string, TAccountMeta
     };
     return {
         programAddress: instruction.programAddress,
-        accounts: { stake: getNextAccount(), clockSysvar: getNextAccount(), stakeAuthority: getNextAccount() },
+        accounts: { stake: getNextAccount(), stakeAuthority: getNextAccount() },
         data: getDeactivateInstructionDataDecoder().decode(instruction.data),
     };
 }

@@ -24,7 +24,6 @@ import {
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
-    type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
     type TransactionSigner,
@@ -48,7 +47,6 @@ export function getAuthorizeCheckedDiscriminatorBytes(): ReadonlyUint8Array {
 export type AuthorizeCheckedInstruction<
     TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
     TAccountStake extends string | AccountMeta<string> = string,
-    TAccountClockSysvar extends string | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
     TAccountAuthority extends string | AccountMeta<string> = string,
     TAccountNewAuthority extends string | AccountMeta<string> = string,
     TAccountLockupAuthority extends string | AccountMeta<string> | undefined = undefined,
@@ -58,7 +56,6 @@ export type AuthorizeCheckedInstruction<
     InstructionWithAccounts<
         [
             TAccountStake extends string ? WritableAccount<TAccountStake> : TAccountStake,
-            TAccountClockSysvar extends string ? ReadonlyAccount<TAccountClockSysvar> : TAccountClockSysvar,
             TAccountAuthority extends string
                 ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority>
                 : TAccountAuthority,
@@ -106,15 +103,12 @@ export function getAuthorizeCheckedInstructionDataCodec(): FixedSizeCodec<
 
 export type AuthorizeCheckedInput<
     TAccountStake extends string = string,
-    TAccountClockSysvar extends string = string,
     TAccountAuthority extends string = string,
     TAccountNewAuthority extends string = string,
     TAccountLockupAuthority extends string = string,
 > = {
     /** Stake account to be updated */
     stake: Address<TAccountStake>;
-    /** Clock sysvar */
-    clockSysvar?: Address<TAccountClockSysvar>;
     /** The stake or withdraw authority */
     authority: TransactionSigner<TAccountAuthority>;
     /** The new stake or withdraw authority */
@@ -126,24 +120,16 @@ export type AuthorizeCheckedInput<
 
 export function getAuthorizeCheckedInstruction<
     TAccountStake extends string,
-    TAccountClockSysvar extends string,
     TAccountAuthority extends string,
     TAccountNewAuthority extends string,
     TAccountLockupAuthority extends string,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-    input: AuthorizeCheckedInput<
-        TAccountStake,
-        TAccountClockSysvar,
-        TAccountAuthority,
-        TAccountNewAuthority,
-        TAccountLockupAuthority
-    >,
+    input: AuthorizeCheckedInput<TAccountStake, TAccountAuthority, TAccountNewAuthority, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
 ): AuthorizeCheckedInstruction<
     TProgramAddress,
     TAccountStake,
-    TAccountClockSysvar,
     TAccountAuthority,
     TAccountNewAuthority,
     TAccountLockupAuthority
@@ -154,7 +140,6 @@ export function getAuthorizeCheckedInstruction<
     // Original accounts.
     const originalAccounts = {
         stake: { value: input.stake ?? null, isWritable: true },
-        clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
         authority: { value: input.authority ?? null, isWritable: false },
         newAuthority: { value: input.newAuthority ?? null, isWritable: false },
         lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
@@ -164,17 +149,10 @@ export function getAuthorizeCheckedInstruction<
     // Original args.
     const args = { ...input };
 
-    // Resolve default values.
-    if (!accounts.clockSysvar.value) {
-        accounts.clockSysvar.value =
-            'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-    }
-
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
-            getAccountMeta('clockSysvar', accounts.clockSysvar),
             getAccountMeta('authority', accounts.authority),
             getAccountMeta('newAuthority', accounts.newAuthority),
             getAccountMeta('lockupAuthority', accounts.lockupAuthority),
@@ -184,7 +162,6 @@ export function getAuthorizeCheckedInstruction<
     } as AuthorizeCheckedInstruction<
         TProgramAddress,
         TAccountStake,
-        TAccountClockSysvar,
         TAccountAuthority,
         TAccountNewAuthority,
         TAccountLockupAuthority
@@ -199,14 +176,12 @@ export type ParsedAuthorizeCheckedInstruction<
     accounts: {
         /** Stake account to be updated */
         stake: TAccountMetas[0];
-        /** Clock sysvar */
-        clockSysvar: TAccountMetas[1];
         /** The stake or withdraw authority */
-        authority: TAccountMetas[2];
+        authority: TAccountMetas[1];
         /** The new stake or withdraw authority */
-        newAuthority: TAccountMetas[3];
+        newAuthority: TAccountMetas[2];
         /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
-        lockupAuthority?: TAccountMetas[4] | undefined;
+        lockupAuthority?: TAccountMetas[3] | undefined;
     };
     data: AuthorizeCheckedInstructionData;
 };
@@ -216,10 +191,10 @@ export function parseAuthorizeCheckedInstruction<TProgram extends string, TAccou
         InstructionWithAccounts<TAccountMetas> &
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAuthorizeCheckedInstruction<TProgram, TAccountMetas> {
-    if (instruction.accounts.length < 4) {
+    if (instruction.accounts.length < 3) {
         throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
             actualAccountMetas: instruction.accounts.length,
-            expectedAccountMetas: 4,
+            expectedAccountMetas: 3,
         });
     }
     let accountIndex = 0;
@@ -228,7 +203,7 @@ export function parseAuthorizeCheckedInstruction<TProgram extends string, TAccou
         accountIndex += 1;
         return accountMeta;
     };
-    let optionalAccountsRemaining = instruction.accounts.length - 4;
+    let optionalAccountsRemaining = instruction.accounts.length - 3;
     const getNextOptionalAccount = () => {
         if (optionalAccountsRemaining === 0) return undefined;
         optionalAccountsRemaining -= 1;
@@ -238,7 +213,6 @@ export function parseAuthorizeCheckedInstruction<TProgram extends string, TAccou
         programAddress: instruction.programAddress,
         accounts: {
             stake: getNextAccount(),
-            clockSysvar: getNextAccount(),
             authority: getNextAccount(),
             newAuthority: getNextAccount(),
             lockupAuthority: getNextOptionalAccount(),
