@@ -43,9 +43,6 @@ export type DelegateStakeInstruction<
     TProgram extends string = typeof STAKE_PROGRAM_ADDRESS,
     TAccountStake extends string | AccountMeta<string> = string,
     TAccountVote extends string | AccountMeta<string> = string,
-    TAccountClockSysvar extends string | AccountMeta<string> = 'SysvarC1ock11111111111111111111111111111111',
-    TAccountStakeHistory extends string | AccountMeta<string> = 'SysvarStakeHistory1111111111111111111111111',
-    TAccountUnused extends string | AccountMeta<string> = string,
     TAccountStakeAuthority extends string | AccountMeta<string> = string,
     TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
@@ -54,9 +51,6 @@ export type DelegateStakeInstruction<
         [
             TAccountStake extends string ? WritableAccount<TAccountStake> : TAccountStake,
             TAccountVote extends string ? ReadonlyAccount<TAccountVote> : TAccountVote,
-            TAccountClockSysvar extends string ? ReadonlyAccount<TAccountClockSysvar> : TAccountClockSysvar,
-            TAccountStakeHistory extends string ? ReadonlyAccount<TAccountStakeHistory> : TAccountStakeHistory,
-            TAccountUnused extends string ? ReadonlyAccount<TAccountUnused> : TAccountUnused,
             TAccountStakeAuthority extends string
                 ? ReadonlySignerAccount<TAccountStakeAuthority> & AccountSignerMeta<TAccountStakeAuthority>
                 : TAccountStakeAuthority,
@@ -89,21 +83,12 @@ export function getDelegateStakeInstructionDataCodec(): FixedSizeCodec<
 export type DelegateStakeInput<
     TAccountStake extends string = string,
     TAccountVote extends string = string,
-    TAccountClockSysvar extends string = string,
-    TAccountStakeHistory extends string = string,
-    TAccountUnused extends string = string,
     TAccountStakeAuthority extends string = string,
 > = {
     /** Initialized stake account to be delegated */
     stake: Address<TAccountStake>;
     /** Vote account to which this stake will be delegated */
     vote: Address<TAccountVote>;
-    /** Clock sysvar */
-    clockSysvar?: Address<TAccountClockSysvar>;
-    /** Stake history sysvar that carries stake warmup/cooldown history */
-    stakeHistory?: Address<TAccountStakeHistory>;
-    /** Unused account, formerly the stake config */
-    unused: Address<TAccountUnused>;
     /** Stake authority */
     stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
 };
@@ -111,30 +96,12 @@ export type DelegateStakeInput<
 export function getDelegateStakeInstruction<
     TAccountStake extends string,
     TAccountVote extends string,
-    TAccountClockSysvar extends string,
-    TAccountStakeHistory extends string,
-    TAccountUnused extends string,
     TAccountStakeAuthority extends string,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
-    input: DelegateStakeInput<
-        TAccountStake,
-        TAccountVote,
-        TAccountClockSysvar,
-        TAccountStakeHistory,
-        TAccountUnused,
-        TAccountStakeAuthority
-    >,
+    input: DelegateStakeInput<TAccountStake, TAccountVote, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): DelegateStakeInstruction<
-    TProgramAddress,
-    TAccountStake,
-    TAccountVote,
-    TAccountClockSysvar,
-    TAccountStakeHistory,
-    TAccountUnused,
-    TAccountStakeAuthority
-> {
+): DelegateStakeInstruction<TProgramAddress, TAccountStake, TAccountVote, TAccountStakeAuthority> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
@@ -142,44 +109,20 @@ export function getDelegateStakeInstruction<
     const originalAccounts = {
         stake: { value: input.stake ?? null, isWritable: true },
         vote: { value: input.vote ?? null, isWritable: false },
-        clockSysvar: { value: input.clockSysvar ?? null, isWritable: false },
-        stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
-        unused: { value: input.unused ?? null, isWritable: false },
         stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-    // Resolve default values.
-    if (!accounts.clockSysvar.value) {
-        accounts.clockSysvar.value =
-            'SysvarC1ock11111111111111111111111111111111' as Address<'SysvarC1ock11111111111111111111111111111111'>;
-    }
-    if (!accounts.stakeHistory.value) {
-        accounts.stakeHistory.value =
-            'SysvarStakeHistory1111111111111111111111111' as Address<'SysvarStakeHistory1111111111111111111111111'>;
-    }
 
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
             getAccountMeta('vote', accounts.vote),
-            getAccountMeta('clockSysvar', accounts.clockSysvar),
-            getAccountMeta('stakeHistory', accounts.stakeHistory),
-            getAccountMeta('unused', accounts.unused),
             getAccountMeta('stakeAuthority', accounts.stakeAuthority),
         ],
         data: getDelegateStakeInstructionDataEncoder().encode({}),
         programAddress,
-    } as DelegateStakeInstruction<
-        TProgramAddress,
-        TAccountStake,
-        TAccountVote,
-        TAccountClockSysvar,
-        TAccountStakeHistory,
-        TAccountUnused,
-        TAccountStakeAuthority
-    >);
+    } as DelegateStakeInstruction<TProgramAddress, TAccountStake, TAccountVote, TAccountStakeAuthority>);
 }
 
 export type ParsedDelegateStakeInstruction<
@@ -192,14 +135,8 @@ export type ParsedDelegateStakeInstruction<
         stake: TAccountMetas[0];
         /** Vote account to which this stake will be delegated */
         vote: TAccountMetas[1];
-        /** Clock sysvar */
-        clockSysvar: TAccountMetas[2];
-        /** Stake history sysvar that carries stake warmup/cooldown history */
-        stakeHistory: TAccountMetas[3];
-        /** Unused account, formerly the stake config */
-        unused: TAccountMetas[4];
         /** Stake authority */
-        stakeAuthority: TAccountMetas[5];
+        stakeAuthority: TAccountMetas[2];
     };
     data: DelegateStakeInstructionData;
 };
@@ -209,10 +146,10 @@ export function parseDelegateStakeInstruction<TProgram extends string, TAccountM
         InstructionWithAccounts<TAccountMetas> &
         InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDelegateStakeInstruction<TProgram, TAccountMetas> {
-    if (instruction.accounts.length < 6) {
+    if (instruction.accounts.length < 3) {
         throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, {
             actualAccountMetas: instruction.accounts.length,
-            expectedAccountMetas: 6,
+            expectedAccountMetas: 3,
         });
     }
     let accountIndex = 0;
@@ -223,14 +160,7 @@ export function parseDelegateStakeInstruction<TProgram extends string, TAccountM
     };
     return {
         programAddress: instruction.programAddress,
-        accounts: {
-            stake: getNextAccount(),
-            vote: getNextAccount(),
-            clockSysvar: getNextAccount(),
-            stakeHistory: getNextAccount(),
-            unused: getNextAccount(),
-            stakeAuthority: getNextAccount(),
-        },
+        accounts: { stake: getNextAccount(), vote: getNextAccount(), stakeAuthority: getNextAccount() },
         data: getDelegateStakeInstructionDataDecoder().decode(instruction.data),
     };
 }

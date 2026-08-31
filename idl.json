@@ -26,24 +26,6 @@
               "kind": "instructionAccountDisplayNode",
               "label": "Stake Account"
             }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "rentSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Rent sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarRent111111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
           }
         ],
         "arguments": [
@@ -120,24 +102,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Stake Account"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {
@@ -248,56 +212,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Vote Account"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "unused",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Unused account, formerly the stake config"
-            ],
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {
@@ -476,42 +390,6 @@
           },
           {
             "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
             "name": "withdrawAuthority",
             "isWritable": false,
             "isSigner": true,
@@ -605,24 +483,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Stake Account"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {
@@ -825,42 +685,6 @@
           },
           {
             "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "stakeHistory",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Stake history sysvar that carries stake warmup/cooldown history"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarStakeHistory1111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": true,
@@ -934,24 +758,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Base Key"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {
@@ -1065,24 +871,6 @@
           },
           {
             "kind": "instructionAccountNode",
-            "name": "rentSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Rent sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarRent111111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
             "name": "stakeAuthority",
             "isWritable": false,
             "isSigner": false,
@@ -1152,24 +940,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Stake Account"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {
@@ -1279,24 +1049,6 @@
             "display": {
               "kind": "instructionAccountDisplayNode",
               "label": "Base Key"
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "clockSysvar",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "Clock sysvar"
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "SysvarC1ock11111111111111111111111111111111"
-            },
-            "display": {
-              "kind": "instructionAccountDisplayNode",
-              "skip": "always"
             }
           },
           {

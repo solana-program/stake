@@ -14,8 +14,6 @@ pub const INITIALIZE_CHECKED_DISCRIMINATOR: u32 = 9;
 pub struct InitializeChecked {
     /// Uninitialized stake account
     pub stake: solana_address::Address,
-    /// Rent sysvar
-    pub rent_sysvar: solana_address::Address,
     /// The stake authority
     pub stake_authority: solana_address::Address,
     /// The withdraw authority
@@ -32,12 +30,8 @@ impl InitializeChecked {
         &self,
         remaining_accounts: &[solana_instruction::AccountMeta],
     ) -> solana_instruction::Instruction {
-        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(self.stake, false));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            self.rent_sysvar,
-            false,
-        ));
         accounts.push(solana_instruction::AccountMeta::new_readonly(
             self.stake_authority,
             false,
@@ -85,13 +79,11 @@ impl Default for InitializeCheckedInstructionData {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[optional]` rent_sysvar (default to `SysvarRent111111111111111111111111111111111`)
-///   2. `[]` stake_authority
-///   3. `[signer]` withdraw_authority
+///   1. `[]` stake_authority
+///   2. `[signer]` withdraw_authority
 #[derive(Clone, Debug, Default)]
 pub struct InitializeCheckedBuilder {
     stake: Option<solana_address::Address>,
-    rent_sysvar: Option<solana_address::Address>,
     stake_authority: Option<solana_address::Address>,
     withdraw_authority: Option<solana_address::Address>,
     __remaining_accounts: Vec<solana_instruction::AccountMeta>,
@@ -105,13 +97,6 @@ impl InitializeCheckedBuilder {
     #[inline(always)]
     pub fn stake(&mut self, stake: solana_address::Address) -> &mut Self {
         self.stake = Some(stake);
-        self
-    }
-    /// `[optional account, default to 'SysvarRent111111111111111111111111111111111']`
-    /// Rent sysvar
-    #[inline(always)]
-    pub fn rent_sysvar(&mut self, rent_sysvar: solana_address::Address) -> &mut Self {
-        self.rent_sysvar = Some(rent_sysvar);
         self
     }
     /// The stake authority
@@ -145,9 +130,6 @@ impl InitializeCheckedBuilder {
     pub fn instruction(&self) -> solana_instruction::Instruction {
         let accounts = InitializeChecked {
             stake: self.stake.expect("stake is not set"),
-            rent_sysvar: self.rent_sysvar.unwrap_or(solana_address::address!(
-                "SysvarRent111111111111111111111111111111111"
-            )),
             stake_authority: self.stake_authority.expect("stake_authority is not set"),
             withdraw_authority: self
                 .withdraw_authority
@@ -162,8 +144,6 @@ impl InitializeCheckedBuilder {
 pub struct InitializeCheckedCpiAccounts<'a, 'b> {
     /// Uninitialized stake account
     pub stake: &'b solana_account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
     /// The stake authority
     pub stake_authority: &'b solana_account_info::AccountInfo<'a>,
     /// The withdraw authority
@@ -176,8 +156,6 @@ pub struct InitializeCheckedCpi<'a, 'b> {
     pub __program: &'b solana_account_info::AccountInfo<'a>,
     /// Uninitialized stake account
     pub stake: &'b solana_account_info::AccountInfo<'a>,
-    /// Rent sysvar
-    pub rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
     /// The stake authority
     pub stake_authority: &'b solana_account_info::AccountInfo<'a>,
     /// The withdraw authority
@@ -192,7 +170,6 @@ impl<'a, 'b> InitializeCheckedCpi<'a, 'b> {
         Self {
             __program: program,
             stake: accounts.stake,
-            rent_sysvar: accounts.rent_sysvar,
             stake_authority: accounts.stake_authority,
             withdraw_authority: accounts.withdraw_authority,
         }
@@ -220,12 +197,8 @@ impl<'a, 'b> InitializeCheckedCpi<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b solana_account_info::AccountInfo<'a>, bool, bool)],
     ) -> solana_program_error::ProgramResult {
-        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
         accounts.push(solana_instruction::AccountMeta::new(*self.stake.key, false));
-        accounts.push(solana_instruction::AccountMeta::new_readonly(
-            *self.rent_sysvar.key,
-            false,
-        ));
         accounts.push(solana_instruction::AccountMeta::new_readonly(
             *self.stake_authority.key,
             false,
@@ -250,10 +223,9 @@ impl<'a, 'b> InitializeCheckedCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(5 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(4 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.stake.clone());
-        account_infos.push(self.rent_sysvar.clone());
         account_infos.push(self.stake_authority.clone());
         account_infos.push(self.withdraw_authority.clone());
         remaining_accounts
@@ -273,9 +245,8 @@ impl<'a, 'b> InitializeCheckedCpi<'a, 'b> {
 /// ### Accounts:
 ///
 ///   0. `[writable]` stake
-///   1. `[]` rent_sysvar
-///   2. `[]` stake_authority
-///   3. `[signer]` withdraw_authority
+///   1. `[]` stake_authority
+///   2. `[signer]` withdraw_authority
 #[derive(Clone, Debug)]
 pub struct InitializeCheckedCpiBuilder<'a, 'b> {
     instruction: Box<InitializeCheckedCpiBuilderInstruction<'a, 'b>>,
@@ -286,7 +257,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
         let instruction = Box::new(InitializeCheckedCpiBuilderInstruction {
             __program: program,
             stake: None,
-            rent_sysvar: None,
             stake_authority: None,
             withdraw_authority: None,
             __remaining_accounts: Vec::new(),
@@ -297,15 +267,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn stake(&mut self, stake: &'b solana_account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.stake = Some(stake);
-        self
-    }
-    /// Rent sysvar
-    #[inline(always)]
-    pub fn rent_sysvar(
-        &mut self,
-        rent_sysvar: &'b solana_account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.rent_sysvar = Some(rent_sysvar);
         self
     }
     /// The stake authority
@@ -365,11 +326,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
 
             stake: self.instruction.stake.expect("stake is not set"),
 
-            rent_sysvar: self
-                .instruction
-                .rent_sysvar
-                .expect("rent_sysvar is not set"),
-
             stake_authority: self
                 .instruction
                 .stake_authority
@@ -391,7 +347,6 @@ impl<'a, 'b> InitializeCheckedCpiBuilder<'a, 'b> {
 struct InitializeCheckedCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_account_info::AccountInfo<'a>,
     stake: Option<&'b solana_account_info::AccountInfo<'a>>,
-    rent_sysvar: Option<&'b solana_account_info::AccountInfo<'a>>,
     stake_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     withdraw_authority: Option<&'b solana_account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
