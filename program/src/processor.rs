@@ -16,30 +16,15 @@ use {
         stake_flags::StakeFlags,
         state::{Authorized, Lockup, Meta, StakeAuthorize, StakeStateV2},
         sysvar::stake_history::StakeHistorySysvar,
-        tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
+        tools::{
+            acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent_v2,
+            get_vote_state,
+        },
     },
     solana_sysvar::{epoch_rewards::EpochRewards, Sysvar},
     solana_sysvar_id::SysvarId,
-    solana_vote_interface::{program as solana_vote_program, state::VoteStateV4},
-    std::{collections::HashSet, mem::MaybeUninit},
+    std::collections::HashSet,
 };
-
-fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4>, ProgramError> {
-    if *vote_account_info.owner != solana_vote_program::id() {
-        return Err(ProgramError::IncorrectProgramId);
-    }
-
-    let mut vote_state = Box::new(MaybeUninit::uninit());
-    VoteStateV4::deserialize_into_uninit(
-        &vote_account_info.try_borrow_data()?,
-        vote_state.as_mut(),
-        vote_account_info.key,
-    )
-    .map_err(|_| ProgramError::InvalidAccountData)?;
-    let vote_state = unsafe { vote_state.assume_init() };
-
-    Ok(vote_state)
-}
 
 fn get_stake_state(stake_account_info: &AccountInfo) -> Result<StakeStateV2, ProgramError> {
     if *stake_account_info.owner != id() {
@@ -1201,39 +1186,31 @@ impl Processor {
 
         let clock = Clock::get()?;
 
-        let delinquent_vote_state = get_vote_state(delinquent_vote_account_info)?;
         let reference_vote_state = get_vote_state(reference_vote_account_info)?;
 
         if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
             return Err(StakeError::InsufficientReferenceVotes.into());
         }
 
-        if let StakeStateV2::Stake(meta, mut stake, stake_flags) =
+        let StakeStateV2::Stake(meta, mut stake, stake_flags) =
             get_stake_state(stake_account_info)?
-        {
-            if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
-                return Err(StakeError::VoteAddressMismatch.into());
-            }
+        else {
+            return Err(ProgramError::InvalidAccountData);
+        };
 
-            // Deactivate the stake account if its delegated vote account has never voted or
-            // has not voted in the last
-            // `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
-            if eligible_for_deactivate_delinquent(&delinquent_vote_state.epoch_credits, clock.epoch)
-            {
-                stake.deactivate(clock.epoch)?;
+        if stake.delegation.voter_pubkey != *delinquent_vote_account_info.key {
+            return Err(StakeError::VoteAddressMismatch.into());
+        }
 
-                set_stake_state(
-                    stake_account_info,
-                    &StakeStateV2::Stake(meta, stake, stake_flags),
-                )
-            } else {
-                Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into())
-            }
-        } else {
-            Err(ProgramError::InvalidAccountData)
-        }?;
+        if !eligible_for_deactivate_delinquent_v2(delinquent_vote_account_info, clock.epoch)? {
+            return Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into());
+        }
 
-        Ok(())
+        stake.deactivate(clock.epoch)?;
+        set_stake_state(
+            stake_account_info,
+            &StakeStateV2::Stake(meta, stake, stake_flags),
+        )
     }
 
     fn process_move_stake(accounts: &[AccountInfo], move_amount: u64) -> ProgramResult {

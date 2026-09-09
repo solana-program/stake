@@ -447,8 +447,8 @@ fn test_stake_process_instruction() {
         &mollusk,
         &instruction::deactivate_delinquent_stake(
             &Pubkey::new_unique(),
-            &Pubkey::new_unique(),
             &invalid_vote_state_pubkey(),
+            &Pubkey::new_unique(),
         ),
         Err(ProgramError::IncorrectProgramId),
     );
@@ -456,8 +456,8 @@ fn test_stake_process_instruction() {
         &mollusk,
         &instruction::deactivate_delinquent_stake(
             &Pubkey::new_unique(),
-            &invalid_vote_state_pubkey(),
             &Pubkey::new_unique(),
+            &invalid_vote_state_pubkey(),
         ),
         Err(ProgramError::InvalidAccountData),
     );
@@ -7692,31 +7692,6 @@ fn test_delegate_deserialize_vote_state(vote_state_version: VoteStateVersion) {
     );
 }
 
-#[test]
-fn test_deactivate_delinquent_incorrect_vote_owner() {
-    // Create vote account with incorrect owner.
-    let wrong_owner = Pubkey::new_unique();
-    let vote_state = VoteStateVersions::new_v4(VoteStateV4::default());
-    let vote_account = AccountSharedData::new_data_with_space(
-        Rent::default().minimum_balance(VoteStateV4::size_of()),
-        &vote_state,
-        VoteStateV4::size_of(),
-        &wrong_owner,
-    )
-    .unwrap();
-
-    let (mollusk, instruction_accounts, transaction_accounts) =
-        setup_deactivate_delinquent_test_with_vote_account(vote_account);
-
-    process_instruction(
-        &mollusk,
-        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
-        transaction_accounts,
-        instruction_accounts,
-        Err(ProgramError::IncorrectProgramId), // <-- Always throws
-    );
-}
-
 #[test_case(VoteStateVersion::V1_14_11)]
 #[test_case(VoteStateVersion::V3)]
 #[test_case(VoteStateVersion::V4)]
@@ -7741,4 +7716,45 @@ fn test_deactivate_delinquent_deserialize_vote_state(vote_state_version: VoteSta
         instruction_accounts,
         Ok(()),
     );
+}
+
+#[test_case(system_program::id(), vec![], 0; "missing")]
+#[test_case(system_program::id(), vec![], 1; "refunded")]
+#[test_case(Pubkey::new_unique(), vec![255], 1; "other_owner")]
+#[test_case(solana_sdk_ids::vote::id(), vec![], 1; "empty")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; 3], 1; "three_zero_bytes")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; VoteStateV4::size_of()], 0; "closed_vote_state")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; VoteStateV4::size_of()], 1; "refunded_vote_state")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; 10 * 1024 * 1024], 1; "maximum_size_shell")]
+fn test_deactivate_delinquent_closed_vote_account(owner: Pubkey, data: Vec<u8>, lamports: u64) {
+    let vote_account = AccountSharedData::from(Account {
+        lamports,
+        data,
+        owner,
+        ..Account::default()
+    });
+    let (mut mollusk, instruction_accounts, transaction_accounts) =
+        setup_deactivate_delinquent_test_with_vote_account(vote_account);
+    mollusk.compute_budget.compute_unit_limit = 200_000;
+
+    let mut expected_accounts: Vec<_> = transaction_accounts
+        .iter()
+        .map(|(_, account)| account.clone())
+        .collect();
+    let StakeStateV2::Stake(meta, mut stake, flags) = expected_accounts[0].state().unwrap() else {
+        panic!("expected delegated stake");
+    };
+    stake.delegation.deactivation_epoch = 20; // Current epoch configured by setup helper
+    expected_accounts[0]
+        .set_state(&StakeStateV2::Stake(meta, stake, flags))
+        .unwrap();
+
+    let resulting_accounts = process_instruction(
+        &mollusk,
+        &serialize(&StakeInstruction::DeactivateDelinquent).unwrap(),
+        transaction_accounts,
+        instruction_accounts,
+        Ok(()),
+    );
+    assert_eq!(resulting_accounts, expected_accounts);
 }

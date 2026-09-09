@@ -519,8 +519,14 @@ pub enum StakeInstruction {
     )]
     GetMinimumDelegation,
 
-    /// Deactivate stake delegated to a vote account that has been delinquent for at least
-    /// `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
+    /// Deactivate stake delegated to a vote account that is closed or has been delinquent
+    /// for at least `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs.
+    ///
+    /// A delegated vote account is treated as closed if it is not owned by the Vote Program.
+    /// Vote Program owned accounts also qualify if their first four data bytes are zero
+    /// (`Uninitialized` discriminator). Shorter data qualifies if all its bytes are zero.
+    /// Empty data qualifies. Closure or recreation without vote initialization can produce
+    /// these states.
     ///
     /// No signer is required for this instruction as it is a common good to deactivate abandoned
     /// stake.
