@@ -23,6 +23,7 @@ codama-macros = { version = "0.13.1", optional = true }
 num-traits = "0.2"
 serde = { version = "1.0.210", optional = true }
 serde_derive = { version = "1.0.210", optional = true }
+solana-account-info = { version = "3.1.1", optional = true }
 solana-clock = "3.2.0"
 solana-cpi = { version = "3.0.0", optional = true }
 solana-frozen-abi = { version = "3.8.0", features = ["frozen-abi"], optional = true }
@@ -32,6 +33,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = { version = "4.3.0", default-features = false }
 solana-stake-history = "1.0.0"
 solana-system-interface = "3.3.0"
+solana-vote-interface = { version = "5.0.0", features = ["bincode"], optional = true }
 wincode = { version = "0.6.0", features = ["derive"],  optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
@@ -60,7 +62,9 @@ rustdoc-args = ["--cfg=docsrs"]
 
 [features]
 bincode = [
+    "dep:solana-account-info",
     "dep:solana-cpi",
+    "dep:solana-vote-interface",
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
