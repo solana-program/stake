@@ -19,7 +19,7 @@ use {
         },
     },
     solana_clock::{Clock, Epoch, UnixTimestamp},
-    solana_instruction::error::InstructionError,
+    solana_instruction_error::InstructionError,
     solana_pubkey::Pubkey,
     std::collections::HashSet,
 };
