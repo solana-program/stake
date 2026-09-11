@@ -33,7 +33,7 @@ mollusk-svm = { version = "0.12.0", features = ["all-builtins"] }
 mollusk-svm-result = "0.12.0"
 proptest = "1.11.0"
 rand = "0.10.1"
-solana-account = { version = "3.2.0", features = ["bincode"] }
+solana-account = { version = "4.4.0", features = ["bincode"] }
 solana-config-interface = { version = "2", features = ["serde"] }
 solana-epoch-rewards = "3.0.2"
 solana-epoch-schedule = "3.1.0"
