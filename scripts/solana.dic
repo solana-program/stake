@@ -5,6 +5,7 @@ codama
 config
 cooldown
 deallocated
+deserialize
 entrypoint
 fn
 IDL

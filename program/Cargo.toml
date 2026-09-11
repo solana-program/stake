@@ -23,7 +23,6 @@ solana-security-txt = "1.1.3"
 solana-stake-interface = { path = "../interface", version = "4.0.0", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "3.0.0"
 solana-sysvar-id = "3.1.0"
-solana-vote-interface = { version = "5.0.0", features = ["bincode"] }
 
 [dev-dependencies]
 agave-feature-set = "3.0.0"
@@ -51,6 +50,7 @@ solana-stake-interface-v2 = { package = "solana-stake-interface", version = "2.0
 solana-svm-log-collector = "3.0.0"
 solana-system-interface = { version = "3.3.0", features = ["bincode"] }
 solana-transaction = "3.0.2"
+solana-vote-interface = { version = "5.0.0", features = ["bincode"] }
 test-case = "3.3.1"
 
 [lib]
