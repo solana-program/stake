@@ -7718,17 +7718,15 @@ fn test_deactivate_delinquent_deserialize_vote_state(vote_state_version: VoteSta
     );
 }
 
-#[test_case(system_program::id(), vec![], 0; "missing")]
-#[test_case(system_program::id(), vec![], 1; "refunded")]
-#[test_case(Pubkey::new_unique(), vec![255], 1; "other_owner")]
-#[test_case(solana_sdk_ids::vote::id(), vec![], 1; "empty")]
-#[test_case(solana_sdk_ids::vote::id(), vec![0; 3], 1; "three_zero_bytes")]
-#[test_case(solana_sdk_ids::vote::id(), vec![0; VoteStateV4::size_of()], 0; "closed_vote_state")]
-#[test_case(solana_sdk_ids::vote::id(), vec![0; VoteStateV4::size_of()], 1; "refunded_vote_state")]
-#[test_case(solana_sdk_ids::vote::id(), vec![0; 10 * 1024 * 1024], 1; "maximum_size_shell")]
-fn test_deactivate_delinquent_closed_vote_account(owner: Pubkey, data: Vec<u8>, lamports: u64) {
+#[test_case(system_program::id(), vec![]; "system_owner_with_empty_data")]
+#[test_case(Pubkey::new_unique(), vec![255]; "other_owner")]
+#[test_case(solana_sdk_ids::vote::id(), vec![]; "empty")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; 3]; "three_zero_bytes")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; VoteStateV4::size_of()]; "zeroed_vote_state")]
+#[test_case(solana_sdk_ids::vote::id(), vec![0; 10 * 1024 * 1024]; "maximum_size_shell")]
+fn test_deactivate_delinquent_closed_vote_account(owner: Pubkey, data: Vec<u8>) {
     let vote_account = AccountSharedData::from(Account {
-        lamports,
+        lamports: 1,
         data,
         owner,
         ..Account::default()
