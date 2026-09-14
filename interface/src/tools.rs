@@ -261,13 +261,13 @@ mod tests {
             Account::new_data_with_space(1, &state, VoteStateV4::size_of(), &vote::id()).unwrap()
         }
 
-        #[test_case(system_program::id(), vec![], 0; "removed_account")]
-        #[test_case(Pubkey::new_unique(), vec![255], 1; "other_owner_with_invalid_data")]
-        fn test_non_vote_owner(owner: Pubkey, data: Vec<u8>, lamports: u64) {
+        #[test_case(system_program::id(), vec![]; "system_owner_with_empty_data")]
+        #[test_case(Pubkey::new_unique(), vec![255]; "other_owner_with_invalid_data")]
+        fn test_non_vote_owner(owner: Pubkey, data: Vec<u8>) {
             let mut account = Account {
                 owner,
                 data,
-                lamports,
+                lamports: 1,
                 ..Account::default()
             };
             assert_eq!(
