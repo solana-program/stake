@@ -7731,9 +7731,8 @@ fn test_deactivate_delinquent_closed_vote_account(owner: Pubkey, data: Vec<u8>) 
         owner,
         ..Account::default()
     });
-    let (mut mollusk, instruction_accounts, transaction_accounts) =
+    let (mollusk, instruction_accounts, transaction_accounts) =
         setup_deactivate_delinquent_test_with_vote_account(vote_account);
-    mollusk.compute_budget.compute_unit_limit = 200_000;
 
     let mut expected_accounts: Vec<_> = transaction_accounts
         .iter()
