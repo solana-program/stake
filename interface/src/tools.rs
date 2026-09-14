@@ -92,7 +92,7 @@ pub fn acceptable_reference_epoch_credits(
 /// Check if the provided `epoch_credits` demonstrate delinquency over the previous
 /// [`MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`].
 #[deprecated(
-    since = "4.5.0",
+    since = "5.1.0",
     note = "Use eligible_for_deactivate_delinquent_v2 to also handle closed vote accounts"
 )]
 pub fn eligible_for_deactivate_delinquent(
