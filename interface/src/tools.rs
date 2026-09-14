@@ -2,11 +2,11 @@
 use {crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION, solana_clock::Epoch};
 #[cfg(feature = "bincode")]
 use {
+    core::mem::MaybeUninit,
     solana_account_info::AccountInfo,
     solana_cpi::{get_return_data, invoke_unchecked},
     solana_program_error::ProgramError,
     solana_vote_interface::state::VoteStateV4,
-    std::mem::MaybeUninit,
 };
 
 /// Helper function for programs to call [`GetMinimumDelegation`] and then fetch the return data
