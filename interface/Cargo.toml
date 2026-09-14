@@ -34,7 +34,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = { version = "4.3.0", default-features = false }
 solana-stake-history = "2.0.0"
 solana-system-interface = "3.3.0"
-solana-vote-interface = { version = "5.0.0", features = ["bincode"], optional = true }
+solana-vote-interface = { version = "7.0.0", features = ["bincode"], optional = true }
 wincode = { version = "0.6.0", features = ["derive"],  optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
