@@ -6,7 +6,7 @@
     "kind": "programNode",
     "name": "stake",
     "publicKey": "Stake11111111111111111111111111111111111111",
-    "version": "4.4.0",
+    "version": "5.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
