@@ -61,7 +61,7 @@ pub fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4
         vote_account_info.key,
     )
     .map_err(|_| ProgramError::InvalidAccountData)?;
-    let vote_state = unsafe { Box::from_raw(Box::into_raw(vote_state).cast::<VoteStateV4>()) };
+    let vote_state = unsafe { vote_state.assume_init() };
 
     Ok(vote_state)
 }
