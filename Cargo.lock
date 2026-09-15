@@ -6002,7 +6002,7 @@ dependencies = [
  "solana-pubkey 3.0.0",
  "solana-sanitize",
  "solana-sdk-ids",
- "solana-serialize-utils",
+ "solana-serialize-utils 3.1.0",
  "solana-sysvar-id",
 ]
 
@@ -7052,6 +7052,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-serialize-utils"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f844dab1b29cc8c1a3413b96bf0ef9fba44f47be53ec498ce01507ab4b5520"
+dependencies = [
+ "solana-instruction-error 3.0.0",
+ "solana-pubkey 4.3.0",
+ "solana-sanitize",
+]
+
+[[package]]
 name = "solana-sha256-hasher"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7289,7 +7300,7 @@ dependencies = [
  "solana-sysvar 3.1.1",
  "solana-sysvar-id",
  "solana-transaction",
- "solana-vote-interface 5.1.1",
+ "solana-vote-interface 7.0.0",
  "test-case",
 ]
 
@@ -7830,7 +7841,7 @@ dependencies = [
  "solana-packet",
  "solana-pubkey 3.0.0",
  "solana-sdk-ids",
- "solana-serialize-utils",
+ "solana-serialize-utils 3.1.0",
  "solana-signature",
  "solana-signer",
  "solana-svm-transaction",
@@ -7860,16 +7871,16 @@ dependencies = [
  "solana-rent 3.0.0",
  "solana-sdk-ids",
  "solana-serde-varint",
- "solana-serialize-utils",
+ "solana-serialize-utils 3.1.0",
  "solana-short-vec",
  "solana-system-interface 2.0.0",
 ]
 
 [[package]]
 name = "solana-vote-interface"
-version = "5.1.1"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d444ce30b6b4f9c281ba06061ea96638d063b53c2171b1e41ba02ebff79ed28f"
+checksum = "6b3909c886ea5e6dbbda3fe5046244ad05566209e3d2f96a278f75e8956d9d51"
 dependencies = [
  "bincode",
  "cfg_eval",
@@ -7878,15 +7889,14 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_with",
- "solana-clock 3.2.1",
+ "solana-clock 4.0.0",
  "solana-hash 4.6.0",
- "solana-instruction 3.5.1",
- "solana-instruction-error 2.5.0",
+ "solana-instruction 4.0.0",
+ "solana-instruction-error 3.0.0",
  "solana-pubkey 4.3.0",
- "solana-rent 4.4.0",
  "solana-sdk-ids",
  "solana-serde-varint",
- "solana-serialize-utils",
+ "solana-serialize-utils 4.0.0",
  "solana-short-vec",
  "solana-system-interface 3.3.0",
 ]
