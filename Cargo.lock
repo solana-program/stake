@@ -7238,7 +7238,6 @@ dependencies = [
  "serde_json",
  "serial_test",
  "solana-account 5.0.0",
- "solana-account-info",
  "solana-borsh",
  "solana-clock 4.0.0",
  "solana-cpi",

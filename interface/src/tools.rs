@@ -3,9 +3,9 @@ use {crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION, solana_clock::Epoch};
 #[cfg(feature = "bincode")]
 use {
     core::mem::MaybeUninit,
-    solana_account_info::AccountInfo,
     solana_cpi::{get_return_data, invoke_unchecked},
     solana_program_error::ProgramError,
+    solana_pubkey::Pubkey,
     solana_vote_interface::state::VoteStateV4,
 };
 
@@ -49,18 +49,18 @@ fn get_minimum_delegation_return_data() -> Result<u64, ProgramError> {
 
 /// Deserialize a Vote Program-owned account as [`VoteStateV4`].
 #[cfg(feature = "bincode")]
-pub fn get_vote_state(vote_account_info: &AccountInfo) -> Result<Box<VoteStateV4>, ProgramError> {
-    if *vote_account_info.owner != solana_vote_interface::program::id() {
+pub fn get_vote_state(
+    address: &Pubkey,
+    owner: &Pubkey,
+    data: &[u8],
+) -> Result<Box<VoteStateV4>, ProgramError> {
+    if *owner != solana_vote_interface::program::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
 
     let mut vote_state = Box::new(MaybeUninit::uninit());
-    VoteStateV4::deserialize_into_uninit(
-        &vote_account_info.try_borrow_data()?,
-        vote_state.as_mut(),
-        vote_account_info.key,
-    )
-    .map_err(|_| ProgramError::InvalidAccountData)?;
+    VoteStateV4::deserialize_into_uninit(data, vote_state.as_mut(), address)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
     let vote_state = unsafe { vote_state.assume_init() };
 
     Ok(vote_state)
@@ -139,24 +139,21 @@ fn is_delinquent_by_epoch_credits(
 ///   epochs before `current_epoch`.
 #[cfg(feature = "bincode")]
 pub fn eligible_for_deactivate_delinquent_v2(
-    vote_account_info: &AccountInfo,
+    address: &Pubkey,
+    owner: &Pubkey,
+    data: &[u8],
     current_epoch: Epoch,
 ) -> Result<bool, ProgramError> {
-    if *vote_account_info.owner != solana_vote_interface::program::id() {
+    if *owner != solana_vote_interface::program::id() {
         return Ok(true);
     }
 
     // Inspect at most enough bytes to cover the discriminator
-    if vote_account_info
-        .try_borrow_data()?
-        .iter()
-        .take(4)
-        .all(|byte| *byte == 0)
-    {
+    if data.iter().take(4).all(|byte| *byte == 0) {
         return Ok(true);
     }
 
-    let vote_state = get_vote_state(vote_account_info)?;
+    let vote_state = get_vote_state(address, owner, data)?;
 
     Ok(is_delinquent_by_epoch_credits(
         &vote_state.epoch_credits,
@@ -264,7 +261,7 @@ mod tests {
         #[test_case(system_program::id(), vec![]; "system_owner_with_empty_data")]
         #[test_case(Pubkey::new_unique(), vec![255]; "other_owner_with_invalid_data")]
         fn test_non_vote_owner(owner: Pubkey, data: Vec<u8>) {
-            let mut account = Account {
+            let account = Account {
                 owner,
                 data,
                 lamports: 1,
@@ -272,7 +269,9 @@ mod tests {
             };
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     0,
                 ),
                 Ok(true)
@@ -282,7 +281,7 @@ mod tests {
         #[test_case(vec![0; 4]; "discriminator_only")]
         #[test_case(vec![0, 0, 0, 0, 255]; "nonzero_trailing_data")]
         fn test_zero_discriminator(data: Vec<u8>) {
-            let mut account = Account {
+            let account = Account {
                 owner: vote::id(),
                 data,
                 lamports: 1,
@@ -290,7 +289,9 @@ mod tests {
             };
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     0,
                 ),
                 Ok(true)
@@ -302,10 +303,12 @@ mod tests {
         #[test_case(2; "two_bytes")]
         #[test_case(3; "three_bytes")]
         fn test_short_zero_data(len: usize) {
-            let mut account = Account::new(1, len, &vote::id());
+            let account = Account::new(1, len, &vote::id());
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     0,
                 ),
                 Ok(true)
@@ -316,10 +319,12 @@ mod tests {
         #[test_case(VoteStateVersions::V3(Box::default()); "v3")]
         #[test_case(VoteStateVersions::V4(Box::default()); "v4")]
         fn test_no_epoch_credits(state: VoteStateVersions) {
-            let mut account = vote_account(state, vec![]);
+            let account = vote_account(state, vec![]);
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     0,
                 ),
                 Ok(true)
@@ -330,10 +335,12 @@ mod tests {
         #[test_case(VoteStateVersions::V3(Box::default()); "v3")]
         #[test_case(VoteStateVersions::V4(Box::default()); "v4")]
         fn test_recent_credits_in_each_vote_state_version(state: VoteStateVersions) {
-            let mut account = vote_account(state, vec![(42, 1, 0)]);
+            let account = vote_account(state, vec![(42, 1, 0)]);
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     42,
                 ),
                 Ok(false)
@@ -343,13 +350,15 @@ mod tests {
         #[test_case(0, MINIMUM_EPOCHS - 1; "before_first_possible_deactivation")]
         #[test_case(40, 40 + MINIMUM_EPOCHS - 1; "one_epoch_too_early")]
         fn test_insufficient_credit_age(last_credit_epoch: Epoch, current_epoch: Epoch) {
-            let mut account = vote_account(
+            let account = vote_account(
                 VoteStateVersions::V4(Box::default()),
                 vec![(last_credit_epoch, 1, 0)],
             );
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     current_epoch,
                 ),
                 Ok(false)
@@ -360,13 +369,15 @@ mod tests {
         #[test_case(40, 40 + MINIMUM_EPOCHS; "exact_threshold")]
         #[test_case(40, 40 + MINIMUM_EPOCHS + 1; "past_threshold")]
         fn test_sufficient_credit_age(last_credit_epoch: Epoch, current_epoch: Epoch) {
-            let mut account = vote_account(
+            let account = vote_account(
                 VoteStateVersions::V4(Box::default()),
                 vec![(last_credit_epoch, 1, 0)],
             );
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     current_epoch,
                 ),
                 Ok(true)
@@ -375,13 +386,15 @@ mod tests {
 
         #[test]
         fn test_latest_credit_epoch() {
-            let mut account = vote_account(
+            let account = vote_account(
                 VoteStateVersions::V4(Box::default()),
                 vec![(1, 1, 0), (42, 2, 1)],
             );
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     42,
                 ),
                 Ok(false)
@@ -392,7 +405,7 @@ mod tests {
         #[test_case(vec![3, 0, 0, 0]; "truncated_v4")]
         #[test_case(vec![0, 0, 0, 1]; "nonzero_fourth_discriminator_byte")]
         fn test_invalid_vote_data(data: Vec<u8>) {
-            let mut account = Account {
+            let account = Account {
                 owner: vote::id(),
                 data,
                 lamports: 1,
@@ -400,7 +413,9 @@ mod tests {
             };
             assert_eq!(
                 eligible_for_deactivate_delinquent_v2(
-                    &AccountInfo::from((&Pubkey::new_unique(), &mut account)),
+                    &Pubkey::new_unique(),
+                    &account.owner,
+                    &account.data,
                     42,
                 ),
                 Err(ProgramError::InvalidAccountData)

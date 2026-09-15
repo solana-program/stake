@@ -393,7 +393,11 @@ impl Processor {
         let clock = &Clock::get()?;
         let stake_history = &StakeHistorySysvar(clock.epoch);
 
-        let vote_state = get_vote_state(vote_account_info)?;
+        let vote_state = get_vote_state(
+            vote_account_info.key,
+            vote_account_info.owner,
+            &vote_account_info.try_borrow_data()?,
+        )?;
 
         let rent_exempt_reserve = rent.minimum_balance(stake_account_info.data_len());
 
@@ -1186,7 +1190,11 @@ impl Processor {
 
         let clock = Clock::get()?;
 
-        let reference_vote_state = get_vote_state(reference_vote_account_info)?;
+        let reference_vote_state = get_vote_state(
+            reference_vote_account_info.key,
+            reference_vote_account_info.owner,
+            &reference_vote_account_info.try_borrow_data()?,
+        )?;
 
         if !acceptable_reference_epoch_credits(&reference_vote_state.epoch_credits, clock.epoch) {
             return Err(StakeError::InsufficientReferenceVotes.into());
@@ -1202,7 +1210,12 @@ impl Processor {
             return Err(StakeError::VoteAddressMismatch.into());
         }
 
-        if !eligible_for_deactivate_delinquent_v2(delinquent_vote_account_info, clock.epoch)? {
+        if !eligible_for_deactivate_delinquent_v2(
+            delinquent_vote_account_info.key,
+            delinquent_vote_account_info.owner,
+            &delinquent_vote_account_info.try_borrow_data()?,
+            clock.epoch,
+        )? {
             return Err(StakeError::MinimumDelinquentEpochsForDeactivationNotMet.into());
         }
 
