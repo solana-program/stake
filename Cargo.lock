@@ -7286,7 +7286,7 @@ dependencies = [
  "solana-stake-interface 5.0.0",
  "solana-svm-log-collector",
  "solana-system-interface 3.3.0",
- "solana-sysvar 3.1.1",
+ "solana-sysvar 5.0.0",
  "solana-sysvar-id",
  "solana-transaction",
  "solana-vote-interface 5.1.1",
