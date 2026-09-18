@@ -8,7 +8,7 @@ repository = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 edition = { workspace = true }
-rust-version = "1.81.0"
+rust-version = "1.89.0"
 
 [lib]
 crate-type = ["rlib"]
@@ -33,6 +33,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = { version = "4.3.0", default-features = false }
 solana-stake-history = "2.0.0"
 solana-system-interface = "3.3.0"
+solana-vote-interface = { version = "7.0.0", features = ["bincode"], optional = true }
 wincode = { version = "0.6.0", features = ["derive"],  optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
@@ -62,6 +63,7 @@ rustdoc-args = ["--cfg=docsrs"]
 [features]
 bincode = [
     "dep:solana-cpi",
+    "dep:solana-vote-interface",
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
