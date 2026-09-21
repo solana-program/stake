@@ -26,10 +26,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const MERGE_DISCRIMINATOR = 7;
@@ -79,39 +85,46 @@ export function getMergeInstructionDataCodec(): FixedSizeCodec<MergeInstructionD
 }
 
 export type MergeInput<
-    TAccountDestinationStake extends string = string,
-    TAccountSourceStake extends string = string,
-    TAccountStakeAuthority extends string = string,
+    TAccountDestinationStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountSourceStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Destination stake account for the merge */
-    destinationStake: Address<TAccountDestinationStake>;
+    destinationStake: TAccountDestinationStake;
     /** Source stake account for to merge.  This account will be drained */
-    sourceStake: Address<TAccountSourceStake>;
+    sourceStake: TAccountSourceStake;
     /** Stake authority */
-    stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
 };
 
 export function getMergeInstruction<
-    TAccountDestinationStake extends string,
-    TAccountSourceStake extends string,
-    TAccountStakeAuthority extends string,
+    TAccountDestinationStake extends InstructionAccountInput,
+    TAccountSourceStake extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: MergeInput<TAccountDestinationStake, TAccountSourceStake, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): MergeInstruction<TProgramAddress, TAccountDestinationStake, TAccountSourceStake, TAccountStakeAuthority> {
+): MergeInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountDestinationStake, InstructionAccountInputAddress<TAccountDestinationStake>>,
+    ResolvedInstructionAccountMeta<TAccountSourceStake, InstructionAccountInputAddress<TAccountSourceStake>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        destinationStake: { value: input.destinationStake ?? null, isWritable: true },
-        sourceStake: { value: input.sourceStake ?? null, isWritable: true },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
+        destinationStake: { value: input.destinationStake ?? null, isSigner: false, isWritable: true },
+        sourceStake: { value: input.sourceStake ?? null, isSigner: false, isWritable: true },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('destinationStake', accounts.destinationStake),
@@ -120,7 +133,15 @@ export function getMergeInstruction<
         ],
         data: getMergeInstructionDataEncoder().encode({}),
         programAddress,
-    } as MergeInstruction<TProgramAddress, TAccountDestinationStake, TAccountSourceStake, TAccountStakeAuthority>);
+    } as MergeInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<
+            TAccountDestinationStake,
+            InstructionAccountInputAddress<TAccountDestinationStake>
+        >,
+        ResolvedInstructionAccountMeta<TAccountSourceStake, InstructionAccountInputAddress<TAccountSourceStake>>,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+    >);
 }
 
 export type ParsedMergeInstruction<

@@ -32,10 +32,16 @@ import {
     type OptionOrNullable,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getEpochDecoder,
@@ -109,43 +115,56 @@ export function getSetLockupInstructionDataCodec(): Codec<SetLockupInstructionDa
     return combineCodec(getSetLockupInstructionDataEncoder(), getSetLockupInstructionDataDecoder());
 }
 
-export type SetLockupInput<TAccountStake extends string = string, TAccountAuthority extends string = string> = {
+export type SetLockupInput<
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+> = {
     /** Initialized stake account */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Lockup authority or withdraw authority */
-    authority: TransactionSigner<TAccountAuthority>;
+    authority: TAccountAuthority;
     unixTimestamp: SetLockupInstructionDataArgs['unixTimestamp'];
     epoch: SetLockupInstructionDataArgs['epoch'];
     custodian: SetLockupInstructionDataArgs['custodian'];
 };
 
 export function getSetLockupInstruction<
-    TAccountStake extends string,
-    TAccountAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: SetLockupInput<TAccountStake, TAccountAuthority>,
     config?: { programAddress?: TProgramAddress },
-): SetLockupInstruction<TProgramAddress, TAccountStake, TAccountAuthority> {
+): SetLockupInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        authority: { value: input.authority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        authority: { value: input.authority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [getAccountMeta('stake', accounts.stake), getAccountMeta('authority', accounts.authority)],
         data: getSetLockupInstructionDataEncoder().encode(args as SetLockupInstructionDataArgs),
         programAddress,
-    } as SetLockupInstruction<TProgramAddress, TAccountStake, TAccountAuthority>);
+    } as SetLockupInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>
+    >);
 }
 
 export type ParsedSetLockupInstruction<

@@ -27,10 +27,16 @@ import {
     type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const INITIALIZE_CHECKED_DISCRIMINATOR = 9;
@@ -81,39 +87,46 @@ export function getInitializeCheckedInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type InitializeCheckedInput<
-    TAccountStake extends string = string,
-    TAccountStakeAuthority extends string = string,
-    TAccountWithdrawAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionAccountInput = InstructionAccountInput,
+    TAccountWithdrawAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Uninitialized stake account */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** The stake authority */
-    stakeAuthority: Address<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
     /** The withdraw authority */
-    withdrawAuthority: TransactionSigner<TAccountWithdrawAuthority>;
+    withdrawAuthority: TAccountWithdrawAuthority;
 };
 
 export function getInitializeCheckedInstruction<
-    TAccountStake extends string,
-    TAccountStakeAuthority extends string,
-    TAccountWithdrawAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionAccountInput,
+    TAccountWithdrawAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: InitializeCheckedInput<TAccountStake, TAccountStakeAuthority, TAccountWithdrawAuthority>,
     config?: { programAddress?: TProgramAddress },
-): InitializeCheckedInstruction<TProgramAddress, TAccountStake, TAccountStakeAuthority, TAccountWithdrawAuthority> {
+): InitializeCheckedInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>,
+    ResolvedInstructionAccountMeta<TAccountWithdrawAuthority, InstructionAccountInputAddress<TAccountWithdrawAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
-        withdrawAuthority: { value: input.withdrawAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: false, isWritable: false },
+        withdrawAuthority: { value: input.withdrawAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -124,9 +137,12 @@ export function getInitializeCheckedInstruction<
         programAddress,
     } as InitializeCheckedInstruction<
         TProgramAddress,
-        TAccountStake,
-        TAccountStakeAuthority,
-        TAccountWithdrawAuthority
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>,
+        ResolvedInstructionAccountMeta<
+            TAccountWithdrawAuthority,
+            InstructionAccountInputAddress<TAccountWithdrawAuthority>
+        >
     >);
 }
 

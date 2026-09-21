@@ -26,7 +26,13 @@ import {
     type ReadonlyUint8Array,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getAuthorizedDecoder,
@@ -85,36 +91,44 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
     return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
 }
 
-export type InitializeInput<TAccountStake extends string = string> = {
+export type InitializeInput<TAccountStake extends InstructionAccountInput = InstructionAccountInput> = {
     /** Uninitialized stake account */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     arg0: InitializeInstructionDataArgs['arg0'];
     arg1: InitializeInstructionDataArgs['arg1'];
 };
 
 export function getInitializeInstruction<
-    TAccountStake extends string,
+    TAccountStake extends InstructionAccountInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: InitializeInput<TAccountStake>,
     config?: { programAddress?: TProgramAddress },
-): InitializeInstruction<TProgramAddress, TAccountStake> {
+): InitializeInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
-    const originalAccounts = { stake: { value: input.stake ?? null, isWritable: true } };
+    const originalAccounts = { stake: { value: input.stake ?? null, isSigner: false, isWritable: true } };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [getAccountMeta('stake', accounts.stake)],
         data: getInitializeInstructionDataEncoder().encode(args as InitializeInstructionDataArgs),
         programAddress,
-    } as InitializeInstruction<TProgramAddress, TAccountStake>);
+    } as InitializeInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>
+    >);
 }
 
 export type ParsedInitializeInstruction<

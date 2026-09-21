@@ -30,10 +30,16 @@ import {
     type OptionOrNullable,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getEpochDecoder,
@@ -115,44 +121,51 @@ export function getSetLockupCheckedInstructionDataCodec(): Codec<
 }
 
 export type SetLockupCheckedInput<
-    TAccountStake extends string = string,
-    TAccountAuthority extends string = string,
-    TAccountNewAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+    TAccountNewAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Initialized stake account */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Lockup authority or withdraw authority */
-    authority: TransactionSigner<TAccountAuthority>;
+    authority: TAccountAuthority;
     /** New lockup authority */
-    newAuthority?: TransactionSigner<TAccountNewAuthority>;
+    newAuthority?: TAccountNewAuthority;
     unixTimestamp: SetLockupCheckedInstructionDataArgs['unixTimestamp'];
     epoch: SetLockupCheckedInstructionDataArgs['epoch'];
 };
 
 export function getSetLockupCheckedInstruction<
-    TAccountStake extends string,
-    TAccountAuthority extends string,
-    TAccountNewAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput,
+    TAccountNewAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: SetLockupCheckedInput<TAccountStake, TAccountAuthority, TAccountNewAuthority>,
     config?: { programAddress?: TProgramAddress },
-): SetLockupCheckedInstruction<TProgramAddress, TAccountStake, TAccountAuthority, TAccountNewAuthority> {
+): SetLockupCheckedInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+    ResolvedInstructionAccountMeta<TAccountNewAuthority, InstructionAccountInputAddress<TAccountNewAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        authority: { value: input.authority ?? null, isWritable: false },
-        newAuthority: { value: input.newAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        authority: { value: input.authority ?? null, isSigner: true, isWritable: false },
+        newAuthority: { value: input.newAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -161,7 +174,12 @@ export function getSetLockupCheckedInstruction<
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getSetLockupCheckedInstructionDataEncoder().encode(args as SetLockupCheckedInstructionDataArgs),
         programAddress,
-    } as SetLockupCheckedInstruction<TProgramAddress, TAccountStake, TAccountAuthority, TAccountNewAuthority>);
+    } as SetLockupCheckedInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+        ResolvedInstructionAccountMeta<TAccountNewAuthority, InstructionAccountInputAddress<TAccountNewAuthority>>
+    >);
 }
 
 export type ParsedSetLockupCheckedInstruction<

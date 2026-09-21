@@ -28,10 +28,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const SPLIT_DISCRIMINATOR = 3;
@@ -85,43 +91,50 @@ export function getSplitInstructionDataCodec(): FixedSizeCodec<SplitInstructionD
 }
 
 export type SplitInput<
-    TAccountStake extends string = string,
-    TAccountSplitStake extends string = string,
-    TAccountStakeAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountSplitStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Stake account to be split; must be in the Initialized or Stake state */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Uninitialized stake account that will take the split-off amount */
-    splitStake: Address<TAccountSplitStake>;
+    splitStake: TAccountSplitStake;
     /** Stake authority */
-    stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
     args: SplitInstructionDataArgs['args'];
 };
 
 export function getSplitInstruction<
-    TAccountStake extends string,
-    TAccountSplitStake extends string,
-    TAccountStakeAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountSplitStake extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: SplitInput<TAccountStake, TAccountSplitStake, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): SplitInstruction<TProgramAddress, TAccountStake, TAccountSplitStake, TAccountStakeAuthority> {
+): SplitInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountSplitStake, InstructionAccountInputAddress<TAccountSplitStake>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        splitStake: { value: input.splitStake ?? null, isWritable: true },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        splitStake: { value: input.splitStake ?? null, isSigner: false, isWritable: true },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -130,7 +143,12 @@ export function getSplitInstruction<
         ],
         data: getSplitInstructionDataEncoder().encode(args as SplitInstructionDataArgs),
         programAddress,
-    } as SplitInstruction<TProgramAddress, TAccountStake, TAccountSplitStake, TAccountStakeAuthority>);
+    } as SplitInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountSplitStake, InstructionAccountInputAddress<TAccountSplitStake>>,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+    >);
 }
 
 export type ParsedSplitInstruction<
