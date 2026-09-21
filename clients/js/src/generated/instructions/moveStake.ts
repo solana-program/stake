@@ -28,10 +28,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const MOVE_STAKE_DISCRIMINATOR = 16;
@@ -90,43 +96,50 @@ export function getMoveStakeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type MoveStakeInput<
-    TAccountSourceStake extends string = string,
-    TAccountDestinationStake extends string = string,
-    TAccountStakeAuthority extends string = string,
+    TAccountSourceStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountDestinationStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Active source stake account */
-    sourceStake: Address<TAccountSourceStake>;
+    sourceStake: TAccountSourceStake;
     /** Active or inactive destination stake account */
-    destinationStake: Address<TAccountDestinationStake>;
+    destinationStake: TAccountDestinationStake;
     /** Stake authority */
-    stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
     args: MoveStakeInstructionDataArgs['args'];
 };
 
 export function getMoveStakeInstruction<
-    TAccountSourceStake extends string,
-    TAccountDestinationStake extends string,
-    TAccountStakeAuthority extends string,
+    TAccountSourceStake extends InstructionAccountInput,
+    TAccountDestinationStake extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: MoveStakeInput<TAccountSourceStake, TAccountDestinationStake, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): MoveStakeInstruction<TProgramAddress, TAccountSourceStake, TAccountDestinationStake, TAccountStakeAuthority> {
+): MoveStakeInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountSourceStake, InstructionAccountInputAddress<TAccountSourceStake>>,
+    ResolvedInstructionAccountMeta<TAccountDestinationStake, InstructionAccountInputAddress<TAccountDestinationStake>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        sourceStake: { value: input.sourceStake ?? null, isWritable: true },
-        destinationStake: { value: input.destinationStake ?? null, isWritable: true },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
+        sourceStake: { value: input.sourceStake ?? null, isSigner: false, isWritable: true },
+        destinationStake: { value: input.destinationStake ?? null, isSigner: false, isWritable: true },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('sourceStake', accounts.sourceStake),
@@ -135,7 +148,15 @@ export function getMoveStakeInstruction<
         ],
         data: getMoveStakeInstructionDataEncoder().encode(args as MoveStakeInstructionDataArgs),
         programAddress,
-    } as MoveStakeInstruction<TProgramAddress, TAccountSourceStake, TAccountDestinationStake, TAccountStakeAuthority>);
+    } as MoveStakeInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountSourceStake, InstructionAccountInputAddress<TAccountSourceStake>>,
+        ResolvedInstructionAccountMeta<
+            TAccountDestinationStake,
+            InstructionAccountInputAddress<TAccountDestinationStake>
+        >,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+    >);
 }
 
 export type ParsedMoveStakeInstruction<

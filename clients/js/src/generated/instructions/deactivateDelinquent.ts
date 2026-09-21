@@ -27,7 +27,13 @@ import {
     type ReadonlyUint8Array,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const DEACTIVATE_DELINQUENT_DISCRIMINATOR = 14;
@@ -79,39 +85,46 @@ export function getDeactivateDelinquentInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type DeactivateDelinquentInput<
-    TAccountStake extends string = string,
-    TAccountDelinquentVote extends string = string,
-    TAccountReferenceVote extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountDelinquentVote extends InstructionAccountInput = InstructionAccountInput,
+    TAccountReferenceVote extends InstructionAccountInput = InstructionAccountInput,
 > = {
     /** Delegated stake account */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Delinquent vote account for the delegated stake account */
-    delinquentVote: Address<TAccountDelinquentVote>;
+    delinquentVote: TAccountDelinquentVote;
     /** Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs */
-    referenceVote: Address<TAccountReferenceVote>;
+    referenceVote: TAccountReferenceVote;
 };
 
 export function getDeactivateDelinquentInstruction<
-    TAccountStake extends string,
-    TAccountDelinquentVote extends string,
-    TAccountReferenceVote extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountDelinquentVote extends InstructionAccountInput,
+    TAccountReferenceVote extends InstructionAccountInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: DeactivateDelinquentInput<TAccountStake, TAccountDelinquentVote, TAccountReferenceVote>,
     config?: { programAddress?: TProgramAddress },
-): DeactivateDelinquentInstruction<TProgramAddress, TAccountStake, TAccountDelinquentVote, TAccountReferenceVote> {
+): DeactivateDelinquentInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountDelinquentVote, InstructionAccountInputAddress<TAccountDelinquentVote>>,
+    ResolvedInstructionAccountMeta<TAccountReferenceVote, InstructionAccountInputAddress<TAccountReferenceVote>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        delinquentVote: { value: input.delinquentVote ?? null, isWritable: false },
-        referenceVote: { value: input.referenceVote ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        delinquentVote: { value: input.delinquentVote ?? null, isSigner: false, isWritable: false },
+        referenceVote: { value: input.referenceVote ?? null, isSigner: false, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -122,9 +135,9 @@ export function getDeactivateDelinquentInstruction<
         programAddress,
     } as DeactivateDelinquentInstruction<
         TProgramAddress,
-        TAccountStake,
-        TAccountDelinquentVote,
-        TAccountReferenceVote
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountDelinquentVote, InstructionAccountInputAddress<TAccountDelinquentVote>>,
+        ResolvedInstructionAccountMeta<TAccountReferenceVote, InstructionAccountInputAddress<TAccountReferenceVote>>
     >);
 }
 

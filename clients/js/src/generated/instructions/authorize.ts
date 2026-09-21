@@ -28,10 +28,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getStakeAuthorizeDecoder,
@@ -102,44 +108,51 @@ export function getAuthorizeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type AuthorizeInput<
-    TAccountStake extends string = string,
-    TAccountAuthority extends string = string,
-    TAccountLockupAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Stake account to be updated */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** The stake or withdraw authority */
-    authority: TransactionSigner<TAccountAuthority>;
+    authority: TAccountAuthority;
     /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
-    lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
+    lockupAuthority?: TAccountLockupAuthority;
     arg0: AuthorizeInstructionDataArgs['arg0'];
     arg1: AuthorizeInstructionDataArgs['arg1'];
 };
 
 export function getAuthorizeInstruction<
-    TAccountStake extends string,
-    TAccountAuthority extends string,
-    TAccountLockupAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: AuthorizeInput<TAccountStake, TAccountAuthority, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
-): AuthorizeInstruction<TProgramAddress, TAccountStake, TAccountAuthority, TAccountLockupAuthority> {
+): AuthorizeInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+    ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        authority: { value: input.authority ?? null, isWritable: false },
-        lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        authority: { value: input.authority ?? null, isSigner: true, isWritable: false },
+        lockupAuthority: { value: input.lockupAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -148,7 +161,12 @@ export function getAuthorizeInstruction<
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getAuthorizeInstructionDataEncoder().encode(args as AuthorizeInstructionDataArgs),
         programAddress,
-    } as AuthorizeInstruction<TProgramAddress, TAccountStake, TAccountAuthority, TAccountLockupAuthority>);
+    } as AuthorizeInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+        ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
+    >);
 }
 
 export type ParsedAuthorizeInstruction<

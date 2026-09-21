@@ -26,10 +26,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const DEACTIVATE_DISCRIMINATOR = 5;
@@ -77,37 +83,50 @@ export function getDeactivateInstructionDataCodec(): FixedSizeCodec<
     return combineCodec(getDeactivateInstructionDataEncoder(), getDeactivateInstructionDataDecoder());
 }
 
-export type DeactivateInput<TAccountStake extends string = string, TAccountStakeAuthority extends string = string> = {
+export type DeactivateInput<
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput = InstructionSignerInput,
+> = {
     /** Delegated stake account to be deactivated */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Stake authority */
-    stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
 };
 
 export function getDeactivateInstruction<
-    TAccountStake extends string,
-    TAccountStakeAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: DeactivateInput<TAccountStake, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): DeactivateInstruction<TProgramAddress, TAccountStake, TAccountStakeAuthority> {
+): DeactivateInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [getAccountMeta('stake', accounts.stake), getAccountMeta('stakeAuthority', accounts.stakeAuthority)],
         data: getDeactivateInstructionDataEncoder().encode({}),
         programAddress,
-    } as DeactivateInstruction<TProgramAddress, TAccountStake, TAccountStakeAuthority>);
+    } as DeactivateInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+    >);
 }
 
 export type ParsedDeactivateInstruction<

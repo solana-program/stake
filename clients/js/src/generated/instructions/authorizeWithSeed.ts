@@ -34,10 +34,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getStakeAuthorizeDecoder,
@@ -123,16 +129,16 @@ export function getAuthorizeWithSeedInstructionDataCodec(): Codec<
 }
 
 export type AuthorizeWithSeedInput<
-    TAccountStake extends string = string,
-    TAccountBase extends string = string,
-    TAccountLockupAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountBase extends InstructionSignerInput = InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Stake account to be updated */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Base key of stake or withdraw authority */
-    base: TransactionSigner<TAccountBase>;
+    base: TAccountBase;
     /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
-    lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
+    lockupAuthority?: TAccountLockupAuthority;
     newAuthorizedPubkey: AuthorizeWithSeedInstructionDataArgs['newAuthorizedPubkey'];
     stakeAuthorize: AuthorizeWithSeedInstructionDataArgs['stakeAuthorize'];
     authoritySeed: AuthorizeWithSeedInstructionDataArgs['authoritySeed'];
@@ -140,29 +146,36 @@ export type AuthorizeWithSeedInput<
 };
 
 export function getAuthorizeWithSeedInstruction<
-    TAccountStake extends string,
-    TAccountBase extends string,
-    TAccountLockupAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountBase extends InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: AuthorizeWithSeedInput<TAccountStake, TAccountBase, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
-): AuthorizeWithSeedInstruction<TProgramAddress, TAccountStake, TAccountBase, TAccountLockupAuthority> {
+): AuthorizeWithSeedInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountBase, InstructionAccountInputAddress<TAccountBase>>,
+    ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        base: { value: input.base ?? null, isWritable: false },
-        lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        base: { value: input.base ?? null, isSigner: true, isWritable: false },
+        lockupAuthority: { value: input.lockupAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -171,7 +184,12 @@ export function getAuthorizeWithSeedInstruction<
         ].filter(<T>(x: T | undefined): x is T => x !== undefined),
         data: getAuthorizeWithSeedInstructionDataEncoder().encode(args as AuthorizeWithSeedInstructionDataArgs),
         programAddress,
-    } as AuthorizeWithSeedInstruction<TProgramAddress, TAccountStake, TAccountBase, TAccountLockupAuthority>);
+    } as AuthorizeWithSeedInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountBase, InstructionAccountInputAddress<TAccountBase>>,
+        ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
+    >);
 }
 
 export type ParsedAuthorizeWithSeedInstruction<

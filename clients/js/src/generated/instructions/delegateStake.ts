@@ -27,10 +27,16 @@ import {
     type ReadonlyAccount,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 
 export const DELEGATE_STAKE_DISCRIMINATOR = 2;
@@ -81,39 +87,46 @@ export function getDelegateStakeInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type DelegateStakeInput<
-    TAccountStake extends string = string,
-    TAccountVote extends string = string,
-    TAccountStakeAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountVote extends InstructionAccountInput = InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Initialized stake account to be delegated */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** Vote account to which this stake will be delegated */
-    vote: Address<TAccountVote>;
+    vote: TAccountVote;
     /** Stake authority */
-    stakeAuthority: TransactionSigner<TAccountStakeAuthority>;
+    stakeAuthority: TAccountStakeAuthority;
 };
 
 export function getDelegateStakeInstruction<
-    TAccountStake extends string,
-    TAccountVote extends string,
-    TAccountStakeAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountVote extends InstructionAccountInput,
+    TAccountStakeAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: DelegateStakeInput<TAccountStake, TAccountVote, TAccountStakeAuthority>,
     config?: { programAddress?: TProgramAddress },
-): DelegateStakeInstruction<TProgramAddress, TAccountStake, TAccountVote, TAccountStakeAuthority> {
+): DelegateStakeInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountVote, InstructionAccountInputAddress<TAccountVote>>,
+    ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+> {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        vote: { value: input.vote ?? null, isWritable: false },
-        stakeAuthority: { value: input.stakeAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        vote: { value: input.vote ?? null, isSigner: false, isWritable: false },
+        stakeAuthority: { value: input.stakeAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -122,7 +135,12 @@ export function getDelegateStakeInstruction<
         ],
         data: getDelegateStakeInstructionDataEncoder().encode({}),
         programAddress,
-    } as DelegateStakeInstruction<TProgramAddress, TAccountStake, TAccountVote, TAccountStakeAuthority>);
+    } as DelegateStakeInstruction<
+        TProgramAddress,
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountVote, InstructionAccountInputAddress<TAccountVote>>,
+        ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
+    >);
 }
 
 export type ParsedDelegateStakeInstruction<

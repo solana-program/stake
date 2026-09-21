@@ -26,10 +26,16 @@ import {
     type InstructionWithData,
     type ReadonlySignerAccount,
     type ReadonlyUint8Array,
-    type TransactionSigner,
     type WritableAccount,
 } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/kit/program-client-core';
+import {
+    getAccountMetaFactory,
+    type InstructionAccountInput,
+    type InstructionAccountInputAddress,
+    type InstructionSignerInput,
+    type ResolvedInstructionAccount,
+    type ResolvedInstructionAccountMeta,
+} from '@solana/kit/program-client-core';
 import { STAKE_PROGRAM_ADDRESS } from '../programs';
 import {
     getStakeAuthorizeDecoder,
@@ -102,54 +108,56 @@ export function getAuthorizeCheckedInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type AuthorizeCheckedInput<
-    TAccountStake extends string = string,
-    TAccountAuthority extends string = string,
-    TAccountNewAuthority extends string = string,
-    TAccountLockupAuthority extends string = string,
+    TAccountStake extends InstructionAccountInput = InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+    TAccountNewAuthority extends InstructionSignerInput = InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput = InstructionSignerInput,
 > = {
     /** Stake account to be updated */
-    stake: Address<TAccountStake>;
+    stake: TAccountStake;
     /** The stake or withdraw authority */
-    authority: TransactionSigner<TAccountAuthority>;
+    authority: TAccountAuthority;
     /** The new stake or withdraw authority */
-    newAuthority: TransactionSigner<TAccountNewAuthority>;
+    newAuthority: TAccountNewAuthority;
     /** Lockup authority, if updating `StakeAuthorize::Withdrawer` before lockup expiration */
-    lockupAuthority?: TransactionSigner<TAccountLockupAuthority>;
+    lockupAuthority?: TAccountLockupAuthority;
     stakeAuthorize: AuthorizeCheckedInstructionDataArgs['stakeAuthorize'];
 };
 
 export function getAuthorizeCheckedInstruction<
-    TAccountStake extends string,
-    TAccountAuthority extends string,
-    TAccountNewAuthority extends string,
-    TAccountLockupAuthority extends string,
+    TAccountStake extends InstructionAccountInput,
+    TAccountAuthority extends InstructionSignerInput,
+    TAccountNewAuthority extends InstructionSignerInput,
+    TAccountLockupAuthority extends InstructionSignerInput,
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: AuthorizeCheckedInput<TAccountStake, TAccountAuthority, TAccountNewAuthority, TAccountLockupAuthority>,
     config?: { programAddress?: TProgramAddress },
 ): AuthorizeCheckedInstruction<
     TProgramAddress,
-    TAccountStake,
-    TAccountAuthority,
-    TAccountNewAuthority,
-    TAccountLockupAuthority
+    ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+    ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+    ResolvedInstructionAccountMeta<TAccountNewAuthority, InstructionAccountInputAddress<TAccountNewAuthority>>,
+    ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
 > {
     // Program address.
     const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
 
+    // Account meta helper.
+    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
+
     // Original accounts.
     const originalAccounts = {
-        stake: { value: input.stake ?? null, isWritable: true },
-        authority: { value: input.authority ?? null, isWritable: false },
-        newAuthority: { value: input.newAuthority ?? null, isWritable: false },
-        lockupAuthority: { value: input.lockupAuthority ?? null, isWritable: false },
+        stake: { value: input.stake ?? null, isSigner: false, isWritable: true },
+        authority: { value: input.authority ?? null, isSigner: true, isWritable: false },
+        newAuthority: { value: input.newAuthority ?? null, isSigner: true, isWritable: false },
+        lockupAuthority: { value: input.lockupAuthority ?? null, isSigner: true, isWritable: false },
     };
     const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
     // Original args.
     const args = { ...input };
 
-    const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
     return Object.freeze({
         accounts: [
             getAccountMeta('stake', accounts.stake),
@@ -161,10 +169,10 @@ export function getAuthorizeCheckedInstruction<
         programAddress,
     } as AuthorizeCheckedInstruction<
         TProgramAddress,
-        TAccountStake,
-        TAccountAuthority,
-        TAccountNewAuthority,
-        TAccountLockupAuthority
+        ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
+        ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>,
+        ResolvedInstructionAccountMeta<TAccountNewAuthority, InstructionAccountInputAddress<TAccountNewAuthority>>,
+        ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
     >);
 }
 
