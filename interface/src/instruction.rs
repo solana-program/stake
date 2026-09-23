@@ -5,12 +5,14 @@
 
 #[cfg(feature = "codama")]
 use codama_macros::{CodamaInstructions, CodamaType};
+#[cfg(feature = "stable-abi")]
+use solana_frozen_abi_macro::{StableAbi, StableAbiSample};
 use {
     crate::state::{Authorized, Lockup, StakeAuthorize},
     solana_clock::{Epoch, UnixTimestamp},
     solana_pubkey::Pubkey,
 };
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 use {
     crate::{program::ID, state::StakeStateV2},
     solana_instruction::{AccountMeta, Instruction},
@@ -27,6 +29,16 @@ use {
 #[cfg_attr(feature = "codama", derive(CodamaInstructions))]
 #[cfg_attr(feature = "codama", codama(enum_discriminator(size = number(u32))))]
 #[cfg_attr(feature = "codama", codama(optional_account_strategy = omitted))]
+#[cfg_attr(
+    all(feature = "stable-abi", feature = "serde", feature = "wincode"),
+    solana_frozen_abi_macro::frozen_abi(
+        abi_digest = "3wpNccdLMhHtmGWr27a8uWbqaekcnEfrUdkRUKSa6Dya",
+        abi_serializer = ["bincode", "wincode"],
+        test_roundtrip = "eq_and_wire"
+    )
+)]
+#[cfg_attr(feature = "stable-abi", derive(StableAbi, StableAbiSample))]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StakeInstruction {
     /// Initialize a stake with lockup and authorization information
@@ -677,6 +689,8 @@ pub enum StakeInstruction {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "stable-abi", derive(StableAbi, StableAbiSample))]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct LockupArgs {
     #[cfg_attr(feature = "codama", codama(display(label = "Locked Until")))]
     pub unix_timestamp: Option<UnixTimestamp>,
@@ -695,6 +709,8 @@ pub struct LockupArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "stable-abi", derive(StableAbi, StableAbiSample))]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct LockupCheckedArgs {
     #[cfg_attr(feature = "codama", codama(display(label = "Locked Until")))]
     pub unix_timestamp: Option<UnixTimestamp>,
@@ -712,6 +728,8 @@ pub struct LockupCheckedArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "stable-abi", derive(StableAbi, StableAbiSample))]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct AuthorizeWithSeedArgs {
     #[cfg_attr(feature = "codama", codama(display(label = "New Authority")))]
     pub new_authorized_pubkey: Pubkey,
@@ -732,6 +750,8 @@ pub struct AuthorizeWithSeedArgs {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(feature = "stable-abi", derive(StableAbi, StableAbiSample))]
+#[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 pub struct AuthorizeCheckedWithSeedArgs {
     #[cfg_attr(feature = "codama", codama(display(label = "Authority Type")))]
     pub stake_authorize: StakeAuthorize,
@@ -740,19 +760,36 @@ pub struct AuthorizeCheckedWithSeedArgs {
     pub authority_owner: Pubkey,
 }
 
-#[cfg(feature = "bincode")]
+/// Build a stake instruction with bincode-encoded data.
+#[cfg(all(feature = "bincode", not(feature = "wincode")))]
+#[inline(always)]
+fn new_instruction<T: serde::Serialize>(data: &T, accounts: Vec<AccountMeta>) -> Instruction {
+    Instruction::new_with_bincode(ID, data, accounts)
+}
+
+/// Build a stake instruction with wincode-encoded data.
+///
+/// wincode takes precedence over bincode, since it produces the same bytes faster.
+#[cfg(feature = "wincode")]
+#[inline(always)]
+fn new_instruction<T: wincode::Serialize<Src = T>>(
+    data: &T,
+    accounts: Vec<AccountMeta>,
+) -> Instruction {
+    Instruction::new_with_wincode(ID, data, accounts)
+}
+
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn initialize(stake_pubkey: &Pubkey, authorized: &Authorized, lockup: &Lockup) -> Instruction {
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::Initialize(*authorized, *lockup),
         vec![AccountMeta::new(*stake_pubkey, false)],
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn initialize_checked(stake_pubkey: &Pubkey, authorized: &Authorized) -> Instruction {
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::InitializeChecked,
         vec![
             AccountMeta::new(*stake_pubkey, false),
@@ -762,7 +799,7 @@ pub fn initialize_checked(stake_pubkey: &Pubkey, authorized: &Authorized) -> Ins
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn create_account_with_seed(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -786,7 +823,7 @@ pub fn create_account_with_seed(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn create_account(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -806,7 +843,7 @@ pub fn create_account(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn create_account_with_seed_checked(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -829,7 +866,7 @@ pub fn create_account_with_seed_checked(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn create_account_checked(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -848,7 +885,7 @@ pub fn create_account_checked(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 fn _split(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -861,10 +898,10 @@ fn _split(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Split(lamports), account_metas)
+    new_instruction(&StakeInstruction::Split(lamports), account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn split(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -886,7 +923,7 @@ pub fn split(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn split_with_seed(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -912,7 +949,7 @@ pub fn split_with_seed(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn merge(
     destination_stake_pubkey: &Pubkey,
     source_stake_pubkey: &Pubkey,
@@ -924,14 +961,10 @@ pub fn merge(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    vec![Instruction::new_with_bincode(
-        ID,
-        &StakeInstruction::Merge,
-        account_metas,
-    )]
+    vec![new_instruction(&StakeInstruction::Merge, account_metas)]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn create_account_and_delegate_stake(
     from_pubkey: &Pubkey,
     stake_pubkey: &Pubkey,
@@ -949,7 +982,7 @@ pub fn create_account_and_delegate_stake(
     instructions
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 #[allow(clippy::too_many_arguments)]
 pub fn create_account_with_seed_and_delegate_stake(
     from_pubkey: &Pubkey,
@@ -978,7 +1011,7 @@ pub fn create_account_with_seed_and_delegate_stake(
     instructions
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn authorize(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -995,14 +1028,13 @@ pub fn authorize(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::Authorize(*new_authorized_pubkey, stake_authorize),
         account_metas,
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn authorize_checked(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -1020,14 +1052,13 @@ pub fn authorize_checked(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::AuthorizeChecked(stake_authorize),
         account_metas,
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn authorize_with_seed(
     stake_pubkey: &Pubkey,
     authority_base: &Pubkey,
@@ -1053,14 +1084,10 @@ pub fn authorize_with_seed(
         authority_owner: *authority_owner,
     };
 
-    Instruction::new_with_bincode(
-        ID,
-        &StakeInstruction::AuthorizeWithSeed(args),
-        account_metas,
-    )
+    new_instruction(&StakeInstruction::AuthorizeWithSeed(args), account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn authorize_checked_with_seed(
     stake_pubkey: &Pubkey,
     authority_base: &Pubkey,
@@ -1086,14 +1113,13 @@ pub fn authorize_checked_with_seed(
         authority_owner: *authority_owner,
     };
 
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::AuthorizeCheckedWithSeed(args),
         account_metas,
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn delegate_stake(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -1104,10 +1130,10 @@ pub fn delegate_stake(
         AccountMeta::new_readonly(*vote_pubkey, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::DelegateStake, account_metas)
+    new_instruction(&StakeInstruction::DelegateStake, account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn withdraw(
     stake_pubkey: &Pubkey,
     withdrawer_pubkey: &Pubkey,
@@ -1125,19 +1151,19 @@ pub fn withdraw(
         account_metas.push(AccountMeta::new_readonly(*custodian_pubkey, true));
     }
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::Withdraw(lamports), account_metas)
+    new_instruction(&StakeInstruction::Withdraw(lamports), account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn deactivate_stake(stake_pubkey: &Pubkey, authorized_pubkey: &Pubkey) -> Instruction {
     let account_metas = vec![
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::Deactivate, account_metas)
+    new_instruction(&StakeInstruction::Deactivate, account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn set_lockup(
     stake_pubkey: &Pubkey,
     lockup: &LockupArgs,
@@ -1147,10 +1173,10 @@ pub fn set_lockup(
         AccountMeta::new(*stake_pubkey, false),
         AccountMeta::new_readonly(*custodian_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::SetLockup(*lockup), account_metas)
+    new_instruction(&StakeInstruction::SetLockup(*lockup), account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn set_lockup_checked(
     stake_pubkey: &Pubkey,
     lockup: &LockupArgs,
@@ -1168,19 +1194,18 @@ pub fn set_lockup_checked(
     if let Some(new_custodian) = lockup.custodian {
         account_metas.push(AccountMeta::new_readonly(new_custodian, true));
     }
-    Instruction::new_with_bincode(
-        ID,
+    new_instruction(
         &StakeInstruction::SetLockupChecked(lockup_checked),
         account_metas,
     )
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn get_minimum_delegation() -> Instruction {
-    Instruction::new_with_bincode(ID, &StakeInstruction::GetMinimumDelegation, Vec::default())
+    new_instruction(&StakeInstruction::GetMinimumDelegation, Vec::default())
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn deactivate_delinquent_stake(
     stake_account: &Pubkey,
     delinquent_vote_account: &Pubkey,
@@ -1191,10 +1216,10 @@ pub fn deactivate_delinquent_stake(
         AccountMeta::new_readonly(*delinquent_vote_account, false),
         AccountMeta::new_readonly(*reference_vote_account, false),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::DeactivateDelinquent, account_metas)
+    new_instruction(&StakeInstruction::DeactivateDelinquent, account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 fn _redelegate(
     stake_pubkey: &Pubkey,
     authorized_pubkey: &Pubkey,
@@ -1207,10 +1232,10 @@ fn _redelegate(
         AccountMeta::new_readonly(*vote_pubkey, false),
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
-    Instruction::new_with_bincode(ID, &StakeInstruction::Redelegate, account_metas)
+    new_instruction(&StakeInstruction::Redelegate, account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
 pub fn redelegate(
     stake_pubkey: &Pubkey,
@@ -1233,7 +1258,7 @@ pub fn redelegate(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 #[deprecated(since = "2.1.0", note = "Redelegate will not be enabled")]
 pub fn redelegate_with_seed(
     stake_pubkey: &Pubkey,
@@ -1260,7 +1285,7 @@ pub fn redelegate_with_seed(
     ]
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn move_stake(
     source_stake_pubkey: &Pubkey,
     destination_stake_pubkey: &Pubkey,
@@ -1273,10 +1298,10 @@ pub fn move_stake(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveStake(lamports), account_metas)
+    new_instruction(&StakeInstruction::MoveStake(lamports), account_metas)
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn move_lamports(
     source_stake_pubkey: &Pubkey,
     destination_stake_pubkey: &Pubkey,
@@ -1289,5 +1314,5 @@ pub fn move_lamports(
         AccountMeta::new_readonly(*authorized_pubkey, true),
     ];
 
-    Instruction::new_with_bincode(ID, &StakeInstruction::MoveLamports(lamports), account_metas)
+    new_instruction(&StakeInstruction::MoveLamports(lamports), account_metas)
 }

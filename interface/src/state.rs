@@ -184,6 +184,14 @@ impl StakeState {
     feature = "serde",
     derive(serde_derive::Deserialize, serde_derive::Serialize)
 )]
+#[cfg_attr(
+    all(feature = "stable-abi", feature = "serde", feature = "wincode"),
+    solana_frozen_abi_macro::frozen_abi(
+        abi_digest = "DJpswvqjPasMkq6zE75WEZ1uP32yPjFJHFz3p1tskp6r",
+        abi_serializer = ["bincode", "wincode"],
+        test_roundtrip = "eq_and_wire"
+    )
+)]
 #[cfg_attr(feature = "wincode", derive(wincode::SchemaRead, wincode::SchemaWrite))]
 #[allow(clippy::large_enum_variant)]
 pub enum StakeStateV2 {
@@ -1061,7 +1069,7 @@ impl Stake {
     }
 }
 
-#[cfg(all(feature = "borsh", feature = "bincode"))]
+#[cfg(all(feature = "borsh", feature = "serde", feature = "wincode"))]
 #[cfg(test)]
 mod tests {
     use {
@@ -1069,7 +1077,10 @@ mod tests {
         crate::{stake_history::StakeHistory, warmup_cooldown_allowance::warmup_cooldown_rate_bps},
         assert_matches::assert_matches,
         bincode::serialize,
-        solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
+        // the runtime reads and writes stake accounts through the wincode trait
+        solana_account::{
+            state_traits::StateMutWincode as StateMut, AccountSharedData, ReadableAccount,
+        },
         solana_borsh::v1::try_from_slice_unchecked,
         solana_pubkey::Pubkey,
         test_case::test_case,
