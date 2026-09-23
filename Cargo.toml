@@ -17,7 +17,7 @@ edition = "2021"
 level = "warn"
 check-cfg = [
     'cfg(target_os, values("solana"))',
-    'cfg(feature, values("codama", "custom-heap", "custom-panic", "frozen-abi", "no-entrypoint"))',
+    'cfg(feature, values("codama", "custom-heap", "custom-panic", "frozen-abi", "no-entrypoint", "stable-abi"))',
 ]
 
 [workspace.metadata.spellcheck]
