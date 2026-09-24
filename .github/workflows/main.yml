@@ -40,6 +40,22 @@ jobs:
           echo "RUST_TOOLCHAIN_NIGHTLY=$(make rust-toolchain-nightly)" >> "$GITHUB_OUTPUT"
           echo "SOLANA_CLI_VERSION=$(make solana-cli-version)" >> "$GITHUB_OUTPUT"
 
+  check_lockfile:
+    name: Check Cargo.lock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: solana-program/actions/setup-ubuntu@main
+        with:
+          default-toolchain: true
+          cargo-cache-key: cargo-check-lockfile
+
+      - name: Check Cargo.lock is up to date
+        run: cargo tree --locked > /dev/null
+
   main:
     needs: set_env
     uses: solana-program/actions/.github/workflows/main.yml@main
