@@ -20,6 +20,8 @@ cargo add solana-stake-interface --features bincode
 
 This will add the `solana-stake-interface` dependency with the `bincode` feature enabled to your `Cargo.toml` file. The `bincode` feature contains the instruction constructors to create instructions for the Stake program.
 
+The `wincode` feature offers the same constructors over the [`wincode`](https://docs.rs/wincode) codec. wincode encodes byte-for-byte like bincode. The feature also derives `SchemaRead`/`SchemaWrite` on the instruction and state types, so callers decode them without bincode. Enabling both features makes the constructors use wincode.
+
 ## Documentation
 
 Read more about the Stake program on the crate [documentation](https://docs.rs/solana-stake-interface/latest/solana_stake_interface/).
