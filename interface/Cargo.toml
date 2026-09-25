@@ -13,6 +13,12 @@ rust-version = "1.81.0"
 [lib]
 crate-type = ["rlib"]
 
+[package.metadata.release]
+pre-release-replacements = [
+    { file = "../idl.json", search = '("publicKey": "Stake11111111111111111111111111111111111111",\n    "version": ")[^"]+', replace = "${1}{{version}}", exactly = 1 },
+    { file = "../interface-idl.json", search = '("publicKey": "Stake11111111111111111111111111111111111111",\n    "version": ")[^"]+', replace = "${1}{{version}}", exactly = 1 },
+]
+
 [package.metadata.solana]
 program-id = "Stake11111111111111111111111111111111111111"
 
