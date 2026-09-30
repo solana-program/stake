@@ -540,7 +540,7 @@ impl Meta {
 
 #[repr(C)]
 #[cfg_attr(feature = "codama", derive(CodamaType))]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "frozen-abi", derive(solana_frozen_abi_macro::AbiExample))]
 #[cfg_attr(
     feature = "stable-abi",
@@ -588,6 +588,15 @@ impl Default for Delegation {
             deactivation_epoch: u64::MAX,
             _reserved: [0; 8],
         }
+    }
+}
+
+impl PartialEq for Delegation {
+    fn eq(&self, other: &Self) -> bool {
+        self.voter_pubkey == other.voter_pubkey
+            && self.stake == other.stake
+            && self.activation_epoch == other.activation_epoch
+            && self.deactivation_epoch == other.deactivation_epoch
     }
 }
 
@@ -2068,6 +2077,48 @@ mod tests {
             1,
         );
         check_flag(StakeFlags::empty(), 0);
+    }
+
+    #[test]
+    #[allow(clippy::used_underscore_binding)]
+    fn test_delegation_eq_ignores_reserved_bytes() {
+        let delegation = Delegation::new(&Pubkey::new_unique(), 12345, 10);
+
+        // Accounts written before `warmup_cooldown_rate` became `_reserved`
+        // still hold the raw bits of the old f64; they compare equal.
+        let mut legacy = delegation;
+        legacy._reserved = DEFAULT_WARMUP_COOLDOWN_RATE.to_le_bytes();
+        assert_eq!(delegation, legacy);
+
+        // Every other field is still significant.
+        assert_ne!(
+            delegation,
+            Delegation {
+                voter_pubkey: Pubkey::new_unique(),
+                ..delegation
+            }
+        );
+        assert_ne!(
+            delegation,
+            Delegation {
+                stake: 12346,
+                ..delegation
+            }
+        );
+        assert_ne!(
+            delegation,
+            Delegation {
+                activation_epoch: 11,
+                ..delegation
+            }
+        );
+        assert_ne!(
+            delegation,
+            Delegation {
+                deactivation_epoch: 20,
+                ..delegation
+            }
+        );
     }
 
     mod deprecated {
