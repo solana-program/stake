@@ -575,6 +575,7 @@ pub struct Delegation {
     pub deactivation_epoch: Epoch,
     /// Formerly the `warmup_cooldown_rate: f64`, but floats are not eBPF-compatible.
     /// It is unused, but this field is now reserved to maintain layout compatibility.
+    /// These bytes are ignored by `PartialEq`.
     #[cfg_attr(feature = "codama", codama(display(skip = always)))]
     pub _reserved: [u8; 8],
 }
