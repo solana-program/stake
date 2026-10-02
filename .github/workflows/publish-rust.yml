@@ -93,4 +93,5 @@ jobs:
       create-release: ${{ inputs['create-release'] }}
       dry-run: ${{ inputs['dry-run'] }}
       run-semver: ${{ inputs['run-semver'] }}
+      pnpm: true
     secrets: inherit

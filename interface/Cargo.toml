@@ -13,6 +13,9 @@ rust-version = "1.81.0"
 [lib]
 crate-type = ["rlib"]
 
+[package.metadata.release]
+pre-release-hook = ["sh", "-c", '[ "$DRY_RUN" = true ] || make -C "$WORKSPACE_ROOT" generate-idl-interface']
+
 [package.metadata.solana]
 program-id = "Stake11111111111111111111111111111111111111"
 
