@@ -117,7 +117,7 @@ export default {
                     {
                         anchorTraits: false,
                         formatCode: true,
-                        toolchain: '+nightly-2026-01-22',
+                        toolchain: '+nightly-2026-07-16',
                         traitOptions: {
                             baseDefaults: [
                                 'borsh::BorshSerialize',
