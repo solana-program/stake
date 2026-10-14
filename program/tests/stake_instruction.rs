@@ -1,13 +1,11 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 use {
-    agave_feature_set::stake_raise_minimum_delegation_to_1_sol,
     assert_matches::assert_matches,
     bincode::{deserialize, serialize},
     mollusk_svm::{result::Check, Mollusk},
     solana_account::{
-        create_account_shared_data_for_test, state_traits::StateMut, Account, AccountSharedData,
-        ReadableAccount, WritableAccount,
+        state_traits::StateMutWincode, Account, AccountSharedData, ReadableAccount, WritableAccount,
     },
     solana_clock::{Clock, Epoch, INITIAL_RENT_EPOCH},
     solana_epoch_rewards::EpochRewards,
@@ -40,11 +38,7 @@ use {
 };
 
 fn mollusk_bpf() -> Mollusk {
-    let mut mollusk = Mollusk::new(&id(), "solana_stake_program");
-    mollusk
-        .feature_set
-        .deactivate(&stake_raise_minimum_delegation_to_1_sol::id());
-    mollusk
+    Mollusk::new(&id(), "solana_stake_program")
 }
 
 fn create_default_account() -> AccountSharedData {
@@ -53,6 +47,16 @@ fn create_default_account() -> AccountSharedData {
 
 fn create_default_stake_account() -> AccountSharedData {
     AccountSharedData::new(0, 0, &id())
+}
+
+fn create_account_shared_data_for_test<T>(value: &T) -> AccountSharedData
+where
+    T: wincode::Serialize<Src = T>,
+{
+    let serialized_len = wincode::serialized_size(value).unwrap() as usize;
+    let mut account = AccountSharedData::new(1, serialized_len, &solana_sdk_ids::sysvar::id());
+    wincode::serialize_into(account.data_as_mut_slice(), value).unwrap();
+    account
 }
 
 fn create_default_vote_account() -> AccountSharedData {
@@ -194,11 +198,11 @@ fn new_stake(
     }
 }
 
-fn from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<StakeStateV2> {
+fn from<T: ReadableAccount + StateMutWincode<StakeStateV2>>(account: &T) -> Option<StakeStateV2> {
     account.state().ok()
 }
 
-fn stake_from<T: ReadableAccount + StateMut<StakeStateV2>>(account: &T) -> Option<Stake> {
+fn stake_from<T: ReadableAccount + StateMutWincode<StakeStateV2>>(account: &T) -> Option<Stake> {
     from(account).and_then(|state: StakeStateV2| state.stake())
 }
 
@@ -244,7 +248,7 @@ fn get_active_stake_for_tests(
 }
 
 fn create_empty_stake_history_for_test() -> AccountSharedData {
-    AccountSharedData::create(1, vec![0; 8], solana_sdk_ids::sysvar::id(), false, u64::MAX)
+    AccountSharedData::new(1, 8, &solana_sdk_ids::sysvar::id())
 }
 
 fn create_stake_history_account(stake_history: &StakeHistory) -> AccountSharedData {
@@ -1117,7 +1121,7 @@ fn test_stake_initialize() {
     transaction_accounts[1] = (
         rent::id(),
         create_account_shared_data_for_test(&Rent {
-            lamports_per_byte_year: rent.lamports_per_byte_year + 1,
+            lamports_per_byte: rent.lamports_per_byte + 1,
             ..rent
         }),
     );
@@ -2368,6 +2372,7 @@ fn test_withdraw_stake() {
     let custodian_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
     let minimum_delegation = crate::get_minimum_delegation();
+    let rent = Rent::default();
     let stake_lamports = minimum_delegation;
     let stake_account = AccountSharedData::new_data_with_space(
         stake_lamports,
@@ -2382,7 +2387,10 @@ fn test_withdraw_stake() {
     let mut transaction_accounts = vec![
         (stake_address, stake_account),
         (vote_address, vote_account),
-        (recipient_address, AccountSharedData::default()),
+        (
+            recipient_address,
+            AccountSharedData::new(rent.minimum_balance(0), 0, &system_program::id()),
+        ),
         (
             authority_address,
             AccountSharedData::new(42, 0, &system_program::id()),
@@ -2801,6 +2809,7 @@ fn test_withdraw_lockup() {
     let custodian_address = solana_pubkey::new_rand();
     let stake_address = solana_pubkey::new_rand();
     let total_lamports = 100;
+    let rent = Rent::default();
     let mut meta = Meta {
         lockup: Lockup {
             unix_timestamp: 0,
@@ -2819,7 +2828,10 @@ fn test_withdraw_lockup() {
     let mut clock = Clock::default();
     let mut transaction_accounts = vec![
         (stake_address, stake_account.clone()),
-        (recipient_address, AccountSharedData::default()),
+        (
+            recipient_address,
+            AccountSharedData::new(rent.minimum_balance(0), 0, &system_program::id()),
+        ),
         (custodian_address, AccountSharedData::default()),
         (clock::id(), create_account_shared_data_for_test(&clock)),
         (
@@ -4168,6 +4180,8 @@ fn test_withdraw_minimum_stake_delegation() {
 fn test_rescind_blocked_when_underfunded() {
     let mollusk = mollusk_bpf();
 
+    let rent = Rent::default();
+    let rent_exempt_reserve = rent.minimum_balance(StakeStateV2::size_of());
     let stake_address = Pubkey::new_unique();
     let vote_address = Pubkey::new_unique();
     let recipient_address = Pubkey::new_unique();
@@ -4177,7 +4191,7 @@ fn test_rescind_blocked_when_underfunded() {
         (
             stake_address,
             AccountSharedData::new_data_with_space(
-                delegated_lamports,
+                delegated_lamports + rent_exempt_reserve,
                 &StakeStateV2::Uninitialized,
                 StakeStateV2::size_of(),
                 &id(),
@@ -4187,7 +4201,7 @@ fn test_rescind_blocked_when_underfunded() {
         (vote_address, create_default_vote_account()),
         (
             recipient_address,
-            AccountSharedData::new(0, 0, &system_program::id()),
+            AccountSharedData::new(rent.minimum_balance(0), 0, &system_program::id()),
         ),
         (
             clock::id(),
