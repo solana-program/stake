@@ -45,7 +45,7 @@ solana-pubkey = { version = "4.2.0", features = ["rand"] }
 solana-rent = { version = "4.5.0", features = ["wincode"] }
 solana-sdk-ids = "3.1.0"
 solana-signature = "3.6.0"
-solana-signer = "3.0.0"
+solana-signer = "4.0.0"
 solana-stake-interface = { path = "../interface", version = "5.0.0", features = ["bincode", "borsh", "sysvar", "wincode"] }
 solana-stake-history = "1.0.0"
 solana-svm-log-collector = "4.3.1"
