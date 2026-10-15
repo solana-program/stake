@@ -40,6 +40,9 @@ pub const DEFAULT_WARMUP_COOLDOWN_RATE: f64 = 0.25;
 pub const NEW_WARMUP_COOLDOWN_RATE: f64 = 0.09;
 pub const DEFAULT_SLASH_PENALTY: u8 = ((5 * u8::MAX as usize) / 100) as u8;
 
+// Enum tag of `StakeStateV2::Stake`
+const STAKE_STATE_V2_STAKE_TAG: [u8; 4] = 2u32.to_le_bytes();
+
 #[deprecated(since = "3.2.0", note = "Use warmup_cooldown_rate_bps() instead")]
 pub fn warmup_cooldown_rate(current_epoch: Epoch, new_rate_activation_epoch: Option<Epoch>) -> f64 {
     if current_epoch < new_rate_activation_epoch.unwrap_or(u64::MAX) {
@@ -255,6 +258,11 @@ impl StakeStateV2 {
     /// The fixed number of bytes used to serialize each stake account
     pub const fn size_of() -> usize {
         200 // see test_size_of
+    }
+
+    /// Whether a serialized stake account is `StakeStateV2::Stake`, a stake with a delegation
+    pub fn has_delegation(data: &[u8]) -> bool {
+        data.len() >= Self::size_of() && data.starts_with(&STAKE_STATE_V2_STAKE_TAG)
     }
 
     pub fn stake(&self) -> Option<Stake> {
@@ -1942,6 +1950,34 @@ mod tests {
     #[test]
     fn test_size_of() {
         assert_eq!(StakeStateV2::size_of(), std::mem::size_of::<StakeStateV2>());
+    }
+
+    #[test]
+    fn test_stake_tag() {
+        let stake_state =
+            StakeStateV2::Stake(Meta::default(), Stake::default(), StakeFlags::empty());
+        let data = serialize(&stake_state).unwrap();
+        assert!(data.starts_with(&STAKE_STATE_V2_STAKE_TAG));
+    }
+
+    #[test]
+    fn test_has_delegation() {
+        let mut data = vec![0u8; StakeStateV2::size_of()];
+        for tag in 0..=u8::MAX {
+            data[0] = tag;
+            assert_eq!(
+                StakeStateV2::has_delegation(&data),
+                data[..4] == STAKE_STATE_V2_STAKE_TAG
+            );
+        }
+
+        data[..4].copy_from_slice(&STAKE_STATE_V2_STAKE_TAG);
+        data.truncate(StakeStateV2::size_of() - 1);
+        assert!(!StakeStateV2::has_delegation(&data));
+
+        // necessary to support legacy stakes larger than 200 bytes
+        data.resize(StakeStateV2::size_of() + 1, 0);
+        assert!(StakeStateV2::has_delegation(&data));
     }
 
     #[test]
