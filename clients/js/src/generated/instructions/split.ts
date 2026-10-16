@@ -111,7 +111,7 @@ export function getSplitInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: SplitInput<TAccountStake, TAccountSplitStake, TAccountStakeAuthority>,
-    config?: { programAddress?: TProgramAddress },
+    config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } },
 ): SplitInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
@@ -119,7 +119,8 @@ export function getSplitInstruction<
     ResolvedInstructionAccountMeta<TAccountStakeAuthority, InstructionAccountInputAddress<TAccountStakeAuthority>>
 > {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     // Account meta helper.
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');

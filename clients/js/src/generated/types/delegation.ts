@@ -22,6 +22,7 @@ import {
     type FixedSizeCodec,
     type FixedSizeDecoder,
     type FixedSizeEncoder,
+    type HasAddress,
 } from '@solana/kit';
 import { getEpochDecoder, getEpochEncoder, type Epoch, type EpochArgs } from '.';
 
@@ -34,7 +35,7 @@ export type Delegation = {
 };
 
 export type DelegationArgs = {
-    voterPubkey: Address;
+    voterPubkey: Address | HasAddress;
     stake: number | bigint;
     activationEpoch: EpochArgs;
     deactivationEpoch: EpochArgs;

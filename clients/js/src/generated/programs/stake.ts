@@ -21,6 +21,7 @@ import {
     type ExtendedClient,
     type GetAccountInfoApi,
     type GetMultipleAccountsApi,
+    type HasAddress,
     type Instruction,
     type InstructionWithData,
     type ReadonlyUint8Array,
@@ -326,40 +327,73 @@ export type StakePluginAccounts = {
 };
 
 export type StakePluginInstructions = {
-    initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
-    authorize: (input: AuthorizeInput) => ReturnType<typeof getAuthorizeInstruction> & SelfPlanAndSendFunctions;
+    initialize: (
+        input: InitializeInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+    authorize: (
+        input: AuthorizeInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getAuthorizeInstruction> & SelfPlanAndSendFunctions;
     delegateStake: (
         input: DelegateStakeInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getDelegateStakeInstruction> & SelfPlanAndSendFunctions;
-    split: (input: SplitInput) => ReturnType<typeof getSplitInstruction> & SelfPlanAndSendFunctions;
-    withdraw: (input: WithdrawInput) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
-    deactivate: (input: DeactivateInput) => ReturnType<typeof getDeactivateInstruction> & SelfPlanAndSendFunctions;
-    setLockup: (input: SetLockupInput) => ReturnType<typeof getSetLockupInstruction> & SelfPlanAndSendFunctions;
-    merge: (input: MergeInput) => ReturnType<typeof getMergeInstruction> & SelfPlanAndSendFunctions;
+    split: (
+        input: SplitInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getSplitInstruction> & SelfPlanAndSendFunctions;
+    withdraw: (
+        input: WithdrawInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
+    deactivate: (
+        input: DeactivateInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getDeactivateInstruction> & SelfPlanAndSendFunctions;
+    setLockup: (
+        input: SetLockupInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getSetLockupInstruction> & SelfPlanAndSendFunctions;
+    merge: (
+        input: MergeInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getMergeInstruction> & SelfPlanAndSendFunctions;
     authorizeWithSeed: (
         input: AuthorizeWithSeedInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getAuthorizeWithSeedInstruction> & SelfPlanAndSendFunctions;
     initializeChecked: (
         input: InitializeCheckedInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getInitializeCheckedInstruction> & SelfPlanAndSendFunctions;
     authorizeChecked: (
         input: AuthorizeCheckedInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getAuthorizeCheckedInstruction> & SelfPlanAndSendFunctions;
     authorizeCheckedWithSeed: (
         input: AuthorizeCheckedWithSeedInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getAuthorizeCheckedWithSeedInstruction> & SelfPlanAndSendFunctions;
     setLockupChecked: (
         input: SetLockupCheckedInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getSetLockupCheckedInstruction> & SelfPlanAndSendFunctions;
     getMinimumDelegation: (
         input: GetMinimumDelegationInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getGetMinimumDelegationInstruction> & SelfPlanAndSendFunctions;
     deactivateDelinquent: (
         input: DeactivateDelinquentInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getDeactivateDelinquentInstruction> & SelfPlanAndSendFunctions;
-    moveStake: (input: MoveStakeInput) => ReturnType<typeof getMoveStakeInstruction> & SelfPlanAndSendFunctions;
+    moveStake: (
+        input: MoveStakeInput,
+        config?: { programAddress?: Address | HasAddress },
+    ) => ReturnType<typeof getMoveStakeInstruction> & SelfPlanAndSendFunctions;
     moveLamports: (
         input: MoveLamportsInput,
+        config?: { programAddress?: Address | HasAddress },
     ) => ReturnType<typeof getMoveLamportsInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -367,36 +401,131 @@ export type StakePluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMulti
     ClientWithTransactionPlanning &
     ClientWithTransactionSending;
 
-export function stakeProgram() {
+export function stakeProgram(config: { programAddress?: Address | HasAddress } = {}) {
     return <T extends StakePluginRequirements>(client: T): ExtendedClient<T, { stake: StakePlugin }> => {
         return extendClient(client, {
             stake: <StakePlugin>{
                 accounts: { stakeStateAccount: addSelfFetchFunctions(client, getStakeStateAccountCodec()) },
                 instructions: {
-                    initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)),
-                    authorize: input => addSelfPlanAndSendFunctions(client, getAuthorizeInstruction(input)),
-                    delegateStake: input => addSelfPlanAndSendFunctions(client, getDelegateStakeInstruction(input)),
-                    split: input => addSelfPlanAndSendFunctions(client, getSplitInstruction(input)),
-                    withdraw: input => addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
-                    deactivate: input => addSelfPlanAndSendFunctions(client, getDeactivateInstruction(input)),
-                    setLockup: input => addSelfPlanAndSendFunctions(client, getSetLockupInstruction(input)),
-                    merge: input => addSelfPlanAndSendFunctions(client, getMergeInstruction(input)),
-                    authorizeWithSeed: input =>
-                        addSelfPlanAndSendFunctions(client, getAuthorizeWithSeedInstruction(input)),
-                    initializeChecked: input =>
-                        addSelfPlanAndSendFunctions(client, getInitializeCheckedInstruction(input)),
-                    authorizeChecked: input =>
-                        addSelfPlanAndSendFunctions(client, getAuthorizeCheckedInstruction(input)),
-                    authorizeCheckedWithSeed: input =>
-                        addSelfPlanAndSendFunctions(client, getAuthorizeCheckedWithSeedInstruction(input)),
-                    setLockupChecked: input =>
-                        addSelfPlanAndSendFunctions(client, getSetLockupCheckedInstruction(input)),
-                    getMinimumDelegation: input =>
-                        addSelfPlanAndSendFunctions(client, getGetMinimumDelegationInstruction(input)),
-                    deactivateDelinquent: input =>
-                        addSelfPlanAndSendFunctions(client, getDeactivateDelinquentInstruction(input)),
-                    moveStake: input => addSelfPlanAndSendFunctions(client, getMoveStakeInstruction(input)),
-                    moveLamports: input => addSelfPlanAndSendFunctions(client, getMoveLamportsInstruction(input)),
+                    initialize: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getInitializeInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    authorize: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getAuthorizeInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    delegateStake: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getDelegateStakeInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    split: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getSplitInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    withdraw: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getWithdrawInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    deactivate: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getDeactivateInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    setLockup: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getSetLockupInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    merge: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getMergeInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    authorizeWithSeed: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getAuthorizeWithSeedInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    initializeChecked: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getInitializeCheckedInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    authorizeChecked: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getAuthorizeCheckedInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    authorizeCheckedWithSeed: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getAuthorizeCheckedWithSeedInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    setLockupChecked: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getSetLockupCheckedInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    getMinimumDelegation: (_input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getGetMinimumDelegationInstruction({
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    deactivateDelinquent: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getDeactivateDelinquentInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    moveStake: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getMoveStakeInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
+                    moveLamports: (input, instructionConfig) =>
+                        addSelfPlanAndSendFunctions(
+                            client,
+                            getMoveLamportsInstruction(input, {
+                                programAddress: instructionConfig?.programAddress ?? config.programAddress,
+                            }),
+                        ),
                 },
                 identifyInstruction: identifyStakeInstruction,
                 parseInstruction: parseStakeInstruction,

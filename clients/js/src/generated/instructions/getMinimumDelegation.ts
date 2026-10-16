@@ -65,9 +65,12 @@ export type GetMinimumDelegationInput = {};
 
 export function getGetMinimumDelegationInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
->(config?: { programAddress?: TProgramAddress }): GetMinimumDelegationInstruction<TProgramAddress> {
+>(config?: {
+    programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+}): GetMinimumDelegationInstruction<TProgramAddress> {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     return Object.freeze({
         data: getGetMinimumDelegationInstructionDataEncoder().encode({}),

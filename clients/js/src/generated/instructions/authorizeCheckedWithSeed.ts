@@ -29,6 +29,7 @@ import {
     type Codec,
     type Decoder,
     type Encoder,
+    type HasAddress,
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
@@ -97,7 +98,7 @@ export type AuthorizeCheckedWithSeedInstructionData = {
 export type AuthorizeCheckedWithSeedInstructionDataArgs = {
     stakeAuthorize: StakeAuthorizeArgs;
     authoritySeed: string;
-    authorityOwner: Address;
+    authorityOwner: Address | HasAddress;
 };
 
 export function getAuthorizeCheckedWithSeedInstructionDataEncoder(): Encoder<AuthorizeCheckedWithSeedInstructionDataArgs> {
@@ -158,7 +159,7 @@ export function getAuthorizeCheckedWithSeedInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: AuthorizeCheckedWithSeedInput<TAccountStake, TAccountBase, TAccountNewAuthority, TAccountLockupAuthority>,
-    config?: { programAddress?: TProgramAddress },
+    config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } },
 ): AuthorizeCheckedWithSeedInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
@@ -167,7 +168,8 @@ export function getAuthorizeCheckedWithSeedInstruction<
     ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
 > {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     // Account meta helper.
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
