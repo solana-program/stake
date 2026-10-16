@@ -38,7 +38,7 @@ solana-config-interface = { version = "2", features = ["serde"] }
 solana-epoch-rewards = { version = "3.0.2", features = ["wincode"] }
 solana-epoch-schedule = { version = "3.1.0", features = ["wincode"] }
 solana-instruction = "4.0.0"
-solana-keypair = "3.1.2"
+solana-keypair = "4.0.0"
 solana-logger = "3.0.0"
 solana-program-test = { version = "4.3.1", features = ["agave-unstable-api"] }
 solana-pubkey = { version = "4.2.0", features = ["rand"] }
