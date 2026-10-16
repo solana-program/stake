@@ -106,7 +106,7 @@ export function getInitializeCheckedInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: InitializeCheckedInput<TAccountStake, TAccountStakeAuthority, TAccountWithdrawAuthority>,
-    config?: { programAddress?: TProgramAddress },
+    config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } },
 ): InitializeCheckedInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
@@ -114,7 +114,8 @@ export function getInitializeCheckedInstruction<
     ResolvedInstructionAccountMeta<TAccountWithdrawAuthority, InstructionAccountInputAddress<TAccountWithdrawAuthority>>
 > {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     // Account meta helper.
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');

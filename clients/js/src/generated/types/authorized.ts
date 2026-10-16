@@ -16,11 +16,12 @@ import {
     type FixedSizeCodec,
     type FixedSizeDecoder,
     type FixedSizeEncoder,
+    type HasAddress,
 } from '@solana/kit';
 
 export type Authorized = { staker: Address; withdrawer: Address };
 
-export type AuthorizedArgs = Authorized;
+export type AuthorizedArgs = { staker: Address | HasAddress; withdrawer: Address | HasAddress };
 
 export function getAuthorizedEncoder(): FixedSizeEncoder<AuthorizedArgs> {
     return getStructEncoder([

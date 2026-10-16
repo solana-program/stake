@@ -23,6 +23,7 @@ import {
     type FixedSizeCodec,
     type FixedSizeDecoder,
     type FixedSizeEncoder,
+    type HasAddress,
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
@@ -79,7 +80,7 @@ export type AuthorizeInstruction<
 
 export type AuthorizeInstructionData = { discriminator: number; arg0: Address; arg1: StakeAuthorize };
 
-export type AuthorizeInstructionDataArgs = { arg0: Address; arg1: StakeAuthorizeArgs };
+export type AuthorizeInstructionDataArgs = { arg0: Address | HasAddress; arg1: StakeAuthorizeArgs };
 
 export function getAuthorizeInstructionDataEncoder(): FixedSizeEncoder<AuthorizeInstructionDataArgs> {
     return transformEncoder(
@@ -129,7 +130,7 @@ export function getAuthorizeInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: AuthorizeInput<TAccountStake, TAccountAuthority, TAccountLockupAuthority>,
-    config?: { programAddress?: TProgramAddress },
+    config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } },
 ): AuthorizeInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
@@ -137,7 +138,8 @@ export function getAuthorizeInstruction<
     ResolvedInstructionAccountMeta<TAccountLockupAuthority, InstructionAccountInputAddress<TAccountLockupAuthority>>
 > {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     // Account meta helper.
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');

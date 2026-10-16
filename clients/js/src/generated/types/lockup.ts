@@ -16,6 +16,7 @@ import {
     type FixedSizeCodec,
     type FixedSizeDecoder,
     type FixedSizeEncoder,
+    type HasAddress,
 } from '@solana/kit';
 import {
     getEpochDecoder,
@@ -30,7 +31,7 @@ import {
 
 export type Lockup = { unixTimestamp: UnixTimestamp; epoch: Epoch; custodian: Address };
 
-export type LockupArgs = { unixTimestamp: UnixTimestampArgs; epoch: EpochArgs; custodian: Address };
+export type LockupArgs = { unixTimestamp: UnixTimestampArgs; epoch: EpochArgs; custodian: Address | HasAddress };
 
 export function getLockupEncoder(): FixedSizeEncoder<LockupArgs> {
     return getStructEncoder([

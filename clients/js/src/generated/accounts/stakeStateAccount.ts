@@ -23,6 +23,7 @@ import {
     type Encoder,
     type FetchAccountConfig,
     type FetchAccountsConfig,
+    type HasAddress,
     type MaybeAccount,
     type MaybeEncodedAccount,
 } from '@solana/kit';
@@ -61,7 +62,7 @@ export function decodeStakeStateAccount<TAddress extends string = string>(
 
 export async function fetchStakeStateAccount<TAddress extends string = string>(
     rpc: Parameters<typeof fetchEncodedAccount>[0],
-    address: Address<TAddress>,
+    address: Address<TAddress> | HasAddress<TAddress>,
     config?: FetchAccountConfig,
 ): Promise<Account<StakeStateAccount, TAddress>> {
     const maybeAccount = await fetchMaybeStakeStateAccount(rpc, address, config);
@@ -71,16 +72,20 @@ export async function fetchStakeStateAccount<TAddress extends string = string>(
 
 export async function fetchMaybeStakeStateAccount<TAddress extends string = string>(
     rpc: Parameters<typeof fetchEncodedAccount>[0],
-    address: Address<TAddress>,
+    address: Address<TAddress> | HasAddress<TAddress>,
     config?: FetchAccountConfig,
 ): Promise<MaybeAccount<StakeStateAccount, TAddress>> {
-    const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+    const maybeAccount = await fetchEncodedAccount(
+        rpc,
+        typeof address === 'string' ? address : address.address,
+        config,
+    );
     return decodeStakeStateAccount(maybeAccount);
 }
 
 export async function fetchAllStakeStateAccount(
     rpc: Parameters<typeof fetchEncodedAccounts>[0],
-    addresses: Array<Address>,
+    addresses: Array<Address | HasAddress>,
     config?: FetchAccountsConfig,
 ): Promise<Account<StakeStateAccount>[]> {
     const maybeAccounts = await fetchAllMaybeStakeStateAccount(rpc, addresses, config);
@@ -90,9 +95,13 @@ export async function fetchAllStakeStateAccount(
 
 export async function fetchAllMaybeStakeStateAccount(
     rpc: Parameters<typeof fetchEncodedAccounts>[0],
-    addresses: Array<Address>,
+    addresses: Array<Address | HasAddress>,
     config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<StakeStateAccount>[]> {
-    const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+    const maybeAccounts = await fetchEncodedAccounts(
+        rpc,
+        addresses.map(a => (typeof a === 'string' ? a : a.address)),
+        config,
+    );
     return maybeAccounts.map(maybeAccount => decodeStakeStateAccount(maybeAccount));
 }

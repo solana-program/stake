@@ -25,6 +25,7 @@ import {
     type Codec,
     type Decoder,
     type Encoder,
+    type HasAddress,
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
@@ -87,7 +88,7 @@ export type SetLockupInstructionData = {
 export type SetLockupInstructionDataArgs = {
     unixTimestamp: OptionOrNullable<UnixTimestampArgs>;
     epoch: OptionOrNullable<EpochArgs>;
-    custodian: OptionOrNullable<Address>;
+    custodian: OptionOrNullable<Address | HasAddress>;
 };
 
 export function getSetLockupInstructionDataEncoder(): Encoder<SetLockupInstructionDataArgs> {
@@ -134,14 +135,15 @@ export function getSetLockupInstruction<
     TProgramAddress extends Address = typeof STAKE_PROGRAM_ADDRESS,
 >(
     input: SetLockupInput<TAccountStake, TAccountAuthority>,
-    config?: { programAddress?: TProgramAddress },
+    config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } },
 ): SetLockupInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<TAccountStake, InstructionAccountInputAddress<TAccountStake>>,
     ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>
 > {
     // Program address.
-    const programAddress = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddressInput = config?.programAddress ?? STAKE_PROGRAM_ADDRESS;
+    const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
 
     // Account meta helper.
     const getAccountMeta = getAccountMetaFactory(programAddress, 'omitted');
