@@ -5772,9 +5772,9 @@ dependencies = [
 
 [[package]]
 name = "solana-frozen-abi"
-version = "3.9.0"
+version = "3.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "636c729a864ead005d1d37e94159e9660f72b194751ce5ca443623e91bca0a7c"
+checksum = "14408f7b17b6012a21075ffcada1dbc226078214a2566dc49e47f6c19a3bc7b3"
 dependencies = [
  "bincode",
  "boxcar",
