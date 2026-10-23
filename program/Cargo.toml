@@ -51,7 +51,7 @@ solana-stake-history = "1.0.0"
 solana-svm-log-collector = "4.3.1"
 solana-system-interface = { version = "3.3.0", features = ["bincode"] }
 solana-sysvar = { version = "5.0.0", features = ["wincode"] }
-solana-transaction = "4.0.0"
+solana-transaction = "6.0.0"
 solana-vote-interface = { version = "7.2.0", features = ["bincode", "wincode"] }
 test-case = "3.3.1"
 wincode = "0.6"
