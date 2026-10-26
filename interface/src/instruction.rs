@@ -49,6 +49,11 @@ pub enum StakeInstruction {
     /// [`Authorized`] carries pubkeys that must sign staker transactions
     /// and withdrawer transactions; [`Lockup`] carries information about
     /// withdrawal restrictions.
+    ///
+    /// This instruction MUST be included within the same Transaction as the
+    /// system program's `CreateAccount` instruction that creates the account
+    /// being initialized. Otherwise another party can acquire ownership of the
+    /// uninitialized account.
     #[cfg_attr(
         feature = "codama",
         codama(display(
@@ -358,6 +363,11 @@ pub enum StakeInstruction {
     ///   0. `[WRITE]` Uninitialized stake account
     ///   1. `[]` The stake authority
     ///   2. `[SIGNER]` The withdraw authority
+    ///
+    /// This instruction MUST be included within the same Transaction as the
+    /// system program's `CreateAccount` instruction that creates the account
+    /// being initialized. Otherwise another party can acquire ownership of the
+    /// uninitialized account.
     #[cfg_attr(
         feature = "codama",
         codama(display(
