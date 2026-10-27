@@ -7452,7 +7452,7 @@ dependencies = [
  "solana-sysvar 5.0.0",
  "solana-sysvar-id",
  "solana-transaction",
- "solana-vote-interface 7.2.0",
+ "solana-vote-interface 7.3.0",
  "test-case",
  "wincode",
 ]
@@ -8042,9 +8042,9 @@ dependencies = [
 
 [[package]]
 name = "solana-vote-interface"
-version = "7.2.0"
+version = "7.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d91f1d7031dfc71bab787ed109f71247a5ffe4b753467562a56c935385252f3"
+checksum = "e91bf90031e7387f9a57f8c4203d433a3ca08b9c1f24d95424e9bab38d5b2620"
 dependencies = [
  "bincode",
  "cfg_eval",
@@ -8585,7 +8585,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.1",
+ "getrandom 0.4.1",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.1",
