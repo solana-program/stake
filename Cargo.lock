@@ -3554,9 +3554,9 @@ dependencies = [
 
 [[package]]
 name = "mollusk-svm"
-version = "0.16.3"
+version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31ea089d953e54d1a8b96a95244ce16733cb940a7ed5cd33771bbf6158fc103b"
+checksum = "e97e2a6d59e2c36b7cd11aba31228be9ae94055861c38625174815e1cc5e91d4"
 dependencies = [
  "bincode",
  "mollusk-svm-error",
