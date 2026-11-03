@@ -15,8 +15,8 @@ importers:
         specifier: ^8.5.0
         version: 8.6.0(typescript@6.0.3)
       '@solana/kit-plugin-litesvm':
-        specifier: ^0.22.0
-        version: 0.22.0(@solana/kit@8.6.0(typescript@6.0.3))(typescript@6.0.3)
+        specifier: ^0.23.0
+        version: 0.23.0(@solana/kit@8.6.0(typescript@6.0.3))(typescript@6.0.3)
       '@solana/kit-plugin-signer':
         specifier: ^0.23.0
         version: 0.23.0(@solana/kit@8.6.0(typescript@6.0.3))
@@ -882,15 +882,15 @@ packages:
       typescript:
         optional: true
 
-  '@solana/kit-plugin-instruction-plan@0.19.0':
-    resolution: {integrity: sha512-62gh9R3jTMuU3UOPNuerQF9QRGM3TTRlVjD4Ukt78Vt3pdKpjx7g311DEDoP3SkKLw1q9UNc0KSKSbIsShFLwg==}
+  '@solana/kit-plugin-instruction-plan@0.23.0':
+    resolution: {integrity: sha512-TjL2oL0fWPrzwxwbaaRaog66jDlDokVQ1+ONR9EdYiVeLYl797WqtEU3YF5D1im2DXrbrUO3Lf3XOr7h6Ok4SQ==}
     peerDependencies:
-      '@solana/kit': ^8.2.0
+      '@solana/kit': ^8.6.0
 
-  '@solana/kit-plugin-litesvm@0.22.0':
-    resolution: {integrity: sha512-tWSJGP809n49Xtm0okSxsDb7Tm80P/REist9My3HCBM/k7pEMh6y7g3C/un1c2xxyvDmhsQYm9L0EkYTGlWzeQ==}
+  '@solana/kit-plugin-litesvm@0.23.0':
+    resolution: {integrity: sha512-E+SLLe+0uR/oPW8tO9mI0RxtSaxUCZhcGyvuXJTrMlFQhqRDmS0ssudB0KbeFVqc/Gx0viKSPgC4PYnXgu2A/A==}
     peerDependencies:
-      '@solana/kit': ^8.2.0
+      '@solana/kit': ^8.6.0
 
   '@solana/kit-plugin-signer@0.23.0':
     resolution: {integrity: sha512-qLFDBYsbjWjwl4e569zSMkFRwWON9WH0sg5hVpCgrzu13uORLynYU9Vrt573a16y2Ic6Dcj4PKGmb7s7Ypm4Ig==}
@@ -2280,14 +2280,14 @@ snapshots:
     transitivePeerDependencies:
       - fastestsmallesttextencoderdecoder
 
-  '@solana/kit-plugin-instruction-plan@0.19.0(@solana/kit@8.6.0(typescript@6.0.3))':
+  '@solana/kit-plugin-instruction-plan@0.23.0(@solana/kit@8.6.0(typescript@6.0.3))':
     dependencies:
       '@solana/kit': 8.6.0(typescript@6.0.3)
 
-  '@solana/kit-plugin-litesvm@0.22.0(@solana/kit@8.6.0(typescript@6.0.3))(typescript@6.0.3)':
+  '@solana/kit-plugin-litesvm@0.23.0(@solana/kit@8.6.0(typescript@6.0.3))(typescript@6.0.3)':
     dependencies:
       '@solana/kit': 8.6.0(typescript@6.0.3)
-      '@solana/kit-plugin-instruction-plan': 0.19.0(@solana/kit@8.6.0(typescript@6.0.3))
+      '@solana/kit-plugin-instruction-plan': 0.23.0(@solana/kit@8.6.0(typescript@6.0.3))
       litesvm: 1.6.1(typescript@6.0.3)
     transitivePeerDependencies:
       - bufferutil
