@@ -46,7 +46,7 @@
     "devDependencies": {
         "@solana-config/oxc": "^0.1.1",
         "@solana/kit": "^8.5.0",
-        "@solana/kit-plugin-litesvm": "^0.22.0",
+        "@solana/kit-plugin-litesvm": "^0.23.0",
         "@solana/kit-plugin-signer": "^0.23.0",
         "@types/node": "^26",
         "oxfmt": "^0.75.0",
