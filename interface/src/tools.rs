@@ -1,11 +1,12 @@
 //! Utility functions
 use {crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION, solana_clock::Epoch};
-#[cfg(feature = "bincode")]
-use {core::mem::MaybeUninit, solana_pubkey::Pubkey, solana_vote_interface::state::VoteStateV4};
 #[cfg(any(feature = "bincode", feature = "wincode"))]
 use {
+    core::mem::MaybeUninit,
     solana_cpi::{get_return_data, invoke_unchecked},
     solana_program_error::ProgramError,
+    solana_pubkey::Pubkey,
+    solana_vote_interface::state::VoteStateV4,
 };
 
 /// Helper function for programs to call [`GetMinimumDelegation`] and then fetch the return data
@@ -47,7 +48,7 @@ fn get_minimum_delegation_return_data() -> Result<u64, ProgramError> {
 }
 
 /// Deserialize a Vote Program-owned account as [`VoteStateV4`].
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn get_vote_state(
     address: &Pubkey,
     owner: &Pubkey,
@@ -136,7 +137,7 @@ fn is_delinquent_by_epoch_credits(
 ///   credits or closure writes a default vote state.
 /// - Its last credit epoch is at least `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`
 ///   epochs before `current_epoch`.
-#[cfg(feature = "bincode")]
+#[cfg(any(feature = "bincode", feature = "wincode"))]
 pub fn eligible_for_deactivate_delinquent_v2(
     address: &Pubkey,
     owner: &Pubkey,
@@ -231,7 +232,7 @@ mod tests {
         ));
     }
 
-    #[cfg(feature = "bincode")]
+    #[cfg(any(feature = "bincode", feature = "wincode"))]
     mod deactivate_delinquent_v2 {
         use {
             super::*,
