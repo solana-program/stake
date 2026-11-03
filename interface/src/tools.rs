@@ -1,12 +1,11 @@
 //! Utility functions
 use {crate::MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION, solana_clock::Epoch};
+#[cfg(feature = "bincode")]
+use {core::mem::MaybeUninit, solana_pubkey::Pubkey, solana_vote_interface::state::VoteStateV4};
 #[cfg(any(feature = "bincode", feature = "wincode"))]
 use {
-    core::mem::MaybeUninit,
     solana_cpi::{get_return_data, invoke_unchecked},
     solana_program_error::ProgramError,
-    solana_pubkey::Pubkey,
-    solana_vote_interface::state::VoteStateV4,
 };
 
 /// Helper function for programs to call [`GetMinimumDelegation`] and then fetch the return data
@@ -92,7 +91,7 @@ pub fn acceptable_reference_epoch_credits(
 /// Check if the provided `epoch_credits` demonstrate delinquency over the previous
 /// [`MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION`].
 #[deprecated(
-    since = "5.1.0",
+    since = "5.1.1",
     note = "Use eligible_for_deactivate_delinquent_v2 to also handle closed vote accounts"
 )]
 pub fn eligible_for_deactivate_delinquent(
@@ -236,7 +235,7 @@ mod tests {
     mod deactivate_delinquent_v2 {
         use {
             super::*,
-            solana_account::Account,
+            solana_account::{state_traits::StateMutWincode, Account},
             solana_pubkey::Pubkey,
             solana_sdk_ids::{system_program, vote},
             solana_vote_interface::state::VoteStateVersions,

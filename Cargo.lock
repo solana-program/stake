@@ -7406,6 +7406,7 @@ dependencies = [
  "solana-stake-history 2.1.0",
  "solana-stake-interface 5.1.1",
  "solana-system-interface",
+ "solana-vote-interface 7.3.0",
  "static_assertions",
  "strum",
  "strum_macros",
