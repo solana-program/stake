@@ -23,7 +23,6 @@ solana-security-txt = "1.1.3"
 solana-stake-interface = { path = "../interface", version = "5.0.0", features = ["bincode", "borsh", "sysvar"] }
 solana-sysvar = "5.0.0"
 solana-sysvar-id = "3.1.0"
-solana-vote-interface = { version = "7.2.0", features = ["bincode"] }
 
 [dev-dependencies]
 arbitrary = { version = "1.4.2", features = ["derive"] }
@@ -52,7 +51,7 @@ solana-svm-log-collector = "4.3.1"
 solana-system-interface = { version = "3.3.0", features = ["bincode"] }
 solana-sysvar = { version = "5.0.0", features = ["wincode"] }
 solana-transaction = "4.0.0"
-solana-vote-interface = { version = "7.2.0", features = ["bincode", "wincode"] }
+solana-vote-interface = { version = "7.4.0", features = ["bincode", "wincode"] }
 test-case = "3.3.1"
 wincode = "0.6"
 
