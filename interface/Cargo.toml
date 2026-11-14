@@ -8,7 +8,7 @@ repository = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
 edition = { workspace = true }
-rust-version = "1.81.0"
+rust-version = "1.89.0"
 
 [lib]
 crate-type = ["rlib"]
@@ -36,6 +36,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = { version = "4.4.0", default-features = false }
 solana-stake-history = "2.1.0"
 solana-system-interface = "3.3.0"
+solana-vote-interface = { version = "7.4.0", optional = true }
 wincode = { version = "0.6.0", features = ["derive"],  optional = true }
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
@@ -52,6 +53,7 @@ solana-borsh = "3.0.2"
 solana-example-mocks = "4.0.0"
 solana-sdk-ids = "3.1.0"
 solana-stake-interface = { path = ".", features = ["borsh", "serde", "stable-abi", "sysvar", "wincode"] }
+solana-vote-interface = { version = "7.4.0", features = ["wincode"] }
 static_assertions = "1.1.0"
 strum = "0.28"
 strum_macros = "0.28"
@@ -65,9 +67,11 @@ rustdoc-args = ["--cfg=docsrs"]
 [features]
 bincode = [
     "dep:solana-cpi",
+    "dep:solana-vote-interface",
     "solana-instruction/bincode",
     "solana-instruction/serde",
     "solana-system-interface/bincode",
+    "solana-vote-interface/bincode",
     "serde"
 ]
 borsh = [
@@ -94,9 +98,11 @@ serde = ["dep:serde", "dep:serde_derive", "solana-pubkey/serde", "solana-stake-h
 sysvar = ["solana-stake-history/sysvar"]
 wincode = [
     "dep:solana-cpi",
+    "dep:solana-vote-interface",
     "dep:wincode",
     "solana-instruction/wincode",
     "solana-pubkey/wincode",
     "solana-stake-history/wincode",
     "solana-system-interface/wincode",
+    "solana-vote-interface/wincode",
 ]
