@@ -29,7 +29,7 @@ solana-vote-interface = { version = "7.2.0", features = ["bincode"] }
 arbitrary = { version = "1.4.2", features = ["derive"] }
 assert_matches = "1.5.0"
 mollusk-svm = { version = "0.16.0", features = ["all-builtins"] }
-mollusk-svm-result = "0.16.0"
+mollusk-svm-result = "0.17.1"
 proptest = "1.11.0"
 rand = "0.10.1"
 solana-account = { version = "4.0.0", features = ["wincode"] }
