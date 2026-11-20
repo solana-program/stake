@@ -5610,7 +5610,7 @@ fn test_split_100_percent_of_source() {
     ] {
         let stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
-            &state,
+            state,
             StakeStateV2::size_of(),
             &id(),
         )
@@ -5846,7 +5846,7 @@ fn test_split_rent_exemptness() {
         // Test that splitting to a larger account fails
         let stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
-            &state,
+            state,
             StakeStateV2::size_of(),
             &id(),
         )
@@ -5884,7 +5884,7 @@ fn test_split_rent_exemptness() {
         // Split amount should not matter, assuming other fund criteria are met
         let stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
-            &state,
+            state,
             StakeStateV2::size_of() + 100,
             &id(),
         )
@@ -6024,7 +6024,7 @@ fn test_split_require_rent_exempt_destination() {
         ] {
             let source_account = AccountSharedData::new_data_with_space(
                 source_lamports,
-                &state,
+                state,
                 StakeStateV2::size_of(),
                 &id(),
             )
@@ -7131,7 +7131,7 @@ fn test_deactivate_delinquent() {
         increment_credits(&mut reference_vote_state, epoch as Epoch, 1);
     }
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
+        .set_state(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     process_instruction_deactivate_delinquent(
@@ -7161,7 +7161,7 @@ fn test_deactivate_delinquent() {
         current_epoch - 1
     );
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
+        .set_state(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     process_instruction_deactivate_delinquent(
@@ -7179,7 +7179,7 @@ fn test_deactivate_delinquent() {
         increment_credits(&mut reference_vote_state, epoch, 1);
     }
     reference_vote_account
-        .serialize_data(&VoteStateVersions::new_v4(reference_vote_state))
+        .set_state(&VoteStateVersions::new_v4(reference_vote_state))
         .unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
@@ -7207,7 +7207,7 @@ fn test_deactivate_delinquent() {
         increment_credits(&mut vote_state, epoch as Epoch, 1);
     }
     vote_account
-        .serialize_data(&VoteStateVersions::new_v4(vote_state))
+        .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
 
     let post_stake_account = &process_instruction_deactivate_delinquent(
@@ -7234,7 +7234,7 @@ fn test_deactivate_delinquent() {
     let mut unrelated_stake_account = stake_account.clone();
     assert_ne!(unrelated_vote_address, vote_address);
     unrelated_stake_account
-        .serialize_data(&StakeStateV2::Stake(
+        .set_state(&StakeStateV2::Stake(
             Meta::default(),
             new_stake(
                 1, /* stake */
@@ -7264,7 +7264,7 @@ fn test_deactivate_delinquent() {
         1,
     );
     vote_account
-        .serialize_data(&VoteStateVersions::new_v4(vote_state))
+        .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
@@ -7284,7 +7284,7 @@ fn test_deactivate_delinquent() {
         1,
     );
     vote_account
-        .serialize_data(&VoteStateVersions::new_v4(vote_state))
+        .set_state(&VoteStateVersions::new_v4(vote_state))
         .unwrap();
     process_instruction_deactivate_delinquent(
         &stake_address,
