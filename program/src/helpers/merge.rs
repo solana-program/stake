@@ -234,7 +234,7 @@ mod tests {
         super::*,
         crate::id,
         proptest::prelude::*,
-        solana_account::{state_traits::StateMut, AccountSharedData, ReadableAccount},
+        solana_account::{state_traits::StateMutWincode, AccountSharedData, ReadableAccount},
         solana_pubkey::Pubkey,
         solana_rent::Rent,
         solana_stake_interface::{

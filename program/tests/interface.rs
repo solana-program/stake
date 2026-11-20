@@ -4,7 +4,7 @@ use {
     arbitrary::{Arbitrary, Unstructured},
     mollusk_svm::{result::Check, Mollusk},
     mollusk_svm_result::InstructionResult as MolluskResult,
-    solana_account::{Account, ReadableAccount, WritableAccount},
+    solana_account::{state_traits::StateMutWincode, Account, ReadableAccount, WritableAccount},
     solana_clock::Clock,
     solana_epoch_rewards::EpochRewards,
     solana_epoch_schedule::EpochSchedule,
@@ -1226,7 +1226,7 @@ fn test_all_success_non_default_rent(lamports_per_byte: u64) {
                 continue;
             }
 
-            match account.deserialize_data::<StakeStateV2>().unwrap() {
+            match StateMutWincode::<StakeStateV2>::state(&account).unwrap() {
                 StakeStateV2::Initialized(meta) | StakeStateV2::Stake(meta, _, _) => {
                     #[allow(deprecated)]
                     let rent_exempt_reserve = meta.rent_exempt_reserve;
