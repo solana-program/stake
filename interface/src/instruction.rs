@@ -550,7 +550,7 @@ pub enum StakeInstruction {
     /// # Account references
     ///   0. `[WRITE]` Delegated stake account
     ///   1. `[]` Delinquent vote account for the delegated stake account
-    ///   2. `[]` Reference vote account that has voted at least once in the last
+    ///   2. `[]` Reference vote account that has voted in each of the last
     ///      `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     #[cfg_attr(
         feature = "codama",
@@ -571,7 +571,7 @@ pub enum StakeInstruction {
         )),
         codama(account(
             name = "reference_vote",
-            docs = "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs",
+            docs = "Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs",
             display(label = "Reference Vote Account")
         ))
     )]

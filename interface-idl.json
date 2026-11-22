@@ -1163,7 +1163,7 @@
             "isWritable": false,
             "isSigner": false,
             "docs": [
-              "Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
+              "Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs"
             ],
             "display": {
               "kind": "instructionAccountDisplayNode",
