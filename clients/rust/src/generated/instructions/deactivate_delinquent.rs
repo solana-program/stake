@@ -16,7 +16,7 @@ pub struct DeactivateDelinquent {
     pub stake: solana_address::Address,
     /// Delinquent vote account for the delegated stake account
     pub delinquent_vote: solana_address::Address,
-    /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    /// Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     pub reference_vote: solana_address::Address,
 }
 
@@ -105,7 +105,7 @@ impl DeactivateDelinquentBuilder {
         self.delinquent_vote = Some(delinquent_vote);
         self
     }
-    /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    /// Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     #[inline(always)]
     pub fn reference_vote(&mut self, reference_vote: solana_address::Address) -> &mut Self {
         self.reference_vote = Some(reference_vote);
@@ -144,7 +144,7 @@ pub struct DeactivateDelinquentCpiAccounts<'a, 'b> {
     pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Delinquent vote account for the delegated stake account
     pub delinquent_vote: &'b solana_account_info::AccountInfo<'a>,
-    /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    /// Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     pub reference_vote: &'b solana_account_info::AccountInfo<'a>,
 }
 
@@ -156,7 +156,7 @@ pub struct DeactivateDelinquentCpi<'a, 'b> {
     pub stake: &'b solana_account_info::AccountInfo<'a>,
     /// Delinquent vote account for the delegated stake account
     pub delinquent_vote: &'b solana_account_info::AccountInfo<'a>,
-    /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    /// Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     pub reference_vote: &'b solana_account_info::AccountInfo<'a>,
 }
 
@@ -276,7 +276,7 @@ impl<'a, 'b> DeactivateDelinquentCpiBuilder<'a, 'b> {
         self.instruction.delinquent_vote = Some(delinquent_vote);
         self
     }
-    /// Reference vote account that has voted at least once in the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
+    /// Reference vote account that has voted in each of the last `MINIMUM_DELINQUENT_EPOCHS_FOR_DEACTIVATION` epochs
     #[inline(always)]
     pub fn reference_vote(
         &mut self,
